@@ -15,10 +15,11 @@ export function CustomTabBar({ state, descriptors, navigation }: BottomTabBarPro
   const { unreadCount: notificationUnreadCount } = useGetUnreadCount();
   const chatUnreadCount = useTotalUnreadCount();
 
-  // Filtrar rotas antes do map para manter consistência no índice
+  // Filtrar rotas aninhadas (contêm "/") e rotas específicas que não devem aparecer na tab bar
+  // Isso resolve o problema de tabs extras sendo geradas no build EAS
   const hiddenRoutes = ['rotas-detalhadas'];
   const visibleRoutes = state.routes.filter(
-    (route) => !hiddenRoutes.includes(route.name)
+    (route) => !route.name.includes('/') && !hiddenRoutes.includes(route.name)
   );
 
   return (
