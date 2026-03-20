@@ -1,0 +1,17 @@
+{
+  "folders": [
+    {
+      "path": "../..",
+    },
+    {
+      "path": "../../../agility-frontend-platform",
+    },
+    {
+      "path": "../../../agility-services",
+    },
+    {
+      "path": "../../../agility-frontend-app",
+    },
+  ],
+  "settings": {},
+}

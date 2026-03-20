@@ -1,0 +1,30 @@
+{
+  "cSpell.words": [
+    "Alean",
+    "Atacarejo",
+    "cnpj",
+    "Agility",
+    "Destinatary",
+    "digitable",
+    "Farma",
+    "Maximo",
+    "Mercadao",
+    "newbackground",
+    "noauth",
+    "Portugues",
+    "Pressable",
+    "Putim",
+    "Semar",
+    "Stilus",
+    "Styllus",
+    "telecom",
+    "Villareal",
+    "waze",
+    "zustand"
+  ],
+  "cSpell.enabled": true,
+  "cSpell.language": "en,pt,pt_BR",
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": "explicit"
+  }
+}

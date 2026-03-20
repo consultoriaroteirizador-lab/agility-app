@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" id="prefix__Componente_29_1" width="35.051" height="60.244" data-name="Componente 29 – 1" viewBox="0 0 35.051 60.244">
+    <defs>
+        <style>
+            .prefix__cls-1{fill:#ff7d00}
+        </style>
+    </defs>
+    <circle id="prefix__Elipse_1013" cx="5.477" cy="5.477" r="5.477" class="prefix__cls-1" data-name="Elipse 1013" transform="translate(12.05 49.29)"/>
+    <path id="prefix__Caminho_9113" d="M193.525 128.5A17.545 17.545 0 0 0 176 146.025a4.381 4.381 0 0 0 8.763 0 8.763 8.763 0 1 1 8.763 8.763 4.381 4.381 0 0 0-4.381 4.381v10.953a4.381 4.381 0 0 0 8.763 0V163a17.527 17.527 0 0 0-4.381-34.5z" class="prefix__cls-1" data-name="Caminho 9113" transform="translate(-176 -128.5)"/>
+</svg>

@@ -1,0 +1,9 @@
+<svg id="Nature-Background-HD" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="428" height="926" viewBox="0 0 428 926">
+  <defs>
+    <linearGradient id="linear-gradient" x1="0.5" y1="0.737" x2="0.5" y2="1" gradientUnits="objectBoundingBox">
+      <stop offset="0" stop-color="#272626"/>
+      <stop offset="1" stop-color="#6e6e6e"/>
+    </linearGradient>
+  </defs>
+  <path id="Nature-Background-HD-2" data-name="Nature-Background-HD" d="M0,0H428V926H0Z" fill="url(#linear-gradient)"/>
+</svg>

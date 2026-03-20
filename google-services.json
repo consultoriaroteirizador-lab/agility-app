@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "964800406460",
+    "project_id": "agility-router-app",
+    "storage_bucket": "agility-router-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:964800406460:android:e692d991f83c23121201b9",
+        "android_client_info": {
+          "package_name": "br.com.agility.agilityapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD37dvcqpql_7HmymZ3RbJ-8OXZ1h3-cyE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="106.877" height="95.891" viewBox="0 0 106.877 95.891">
+    <defs>
+        <style>
+            .prefix__cls-1{fill:#d50000}
+        </style>
+    </defs>
+    <g id="prefix__alert" transform="translate(0 -26.315)">
+        <g id="prefix__Grupo_6517" data-name="Grupo 6517" transform="translate(0 26.315)">
+            <g id="prefix__Grupo_6516" data-name="Grupo 6516">
+                <path id="prefix__Caminho_9114" d="M105.173 103.355L64.322 32.6a12.568 12.568 0 0 0-21.767 0L1.7 103.355a12.567 12.567 0 0 0 10.884 18.851h81.7a12.567 12.567 0 0 0 10.884-18.851zm-5.423 9.437a6.242 6.242 0 0 1-5.461 3.153h-81.7a6.306 6.306 0 0 1-5.461-9.459l40.85-70.756a6.306 6.306 0 0 1 10.922 0l40.851 70.756a6.242 6.242 0 0 1-.001 6.306z" class="prefix__cls-1" data-name="Caminho 9114" transform="translate(0 -26.315)"/>
+            </g>
+        </g>
+        <g id="prefix__Grupo_6519" data-name="Grupo 6519" transform="translate(50.307 57.563)">
+            <g id="prefix__Grupo_6518" data-name="Grupo 6518">
+                <path id="prefix__Retângulo_2779" d="M0 0H6.261V31.308H0z" class="prefix__cls-1" data-name="Retângulo 2779"/>
+            </g>
+        </g>
+        <g id="prefix__Grupo_6521" data-name="Grupo 6521" transform="translate(49.264 95.133)">
+            <g id="prefix__Grupo_6520" data-name="Grupo 6520">
+                <path id="prefix__Caminho_9115" d="M240.177 355.99a4.174 4.174 0 1 0 4.174 4.174 4.179 4.179 0 0 0-4.174-4.174z" class="prefix__cls-1" data-name="Caminho 9115" transform="translate(-236.002 -355.99)"/>
+            </g>
+        </g>
+    </g>
+</svg>

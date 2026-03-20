@@ -1,0 +1,19 @@
+{
+	"folders": [
+		{
+			"path": "../../../../../../../../../../agility-frontend-app"
+		},
+		{
+			"path": "../../../../../../../../../../agility-frontend-platform"
+		},
+		{
+			"path": "../../../../../../../../../../../back-atual/agility-services"
+		},
+		{
+			"path": "../../../../../../../../.."
+		}
+	],
+	"settings": {
+		"java.configuration.updateBuildConfiguration": "interactive"
+	}
+}

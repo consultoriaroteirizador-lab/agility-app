@@ -1,0 +1,191 @@
+{
+    "success": true,
+    "message": null,
+    "result": [
+        {
+            "invoiceCode": 123968200,
+            "dueDate": "2025-09-03T00:00:00",
+            "totalPayable": 414.42,
+            "minimumPayable": 314.99,
+            "totalDue": 0.0,
+            "closed": "S",
+            "digitableLine": "23793.15225 60020.770032 15032.433904 1 00000000000000",
+            "status": null,
+            "invoiceMovements": [
+                {
+                    "release": "FATURA ANTERIOR",
+                    "date": "2025-08-03T00:00:00-03:00",
+                    "value": 290.13,
+                    "signal": "+",
+                    "status": "F",
+                    "futureRelease": "N"
+                },
+                {
+                    "release": "99* ",
+                    "date": "2025-08-04T00:00:00-03:00",
+                    "value": 7.9,
+                    "signal": "+",
+                    "status": "F",
+                    "futureRelease": "N"
+                },
+                {
+                    "release": "ENCARGOS DE ROTATIVO",
+                    "date": "2025-08-25T00:00:00-03:00",
+                    "value": 68.9,
+                    "signal": "+",
+                    "status": "F",
+                    "futureRelease": "N"
+                },
+                {
+                    "release": "JUROS DE MORA",
+                    "date": "2025-08-25T00:00:00-03:00",
+                    "value": 3.0,
+                    "signal": "+",
+                    "status": "F",
+                    "futureRelease": "N"
+                },
+                {
+                    "release": "MULTA DE MORA",
+                    "date": "2025-08-25T00:00:00-03:00",
+                    "value": 5.8,
+                    "signal": "+",
+                    "status": "F",
+                    "futureRelease": "N"
+                },
+                {
+                    "release": "IOF DE ROTATIVO",
+                    "date": "2025-08-25T00:00:00-03:00",
+                    "value": 1.81,
+                    "signal": "+",
+                    "status": "F",
+                    "futureRelease": "N"
+                },
+                {
+                    "release": "TARIFA DE ACIONAMENTO",
+                    "date": "2025-08-25T00:00:00-03:00",
+                    "value": 9.99,
+                    "signal": "+",
+                    "status": "F",
+                    "futureRelease": "N"
+                },
+                {
+                    "release": "SMS ALERTA",
+                    "date": "2025-08-25T00:00:00-03:00",
+                    "value": 6.99,
+                    "signal": "+",
+                    "status": "F",
+                    "futureRelease": "N"
+                },
+                {
+                    "release": "ANUIDADE DM",
+                    "date": "2025-08-25T00:00:00-03:00",
+                    "value": 19.9,
+                    "signal": "+",
+                    "status": "F",
+                    "futureRelease": "N"
+                }
+            ]
+        },
+        {
+            "invoiceCode": 122723297,
+            "dueDate": "2025-08-03T00:00:00",
+            "totalPayable": 290.13,
+            "minimumPayable": 58.03,
+            "totalDue": 0.0,
+            "closed": "S",
+            "digitableLine": "",
+            "status": null,
+            "invoiceMovements": [
+                {
+                    "release": "FATURA ANTERIOR",
+                    "date": "2025-07-03T00:00:00-03:00",
+                    "value": 320.58,
+                    "signal": "+",
+                    "status": "F",
+                    "futureRelease": "N"
+                },
+                {
+                    "release": "PAGAMENTOS EFETUADOS",
+                    "date": "2025-06-29T00:00:00-03:00",
+                    "value": 320.58,
+                    "signal": "-",
+                    "status": "F",
+                    "futureRelease": "N"
+                },
+                {
+                    "release": "AssinetTech ",
+                    "date": "2025-06-29T00:00:00-03:00",
+                    "value": 9.9,
+                    "signal": "+",
+                    "status": "F",
+                    "futureRelease": "N"
+                },
+                {
+                    "release": "PIX CRÉDITO - TAINA ALVES FERNANDES JERONIMO",
+                    "date": "2025-07-07T00:00:00-03:00",
+                    "value": 150.0,
+                    "signal": "+",
+                    "status": "F",
+                    "futureRelease": "N"
+                },
+                {
+                    "release": "IOF PIX CRÉDITO",
+                    "date": "2025-07-07T00:00:00-03:00",
+                    "value": 0.9,
+                    "signal": "+",
+                    "status": "F",
+                    "futureRelease": "N"
+                },
+                {
+                    "release": "JUROS PIX CRÉDITO",
+                    "date": "2025-07-07T00:00:00-03:00",
+                    "value": 10.55,
+                    "signal": "+",
+                    "status": "F",
+                    "futureRelease": "N"
+                },
+                {
+                    "release": "RECARGA CELULAR",
+                    "date": "2025-07-14T00:00:00-03:00",
+                    "value": 30.0,
+                    "signal": "+",
+                    "status": "F",
+                    "futureRelease": "N"
+                },
+                {
+                    "release": "NETFLIX ENTRETENIMENTO ",
+                    "date": "2025-07-16T00:00:00-03:00",
+                    "value": 59.9,
+                    "signal": "+",
+                    "status": "F",
+                    "futureRelease": "N"
+                },
+                {
+                    "release": "ANUIDADE DM",
+                    "date": "2025-07-25T00:00:00-03:00",
+                    "value": 19.9,
+                    "signal": "+",
+                    "status": "F",
+                    "futureRelease": "N"
+                },
+                {
+                    "release": "TAXA DE COMODIDADE - CELULAR",
+                    "date": "2025-07-25T00:00:00-03:00",
+                    "value": 1.99,
+                    "signal": "+",
+                    "status": "F",
+                    "futureRelease": "N"
+                },
+                {
+                    "release": "SMS ALERTA",
+                    "date": "2025-07-25T00:00:00-03:00",
+                    "value": 6.99,
+                    "signal": "+",
+                    "status": "F",
+                    "futureRelease": "N"
+                }
+            ]
+        }
+    ],
+    "error": null
+}
