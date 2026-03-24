@@ -88,7 +88,7 @@ export default function SuporteScreen() {
           <Text preset="text18" color="primary100">←</Text>
         </TouchableOpacityBox>
         <Box flex={1}>
-          <Text preset="text20" fontWeight="600" color="colorTextPrimary">
+          <Text preset="text20" fontWeightPreset='bold' color="colorTextPrimary">
             Suporte
           </Text>
         </Box>
@@ -207,7 +207,7 @@ export default function SuporteScreen() {
               >
                 <Box flexDirection="row" justifyContent="space-between" alignItems="flex-start" mb="y4">
                   <Box flex={1}>
-                    <Text preset="text15" fontWeight="500" color="colorTextPrimary" numberOfLines={1}>
+                    <Text preset="text15" fontWeightPreset='semibold' color="colorTextPrimary" numberOfLines={1}>
                       {subject}
                     </Text>
                   </Box>
@@ -219,7 +219,7 @@ export default function SuporteScreen() {
                       py="y4"
                       alignItems="center"
                     >
-                      <Text preset="text12" fontWeight="600" color="white">
+                      <Text preset="text12" fontWeightPreset='bold' color="white">
                         {unreadCount > 99 ? '99+' : unreadCount}
                       </Text>
                     </Box>

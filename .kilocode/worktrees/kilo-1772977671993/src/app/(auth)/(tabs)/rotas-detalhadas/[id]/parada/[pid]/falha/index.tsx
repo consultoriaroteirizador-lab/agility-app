@@ -40,10 +40,10 @@ export default function FalhaScreen() {
       // Invalidar queries relacionadas
       queryClient.invalidateQueries({ queryKey: [KEY_SERVICES, serviceId] });
       queryClient.invalidateQueries({ queryKey: [KEY_SERVICES, 'routing', rotaId] });
-      
+
       // Aguardar refetch explícito para garantir que os dados sejam atualizados
       await queryClient.refetchQueries({ queryKey: [KEY_SERVICES, 'routing', rotaId] });
-      
+
       // Navegar de volta para a rota após atualizar os dados
       // Pequeno delay para garantir que a UI seja atualizada
       setTimeout(() => {
@@ -172,7 +172,7 @@ export default function FalhaScreen() {
               <Text preset="text18" color="primary100">←</Text>
             </TouchableOpacityBox>
             <Box flex={1}>
-              <Text preset="text18" fontWeight="500" color="colorTextPrimary" textAlign="center">
+              <Text preset="text18" fontWeightPreset='semibold' color="colorTextPrimary" textAlign="center">
                 Registrar insucesso
               </Text>
             </Box>
@@ -183,7 +183,7 @@ export default function FalhaScreen() {
         <Box px="x16" gap="y24" pt="y16">
           {/* Seleção de motivo */}
           <Box>
-            <Text preset="text16" fontWeight="500" color="colorTextPrimary" mb="y12">
+            <Text preset="text16" fontWeightPreset='semibold' color="colorTextPrimary" mb="y12">
               Motivo do insucesso *
             </Text>
             <Box gap="y8">
@@ -224,7 +224,7 @@ export default function FalhaScreen() {
 
           {/* Campo de observações */}
           <Box>
-            <Text preset="text16" fontWeight="500" color="colorTextPrimary" mb="y8">
+            <Text preset="text16" fontWeightPreset='semibold' color="colorTextPrimary" mb="y8">
               Observações
             </Text>
             <TextInput
@@ -248,7 +248,7 @@ export default function FalhaScreen() {
 
           {/* Fotos */}
           <Box>
-            <Text preset="text16" fontWeight="500" color="colorTextPrimary" mb="y12">
+            <Text preset="text16" fontWeightPreset='semibold' color="colorTextPrimary" mb="y12">
               Fotos (opcional)
             </Text>
             <Box flexDirection="row" gap="x12" flexWrap="wrap" mb="y12">

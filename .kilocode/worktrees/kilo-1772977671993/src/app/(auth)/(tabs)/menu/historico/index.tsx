@@ -21,7 +21,7 @@ function mapStatus(status: RoutingStatus): string {
 
 export default function HistoricoRotasScreen() {
   const router = useRouter();
-  
+
   // Buscar apenas rotas concluídas ou canceladas
   const { routings, isLoading } = useFindMyRoutings({
     status: RoutingStatus.COMPLETED,
@@ -56,7 +56,7 @@ export default function HistoricoRotasScreen() {
           <Text preset="text18" color="primary100">←</Text>
         </TouchableOpacityBox>
         <Box flex={1}>
-          <Text preset="text20" fontWeight="600" color="colorTextPrimary">
+          <Text preset="text20" fontWeightPreset='bold' color="colorTextPrimary">
             Histórico de Rotas
           </Text>
         </Box>
@@ -108,7 +108,7 @@ export default function HistoricoRotasScreen() {
               }}
             >
               <Box flexDirection="row" justifyContent="space-between" alignItems="center" mb="y12">
-                <Text preset="text16" fontWeight="500" color="colorTextPrimary">
+                <Text preset="text16" fontWeightPreset='semibold' color="colorTextPrimary">
                   {rota.name || `Rota ${rota.code || rota.id}`}
                 </Text>
                 <Text
@@ -117,8 +117,8 @@ export default function HistoricoRotasScreen() {
                     rota.status === RoutingStatus.COMPLETED
                       ? 'greenSuccess'
                       : rota.status === RoutingStatus.CANCELLED
-                      ? 'redError'
-                      : 'gray400'
+                        ? 'redError'
+                        : 'gray400'
                   }
                 >
                   {status}

@@ -294,7 +294,7 @@ function ChatCard({ chat }: { chat: Chat }) {
           Protocolo: {ticket.ticketNumber}
         </Text>
       )}
-      <Text preset="text15" fontWeight="500">
+      <Text preset="text15" fontWeightPreset='semibold'>
         {chat.subject || 'Conversa de suporte'}
       </Text>
       {/* ... resto do card */}
@@ -316,7 +316,7 @@ const { ticket } = useGetTicketByChatId(chatId)
 
 // No header
 <Box flexDirection="row" alignItems="center">
-  <Text preset="text18" fontWeight="600">
+  <Text preset="text18" fontWeightPreset='bold'>
     {ticket?.ticketNumber
       ? `Protocolo: ${ticket.ticketNumber}`
       : 'Suporte'}

@@ -1,6 +1,7 @@
 
 import { measure, TextVariantsPreset } from '@/theme';
 
+import { ActivityIndicator } from '../ActivityIndicator/ActivityIndicator';
 import { Icon, IconNameMaterial } from '../Icon/Icon';
 import {
   TouchableOpacityBox,
@@ -18,6 +19,7 @@ interface ButtonProps extends TouchableOpacityBoxProps {
   iconName?: IconNameMaterial;
   preset?: ButtonPreset;
   disabled?: boolean;
+  isLoading?: boolean
 }
 
 export function Button({
@@ -26,6 +28,7 @@ export function Button({
   presetText = 'textLabelButton',
   preset = 'main',
   disabled,
+  isLoading = false,
   ...TouchableOpacityBoxProps
 }: ButtonProps) {
   const buttonPreset = buttonPresets[preset]?.[disabled ? 'disabled' : 'default'];
@@ -49,13 +52,18 @@ export function Button({
       {...(buttonPreset.container || {})}
       {...TouchableOpacityBoxProps}
     >
-      {iconName && <Icon color={preset === 'main' ? 'white' : 'primary100'} name={iconName!} />}
-      <Text
-        preset={presetText}
-        color={buttonPreset.content}>
-        {title}
-      </Text>
-
+      {isLoading ? (
+        <ActivityIndicator />
+      ) : (
+        <>
+          {iconName && <Icon color={preset === 'main' ? 'white' : 'primary100'} name={iconName!} />}
+          <Text
+            preset={presetText}
+            color={buttonPreset.content}>
+            {title}
+          </Text>
+        </>
+      )}
     </TouchableOpacityBox>
   );
 }

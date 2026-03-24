@@ -146,7 +146,7 @@ export default function OfertaDetalhadaScreen() {
                 )}
               </Box>
               <Box flex={1} backgroundColor="white" borderRadius="s12" p="y16" borderWidth={measure.m1} borderColor="gray200">
-                <Text preset="text14" fontWeight="500" color="colorTextPrimary" mb="y4">
+                <Text preset="text14" fontWeightPreset='semibold' color="colorTextPrimary" mb="y4">
                   {parada.tipo}
                 </Text>
                 <Text preset="text13" color="gray400">

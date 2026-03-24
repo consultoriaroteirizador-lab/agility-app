@@ -12,6 +12,12 @@
     {
       "path": "../../../agility-frontend-app",
     },
+    {
+      "path": "../../../../../Documents/Conlife/GitLab/conlife-identity",
+    },
+    {
+      "path": "../../../../../Documents/Conlife/GitLab/Front/Conlife-App",
+    },
   ],
   "settings": {},
 }

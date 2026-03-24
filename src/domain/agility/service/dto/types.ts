@@ -46,5 +46,15 @@ export interface VehicleRequirements {
     minimalSeats?: string
 }
 
+/**
+ * Payment method types for COD (Cash on Delivery)
+ */
+export enum PaymentMethodType {
+    CASH = 'CASH',               // Dinheiro
+    PIX = 'PIX',                 // PIX
+    CARD_DEBIT = 'CARD_DEBIT',   // Cartão de débito
+    CARD_CREDIT = 'CARD_CREDIT', // Cartão de crédito
+}
+
 
 

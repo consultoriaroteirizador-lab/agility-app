@@ -191,7 +191,7 @@ function OfertaCard({ oferta, onPress, onAceitar, isAccepting }: OfertaCardProps
         justifyContent="space-between"
       >
         <Box>
-          <Text preset="text14" color="colorTextPrimary" fontWeight="500">
+          <Text preset="text14" color="colorTextPrimary" fontWeightPreset='semibold'>
             Percurso
           </Text>
           <Text preset="text13" color="gray400" mt="y2">

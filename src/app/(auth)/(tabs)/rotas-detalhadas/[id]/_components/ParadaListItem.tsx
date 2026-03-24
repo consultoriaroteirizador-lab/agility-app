@@ -175,14 +175,14 @@ export function ParadaListItem({
                         alignSelf="flex-start"
                         marginBottom="y4"
                     >
-                        <Text preset="text10" fontWeight="600" color="gray600">
+                        <Text preset="text10" fontWeightPreset='bold' color="gray600">
                             {parada.tipo.toUpperCase()}
                         </Text>
                     </Box>
                     <Text
                         preset="text14"
                         color="gray600"
-                        fontWeight="600"
+                        fontWeightPreset='bold'
                         numberOfLines={2}
                         ellipsizeMode="tail"
                     >

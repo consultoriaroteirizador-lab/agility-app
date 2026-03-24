@@ -118,7 +118,7 @@ export default function OfertasScreen() {
               }}
             >
               <Box flexDirection="row" justifyContent="space-between" alignItems="center" mb="y12">
-                <Text preset="text16" color="colorTextPrimary" fontWeight="500">
+                <Text preset="text16" color="colorTextPrimary" fontWeightPreset='semibold'>
                   Oferta #{oferta.id.slice(0, 8)}
                 </Text>
                 <Box bg="primary100" px="x16" py="y4" borderRadius="s20">

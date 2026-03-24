@@ -131,7 +131,7 @@ export default function TentativaEntregaScreen() {
             <Text preset="text18" color="primary100">←</Text>
           </TouchableOpacityBox>
           <Box flex={1}>
-            <Text preset="text18" fontWeight="500" color="colorTextPrimary" textAlign="center">
+            <Text preset="text18" fontWeightPreset='semibold' color="colorTextPrimary" textAlign="center">
               Tentativa de entrega
             </Text>
           </Box>

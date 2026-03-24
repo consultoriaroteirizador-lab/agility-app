@@ -129,7 +129,7 @@ export default function ProtocoloDetalhesScreen() {
             mb="y24"
             alignSelf="flex-start"
           >
-            <Text preset="text14" color="white" fontWeight="600">
+            <Text preset="text14" color="white" fontWeightPreset='bold'>
               {status}
             </Text>
           </Box>
@@ -141,7 +141,7 @@ export default function ProtocoloDetalhesScreen() {
                 <Text preset="text13" color="gray600" mb="y4">
                   Assunto:
                 </Text>
-                <Text preset="text15" color="colorTextPrimary" fontWeight="500">
+                <Text preset="text15" color="colorTextPrimary" fontWeightPreset='semibold'>
                   {ticket.subject}
                 </Text>
               </Box>
@@ -200,7 +200,7 @@ export default function ProtocoloDetalhesScreen() {
               borderWidth={measure.m1}
               borderColor="primary100"
             >
-              <Text preset="text16" fontWeight="600" color="primary100" mb="y8">
+              <Text preset="text16" fontWeightPreset='bold' color="primary100" mb="y8">
                 Transferência do Protocolo
               </Text>
               <Text preset="text14" color="gray700">

@@ -176,7 +176,7 @@ function MessageItem({ item, prevItem, isOwnMessage }: MessageItemProps) {
             gap="x8"
           >
             <Text preset="text20">📄</Text>
-            <Text preset="text13" color={isOwn ? 'white' : 'primary100'} fontWeight="500">
+            <Text preset="text13" color={isOwn ? 'white' : 'primary100'} fontWeightPreset='semibold'>
               Ver anexo
             </Text>
           </TouchableOpacityBox>
@@ -578,7 +578,7 @@ export default function SuporteChatPage() {
     <ScreenBase
       buttonLeft={<ButtonBack />}
       title={
-        <Text preset="text16" fontWeight="600" color="colorTextPrimary">
+        <Text preset="text16" fontWeightPreset='bold' color="colorTextPrimary">
           {headerTitle}
         </Text>
       }
@@ -609,7 +609,7 @@ export default function SuporteChatPage() {
               <Text
                 preset="text12"
                 color={isChatClosed ? 'gray700' : 'gray600'}
-                fontWeight="500"
+                fontWeightPreset='semibold'
               >
                 {isChatClosed ? 'Finalizado' : 'Em aberto'}
               </Text>

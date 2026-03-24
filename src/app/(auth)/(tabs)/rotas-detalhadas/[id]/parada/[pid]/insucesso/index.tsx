@@ -218,7 +218,7 @@ export default function FalhaScreen() {
 
           <Box gap="y24" pt="y16">
             <Box>
-              <Text preset="text16" fontWeight="500" color="colorTextPrimary" mb="y12">
+              <Text preset="text16" fontWeightPreset='semibold' color="colorTextPrimary" mb="y12">
                 Motivo do insucesso *
               </Text>
               <Box gap="y8">
@@ -258,7 +258,7 @@ export default function FalhaScreen() {
             </Box>
 
             <Box>
-              <Text preset="text16" fontWeight="500" color="colorTextPrimary" mb="y8">
+              <Text preset="text16" fontWeightPreset='semibold' color="colorTextPrimary" mb="y8">
                 Observações
               </Text>
               <Input
@@ -273,7 +273,7 @@ export default function FalhaScreen() {
             </Box>
 
             <Box>
-              <Text preset="text16" fontWeight="500" color="colorTextPrimary" mb="y12">
+              <Text preset="text16" fontWeightPreset='semibold' color="colorTextPrimary" mb="y12">
                 Fotos (opcional)
               </Text>
               <Box flexDirection="row" gap="x12" flexWrap="wrap" mb="y12">

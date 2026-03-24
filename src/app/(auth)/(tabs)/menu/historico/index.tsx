@@ -87,7 +87,7 @@ function RouteCard({ rota, onPress }: RouteCardProps) {
       onPress={onPress}
     >
       <Box flexDirection="row" justifyContent="space-between" alignItems="center" mb="y12" gap="x8">
-        <Text preset="text16" fontWeight="500" color="colorTextPrimary" flex={1} numberOfLines={2}>
+        <Text preset="text16" fontWeightPreset='semibold' color="colorTextPrimary" flex={1} numberOfLines={2}>
           {rota.name ?? `Rota ${rota.code ?? rota.id}`}
         </Text>
         <Text preset="text13" color={getStatusColor(rota.status)} flexShrink={0}>
@@ -118,7 +118,7 @@ export default function HistoricoRotasScreen() {
     <ScreenBase
       buttonLeft={<ButtonBack />}
       title={
-        <Text preset="textTitleScreen" fontWeight="600" color="colorTextPrimary">
+        <Text preset="textTitleScreen" fontWeightPreset='bold' color="colorTextPrimary">
           Histórico de Rotas
         </Text>
       }

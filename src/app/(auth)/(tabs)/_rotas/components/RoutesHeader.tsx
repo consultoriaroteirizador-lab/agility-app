@@ -17,7 +17,7 @@ function RoutesHeaderComponent({
         <>
             <Box flexDirection="row" justifyContent="space-between" alignItems="flex-start" mb="y12">
                 <Box>
-                    <Text preset="text20" fontWeight="500" color="colorTextPrimary">
+                    <Text preset="text20" fontWeightPreset='semibold' color="colorTextPrimary">
                         {title}
                     </Text>
                     <Text preset="text16" color="gray400" mt="y4">

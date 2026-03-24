@@ -273,7 +273,7 @@ export default function StopDetailScreen() {
       <Box flexDirection="row" justifyContent="space-between" alignItems="center">
         <Box flexDirection="row" alignItems="center" gap="x8">
           <Box width={18} height={18} backgroundColor="gray300" borderRadius="s9" />
-          <Text preset="text15" fontWeight="500" color="colorTextPrimary">
+          <Text preset="text15" fontWeightPreset='semibold' color="colorTextPrimary">
             {customerName}
           </Text>
           {service.identificationCode && (
@@ -295,7 +295,7 @@ export default function StopDetailScreen() {
               router.push('/(auth)/(tabs)/menu/chat');
             }}
           >
-            <LocalIcon iconName="chat" size={20} color="primary100" />
+            <LocalIcon iconName="chat" size={measure.m20} color="primary100" />
           </TouchableOpacityBox>
 
           {/* Phone button */}
@@ -311,7 +311,7 @@ export default function StopDetailScreen() {
                 Linking.openURL(`tel:${service.clientPhone}`);
               }}
             >
-              <LocalIcon iconName="phone" size={20} color="tertiary100" />
+              <LocalIcon iconName="phone" size={measure.m20} color="tertiary100" />
             </TouchableOpacityBox>
           ) : null}
         </Box>
@@ -327,7 +327,7 @@ export default function StopDetailScreen() {
       {/* Observation/Notes */}
       {service.problemDescription && (
         <Box>
-          <Text preset="text14" fontWeight="600" color="gray600" mb="y8">
+          <Text preset="text14" fontWeightPreset='bold' color="gray600" mb="y8">
             Observação
           </Text>
           <Box backgroundColor="gray50" p="y12" borderRadius="s12">
@@ -365,7 +365,7 @@ export default function StopDetailScreen() {
       scrollable
       buttonLeft={<ButtonBack />}
       title={
-        <Text preset="text16" fontWeight="500" color="colorTextPrimary" textAlign="center" numberOfLines={2}>
+        <Text preset="text16" fontWeightPreset='semibold' color="colorTextPrimary" textAlign="center" numberOfLines={2}>
           {addressText}
         </Text>
       }

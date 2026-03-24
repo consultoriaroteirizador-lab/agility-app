@@ -15,7 +15,7 @@ export default function OfertaDetalhadaScreen() {
 
   const { routing, isLoading: isLoadingRouting } = useFindOneRouting(routingId);
   const { services, isLoading: isLoadingServices } = useFindServicesByRoutingId(routingId);
-  
+
   const { acceptRouting, isLoading: isAccepting } = useAcceptRouting({
     onSuccess: (data) => {
       setShowSuccess(true);
@@ -43,7 +43,7 @@ export default function OfertaDetalhadaScreen() {
 
   const paradas = useMemo(() => {
     if (!services || services.length === 0) return [];
-    
+
     const sorted = [...services].sort((a, b) => {
       const orderA = a.sequenceOrder ?? 999;
       const orderB = b.sequenceOrder ?? 999;
@@ -126,7 +126,7 @@ export default function OfertaDetalhadaScreen() {
         <TouchableOpacityBox onPress={() => router.back()} mr="x12">
           <Text preset="text18" color="primary100">←</Text>
         </TouchableOpacityBox>
-        <Text preset="text18" fontWeight="500" color="colorTextPrimary">
+        <Text preset="text18" fontWeightPreset='semibold' color="colorTextPrimary">
           Rota
         </Text>
       </Box>
@@ -215,7 +215,7 @@ export default function OfertaDetalhadaScreen() {
               )}
             </Box>
             <Box flex={1} bg="white" borderRadius="s12" p="y16" borderWidth={measure.m1} borderColor="gray200">
-              <Text preset="text14" fontWeight="500" color="colorTextPrimary" mb="y4">
+              <Text preset="text14" fontWeightPreset='semibold' color="colorTextPrimary" mb="y4">
                 {parada.tipo}
               </Text>
               <Text preset="text13" color="gray400">
@@ -248,7 +248,7 @@ export default function OfertaDetalhadaScreen() {
           position="absolute"
           top={measure.t0}
           left={measure.l0}
-         right={measure.r0}
+          right={measure.r0}
           bottom={measure.b0}
           bg="blackOpaque"
           justifyContent="center"
@@ -256,7 +256,7 @@ export default function OfertaDetalhadaScreen() {
           zIndex={1000}
         >
           <Box bg="white" borderRadius="s16" p="y24" width="85%" maxWidth={measure.x340}>
-            <Text preset="text18" fontWeight="600" color="colorTextPrimary" mb="y8">
+            <Text preset="text18" fontWeightPreset='bold' color="colorTextPrimary" mb="y8">
               Aceitar oferta
             </Text>
             <Text preset="text14" color="gray600" mb="y24">
@@ -288,7 +288,7 @@ export default function OfertaDetalhadaScreen() {
           position="absolute"
           top={measure.t0}
           left={measure.l0}
-         right={measure.r0}
+          right={measure.r0}
           bottom={measure.b0}
           bg="primary100"
           justifyContent="center"

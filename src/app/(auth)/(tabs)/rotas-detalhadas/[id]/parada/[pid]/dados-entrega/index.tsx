@@ -390,7 +390,7 @@ export default function DadosEntregaScreen() {
         />
       }
       title={
-        <Text preset="text16" fontWeight="500" color="colorTextPrimary" textAlign="center" numberOfLines={2}>
+        <Text preset="text16" fontWeightPreset='semibold' color="colorTextPrimary" textAlign="center" numberOfLines={2}>
           {endereco}
         </Text>
       }
@@ -431,7 +431,7 @@ export default function DadosEntregaScreen() {
                 borderColor="primary100"
                 onPress={() => setNavModalVisible(true)}
               >
-                <LocalIcon iconName="location" size={24} color="primary100" />
+                <LocalIcon iconName="location" size={measure.m24} color="primary100" />
               </TouchableOpacityBox>
             </Box>
           )}
@@ -443,7 +443,7 @@ export default function DadosEntregaScreen() {
             <Box flexDirection="row" alignItems="center" gap="x8" marginBottom="y8">
               <Box width={measure.x36} height={measure.y36} backgroundColor="gray300" borderRadius="s18" />
               <Box flex={1}>
-                <Text preset="text15" fontWeight="500" color="colorTextPrimary">
+                <Text preset="text15" fontWeightPreset='semibold' color="colorTextPrimary">
                   {nomeCliente}
                 </Text>
                 {service?.identificationCode && (
@@ -464,7 +464,7 @@ export default function DadosEntregaScreen() {
 
             {service?.problemDescription && (
               <Box marginTop="y12">
-                <Text preset="text13" fontWeight="500" color="gray600" marginBottom="y4">Observacao</Text>
+                <Text preset="text13" fontWeightPreset='semibold' color="gray600" marginBottom="y4">Observacao</Text>
                 <Text preset="text13" color="gray700">{service.problemDescription}</Text>
               </Box>
             )}
@@ -598,7 +598,7 @@ export default function DadosEntregaScreen() {
         />
       }
       title={
-        <Text preset="text16" fontWeight="500" color="colorTextPrimary" textAlign="center" numberOfLines={2}>
+        <Text preset="text16" fontWeightPreset='semibold' color="colorTextPrimary" textAlign="center" numberOfLines={2}>
           {endereco}
         </Text>
       }
@@ -633,7 +633,7 @@ export default function DadosEntregaScreen() {
                 borderColor="primary100"
                 onPress={() => setNavModalVisible(true)}
               >
-                <LocalIcon iconName="location" size={24} color="primary100" />
+                <LocalIcon iconName="location" size={measure.m24} color="primary100" />
               </TouchableOpacityBox>
             </Box>
           )}
@@ -645,7 +645,7 @@ export default function DadosEntregaScreen() {
             <Box flexDirection="row" alignItems="center" gap="x8">
               <Box width={measure.x36} height={measure.y36} backgroundColor="gray300" borderRadius="s18" />
               <Box flex={1}>
-                <Text preset="text15" fontWeight="500" color="colorTextPrimary">
+                <Text preset="text15" fontWeightPreset='semibold' color="colorTextPrimary">
                   {nomeCliente}
                 </Text>
                 {service?.identificationCode && (
@@ -781,7 +781,7 @@ export default function DadosEntregaScreen() {
         />
       }
       title={
-        <Text preset="text16" fontWeight="500" color="colorTextPrimary" textAlign="center">
+        <Text preset="text16" fontWeightPreset='semibold' color="colorTextPrimary" textAlign="center">
           Dados do recebedor
         </Text>
       }
@@ -864,7 +864,7 @@ export default function DadosEntregaScreen() {
         />
       }
       title={
-        <Text preset="text16" fontWeight="500" color="colorTextPrimary" textAlign="center">
+        <Text preset="text16" fontWeightPreset='semibold' color="colorTextPrimary" textAlign="center">
           Dados do recebedor
         </Text>
       }
@@ -987,7 +987,7 @@ export default function DadosEntregaScreen() {
         />
       }
       title={
-        <Text preset="text16" fontWeight="500" color="colorTextPrimary" textAlign="center">
+        <Text preset="text16" fontWeightPreset='semibold' color="colorTextPrimary" textAlign="center">
           Dados do recebedor
         </Text>
       }

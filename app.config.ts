@@ -114,7 +114,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   extra: {
     router: {},
     eas: {
-      projectId: 'e28f66e5-a4de-455f-a356-ee3d3e78e1bc',
+      projectId: '38a03953-d99c-4fbd-b51e-03fc7f397345',
     },
     appEnv: process.env.APP_ENV || 'development',
     apiKey: process.env.API_KEY || '',

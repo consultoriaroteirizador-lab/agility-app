@@ -121,7 +121,7 @@ export function ColetaEtapaConfirmacao() {
                                             router.push('/(auth)/(tabs)/menu/suporte');
                                         }}
                                     >
-                                        <Icon name="chat" size={20} color="white" />
+                                        <Icon name="chat" size={measure.m20} color="white" />
                                     </TouchableOpacityBox>
 
                                     {/* Botão de Telefone */}
@@ -137,7 +137,7 @@ export function ColetaEtapaConfirmacao() {
                                                 Linking.openURL(`tel:${service.clientPhone}`);
                                             }}
                                         >
-                                            <Icon name="phone" size={20} color="white" />
+                                            <Icon name="phone" size={measure.m20} color="white" />
                                         </TouchableOpacityBox>
                                     )}
                                 </Box>

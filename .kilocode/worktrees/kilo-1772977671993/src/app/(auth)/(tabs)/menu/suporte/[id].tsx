@@ -6,21 +6,21 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { jwtDecode } from 'jwt-decode';
 
-import { 
-  ActivityIndicator, 
-  Box, 
-  Text, 
-  TouchableOpacityBox, 
-  ChatInput, 
-  ChatAttachmentView 
+import {
+  ActivityIndicator,
+  Box,
+  Text,
+  TouchableOpacityBox,
+  ChatInput,
+  ChatAttachmentView
 } from '@/components';
-import { 
-  ChatMessage, 
-  useGetChatMessages, 
-  usePostMessage, 
+import {
+  ChatMessage,
+  useGetChatMessages,
+  usePostMessage,
   useChatWebSocket,
   useChatAttachmentUpload,
-  postMessageService 
+  postMessageService
 } from '@/domain/agility/chat';
 import { getChatService, markChatReadService } from '@/domain/agility/chat/chatService';
 import { KEY_CHATS } from '@/domain/queryKeys';
@@ -41,10 +41,10 @@ function formatChatDate(date: Date | string): string {
   const hoje = new Date();
   const ontem = new Date(hoje);
   ontem.setDate(ontem.getDate() - 1);
-  
+
   if (d.toDateString() === hoje.toDateString()) return "Hoje";
   if (d.toDateString() === ontem.toDateString()) return "Ontem";
-  
+
   return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
@@ -58,7 +58,7 @@ export default function SuporteChatPage() {
   const { id } = useLocalSearchParams();
   const chatId = id ? String(id) : undefined;
   const queryClient = useQueryClient();
-  
+
   const { userAuth, authCredentials } = useAuthCredentialsService();
   const [currentUserSenderId, setCurrentUserSenderId] = useState<string | null>(null);
   const [chatInfo, setChatInfo] = useState<any>(null);
@@ -67,7 +67,7 @@ export default function SuporteChatPage() {
 
   // Buscar mensagens do chat
   const { messages: messagesFromAPI, isLoading: isLoadingMessages, refetch: refetchMessages } = useGetChatMessages(chatId);
-  
+
   // Estado local para mensagens (incluindo as recebidas via WebSocket)
   const [messages, setMessages] = useState<ChatMessage[]>([]);
 
@@ -93,10 +93,10 @@ export default function SuporteChatPage() {
           const chat = chatResult.result as any;
           setChatInfo(chat);
           setChatStatus(chat.status || 'ACTIVE');
-          
+
           const participants = (chat.participants as any[]) || [];
           let userId: string | null = null;
-          
+
           // Extrair userId do token
           if (authCredentials?.accessToken) {
             try {
@@ -115,7 +115,7 @@ export default function SuporteChatPage() {
             const pCollaboratorId = p.collaboratorId ? String(p.collaboratorId) : null;
             const pKeycloakUserId = p.keycloakUserId ? String(p.keycloakUserId) : null;
             const normalizedUserId = userId ? String(userId) : null;
-            
+
             return (
               (normalizedUserId && pDriverId === normalizedUserId) ||
               (normalizedUserId && pCollaboratorId === normalizedUserId) ||
@@ -156,7 +156,7 @@ export default function SuporteChatPage() {
       }));
 
       setMessages(formattedMessages);
-      
+
       // Marcar mensagens como lidas
       if (userAuth?.id && chatId) {
         markChatReadService(chatId, userAuth.id).catch(console.error);
@@ -174,13 +174,13 @@ export default function SuporteChatPage() {
       senderId: wsMessage.senderId,
       senderType: wsMessage.senderType,
     });
-    
+
     // Verifica se a mensagem pertence ao chat atual
     if (wsMessage.chatId !== chatId) {
       console.log('[SuporteChatPage] Message filtered out - chatId mismatch');
       return;
     }
-    
+
     console.log('[SuporteChatPage] Processing message for current chat');
 
     // Converte mensagem do WebSocket para o formato usado no componente
@@ -203,7 +203,7 @@ export default function SuporteChatPage() {
       if (exists) {
         return prevMessages;
       }
-      
+
       // Adiciona a nova mensagem e ordena por data
       const updated = [...prevMessages, chatMessage];
       return updated.sort((a, b) => {
@@ -325,13 +325,13 @@ export default function SuporteChatPage() {
   const groupedMessages = messages.reduce((acc: any[], msg: ChatMessage) => {
     const date = formatChatDate(msg.createdAt);
     const lastGroup = acc[acc.length - 1];
-    
+
     if (lastGroup && lastGroup.date === date) {
       lastGroup.messages.push(msg);
     } else {
       acc.push({ date, messages: [msg] });
     }
-    
+
     return acc;
   }, []);
 
@@ -339,13 +339,13 @@ export default function SuporteChatPage() {
   const isChatClosed = chatStatus === 'CLOSED' || chatInfo?.status === 'CLOSED';
 
   // Info do header
-  const headerTitle = chatInfo?.routeId 
-    ? `Rota ${chatInfo.routeId}` 
+  const headerTitle = chatInfo?.routeId
+    ? `Rota ${chatInfo.routeId}`
     : chatInfo?.subject || 'Suporte';
-  const headerSubtitle = chatInfo?.serviceId 
-    ? `Servico #${chatInfo.serviceId}` 
-    : chatInfo?.ticketNumber 
-      ? `Protocolo: ${chatInfo.ticketNumber}` 
+  const headerSubtitle = chatInfo?.serviceId
+    ? `Servico #${chatInfo.serviceId}`
+    : chatInfo?.ticketNumber
+      ? `Protocolo: ${chatInfo.ticketNumber}`
       : (isConnected ? 'Online' : 'Offline');
 
   if (isLoadingMessages) {
@@ -379,7 +379,7 @@ export default function SuporteChatPage() {
               <Text preset="text18" color="primary100">←</Text>
             </TouchableOpacityBox>
             <Box flex={1}>
-              <Text preset="text16" fontWeight="600" color="colorTextPrimary">
+              <Text preset="text16" fontWeightPreset='bold' color="colorTextPrimary">
                 {headerTitle}
               </Text>
               <Box flexDirection="row" alignItems="center" gap="x8">
@@ -389,7 +389,7 @@ export default function SuporteChatPage() {
               </Box>
             </Box>
           </Box>
-          
+
           {/* Status badges */}
           <Box flexDirection="row" alignItems="center" gap="x8" mt="y8">
             <Box
@@ -398,21 +398,21 @@ export default function SuporteChatPage() {
               py="y4"
               borderRadius="s16"
             >
-              <Text 
-                preset="text12" 
+              <Text
+                preset="text12"
                 color={isChatClosed ? "purple700" : "gray600"}
-                fontWeight="500"
+                fontWeightPreset='semibold'
               >
                 {isChatClosed ? 'Finalizado' : 'Em aberto'}
               </Text>
             </Box>
             {isConnected && !isChatClosed && (
               <Box flexDirection="row" alignItems="center" gap="x4">
-                <Box 
-                  width={measure.x8} 
-                  height={measure.y8} 
-                  borderRadius="s4" 
-                  bg="greenSuccess" 
+                <Box
+                  width={measure.x8}
+                  height={measure.y8}
+                  borderRadius="s4"
+                  bg="greenSuccess"
                 />
                 <Text preset="text10" color="greenSuccess">Conectado</Text>
               </Box>
@@ -455,8 +455,8 @@ export default function SuporteChatPage() {
                 const isSameSender = prevMsg && prevMsg.senderId === msg.senderId;
                 const showSenderName = !isOwn && (!isSameSender || msgIndex === 0);
                 const hasAttachment = msg.attachmentUrl;
-                const isImage = msg.attachmentType === 'IMAGE' || 
-                                (msg.attachmentUrl && /\.(jpg|jpeg|png|gif|webp)$/i.test(msg.attachmentUrl));
+                const isImage = msg.attachmentType === 'IMAGE' ||
+                  (msg.attachmentUrl && /\.(jpg|jpeg|png|gif|webp)$/i.test(msg.attachmentUrl));
 
                 return (
                   <Box
@@ -466,8 +466,8 @@ export default function SuporteChatPage() {
                   >
                     {showSenderName && (
                       <Text preset="text12" color="gray500" mb="y4" ml="x12">
-                        {String(msg.senderType).toUpperCase().includes("SUPPORT") || 
-                         String(msg.senderType).toUpperCase().includes("COLLABORATOR") 
+                        {String(msg.senderType).toUpperCase().includes("SUPPORT") ||
+                          String(msg.senderType).toUpperCase().includes("COLLABORATOR")
                           ? "Suporte" : "Voce"}
                       </Text>
                     )}
@@ -490,19 +490,19 @@ export default function SuporteChatPage() {
                         <Box mb="y8" borderRadius="s8" overflow="hidden">
                           <Image
                             source={{ uri: msg.attachmentUrl }}
-                            style={{ 
-                              width: 200, 
-                              height: 150, 
-                              borderRadius: 8 
+                            style={{
+                              width: 200,
+                              height: 150,
+                              borderRadius: 8
                             }}
                             resizeMode="cover"
                           />
                         </Box>
                       )}
-                      
+
                       {/* Anexo - Documento */}
                       {hasAttachment && !isImage && (
-                        <TouchableOpacityBox 
+                        <TouchableOpacityBox
                           mb="y8"
                           bg={isOwn ? "primary80" : "gray100"}
                           borderRadius="s8"
@@ -513,16 +513,16 @@ export default function SuporteChatPage() {
                           gap="x8"
                         >
                           <Text preset="text20">📄</Text>
-                          <Text 
-                            preset="text13" 
+                          <Text
+                            preset="text13"
                             color={isOwn ? "white" : "primary100"}
-                            fontWeight="500"
+                            fontWeightPreset='semibold'
                           >
                             Ver anexo
                           </Text>
                         </TouchableOpacityBox>
                       )}
-                      
+
                       {/* Texto da mensagem */}
                       {msg.content && (
                         <Text
@@ -532,7 +532,7 @@ export default function SuporteChatPage() {
                           {msg.content}
                         </Text>
                       )}
-                      
+
                       {/* Hora */}
                       <Text
                         preset="text12"

@@ -214,7 +214,7 @@ function ConcluidasList({
   const renderSectionHeader = useCallback(
     ({ section }: { section: (typeof sections)[number] }) => (
       <Box marginBottom="y8" marginTop="y16">
-        <Text preset="text15" fontWeight="600" color="gray500">
+        <Text preset="text15" fontWeightPreset='bold' color="gray500">
           {section.title}
         </Text>
         {section.data.length === 0 && (

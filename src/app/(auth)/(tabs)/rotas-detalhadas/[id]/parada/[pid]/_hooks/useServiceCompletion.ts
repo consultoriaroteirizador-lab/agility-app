@@ -43,6 +43,8 @@ export function useServiceCompletion() {
         setShowSuccess,
         resetState,
         photos,
+        paymentAmount,
+        paymentMethod,
     } = useParada();
     const { showToast } = useToastService();
 
@@ -200,6 +202,24 @@ export function useServiceCompletion() {
                 payload.photoProof = photoUrls.length === 1 ? photoUrls[0] : photoUrls.join(',');
             }
 
+            // Adicionar valor de pagamento se o serviço requer cobrança
+            if (service?.requiresPayment && paymentAmount) {
+                // Extrair valor numérico do campo formatado
+                const numericString = paymentAmount.replace(/[R$\s.]/g, '').replace(',', '.');
+                const value = parseFloat(numericString);
+                if (!isNaN(value) && value > 0) {
+                    // Converter para centavos
+                    payload.receivedValue = Math.round(value * 100);
+                }
+            }
+
+            // Adicionar método de pagamento se selecionado
+            if (service?.requiresPayment && paymentMethod) {
+                payload.paymentMethod = paymentMethod;
+            }
+
+            console.log('[useServiceCompletion] Payload a ser enviado:', JSON.stringify(payload, null, 2));
+
             // Verificar se o serviço precisa ser iniciado
             const needsToStart = !service ||
                 (service.status !== ServiceStatus.IN_PROGRESS &&
@@ -295,6 +315,8 @@ export function useServiceCompletion() {
         setShowSuccess,
         resetState,
         photos,
+        paymentAmount,
+        paymentMethod,
     ]);
 
     // Verificar se pode finalizar - validação robusta

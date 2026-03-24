@@ -1,9 +1,8 @@
 import { useState, useMemo } from 'react';
-import { Input } from 'react-native';
 
 import { useRouter } from 'expo-router';
 
-import { ActivityIndicator, Box, Button, ScreenBase, Text, TouchableOpacityBox } from '@/components';
+import { ActivityIndicator, Box, Button, Input, ScreenBase, Text, TouchableOpacityBox } from '@/components';
 import { ButtonBack } from '@/components/Button/ButtonBack';
 import { Dropdown } from '@/components/DropDown/DropDown';
 import { MyItemTypeDropDown } from '@/components/RestyleComponent/RestyleComponent';
@@ -165,7 +164,7 @@ export default function SuporteScreen() {
               borderRadius="s8"
               onPress={handleRetry}
             >
-              <Text preset="text14" fontWeight="600" color="white">
+              <Text preset="text14" fontWeightPreset='bold' color="white">
                 Tentar novamente
               </Text>
             </TouchableOpacityBox>
@@ -175,44 +174,46 @@ export default function SuporteScreen() {
         {/* Dropdown, campo customizado e botões */}
         {!isLoading && !isError && (
           <>
-            <Box mb="y16">
-              <Dropdown
-                title="Assunto"
-                data={subjectOptions}
-                value={selectedSubject}
-                setItemSelected={setSelectedSubject}
-                onChange={(item: MyItemTypeDropDown) => setSelectedSubject(item)}
-                labelField="label"
-                valueField="value"
-                placeholder="Selecione um assunto (opcional)"
-                search={false}
-                selectedItemTextStyle={{ fontSize: measure.f14 }}
-                widthIcon={measure.x20}
-                heightIcon={measure.y20}
-                width={measure.x300}
-              />
-            </Box>
-
-            {selectedSubject?.value === 'custom' && (
-              <Box mb="y16">
-                <Box
-                  borderWidth={measure.m1}
-                  borderColor="gray300"
-                  borderRadius="s12"
-                  px="x12"
-                  py="y8"
-                >
-                  <Input
-                    placeholder="Digite o assunto..."
-                    value={customSubject}
-                    onChangeText={setCustomSubject}
-                    style={{
-                      fontSize: measure.f14,
-                      fontFamily: 'Ubuntu_400Regular',
-                    }}
+            {/* Ocultar assunto quando já houver chamado aberto */}
+            {!(chatAberto && chatAberto.status === ChatStatus.ACTIVE) && (
+              <>
+                <Box mb="y16">
+                  <Dropdown
+                    title="Assunto"
+                    data={subjectOptions}
+                    value={selectedSubject}
+                    setItemSelected={setSelectedSubject}
+                    onChange={(item: MyItemTypeDropDown) => setSelectedSubject(item)}
+                    labelField="label"
+                    valueField="value"
+                    placeholder="Selecione um assunto (opcional)"
+                    search={false}
+                    selectedItemTextStyle={{ fontSize: measure.f14 }}
+                    widthIcon={measure.x20}
+                    heightIcon={measure.y20}
+                    width={measure.x300}
                   />
                 </Box>
-              </Box>
+
+                {selectedSubject?.value === 'custom' && (
+                  <Box mb="y16">
+                    <Box
+                      borderWidth={measure.m1}
+                      borderColor="gray300"
+                      borderRadius="s12"
+                      px="x12"
+                      py="y8"
+                    >
+                      <Input
+                        title='Assunto'
+                        placeholder="Digite o assunto..."
+                        value={customSubject}
+                        onChangeText={setCustomSubject}
+                      />
+                    </Box>
+                  </Box>
+                )}
+              </>
             )}
 
             <Box gap="x12" mb="y24" alignItems="center">

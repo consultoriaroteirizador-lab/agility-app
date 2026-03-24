@@ -1,13 +1,13 @@
 import { useState, useMemo } from 'react';
 import { useRouter } from 'expo-router';
 
-import { 
-  ActivityIndicator, 
-  Box, 
-  Text, 
-  TouchableOpacityBox, 
-  ScrollView, 
-  TextInput 
+import {
+  ActivityIndicator,
+  Box,
+  Text,
+  TouchableOpacityBox,
+  ScrollView,
+  TextInput
 } from '@/components';
 import { TicketStatus } from '@/domain/agility/ticket/dto/types';
 import { useFindTicketsByDriver } from '@/domain/agility/ticket/useCase';
@@ -42,25 +42,25 @@ export default function HistoricoProtocolosScreen() {
   const router = useRouter();
   const { userAuth } = useAuthCredentialsService();
   const [busca, setBusca] = useState('');
-  
+
   // Obter driverId do usuario autenticado
   // O backend aceita keycloakUserId e converte internamente
   const driverId = userAuth?.id;
-  
+
   const { tickets, isLoading } = useFindTicketsByDriver(driverId);
 
   // Filtrar tickets pela busca
   const ticketsFiltrados = useMemo(() => {
     if (!tickets) return [];
     if (!busca.trim()) return tickets;
-    
+
     const buscaLower = busca.toLowerCase();
     return tickets.filter((ticket: any) => {
       const ticketNumber = ticket.ticketNumber?.toLowerCase() || '';
       const subject = ticket.subject?.toLowerCase() || '';
       const description = ticket.description?.toLowerCase() || '';
       const statusLabel = mapStatus(ticket.status).toLowerCase();
-      
+
       return (
         ticketNumber.includes(buscaLower) ||
         subject.includes(buscaLower) ||
@@ -104,7 +104,7 @@ export default function HistoricoProtocolosScreen() {
           <Text preset="text18" color="primary100">←</Text>
         </TouchableOpacityBox>
         <Box flex={1}>
-          <Text preset="text20" fontWeight="600" color="colorTextPrimary">
+          <Text preset="text20" fontWeightPreset='bold' color="colorTextPrimary">
             Historico de Protocolos
           </Text>
         </Box>
@@ -115,10 +115,10 @@ export default function HistoricoProtocolosScreen() {
       </Text>
 
       {/* Barra de Busca */}
-      <Box 
-        flexDirection="row" 
-        alignItems="center" 
-        gap="x12" 
+      <Box
+        flexDirection="row"
+        alignItems="center"
+        gap="x12"
         mb="y24"
       >
         <Box
@@ -157,7 +157,7 @@ export default function HistoricoProtocolosScreen() {
       {!isLoading && ticketsFiltrados.length === 0 && (
         <Box py="y32" alignItems="center">
           <Text preset="text14" color="gray400" textAlign="center">
-            {busca.trim() 
+            {busca.trim()
               ? 'Nenhum protocolo encontrado com essa busca.'
               : 'Nenhum protocolo encontrado.'}
           </Text>
@@ -185,7 +185,7 @@ export default function HistoricoProtocolosScreen() {
                 >
                   <Box flexDirection="row" justifyContent="space-between" alignItems="center" mb="y12">
                     <Box flex={1}>
-                      <Text preset="text16" fontWeight="600" color="colorTextPrimary" mb="y4">
+                      <Text preset="text16" fontWeightPreset='bold' color="colorTextPrimary" mb="y4">
                         {ticket.ticketNumber}
                       </Text>
                       {ticket.subject && (
@@ -201,7 +201,7 @@ export default function HistoricoProtocolosScreen() {
                       borderRadius="s8"
                       ml="x12"
                     >
-                      <Text preset="text12" color="white" fontWeight="500">
+                      <Text preset="text12" color="white" fontWeightPreset='semibold'>
                         {status}
                       </Text>
                     </Box>
@@ -222,7 +222,7 @@ export default function HistoricoProtocolosScreen() {
                       borderWidth={measure.m1}
                       borderColor="orange300"
                     >
-                      <Text preset="text13" fontWeight="600" color="orange700" mb="y4">
+                      <Text preset="text13" fontWeightPreset='bold' color="orange700" mb="y4">
                         Transferencia:
                       </Text>
                       <Text preset="text13" color="gray700" numberOfLines={2}>
@@ -230,7 +230,7 @@ export default function HistoricoProtocolosScreen() {
                       </Text>
                     </Box>
                   )}
-                  
+
                   {ticket.resolutionDescription && (
                     <Box
                       bg="green100"
@@ -238,7 +238,7 @@ export default function HistoricoProtocolosScreen() {
                       p="y12"
                       mt="y8"
                     >
-                      <Text preset="text13" fontWeight="500" color="colorTextPrimary" mb="y4">
+                      <Text preset="text13" fontWeightPreset='semibold' color="colorTextPrimary" mb="y4">
                         Resolucao:
                       </Text>
                       <Text preset="text13" color="gray700" numberOfLines={3}>
@@ -249,7 +249,7 @@ export default function HistoricoProtocolosScreen() {
 
                   {/* Link funcional para chat */}
                   {ticket.chatId && (
-                    <TouchableOpacityBox 
+                    <TouchableOpacityBox
                       mt="y12"
                       flexDirection="row"
                       alignItems="center"
@@ -258,7 +258,7 @@ export default function HistoricoProtocolosScreen() {
                         handleViewChat(ticket.chatId);
                       }}
                     >
-                      <Text preset="text13" color="primary100" fontWeight="500">
+                      <Text preset="text13" color="primary100" fontWeightPreset='semibold'>
                         Ver historico de chat →
                       </Text>
                     </TouchableOpacityBox>

@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 
+import { Ionicons } from '@expo/vector-icons';
 import { format, startOfDay, startOfWeek, startOfMonth, startOfYear, isAfter } from 'date-fns';
 import { useRouter } from 'expo-router';
 
@@ -8,6 +9,7 @@ import { ButtonBack } from '@/components/Button/ButtonBack';
 import Modal from '@/components/Modal/Modal';
 import { useGetPayments } from '@/domain/agility/finance';
 import type { Payment } from '@/domain/agility/finance';
+import { useGetWallet } from '@/domain/agility/wallet';
 import EarningsChart from '@/EarningsChart';
 import { measure } from '@/theme';
 
@@ -50,6 +52,15 @@ export default function GanhosScreen() {
     const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
     const [showPaymentDetail, setShowPaymentDetail] = useState(false);
     const { payments, isLoading: paymentsLoading } = useGetPayments();
+    const { wallet } = useGetWallet();
+
+    const formatCurrency = (valueInCents: number): string => {
+        const value = valueInCents / 100;
+        return new Intl.NumberFormat('pt-BR', {
+            style: 'currency',
+            currency: 'BRL',
+        }).format(value);
+    };
 
     const filteredPayments = useMemo(() => {
         if (!payments || payments.length === 0) return [];
@@ -185,14 +196,6 @@ export default function GanhosScreen() {
         };
     }, [filteredPayments, selectedPeriod]);
 
-    const formatCurrency = (valueInCents: number): string => {
-        const value = valueInCents / 100;
-        return new Intl.NumberFormat('pt-BR', {
-            style: 'currency',
-            currency: 'BRL',
-        }).format(value);
-    };
-
     const periods: { value: Period; label: string }[] = [
         { value: 'today', label: 'Hoje' },
         { value: 'week', label: 'Semana' },
@@ -231,6 +234,36 @@ export default function GanhosScreen() {
                     </Box>
                 </Box>
             </Box>
+
+            {/* Wallet Balance Card - Link to Carteira */}
+            {wallet && (
+                <TouchableOpacityBox
+                    marginHorizontal="m16"
+                    marginBottom="b12"
+                    backgroundColor="primary10"
+                    borderRadius="s16"
+                    padding="m16"
+                    flexDirection="row"
+                    alignItems="center"
+                    justifyContent="space-between"
+                    onPress={() => router.push('/menu/carteira')}
+                >
+                    <Box>
+                        <Text preset="text12" color="colorTextSecondary">
+                            Saldo disponível
+                        </Text>
+                        <Text preset="text20" color="primary100" fontWeight="bold" marginTop="y4">
+                            {formatCurrency(wallet.availableBalance)}
+                        </Text>
+                    </Box>
+                    <Box flexDirection="row" alignItems="center">
+                        <Text preset="text14" color="primary100" fontWeight="semibold">
+                            Ver carteira
+                        </Text>
+                        <Ionicons name="chevron-forward" size={20} color="#4A90E2" />
+                    </Box>
+                </TouchableOpacityBox>
+            )}
 
             <Box scrollable>
                 <Box margin="m4" borderRadius="s20" paddingVertical="y12">

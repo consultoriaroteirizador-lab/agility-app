@@ -82,7 +82,7 @@ export function RouteHeader() {
             >
                 <Text
                     preset="text18"
-                    fontWeight="500"
+                    fontWeightPreset='semibold'
                     color="colorTextPrimary"
                     numberOfLines={1}
                 >

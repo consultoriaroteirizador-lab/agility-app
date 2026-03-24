@@ -40,6 +40,11 @@ export default function MenuScreen() {
       icon: require('@/assets/images/agility/menu/simbulo-ganhos-menu.png'),
     },
     {
+      label: 'Carteira',
+      href: '/(auth)/(tabs)/menu/carteira',
+      icon: require('@/assets/images/agility/menu/simbulo-ganhos-menu.png'),
+    },
+    {
       label: 'Suporte',
       href: '/(auth)/(tabs)/menu/suporte',
       icon: require('@/assets/images/agility/menu/simbulo-suporte-menu.png'),
@@ -98,7 +103,7 @@ export default function MenuScreen() {
     <Box scrollable flex={1} backgroundColor="white" px="x16" pt="y12" pb="y24">
       {/* Header */}
       <Box alignItems='center' marginVertical='y14'>
-        <Text preset="text20" fontWeight="600" color="colorTextPrimary">
+        <Text preset="text20" fontWeightPreset='bold' color="colorTextPrimary">
           Menu
         </Text>
       </Box>
@@ -196,7 +201,7 @@ export default function MenuScreen() {
       {popupSair && (
         <Modal isVisible={popupSair} onClose={() => setPopupSair(false)} title="Deseja realmente sair?">
           <Box backgroundColor="white" borderRadius="s16" p="y24" alignItems='center' justifyContent='center'>
-            <Text preset="text18" fontWeight="600" color="colorTextPrimary" mb="y8">
+            <Text preset="text18" fontWeightPreset='bold' color="colorTextPrimary" mb="y8">
               Deseja realmente sair?
             </Text>
 

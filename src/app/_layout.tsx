@@ -15,6 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ActivityIndicator, Box } from '@/components';
 import { ModalError } from '@/components/ModalError/ModalError';
 import { Toast } from '@/components/Toast/Toast';
+import { useCheckVersion } from '@/domain/mobileVersion/useCase';
 import { useLoadFonts, useInvalidQueryLogout } from '@/hooks';
 import { goChanceTemporaryPasswordScreen, goHomeScreen, goLoginScreen, goRegisterAllowsBiometricScreen, goUpdateVersionScreen } from '@/routes/routesService';
 import { NotificationProvider, useAuthCredentialsService } from '@/services';
@@ -23,13 +24,13 @@ import { AuthCredentialsProvider } from '@/services/authCredentials/Providers/Au
 import { TenantProvider } from '@/services/tenantStorage/Providers/TenantProvider';
 import { theme } from '@/theme';
 
-// import { useCheckVersion } from '@/domain/Profile/useCase/useCheckVersion';
 
 
 function InitialLayout() {
   const { isLoading: isLoadingAuthStart, authCredentials, userAuth, userCredentialsCurrent } = useAuthCredentialsService();
-  const [forceUpdate, _setForceUpdate] = useState(false);
-  const [needsUpdate, _setNeedsUpdate] = useState(false);
+  const { checkVersion } = useCheckVersion();
+  const [forceUpdate, setForceUpdate] = useState(false);
+  const [needsUpdate, setNeedsUpdate] = useState(false);
   const clearQueryCache = useInvalidQueryLogout();
 
   // Rastrear se já fez a navegação inicial
@@ -38,6 +39,15 @@ function InitialLayout() {
   const prevAuthCredentialsRef = useRef<typeof authCredentials>(undefined);
   // Rastrear o estado anterior de authCredentials (para logout/cache clearing)
   const prevAuthForLogoutRef = useRef<typeof authCredentials>(undefined);
+
+  // Atualizar estados de versão baseado na resposta do checkVersion
+  useEffect(() => {
+    if (checkVersion?.forceUpdate) {
+      setForceUpdate(true);
+    } else if (checkVersion?.needsUpdate) {
+      setNeedsUpdate(true);
+    }
+  }, [checkVersion]);
 
   // Detectar logout e limpar cache do React Query
   useEffect(() => {

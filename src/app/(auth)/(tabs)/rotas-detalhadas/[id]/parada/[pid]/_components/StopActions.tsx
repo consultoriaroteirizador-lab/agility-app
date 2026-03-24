@@ -91,7 +91,7 @@ export const StopActions = ({
             {/* If completed */}
             {isCompleted && (
                 <Box backgroundColor="tertiary10" p="y16" borderRadius="s12" alignItems="center">
-                    <Text preset="text14" color="tertiary100" fontWeight="500">
+                    <Text preset="text14" color="tertiary100" fontWeightPreset='semibold'>
                         Parada concluída com sucesso
                     </Text>
                 </Box>
@@ -100,7 +100,7 @@ export const StopActions = ({
             {/* If canceled */}
             {isCanceled && (
                 <Box backgroundColor="redError" p="y16" borderRadius="s12" alignItems="center">
-                    <Text preset="text14" color="redError" fontWeight="500">
+                    <Text preset="text14" color="redError" fontWeightPreset='semibold'>
                         Parada marcada como insucesso
                     </Text>
                 </Box>

@@ -10,7 +10,7 @@ import {
 import * as ImagePicker from 'expo-image-picker';
 
 import type { ServiceMaterialResponse, MaterialStatus } from '@/domain/agility/service/dto/response/service-material.response';
-import { ServiceStatus } from '@/domain/agility/service/dto/types';
+import { PaymentMethodType, ServiceStatus } from '@/domain/agility/service/dto/types';
 import { serviceService } from '@/domain/agility/service/serviceService';
 import { useFindOneService, useCheckMaterial } from '@/domain/agility/service/useCase';
 
@@ -110,6 +110,14 @@ interface ParadaContextValue {
   // Utilitários
   isServiceStarted: boolean;
   resetState: () => void;
+
+  // Pagamento (cobrança na entrega)
+  showPaymentModal: boolean;
+  setShowPaymentModal: (value: boolean) => void;
+  paymentAmount: string;
+  setPaymentAmount: (value: string) => void;
+  paymentMethod: PaymentMethodType | null;
+  setPaymentMethod: (value: PaymentMethodType | null) => void;
 }
 
 const ParadaContext = createContext<ParadaContextValue | null>(null);
@@ -176,6 +184,11 @@ export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderPr
   const [showSuccess, setShowSuccess] = useState(false);
   const [finalizing, setFinalizing] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<Map<number, { loaded: number; total: number; percentage: number }>>(new Map());
+
+  // Estado de pagamento (cobrança na entrega)
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [paymentAmount, setPaymentAmount] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethodType | null>(null);
 
   // Verificar se o serviço já está iniciado
   const isServiceStarted =
@@ -386,6 +399,8 @@ export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderPr
       loading: false,
       allChecked: false,
     });
+    setPaymentAmount('');
+    setPaymentMethod(null);
   }, []);
 
   const value: ParadaContextValue = {
@@ -462,6 +477,14 @@ export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderPr
     // Utilitários
     isServiceStarted: !!isServiceStarted,
     resetState,
+
+    // Pagamento (cobrança na entrega)
+    showPaymentModal,
+    setShowPaymentModal,
+    paymentAmount,
+    setPaymentAmount,
+    paymentMethod,
+    setPaymentMethod,
   };
 
   return (

@@ -1,10 +1,13 @@
 import { useCallback } from 'react';
+import { TextInput, Alert } from 'react-native';
 
 import { Box, Button, ScreenBase, Text, TouchableOpacityBox } from '@/components';
 import { ButtonBack } from '@/components/Button/ButtonBack';
 import Modal from '@/components/Modal/Modal';
 import { SignatureCanvas } from '@/components/SignatureCanvas';
+import { PaymentMethodType } from '@/domain/agility/service/dto/types';
 import { measure } from '@/theme';
+import { formatCurrency } from '@/utils/formatCurrency';
 
 import { useParada } from '../../_context/ParadaContext';
 import { useServiceCompletion } from '../../_hooks/useServiceCompletion';
@@ -19,6 +22,38 @@ const SERVICE_TYPE_LABELS = {
   servico: { artigo: 'este', substantivo: 'serviço' },
 };
 
+const PAYMENT_METHODS = [
+  { type: PaymentMethodType.CASH, label: 'Dinheiro' },
+  { type: PaymentMethodType.PIX, label: 'PIX' },
+  { type: PaymentMethodType.CARD_DEBIT, label: 'Débito' },
+  { type: PaymentMethodType.CARD_CREDIT, label: 'Crédito' },
+] as const;
+
+/**
+ * Formats a numeric string as Brazilian currency while typing
+ * @param text - Raw input text
+ * @returns Formatted string in "R$ X,XX" format
+ */
+function formatCurrencyInput(text: string): string {
+  // Remove tudo que não é dígito
+  const digits = text.replace(/\D/g, '');
+
+  if (digits.length === 0) {
+    return '';
+  }
+
+  // Converte para centavos
+  const cents = parseInt(digits, 10);
+
+  // Formata como reais
+  const reais = cents / 100;
+
+  return `R$ ${reais.toLocaleString('pt-BR', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+}
+
 export function SharedEtapaFinalizacao({ serviceType }: SharedEtapaFinalizacaoProps) {
   console.log('[SharedEtapaFinalizacao] Renderizando...', { serviceType });
 
@@ -32,11 +67,19 @@ export function SharedEtapaFinalizacao({ serviceType }: SharedEtapaFinalizacaoPr
     setSignature,
     setPhotos,
     setEtapa,
+    service,
+    showPaymentModal,
+    setShowPaymentModal,
+    paymentAmount,
+    setPaymentAmount,
+    paymentMethod,
+    setPaymentMethod,
   } = useParada();
 
   console.log('[SharedEtapaFinalizacao] useParada()', {
     checklist,
     showSignature,
+    requiresPayment: service?.requiresPayment,
   });
 
   // Safe access to checklist with defaults
@@ -61,11 +104,40 @@ export function SharedEtapaFinalizacao({ serviceType }: SharedEtapaFinalizacaoPr
 
   const handleFinalizarWrapper = useCallback(() => {
     console.log(`[SharedEtapaFinalizacao] Finalizando ${serviceType}...`);
+
+    // Se o serviço requer pagamento e ainda não foi preenchido, mostrar modal
+    if (service?.requiresPayment && !paymentAmount) {
+      setShowPaymentModal(true);
+      return;
+    }
+
     // Importante: handleFinalizar é async, então capturamos erros aqui
     handleFinalizar().catch((error) => {
       console.error('[SharedEtapaFinalizacao] Erro não tratado:', error);
     });
-  }, [handleFinalizar, serviceType]);
+  }, [handleFinalizar, serviceType, service?.requiresPayment, paymentAmount, setShowPaymentModal]);
+
+  const handleConfirmPayment = useCallback(() => {
+    // Extrair valor numérico do campo formatado
+    const numericString = paymentAmount.replace(/[R$\s.]/g, '').replace(',', '.');
+    const value = parseFloat(numericString);
+
+    if (isNaN(value) || value <= 0) {
+      Alert.alert('Valor inválido', 'Digite um valor válido maior que zero.');
+      return;
+    }
+
+    if (!paymentMethod) {
+      Alert.alert('Método de pagamento', 'Selecione o método de pagamento.');
+      return;
+    }
+
+    setShowPaymentModal(false);
+    // Prosseguir com a finalização
+    handleFinalizar().catch((error) => {
+      console.error('[SharedEtapaFinalizacao] Erro não tratado:', error);
+    });
+  }, [paymentAmount, paymentMethod, setShowPaymentModal, handleFinalizar]);
 
   return (
     <ScreenBase
@@ -266,6 +338,83 @@ export function SharedEtapaFinalizacao({ serviceType }: SharedEtapaFinalizacaoPr
               penColor="black"
               backgroundColor="white"
               preset="textParagraph"
+            />
+          </Box>
+        </Modal>
+
+        {/* Modal de Cobrança (quando requiresPayment = true) */}
+        <Modal
+          title="Registrar Pagamento"
+          isVisible={showPaymentModal}
+          onClose={() => setShowPaymentModal(false)}
+        >
+          <Box paddingHorizontal="x16" paddingTop="t16" paddingBottom="y16">
+            <Text preset="text14" color="gray600" marginBottom="b12">
+              Esta entrega requer pagamento. Informe o valor recebido do cliente.
+            </Text>
+
+            {service?.offerValue && (
+              <Box marginBottom="b16">
+                <Text preset="text12" color="gray400">
+                  Valor esperado: {formatCurrency(service.offerValue, true)}
+                </Text>
+              </Box>
+            )}
+
+            <Box marginBottom="b16">
+              <Text preset="text14" fontWeightPreset="bold" color="colorTextPrimary" marginBottom="b8">
+                Valor recebido *
+              </Text>
+              <Box
+                borderWidth={measure.m1}
+                borderColor="borderColor"
+                borderRadius="s8"
+                paddingHorizontal="x12"
+                paddingVertical="y8"
+              >
+                <TextInput
+                  value={paymentAmount}
+                  onChangeText={(text) => setPaymentAmount(formatCurrencyInput(text))}
+                  keyboardType="numeric"
+                  placeholder="R$ 0,00"
+                  placeholderTextColor="#999"
+                  style={{ fontSize: 16, color: '#333' }}
+                />
+              </Box>
+            </Box>
+
+            <Box marginBottom="b16">
+              <Text preset="text14" fontWeightPreset="bold" color="colorTextPrimary" marginBottom="b8">
+                Método de pagamento *
+              </Text>
+              <Box flexDirection="row" flexWrap="wrap" gap="y8">
+                {PAYMENT_METHODS.map((method) => (
+                  <TouchableOpacityBox
+                    key={method.type}
+                    onPress={() => setPaymentMethod(method.type)}
+                    paddingHorizontal="x12"
+                    paddingVertical="y8"
+                    borderRadius="s8"
+                    borderWidth={measure.m1}
+                    borderColor={paymentMethod === method.type ? 'primary100' : 'borderColor'}
+                    backgroundColor={paymentMethod === method.type ? 'primary10' : 'white'}
+                  >
+                    <Text
+                      preset="text14"
+                      color={paymentMethod === method.type ? 'primary100' : 'gray600'}
+                      fontWeightPreset={paymentMethod === method.type ? 'bold' : 'regular'}
+                    >
+                      {method.label}
+                    </Text>
+                  </TouchableOpacityBox>
+                ))}
+              </Box>
+            </Box>
+
+            <Button
+              title="Confirmar Pagamento"
+              onPress={handleConfirmPayment}
+              disabled={!paymentAmount || !paymentMethod}
             />
           </Box>
         </Modal>

@@ -172,7 +172,7 @@ export default function HistoricoProtocolosScreen() {
               borderRadius="s8"
               onPress={handleRetry}
             >
-              <Text preset="text14" fontWeight="600" color="white">
+              <Text preset="text14" fontWeightPreset='bold' color="white">
                 Tentar novamente
               </Text>
             </TouchableOpacityBox>
@@ -211,7 +211,7 @@ export default function HistoricoProtocolosScreen() {
                   >
                     <Box flexDirection="row" justifyContent="space-between" alignItems="center" mb="y12">
                       <Box flex={1}>
-                        <Text preset="text14" fontWeight="600" fontWeightPreset='semibold' color="primary100" mb="y4">
+                        <Text preset="text14" fontWeightPreset='bold' fontWeightPreset='semibold' color="primary100" mb="y4">
                           {ticket.ticketNumber}
                         </Text>
                         {ticket.subject && (
@@ -227,7 +227,7 @@ export default function HistoricoProtocolosScreen() {
                         borderRadius="s8"
                         ml="x12"
                       >
-                        <Text preset="text12" color="white" fontWeight="500">
+                        <Text preset="text12" color="white" fontWeightPreset='semibold'>
                           {status}
                         </Text>
                       </Box>
@@ -248,7 +248,7 @@ export default function HistoricoProtocolosScreen() {
                         borderWidth={measure.m1}
                         borderColor="secondary100"
                       >
-                        <Text preset="text13" fontWeight="600" color="secondary100" mb="y4">
+                        <Text preset="text13" fontWeightPreset='bold' color="secondary100" mb="y4">
                           Transferência:
                         </Text>
                         <Text preset="text13" color="gray700" numberOfLines={2}>
@@ -264,7 +264,7 @@ export default function HistoricoProtocolosScreen() {
                         p="y12"
                         mt="y8"
                       >
-                        <Text preset="text13" fontWeight="500" color="colorTextPrimary" mb="y4">
+                        <Text preset="text13" fontWeightPreset='semibold' color="colorTextPrimary" mb="y4">
                           Resolução:
                         </Text>
                         <Text preset="text13" color="gray700" numberOfLines={3}>
@@ -284,7 +284,7 @@ export default function HistoricoProtocolosScreen() {
                           handleViewChat(ticket.chatId);
                         }}
                       >
-                        <Text preset="text13" color="primary100" fontWeight="500">
+                        <Text preset="text13" color="primary100" fontWeightPreset='semibold'>
                           Ver histórico de chat →
                         </Text>
                       </TouchableOpacityBox>

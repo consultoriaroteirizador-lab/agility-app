@@ -47,14 +47,14 @@ export default function ProtocoloDetalhesScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams();
   const ticketId = id ? String(id) : undefined;
-  
+
   const [ticket, setTicket] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const loadTicket = async () => {
       if (!ticketId) return;
-      
+
       setIsLoading(true);
       try {
         const result = await getTicketService(ticketId);
@@ -117,7 +117,7 @@ export default function ProtocoloDetalhesScreen() {
           <Text preset="text18" color="primary100">←</Text>
         </TouchableOpacityBox>
         <Box flex={1}>
-          <Text preset="text20" fontWeight="600" color="colorTextPrimary">
+          <Text preset="text20" fontWeightPreset='bold' color="colorTextPrimary">
             Protocolo {ticket.ticketNumber}
           </Text>
         </Box>
@@ -133,7 +133,7 @@ export default function ProtocoloDetalhesScreen() {
           mb="y24"
           alignSelf="flex-start"
         >
-          <Text preset="text14" color="white" fontWeight="600">
+          <Text preset="text14" color="white" fontWeightPreset='bold'>
             {status}
           </Text>
         </Box>
@@ -145,7 +145,7 @@ export default function ProtocoloDetalhesScreen() {
               <Text preset="text13" color="gray600" mb="y4">
                 Assunto:
               </Text>
-              <Text preset="text15" color="colorTextPrimary" fontWeight="500">
+              <Text preset="text15" color="colorTextPrimary" fontWeightPreset='semibold'>
                 {ticket.subject}
               </Text>
             </Box>
@@ -204,7 +204,7 @@ export default function ProtocoloDetalhesScreen() {
             borderWidth={measure.m1}
             borderColor="orange300"
           >
-            <Text preset="text16" fontWeight="600" color="orange700" mb="y8">
+            <Text preset="text16" fontWeightPreset='bold' color="orange700" mb="y8">
               Transferência do Protocolo
             </Text>
             <Text preset="text14" color="gray700">
@@ -223,7 +223,7 @@ export default function ProtocoloDetalhesScreen() {
             borderWidth={measure.m1}
             borderColor="green300"
           >
-            <Text preset="text16" fontWeight="600" color="green700" mb="y8">
+            <Text preset="text16" fontWeightPreset='bold' color="green700" mb="y8">
               Resolução do Protocolo
             </Text>
             <Text preset="text14" color="gray700">

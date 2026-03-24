@@ -77,7 +77,7 @@ export default function MenuScreen() {
     <Box flex={1} bg="white" px="x16" pt="y12" pb="y24">
       {/* Header */}
       <Box bg="white" px="x16" pt="y12" pb="y16" mb="y24" shadowColor="black" shadowOffset={{ width: 0, height: 2 }} shadowOpacity={0.1} shadowRadius={4} elevation={2}>
-        <Text preset="text20" fontWeight="600" color="colorTextPrimary">
+        <Text preset="text20" fontWeightPreset='bold' color="colorTextPrimary">
           Menu
         </Text>
       </Box>
@@ -95,7 +95,7 @@ export default function MenuScreen() {
         onPress={() => handleNavigate('/(auth)/(tabs)/menu/perfil')}
       >
         {/* <ProfilePhotoPicker size={52} editable={false} initialUri={userAuth?.photo} /> */}
-        <ProfilePhotoPicker size={52} editable={false}/>
+        <ProfilePhotoPicker size={52} editable={false} />
 
         <Box flex={1} marginLeft="x12">
           <Text preset="text15" color="colorTextPrimary" fontWeight="400">
@@ -165,7 +165,7 @@ export default function MenuScreen() {
       {popupSair && (
         <Modal isVisible={popupSair} onClose={() => setPopupSair(false)} title="Deseja realmente sair?">
           <Box bg="white" borderRadius="s16" p="y24" width="85%" maxWidth={measure.x340}>
-            {/* <Text preset="text18" fontWeight="600" color="colorTextPrimary" mb="y8">
+            {/* <Text preset="text18" fontWeightPreset='bold' color="colorTextPrimary" mb="y8">
               Deseja realmente sair?
             </Text> */}
             <Text preset="text14" color="gray600" mb="y24">

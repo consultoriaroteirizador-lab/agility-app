@@ -125,7 +125,7 @@ export const NotificationItem: React.FC<NotificationItemProps> = ({
         marginRight="x12"
         backgroundColor="gray50"
       >
-        <Icon name={getIcon()} size={24} color="primary100" />
+        <Icon name={getIcon()} size={measure.m24} color="primary100" />
       </Box>
 
       <Box flex={1}>
@@ -147,7 +147,7 @@ export const NotificationItem: React.FC<NotificationItemProps> = ({
         >
           {notification.description}
           {notification.linkLabel && (
-            <Text color="primary100" fontWeight="600">
+            <Text color="primary100" fontWeightPreset='bold'>
               {' '}
               {notification.linkLabel}
             </Text>

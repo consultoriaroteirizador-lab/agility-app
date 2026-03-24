@@ -87,6 +87,9 @@ export interface ServiceResponse {
     /** Offer value */
     offerValue: number | null
 
+    /** Whether payment is required from customer on delivery (COD) */
+    requiresPayment: boolean
+
     /** Address ID */
     addressId: string | null
 

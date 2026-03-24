@@ -1,3 +1,5 @@
+import { PaymentMethodType } from '../types'
+
 /**
  * DTO for service completion details
  */
@@ -19,6 +21,12 @@ export interface ServiceCompletionDetailsRequest {
 
     /** Photo proof URLs (comma-separated or JSON array) - optional */
     photoProof?: string
+
+    /** Received payment value in cents - required if service.requiresPayment is true */
+    receivedValue?: number
+
+    /** Payment method used - required if service.requiresPayment is true */
+    paymentMethod?: PaymentMethodType
 }
 
 

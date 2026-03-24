@@ -55,7 +55,7 @@ export function RouteProgress() {
             >
                 <Text
                     preset="text14"
-                    fontWeight="600"
+                    fontWeightPreset='bold'
                     color="colorTextPrimary"
                 >
                     Progresso
@@ -64,7 +64,7 @@ export function RouteProgress() {
                 <Box flexDirection="row" alignItems="center" gap="x8">
                     <Text
                         preset="text14"
-                        fontWeight="500"
+                        fontWeightPreset='semibold'
                         color="primary100"
                     >
                         {porcentagemFormatada}%

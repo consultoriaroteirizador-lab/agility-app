@@ -388,7 +388,7 @@ export default function DadosEntregaScreen() {
         />
       }
       title={
-        <Text preset="text16" fontWeight="500" color="colorTextPrimary" textAlign="center" numberOfLines={2}>
+        <Text preset="text16" fontWeightPreset='semibold' color="colorTextPrimary" textAlign="center" numberOfLines={2}>
           {endereco}
         </Text>
       }
@@ -429,7 +429,7 @@ export default function DadosEntregaScreen() {
                 borderColor="primary100"
                 onPress={() => setNavModalVisible(true)}
               >
-                <LocalIcon iconName="location" size={24} color="primary100" />
+                <LocalIcon iconName="location" size={measure.m24} color="primary100" />
               </TouchableOpacityBox>
             </Box>
           )}
@@ -596,7 +596,7 @@ export default function DadosEntregaScreen() {
         />
       }
       title={
-        <Text preset="text16" fontWeight="500" color="colorTextPrimary" textAlign="center" numberOfLines={2}>
+        <Text preset="text16" fontWeightPreset='semibold' color="colorTextPrimary" textAlign="center" numberOfLines={2}>
           {endereco}
         </Text>
       }
@@ -640,7 +640,7 @@ export default function DadosEntregaScreen() {
           borderColor="primary100"
           onPress={() => setNavModalVisible(true)}
         >
-          <LocalIcon iconName="location" size={24} color="primary100" />
+          <LocalIcon iconName="location" size={measure.m24} color="primary100" />
         </TouchableOpacityBox>
       </Box>
     )}

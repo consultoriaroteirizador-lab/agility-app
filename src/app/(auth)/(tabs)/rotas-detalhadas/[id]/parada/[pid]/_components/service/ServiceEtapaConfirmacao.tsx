@@ -113,7 +113,7 @@ export function ServiceEtapaConfirmacao() {
                                             router.push('/(auth)/(tabs)/menu/suporte');
                                         }}
                                     >
-                                        <Icon name="chat" size={20} color="white" />
+                                        <Icon name="chat" size={measure.m20} color="white" />
                                     </TouchableOpacityBox>
 
                                     {service?.clientPhone && (
@@ -128,7 +128,7 @@ export function ServiceEtapaConfirmacao() {
                                                 Linking.openURL(`tel:${service.clientPhone}`);
                                             }}
                                         >
-                                            <Icon name="phone" size={20} color="white" />
+                                            <Icon name="phone" size={measure.m20} color="white" />
                                         </TouchableOpacityBox>
                                     )}
                                 </Box>

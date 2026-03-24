@@ -43,7 +43,7 @@ function BiometricToggleComponent({
                     <Text
                         preset="text16"
                         color="colorTextPrimary"
-                        fontWeight="500"
+                        fontWeightPreset='semibold'
                     >
                         Login com biometria
                     </Text>
