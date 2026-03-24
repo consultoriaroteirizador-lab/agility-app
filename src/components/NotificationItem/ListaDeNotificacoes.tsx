@@ -69,7 +69,6 @@ export const ListaDeNotificacoes: React.FC<ListaDeNotificacoesProps> = ({
                 />
             )}
             contentContainerStyle={{
-                paddingHorizontal: measure.m16,
                 paddingTop: measure.m16,
                 paddingBottom: measure.m24,
                 gap: measure.m12,

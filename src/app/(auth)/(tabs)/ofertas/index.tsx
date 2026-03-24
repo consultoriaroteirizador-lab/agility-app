@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { RefreshControl, ScrollView } from 'react-native';
 
 import { useRouter } from 'expo-router';
 
@@ -241,10 +242,14 @@ export default function OfertasScreen() {
   const router = useRouter();
   const { userLocation, isLoading: isLoadingLocation } = useUserLocation();
 
-  const { routings, isLoading } = useFindBroadcastingRoutings({
+  const { routings, isLoading, refetch, isRefetching } = useFindBroadcastingRoutings({
     driverLatitude: userLocation?.coords.latitude,
     driverLongitude: userLocation?.coords.longitude,
   });
+
+  const onRefresh = () => {
+    refetch();
+  };
 
 
   // TODO: substituir por store real
@@ -285,7 +290,11 @@ export default function OfertasScreen() {
 
   return (
     <ScreenBase title={<Text preset="textTitleScreen">Ofertas de serviços</Text>}>
-      <Box flex={1} px="x16" pt="y12" pb="y24" scrollable>
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{ paddingTop: 12, paddingBottom: 24 }}
+        refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={onRefresh} />}
+      >
         {ofertas.length === 0 ? (
           <Box py="y32" alignItems="center">
             <Icon name="local-shipping" size={measure.m48} color="gray300" />
@@ -306,7 +315,7 @@ export default function OfertasScreen() {
             ))}
           </Box>
         )}
-      </Box>
+      </ScrollView>
     </ScreenBase>
   );
 }

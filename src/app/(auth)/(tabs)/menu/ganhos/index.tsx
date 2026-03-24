@@ -238,7 +238,6 @@ export default function GanhosScreen() {
             {/* Wallet Balance Card - Link to Carteira */}
             {wallet && (
                 <TouchableOpacityBox
-                    marginHorizontal="m16"
                     marginBottom="b12"
                     backgroundColor="primary10"
                     borderRadius="s16"
@@ -253,7 +252,7 @@ export default function GanhosScreen() {
                             Saldo disponível
                         </Text>
                         <Text preset="text20" color="primary100" fontWeight="bold" marginTop="y4">
-                            {formatCurrency(wallet.availableBalance)}
+                            {formatCurrency(wallet.availableBalance ?? 0)}
                         </Text>
                     </Box>
                     <Box flexDirection="row" alignItems="center">

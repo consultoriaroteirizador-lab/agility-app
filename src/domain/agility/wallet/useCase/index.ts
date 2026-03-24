@@ -7,5 +7,3 @@ export * from './useGetAdvances';
 export * from './useUpdateBankInfo';
 export * from './useFinancialSummary';
 export * from './useWalletBreakdown';
-export * from './useUpdateBankInfo';
-export * from './useGetAdvances';

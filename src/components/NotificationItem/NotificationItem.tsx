@@ -140,7 +140,7 @@ export const NotificationItem: React.FC<NotificationItemProps> = ({
         </Text>
 
         <Text
-          preset="textParagraph"
+          preset="text15"
           color="gray700"
           numberOfLines={3}
           marginBottom="y4"

@@ -211,7 +211,7 @@ export default function HistoricoProtocolosScreen() {
                   >
                     <Box flexDirection="row" justifyContent="space-between" alignItems="center" mb="y12">
                       <Box flex={1}>
-                        <Text preset="text14" fontWeightPreset='bold' fontWeightPreset='semibold' color="primary100" mb="y4">
+                        <Text preset="text14" fontWeightPreset='bold' color="primary100" mb="y4">
                           {ticket.ticketNumber}
                         </Text>
                         {ticket.subject && (
