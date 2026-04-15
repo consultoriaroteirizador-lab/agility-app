@@ -1,65 +1,64 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 
-import { ActivityIndicator, Box, Button, ScreenBase, Text } from '@/components';
+import { ActivityIndicator, Box, Button, ScreenBase, Text, TextButton } from '@/components';
 import { ButtonBack } from '@/components/Button/ButtonBack';
-import Checkbox from '@/components/CheckboxBox/CheckboxBox';
 import { FormInput } from '@/components/Form/FormInput';
 import Modal from '@/components/Modal/Modal';
 import { useRecoverPassword } from "@/domain/Profile/useCase";
-import { extractNumbers } from '@/functions';
 import { useModal } from '@/hooks/useModal';
+import { useTenantService } from '@/services/tenantStorage';
 import { goLoginScreen } from '@/routes';
 import { measure } from '@/theme';
 
-import { ContactType } from '../../../../domain/Profile/dto/ContactType';
 import {
-  formTaxNumberForgotPasswordSchema,
-  FormTaxNumberForgotPasswordSchema,
-} from '../../../../formValidate/formTaxNumberForgotPasswordSchema';
-
+  formForgotPasswordSchema,
+  FormForgotPasswordSchema,
+} from '../../../../formValidate/formForgotPasswordSchema';
 
 export default function ForgotPasswordScreen() {
   const [modalText, setModalText] = useState("")
   const { modalIsVisible, onClose, onOpen } = useModal()
+  const { tenantInfo } = useTenantService()
+  const [showTenantInput, setShowTenantInput] = useState(false)
 
   const { isLoading, recoverPassword } = useRecoverPassword({
     onSuccess: (response) => {
-      setModalText(response.message ?? "Senha temporária enviada com sucesso")
+      setModalText(response.message ?? "Se o cadastro existir, um link de recuperação foi enviado.")
       onOpen()
       reset()
     },
   })
 
-  const [recuperationMethod, setRecuperationMethod] = useState<ContactType>("EMAIL");
+  const hasSavedTenant = tenantInfo && !showTenantInput
 
-  const recuperationMethodsOptions = [
-    { method: "EMAIL" as ContactType, label: "Recuperar por E-mail" },
-    { method: "PHONE" as ContactType, label: "Recuperar por Telefone" }
-  ];
+  function handleChangeTenant() {
+    setShowTenantInput(true)
+  }
 
-  const { control, formState, handleSubmit, reset } =
-    useForm<FormTaxNumberForgotPasswordSchema>({
+  const { control, formState, handleSubmit, reset, setValue } =
+    useForm<FormForgotPasswordSchema>({
       mode: 'onChange',
-      resolver: zodResolver(formTaxNumberForgotPasswordSchema),
+      resolver: zodResolver(formForgotPasswordSchema),
       defaultValues: {
-        taxNumber: '',
+        tenantCode: tenantInfo?.tenantCode || '',
+        email: '',
       },
-    });
+    })
 
-  function submitForm({ taxNumber }: FormTaxNumberForgotPasswordSchema) {
-    // TODO: Converter CPF para email ou ajustar backend para aceitar CPF
-    // Por enquanto, usando CPF como identificador temporário
-    // O backend precisa aceitar CPF ou precisamos buscar o email pelo CPF
-    const cpf = extractNumbers(taxNumber);
-    
-    // Se o backend ainda não aceita CPF diretamente, será necessário:
-    // 1. Buscar o email pelo CPF em outro endpoint, ou
-    // 2. Ajustar o backend para aceitar CPF no campo email
+  // Preenche o tenantCode quando carregar do storage
+  useEffect(() => {
+    if (tenantInfo?.tenantCode) {
+      setValue('tenantCode', tenantInfo.tenantCode, { shouldValidate: true })
+    }
+  }, [tenantInfo, setValue])
+
+  function submitForm(data: FormForgotPasswordSchema) {
     recoverPassword({
-      email: cpf, // Temporário: assumindo que backend aceita CPF como email ou fará discovery
+      tenantCode: data.tenantCode,
+      email: data.email,
     })
   }
 
@@ -78,7 +77,7 @@ export default function ForgotPasswordScreen() {
               preset="textParagraph"
               textAlign="center"
               mb="b16">
-              Digite seu CPF para recuperar a senha!
+              Informe sua empresa e email para recuperar a senha!
             </Text>
             <Box
               alignItems="center"
@@ -87,40 +86,59 @@ export default function ForgotPasswordScreen() {
               borderRadius="s6"
               paddingHorizontal="x10"
             >
+              {/* Tenant: mostra card da empresa ou input */}
+              {hasSavedTenant ? (
+                <Box
+                  alignSelf="flex-start"
+                  mb="b10"
+                  flexDirection="row"
+                  alignItems="flex-end"
+                  justifyContent="space-between"
+                  width={"100%"}
+                  mt="t20"
+                  marginHorizontal="x14"
+                >
+                  <Box>
+                    <Text preset="text14" color="gray400" mb="b4">Empresa</Text>
+                    <Text preset="text16" fontWeightPreset="semibold" color="black">
+                      {tenantInfo.tenantName || tenantInfo.tenantCode}
+                    </Text>
+                  </Box>
+                  <TextButton
+                    fontSize={measure.m14}
+                    preset="textPrimaryUnderline"
+                    title="Trocar"
+                    onPress={handleChangeTenant}
+                  />
+                </Box>
+              ) : (
+                <FormInput
+                  control={control}
+                  name="tenantCode"
+                  paddingVertical='y12'
+                  placeholder="Código da empresa"
+                  title="Empresa"
+                  borderRadius="s4"
+                  width={measure.x330}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  mt="t20"
+                />
+              )}
+
               <FormInput
-                typeMask='cpf'
                 control={control}
-                name="taxNumber"
+                name="email"
                 paddingVertical='y12'
-                keyboardType="numeric"
-                placeholder="Informe seu CPF"
-                title="CPF"
+                keyboardType="email-address"
+                placeholder="Informe seu e-mail"
+                title="E-mail"
                 borderRadius="s4"
                 width={measure.x330}
+                autoCapitalize="none"
+                autoCorrect={false}
+                mt="t16"
               />
-              <Box gap="y14" mt='t20' marginHorizontal='x14'>
-                <Text
-                  color="gray600"
-                  preset="text14"
-                  textAlign="left"
-                  fontWeightPreset='semibold'
-                >
-                  Escolha como deseja receber sua senha temporária:
-                </Text>
-                {recuperationMethodsOptions.map(({ method, label }) => (
-                  <Checkbox
-                    key={method}
-                    textPreset="text15"
-                    alignItems="center"
-                    width={measure.x20}
-                    size={measure.x18}
-                    title={label}
-                    gap="x10"
-                    isChecked={recuperationMethod === method}
-                    onPress={() => setRecuperationMethod(method)}
-                  />
-                ))}
-              </Box>
             </Box>
           </Box>
           <Box alignItems="center" gap="y16">
@@ -132,7 +150,15 @@ export default function ForgotPasswordScreen() {
           </Box>
         </Box>
       </Box>
-      <Modal title='Sucesso' text={modalText} isVisible={modalIsVisible} onClose={onClose} preset='action' buttonActionTitle='Fazer login' onPress={goLoginScreen} />
+      <Modal
+        title='Sucesso'
+        text={modalText}
+        isVisible={modalIsVisible}
+        onClose={onClose}
+        preset='action'
+        buttonActionTitle='Fazer login'
+        onPress={goLoginScreen}
+      />
     </ScreenBase>
   );
 }

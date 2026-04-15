@@ -45,6 +45,11 @@ export default function MenuScreen() {
       icon: require('@/assets/images/agility/menu/simbulo-ganhos-menu.png'),
     },
     {
+      label: 'Avaliações',
+      href: '/(auth)/(tabs)/menu/avaliacoes',
+      icon: require('@/assets/images/agility/menu/simbulo-hist-rotas-menu.png'),
+    },
+    {
       label: 'Suporte',
       href: '/(auth)/(tabs)/menu/suporte',
       icon: require('@/assets/images/agility/menu/simbulo-suporte-menu.png'),

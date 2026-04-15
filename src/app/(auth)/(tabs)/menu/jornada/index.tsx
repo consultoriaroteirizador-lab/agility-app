@@ -4,11 +4,13 @@ import { useQueryClient } from '@tanstack/react-query';
 
 import { ActivityIndicator, Box, Text, TouchableOpacityBox, Button, ScreenBase } from '@/components';
 import { ButtonBack } from '@/components/Button/ButtonBack';
+import { Icon } from '@/components/Icon/Icon';
 import {
   DaySelector,
   PeriodSelector,
   WorkHours,
   CalendarComponent,
+  EventoCard,
 } from '@/components/jornada';
 import type {
   DiaSemana,
@@ -58,6 +60,7 @@ export default function JornadaScreen() {
         workEndTime: jornadaData.workEndTime ?? undefined,
         specificHours: jornadaData.specificWorkHours,
         daysOff: daysOffDates.length > 0 ? daysOffDates : undefined,
+        daysOffArray: jornadaData.daysOffArray,
         intervaloPausa: jornadaData.breakInterval || jornadaData.restInterval ? {
           breakInterval: jornadaData.breakInterval,
           restInterval: jornadaData.restInterval,
@@ -69,9 +72,10 @@ export default function JornadaScreen() {
     }
   }, [jornadaData]);
 
-  // Estados do calendário
+  // Estados do calendario
   const [selectedDate, setSelectedDate] = useState<Date | undefined>();
   const [disabledDates, setDisabledDates] = useState<string[]>([]);
+  const [expanded, setExpanded] = useState(false);
 
   const toggleDay = (day: DiaSemana) => {
     const currentWorkDays = jornada.workDays || [];
@@ -265,18 +269,60 @@ export default function JornadaScreen() {
             </Box>
           ) : (
             <Box gap="y16">
+              {/* Header do mes + toggle expandir */}
+              <Box flexDirection="row" alignItems="center" justifyContent="space-between" marginHorizontal="x10">
+                <Text preset="text20" color="colorTextPrimary" fontWeight="bold">
+                  {new Date(selectedDate || Date.now()).toLocaleDateString('pt-BR', {
+                    month: 'long',
+                    year: 'numeric',
+                  })}
+                </Text>
+                <TouchableOpacityBox onPress={() => setExpanded(!expanded)} padding="y4">
+                  <Icon
+                    name={expanded ? 'keyboard-arrow-up' : 'keyboard-arrow-down'}
+                    size={24}
+                    color="colorTextPrimary"
+                  />
+                </TouchableOpacityBox>
+              </Box>
+
               <CalendarComponent
                 selectedDate={selectedDate?.toISOString().split('T')[0]}
                 onDateSelect={handleDateSelect}
                 disabledDates={disabledDates}
               />
 
+              {/* Dias de folga cadastrados */}
+              <Box marginHorizontal="x10">
+                <Text preset="text16" color="colorTextPrimary" fontWeight="bold" marginBottom="y12">
+                  Dias de folga cadastrados
+                </Text>
+
+                {(!jornada.daysOff || jornada.daysOff.length === 0) && (
+                  <Text preset="text14" color="mutedElementsColor">
+                    Nenhum dia de folga cadastrado.
+                  </Text>
+                )}
+
+                <Box gap="y8">
+                  {jornada.daysOffArray?.map((d, i) => (
+                    <EventoCard
+                      key={i}
+                      titulo={d.title}
+                      status={d.status}
+                    />
+                  ))}
+                </Box>
+              </Box>
+
+              {/* Data selecionada */}
               {selectedDate && (
                 <Box
                   backgroundColor="white"
                   borderRadius="s12"
                   padding="y12"
                   marginTop="y16"
+                  marginHorizontal="x10"
                 >
                   <Text preset="text14" color="colorTextPrimary" fontWeight="bold" marginBottom="y4">
                     Data selecionada
@@ -289,6 +335,16 @@ export default function JornadaScreen() {
                       day: 'numeric',
                     })}
                   </Text>
+                  <TouchableOpacityBox
+                    onPress={() => handleDateSelect(selectedDate)}
+                    marginTop="y8"
+                  >
+                    <Text preset="text14" color="primary100" fontWeight="bold">
+                      {jornada.daysOff?.includes(selectedDate.toISOString().split('T')[0])
+                        ? 'Remover folga'
+                        : 'Adicionar como folga'}
+                    </Text>
+                  </TouchableOpacityBox>
                 </Box>
               )}
 

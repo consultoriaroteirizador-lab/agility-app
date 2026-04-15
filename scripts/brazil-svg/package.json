@@ -1,0 +1,8 @@
+{
+  "name": "brazil-svg-gen",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "convert": "node convert.mjs"
+  }
+}

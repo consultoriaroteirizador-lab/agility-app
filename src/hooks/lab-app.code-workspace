@@ -13,10 +13,10 @@
       "path": "../../../agility-frontend-app",
     },
     {
-      "path": "../../../../../Documents/Conlife/GitLab/conlife-identity",
+      "path": "../../../agility-keycloak-themes",
     },
     {
-      "path": "../../../../../Documents/Conlife/GitLab/Front/Conlife-App",
+      "path": "../../../../infra-config",
     },
   ],
   "settings": {},

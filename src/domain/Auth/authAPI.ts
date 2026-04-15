@@ -61,6 +61,7 @@ async function forgotPassword(
 ): Promise<BaseResponseAPI<ForgotPasswordResponse>> {
     const requestBody = {
       email: request.email,
+      ...(request.tenantCode && { tenantCode: request.tenantCode }),
       ...(request.companyId && { companyId: request.companyId }),
       ...(request.realm && { realm: request.realm }),
       ...(request.clientId && { clientId: request.clientId }),

@@ -173,6 +173,7 @@ export interface JornadaTrabalho {
   workPeriod?: WorkPeriod[]
   specificHours?: SpecificWorkHours[]
   daysOff?: string[] // Datas de folga no formato "YYYY-MM-DD"
+  daysOffArray?: DayOff[] // Array de dias de folga com detalhes
   workStartTime?: string
   workEndTime?: string
   intervaloPausa?: BreakConfig

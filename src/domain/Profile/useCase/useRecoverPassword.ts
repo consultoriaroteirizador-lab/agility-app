@@ -7,6 +7,7 @@ import { useMutationService } from '../../../api/useMutationService';
 
 export interface RecoverPasswordFormRequest {
     email: string;
+    tenantCode?: string;
     companyId?: string;
     realm?: string;
     clientId?: string;
@@ -20,6 +21,7 @@ export function useRecoverPassword(
         action: (request: RecoverPasswordFormRequest) => {
             const forgotPasswordRequest: ForgotPasswordRequest = {
                 email: request.email,
+                tenantCode: request.tenantCode,
                 companyId: request.companyId,
                 realm: request.realm,
                 clientId: request.clientId,

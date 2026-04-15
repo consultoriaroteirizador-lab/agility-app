@@ -42,6 +42,7 @@ export type ChangePasswordResponse = {
 
 export type ForgotPasswordRequest = {
     email: string;
+    tenantCode?: string;
     companyId?: string;
     realm?: string;
     clientId?: string;
