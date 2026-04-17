@@ -1,23 +1,14 @@
 import { Box, Button } from '@/components';
+import type { ServiceMaterialResponse } from '@/domain/agility/service/dto';
 import Modal from '@/components/Modal/Modal';
 import { measure } from '@/theme';
 
 import { MaterialList } from '../MaterialList';
 
-interface ServiceMaterial {
-    id: string;
-    material: string;
-    quantity: number;
-    unit?: string;
-    serialNumber?: string;
-    sku?: string;
-    notes?: string;
-}
-
 interface MaterialsModalProps {
     isVisible: boolean;
     onClose: () => void;
-    materials: ServiceMaterial[];
+    materials: ServiceMaterialResponse[];
 }
 
 export function MaterialsModal({ isVisible, onClose, materials }: MaterialsModalProps) {

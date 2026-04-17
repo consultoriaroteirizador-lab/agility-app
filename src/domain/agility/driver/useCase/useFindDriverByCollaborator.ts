@@ -1,4 +1,4 @@
-import { useQueryService } from '@/api'
+import { useQuery } from '@tanstack/react-query'
 import type { Id } from '@/types/base'
 
 import { driverService } from '../driverService'
@@ -11,14 +11,15 @@ import type { DriverResponse } from '../dto'
  * @deprecated Use userAuth.driverId diretamente
  */
 export function useFindDriverByCollaborator(collaboratorId?: Id | null) {
-    const { data, isLoading, isError, error, refetch } = useQueryService<DriverResponse | null>({
+    const { data, isLoading, isError, error, refetch } = useQuery<DriverResponse | null>({
         queryKey: ['driver', 'by-collaborator', collaboratorId],
         queryFn: async () => {
             if (!collaboratorId) return null
             const response = await driverService.findByCollaboratorId(collaboratorId)
-            return response.result
+            return response.result ?? null
         },
         enabled: !!collaboratorId,
+        retry: false,
     })
 
     return {

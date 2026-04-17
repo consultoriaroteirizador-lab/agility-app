@@ -1,13 +1,13 @@
 import { useQuery } from '@tanstack/react-query'
 
-import { KEY_DRIVERS } from '@/domain/queryKeys'
+import { KEY_DRIVER } from '@/domain/queryKeys'
 import type { Id } from '@/types/base'
 
 import { driverService } from '../driverService'
 
 export function useFindOneDriver(id: Id | null | undefined) {
     const { data, isLoading, isError, refetch, isRefetching } = useQuery({
-        queryKey: [KEY_DRIVERS, id],
+        queryKey: [KEY_DRIVER, id],
         queryFn: () => driverService.findOne(id!),
         enabled: !!id,
         retry: false,

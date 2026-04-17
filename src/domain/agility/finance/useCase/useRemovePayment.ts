@@ -15,11 +15,11 @@ export function useRemovePayment() {
     },
   });
 
-  const { mutateAsync: removePayment, isLoading, isError, error, reset } = mutation;
+  const { mutateAsync: removePayment, isPending, isError, error, reset } = mutation;
 
   return {
     removePayment,
-    isLoading,
+    isLoading: isPending,
     isError,
     error,
     reset,

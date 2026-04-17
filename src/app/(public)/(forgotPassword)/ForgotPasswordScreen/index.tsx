@@ -9,8 +9,8 @@ import { FormInput } from '@/components/Form/FormInput';
 import Modal from '@/components/Modal/Modal';
 import { useRecoverPassword } from "@/domain/Profile/useCase";
 import { useModal } from '@/hooks/useModal';
-import { useTenantService } from '@/services/tenantStorage';
 import { goLoginScreen } from '@/routes';
+import { useTenantService } from '@/services/tenantStorage';
 import { measure } from '@/theme';
 
 import {

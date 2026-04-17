@@ -6,6 +6,7 @@ import type {
     UpdatePaymentRequest,
     ListPaymentsRequest,
     PaymentResponse,
+    PaginatedPaymentsResponse,
     DriverSummaryItem,
 } from './dto'
 import { financeAPI } from './financeAPI'
@@ -18,7 +19,7 @@ async function create(payload: CreatePaymentRequest): Promise<BaseResponse<Payme
     return financeAPI.create(payload)
 }
 
-async function findAll(params: ListPaymentsRequest = {}): Promise<BaseResponse<PaymentResponse[]>> {
+async function findAll(params: ListPaymentsRequest = {}): Promise<BaseResponse<PaymentResponse[] | PaginatedPaymentsResponse<PaymentResponse>>> {
     return financeAPI.findAll(params)
 }
 

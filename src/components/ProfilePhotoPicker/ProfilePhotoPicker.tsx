@@ -27,7 +27,7 @@ export default function ProfilePhotoPicker({
 }: ProfilePhotoPickerProps) {
   const { userAuth } = useAuthCredentialsService();
   const { showToast } = useToastService();
-  const [photoUri, setPhotoUri] = useState<string | undefined>(initialUri || userAuth?.photo);
+  const [photoUri, setPhotoUri] = useState<string | undefined>(initialUri);
   const [loading, setLoading] = useState(false);
 
   const requestPermissions = async () => {
@@ -152,8 +152,8 @@ export default function ProfilePhotoPicker({
         <TouchableOpacityBox
           onPress={removePhoto}
           position="absolute"
-          top="t-5"
-          right="r-5"
+          top={measure.t0}
+          right={measure.r0}
           width={measure.x24}
           height={measure.y24}
           borderRadius="s12"

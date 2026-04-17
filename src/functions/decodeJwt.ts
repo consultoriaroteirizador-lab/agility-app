@@ -1,52 +1,40 @@
 import { jwtDecode } from 'jwt-decode';
 
-import { UserAuth } from '@/services/userAuthInfo/UserAuthInfoType';
+export type TokenClaims = {
+    sub: string;
+    email?: string;
+    email_verified?: boolean;
+    name?: string;
+    given_name?: string;
+    family_name?: string;
+    preferred_username?: string;
+    company_id?: string;
+    collaborator_id?: string;
+    driver_id?: string;
+    employee_code?: string;
+    department?: string;
+    realm_access?: { roles: string[] };
+    resource_access?: Record<string, { roles: string[] }>;
+    exp?: number;
+    iat?: number;
+    iss?: string;
+};
 
-export function decodeJWT(token: string): UserAuth {
+export function decodeJWT(token: string): TokenClaims {
     try {
         if (!token || token.trim() === '') {
             console.error('Token está vazio ou indefinido:', token);
             throw new Error('Invalid token');
         }
 
-        const payload = jwtDecode<any>(token);
+        const payload = jwtDecode<TokenClaims>(token);
 
-        if (
-            !payload.sub ||
-            !payload.taxNumber ||
-            !payload.fullname ||
-            !payload.nickname ||
-            !payload.gender ||
-            !payload.birthdate ||
-            !payload.familyName ||
-            !payload.status ||
-            payload.noDevice === undefined ||
-            payload.noDevice === null ||
-            payload.emailVerified === undefined ||
-            payload.emailVerified === null ||
-            payload.phoneNumberVerified === undefined ||
-            payload.phoneNumberVerified === null ||
-            !Array.isArray(payload.roles) ||
-            payload.roles.length === 0
-        ) {
-            console.error('Payload inválido:', payload);
+        if (!payload.sub) {
+            console.error('Payload inválido - sem sub:', payload);
             throw new Error('Invalid token payload structure');
         }
 
-        return {
-            id: payload.sub,
-            taxNumber: payload.taxNumber,
-            fullname: payload.fullname,
-            nickname: payload.nickname,
-            gender: payload.gender,
-            birthdate: payload.birthdate,
-            familyName: payload.familyName,
-            status: payload.status,
-            noDevice: payload.noDevice,
-            emailVerified: payload.emailVerified,
-            phoneNumberVerified: payload.phoneNumberVerified,
-            roles: payload.roles,
-        };
+        return payload;
     } catch (error) {
         console.error('ERRO GERAL AO DECODIFICAR TOKEN:', error);
         throw new Error('Invalid token');

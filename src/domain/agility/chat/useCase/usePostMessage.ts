@@ -4,9 +4,9 @@ import type { BaseResponse } from '@/api/baseResponse';
 import { KEY_CHATS } from '@/domain/queryKeys';
 import type { Id } from '@/types/base';
 
-import type { MessageItem } from '../chatAPI';
+import type { MessageItem } from '../dto/types';
 import { postMessageService } from '../chatService';
-import type { ChatMessage, AttachmentType } from '../dto/types';
+import type { ChatMessage, AttachmentType, SendMessagePayload } from '../dto/types';
 import { MessageStatus, ParticipantType } from '../dto/types';
 import { useChatStore } from '../store/useChatStore';
 import { generateTempId } from '../utils/messageUtils';
@@ -33,7 +33,7 @@ export function usePostMessage(senderType: string = 'DRIVER') {
     return useMutation({
         mutationFn: (payload: PostMessagePayload) =>
             postMessageService(
-                payload as unknown as Record<string, unknown>,
+                payload as unknown as SendMessagePayload,
                 senderType
             ),
 

@@ -3,10 +3,10 @@ import { createContext, PropsWithChildren, useCallback, useEffect, useRef, useSt
 
 import { apiAgility, apiIdentity } from "@/api";
 import { isDevelopment } from "@/config/environment";
-import { mapCollaboratorToUserAuth } from "@/domain/agility/collaborator/collaboratorMapper";
-import { collaboratorService } from "@/domain/agility/collaborator/collaboratorService";
+import { authAdapter } from "@/domain/Auth/authAdapter";
 import { authService } from "@/domain/Auth/authService";
 import { AuthCredentials } from "@/domain/Auth/authType";
+import { decodeJWT } from "@/functions/decodeJwt";
 import { goLoginScreen } from "@/routes";
 import { UserAuth, UserCredentials } from "@/services/userAuthInfo/UserAuthInfoType";
 import { EnhancedError } from "@/utils/errors";
@@ -92,52 +92,36 @@ export function AuthCredentialsProvider({ children }: PropsWithChildren) {
         setIsLoading(true);
         const wasAuthenticated = !!authCredentials;
 
-        // Update token first so profile API call can use it
+        // Update token so API calls are authenticated
         authService.updateToken(ac.accessToken, ac.tenantId);
         setAuthCredentials(ac);
 
         try {
-            // Get user profile from backend instead of decoding JWT
-            const profileResponse = await collaboratorService.getProfile();
-            if (profileResponse.success && profileResponse.result) {
-                // Use userStatus from login response if available (for temporary password detection)
-                const userAuth = mapCollaboratorToUserAuth(profileResponse.result, ac.userStatus);
-                setUserAuth(userAuth);
-                await saveUserAuth(userAuth);
+            // Decode JWT to extract user info from Keycloak custom claims
+            const claims = decodeJWT(ac.accessToken);
+            const userAuth = authAdapter.mapTokenClaimsToUserAuth(claims, ac.userStatus);
+            setUserAuth(userAuth);
+            await saveUserAuth(userAuth);
 
-                // Limpar o Set apenas quando é um novo login completo (não havia credenciais antes)
-                // Para refresh tokens, manter o Set para evitar loops com requisições que continuam falhando
-                if (!wasAuthenticated) {
-                    failedRequestsAfterRefreshRef.current.clear();
-                }
-                isRedirectingRef.current = false;
-                setIsLoading(false);
-                console.log('[saveCredentials] Finalizado com sucesso');
-                return userAuth;
-            } else {
-                throw new Error(profileResponse.message || 'Failed to get user profile');
+            // Limpar o Set apenas quando é um novo login completo (não havia credenciais antes)
+            if (!wasAuthenticated) {
+                failedRequestsAfterRefreshRef.current.clear();
             }
+            isRedirectingRef.current = false;
+            setIsLoading(false);
+            console.log('[saveCredentials] Finalizado com sucesso via JWT claims');
+            return userAuth;
         } catch (error: any) {
-            const status = error?.response?.status;
-            let errorMessage = 'Erro ao obter perfil do usuário';
-
-            if (status === 403) {
-                errorMessage = 'Você não tem permissão para acessar esta conta. Entre em contato com o administrador.';
-            } else if (status === 404) {
-                errorMessage = 'Perfil de usuário não encontrado. Sua conta pode não estar configurada corretamente.';
-            } else if (status === 401) {
-                errorMessage = 'Sessão expirada. Por favor, faça login novamente.';
-            }
-
             if (isDevelopment) {
-                console.error('[AuthCredentialsProvider] Error getting profile:', error, 'Status:', status);
+                console.error('[AuthCredentialsProvider] Error decoding JWT:', error);
             }
 
-            // Create a more descriptive error with user-friendly message
-            const enhancedError = new EnhancedError(errorMessage, undefined, { originalError: error, status });
+            const enhancedError = new EnhancedError(
+                'Erro ao processar dados do login.',
+                undefined,
+                { originalError: error }
+            );
 
-            // If profile fetch fails, still save credentials but without userAuth
-            // This allows retry later
             throw enhancedError;
         }
     }, [saveUserAuth, authCredentials]);
@@ -162,61 +146,38 @@ export function AuthCredentialsProvider({ children }: PropsWithChildren) {
                 return;
             }
 
-            // If we have authCredentials but no userAuth, fetch profile from backend
-            // This can happen after app restart when credentials are loaded but userAuth was not persisted
+            // If we have authCredentials but no userAuth, decode JWT to populate userAuth
+            // This can happen after app restart when credentials are loaded from storage
             if (!userAuth) {
-                if (isDevelopment) console.log('[Auth] Credentials found but no userAuth, fetching profile...');
+                if (isDevelopment) console.log('[Auth] Credentials found but no userAuth, decoding JWT...');
                 try {
-                    authService.updateToken(authCredentials.accessToken, authCredentials.tenantId);
-                    const profileResponse = await collaboratorService.getProfile();
-                    if (profileResponse.success && profileResponse.result) {
-                        const mappedUserAuth = mapCollaboratorToUserAuth(profileResponse.result);
-                        setUserAuth(mappedUserAuth);
-                        await saveUserAuth(mappedUserAuth);
-                    }
-                } catch (profileError) {
-                    if (isDevelopment) console.log('[Auth] Failed to fetch profile on start:', profileError);
-                    // Continue with token validation even if profile fetch fails
+                    const claims = decodeJWT(authCredentials.accessToken);
+                    const mappedUserAuth = authAdapter.mapTokenClaimsToUserAuth(claims);
+                    setUserAuth(mappedUserAuth);
+                    await saveUserAuth(mappedUserAuth);
+                } catch (decodeError) {
+                    if (isDevelopment) console.log('[Auth] Failed to decode JWT on start:', decodeError);
+                    // If JWT decode fails (e.g. token corrupted), try to refresh
                 }
             }
 
-            let { expiration, expirationRefreshToken } = authCredentials;
-            expiration = new Date(expiration);
-            expirationRefreshToken = new Date(expirationRefreshToken);
+            const expirationDate = new Date(authCredentials.expiration);
+            const expirationRefreshTokenDate = new Date(authCredentials.expirationRefreshToken);
             const currentTime = new Date();
 
-            if (isNaN(expiration.getTime()) || isNaN(expirationRefreshToken.getTime())) {
+            if (isNaN(expirationDate.getTime()) || isNaN(expirationRefreshTokenDate.getTime())) {
                 throw new Error("Datas de expiração inválidas");
             }
 
-            const remainingTimeAccessToken = expiration.getTime() - currentTime.getTime();
-            const remainingTimeRefreshToken = expirationRefreshToken.getTime() - currentTime.getTime();
+            const remainingTimeAccessToken = expirationDate.getTime() - currentTime.getTime();
+            const remainingTimeRefreshToken = expirationRefreshTokenDate.getTime() - currentTime.getTime();
 
             if (remainingTimeAccessToken <= 0) {
-                // For refresh token, we need userAuth.taxNumber
-                // If userAuth is still not available, try to get it from profile first
-                let currentUserAuth = userAuth;
-                if (!currentUserAuth?.taxNumber && authCredentials.accessToken) {
-                    if (isDevelopment) console.log('[Auth] No userAuth for refresh, fetching profile...');
-                    try {
-                        authService.updateToken(authCredentials.accessToken, authCredentials.tenantId);
-                        const profileResponse = await collaboratorService.getProfile();
-                        if (profileResponse.success && profileResponse.result) {
-                            currentUserAuth = mapCollaboratorToUserAuth(profileResponse.result);
-                            setUserAuth(currentUserAuth);
-                            await saveUserAuth(currentUserAuth);
-                        }
-                    } catch (profileError) {
-                        if (isDevelopment) console.log('[Auth] Failed to fetch profile for refresh:', profileError);
-                    }
-                }
-
-                if (remainingTimeRefreshToken > 0 && authCredentials.refreshToken && currentUserAuth?.taxNumber) {
+                if (remainingTimeRefreshToken > 0 && authCredentials.refreshToken) {
                     if (isDevelopment) console.log('[Auth] Access token expirado, tentando refresh...');
                     try {
                         const newAuthCredentials = await authService.refreshToken(
-                            authCredentials.refreshToken,
-                            currentUserAuth.taxNumber
+                            authCredentials.refreshToken
                         );
                         if (isDevelopment) console.log('[Auth] Refresh bem sucedido no boot');
                         await saveCredentials(newAuthCredentials);
@@ -281,7 +242,6 @@ export function AuthCredentialsProvider({ children }: PropsWithChildren) {
 
                     // Rotas públicas (x-api-key sem Authorization) não precisam de token
                     // Rotas de refresh também não devem tentar refresh token novamente
-                    // 401 significa erro de autenticação/autorização, não token expirado
                     if (responseError.skipRefreshToken || (hasApiKey && !hasAuthHeader)) {
                         if (isDevelopment) {
                             console.log('[Auth Interceptor] 401 em rota pública (x-api-key sem Authorization):', failedRequestUrl, '- deixando caller tratar (erro de autenticação, não token)');
@@ -308,7 +268,6 @@ export function AuthCredentialsProvider({ children }: PropsWithChildren) {
                     }
 
                     // Só tenta refresh token se a requisição tem Authorization header (rota autenticada)
-                    // Se não tem Authorization, é rota pública e não deve tentar refresh
                     if (!hasAuthHeader) {
                         if (isDevelopment) console.log('[Auth Interceptor] 401 sem token na requisição (rota pública), deixando caller tratar');
                         return Promise.reject(responseError);
@@ -333,7 +292,6 @@ export function AuthCredentialsProvider({ children }: PropsWithChildren) {
                                 return await apiInstance(failedRequest);
                             }
                         } catch {
-                            // Se o refresh falhou, rejeitar a requisição
                             return Promise.reject(responseError);
                         }
                         return Promise.reject(responseError);
@@ -341,8 +299,7 @@ export function AuthCredentialsProvider({ children }: PropsWithChildren) {
 
 
                     const currentAuthCredentials = authCredentials;
-                    const currentUserAuth = userAuth;
-                    if (!currentAuthCredentials?.refreshToken || !currentUserAuth?.taxNumber) {
+                    if (!currentAuthCredentials?.refreshToken) {
                         if (isDevelopment) console.log('[Auth Interceptor] Credenciais não disponíveis para refresh token (possível logout em andamento)');
                         return Promise.reject(responseError);
                     }
@@ -350,7 +307,7 @@ export function AuthCredentialsProvider({ children }: PropsWithChildren) {
                     const refreshPromise = (async () => {
                         try {
                             if (isDevelopment) console.log('[Auth Interceptor] Token expirado detectado, tentando refresh token...');
-                            const newAuthCredentials = await authService.refreshToken(currentAuthCredentials.refreshToken, currentUserAuth.taxNumber);
+                            const newAuthCredentials = await authService.refreshToken(currentAuthCredentials.refreshToken);
                             if (isDevelopment) console.log('[Auth Interceptor] Refresh token bem sucedido');
                             await saveCredentials(newAuthCredentials);
                             return newAuthCredentials;

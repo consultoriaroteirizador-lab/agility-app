@@ -1,5 +1,5 @@
 import { useRef } from 'react';
-import { Pressable, Input } from 'react-native';
+import { Pressable, TextInput } from 'react-native';
 
 import { measure } from '@/theme';
 
@@ -25,7 +25,7 @@ export function PinValidation({
   codeLength
 }: PinValidationProps) {
 
-  const inputRef = useRef<Input | null>(null);
+  const inputRef = useRef<TextInput | null>(null);
   const openKeyboard = () => {
     inputRef.current?.focus();
   };
@@ -72,7 +72,7 @@ export function PinValidation({
           </Box>
         </Box>
         <Box>
-          <Input
+          <TextInput
             ref={inputRef}
             style={{
               position: 'absolute',

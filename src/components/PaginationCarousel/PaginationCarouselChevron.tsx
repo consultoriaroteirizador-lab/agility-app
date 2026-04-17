@@ -26,7 +26,7 @@ export function PaginationCarouselChevron<T>({ data, activeIndex, dataRef, onSli
                 <Box alignItems='center' justifyContent='center' flexDirection='row'>
                     < IconButton disabled={data.length > 1 && activeIndex === 0} iconName='chevron-left' color={data.length > 1 && activeIndex !== 0 ? 'primary100' : 'gray200'} size={measure.m30} onPress={() => handleGoToSlide(activeIndex - 1)} />
                     <Text preset="text14">{`${activeIndex + 1} de ${data.length}`}</Text>
-                    <IconButton disabled={activeIndex === data.length - 1} iconName='chevron-right' color={activeIndex !== data.length - 1 ? 'orangeAgility' : 'gray200'} size={measure.m30} onPress={() => handleGoToSlide(activeIndex + 1)} />
+                    <IconButton disabled={activeIndex === data.length - 1} iconName='chevron-right' color={activeIndex !== data.length - 1 ? 'primary100' : 'gray200'} size={measure.m30} onPress={() => handleGoToSlide(activeIndex + 1)} />
                 </Box>}
         </Box>
     )

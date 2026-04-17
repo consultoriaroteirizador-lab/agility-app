@@ -15,11 +15,11 @@ export function useCreatePayment() {
     },
   });
 
-  const { mutateAsync: createPayment, isLoading, isError, error, reset } = mutation;
+  const { mutateAsync: createPayment, isPending, isError, error, reset } = mutation;
 
   return {
     createPayment,
-    isLoading,
+    isLoading: isPending,
     isError,
     error,
     reset,

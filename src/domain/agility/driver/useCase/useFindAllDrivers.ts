@@ -1,13 +1,13 @@
 import { useQuery } from '@tanstack/react-query'
 
-import { KEY_DRIVERS } from '@/domain/queryKeys'
+import { KEY_DRIVER } from '@/domain/queryKeys'
 
 import { driverService } from '../driverService'
 import type { ListDriversRequest } from '../dto'
 
 export function useFindAllDrivers(params?: ListDriversRequest) {
     const { data, isLoading, isError, refetch, isRefetching } = useQuery({
-        queryKey: [KEY_DRIVERS, params?.teamCode, params?.page, params?.limit],
+        queryKey: [KEY_DRIVER, params?.teamCode],
         queryFn: () => driverService.findAll(params || {}),
         retry: false,
     })

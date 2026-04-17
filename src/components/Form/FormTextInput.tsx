@@ -2,14 +2,14 @@ import { useState } from 'react';
 
 import { Controller, UseControllerProps, FieldValues } from 'react-hook-form';
 
-import { Input, TextInputProps } from '../Input/Input';
+import { Input, InputProps } from '../Input/Input';
 
 export function FormTextInput<T extends FieldValues>({
   control,
   name,
   isPassword,
   ...rest
-}: TextInputProps & UseControllerProps<T>) {
+}: InputProps & UseControllerProps<T> & { isPassword?: boolean }) {
   const [isFocused, setIsFocused] = useState(false);
   return (
     <Controller

@@ -4,6 +4,8 @@ import type { Id } from '@/types/base'
 
 import type { ChatItem, MessageItem, CreateDriverSupportChatPayload, SendMessagePayload } from './dto/types'
 
+export type { ChatItem, MessageItem } from './dto/types'
+
 export async function create(payload: Record<string, unknown>): Promise<BaseResponse<ChatItem>> {
   const { data } = await apiAgility.post<BaseResponse<ChatItem>>('/chats', payload)
   return data

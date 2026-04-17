@@ -20,6 +20,7 @@ interface ScreenBaseProps {
   marginHorizontalScreenBase?: ThemeSpace;
   imageBackground?: any;
   dismissKeyboardOnTouch?: boolean;
+  disableKeyboardAvoid?: boolean;
 }
 
 export function ScreenBase({
@@ -31,8 +32,39 @@ export function ScreenBase({
   marginHorizontalScreenBase = 'x20',
   mbScreenBase = 'b20',
   mtScreenBase = 't20',
+  disableKeyboardAvoid,
 }: ScreenBaseProps) {
   const Container = scrollable ? ScrollViewContainer : ViewContainer;
+
+  const content = (
+    <Container backgroundColor={colors.backgroundColor}>
+      <Box
+        flex={1}
+        marginHorizontal={marginHorizontalScreenBase}
+        mb={mbScreenBase}
+        mt={mtScreenBase}
+      >
+        {(buttonLeft || title || buttonRight) && (
+          <Box
+            flexDirection="row"
+            justifyContent="space-between"
+            alignItems="center"
+            mb="b10">
+            <Box flex={1}>{buttonLeft}</Box>
+            <Box alignItems="center" flex={8}>
+              {title}
+            </Box>
+            <Box flex={1}>{buttonRight}</Box>
+          </Box>
+        )}
+        {children}
+      </Box>
+    </Container>
+  );
+
+  if (disableKeyboardAvoid) {
+    return content;
+  }
 
   return (
     <KeyboardAvoidingView
@@ -40,29 +72,7 @@ export function ScreenBase({
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
     >
-      <Container backgroundColor={colors.backgroundColor}>
-        <Box
-          flex={1}
-          marginHorizontal={marginHorizontalScreenBase}
-          mb={mbScreenBase}
-          mt={mtScreenBase}
-        >
-          {(buttonLeft || title || buttonRight) && (
-            <Box
-              flexDirection="row"
-              justifyContent="space-between"
-              alignItems="center"
-              mb="b10">
-              <Box flex={1}>{buttonLeft}</Box>
-              <Box alignItems="center" flex={8}>
-                {title}
-              </Box>
-              <Box flex={1}>{buttonRight}</Box>
-            </Box>
-          )}
-          {children}
-        </Box>
-      </Container>
+      {content}
     </KeyboardAvoidingView>
   );
 }

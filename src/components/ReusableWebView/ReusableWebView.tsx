@@ -4,6 +4,7 @@ import { ActivityIndicator } from '../ActivityIndicator/ActivityIndicator';
 import { Box } from '../BoxBackGround/BoxBackGround';
 import { WebViewBox, WebViewBoxProps } from '../RestyleComponent/RestyleComponent';
 import { Text } from '../Text/Text';
+import { measure } from '../../theme';
 
 
 

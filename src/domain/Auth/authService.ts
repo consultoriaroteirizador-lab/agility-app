@@ -13,8 +13,8 @@ async function signIn(request: AuthRequest): Promise<BaseResponse<AuthCredential
     return baseResponseAdapter.toBaseResponse(response, authType) as BaseResponse<AuthCredentials>
 }
 
-async function refreshToken(refreshToken: string, username?: string): Promise<AuthCredentials> {
-    const response = await authApi.refreshToken(refreshToken, username)
+async function refreshToken(refreshToken: string): Promise<AuthCredentials> {
+    const response = await authApi.refreshToken(refreshToken)
     
     // Se o refresh falhou, lançar erro
     if (!response.success || !response.result) {

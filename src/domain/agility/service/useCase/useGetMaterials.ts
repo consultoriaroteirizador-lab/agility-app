@@ -1,18 +1,16 @@
-import { BaseResponse, QueryOptions, useQueryService } from '@/api'
+import { useQuery } from '@tanstack/react-query'
 import type { Id } from '@/types/base'
 
 import type { ServiceMaterialResponse } from '../dto/response/service-material.response'
 import { serviceService } from '../serviceService'
 
-export function useGetMaterials(serviceId: Id | undefined, options?: QueryOptions<BaseResponse<ServiceMaterialResponse[]>>) {
-    const { data, isLoading, isError, refetch } = useQueryService<ServiceMaterialResponse[]>(
-        ['serviceMaterials', serviceId],
-        () => serviceService.getMaterials(serviceId!),
-        {
-            enabled: !!serviceId,
-            ...options,
-        }
-    )
+export function useGetMaterials(serviceId: Id | undefined) {
+    const { data, isLoading, isError, refetch } = useQuery({
+        queryKey: ['serviceMaterials', serviceId],
+        queryFn: () => serviceService.getMaterials(serviceId!),
+        enabled: !!serviceId,
+        retry: false,
+    })
 
     return {
         materials: data?.result ?? [],

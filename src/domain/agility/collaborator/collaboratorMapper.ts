@@ -51,5 +51,6 @@ export function mapCollaboratorToUserAuth(
         emailVerified: !!collaborator.email,
         driverId: collaborator.driverId || undefined,
         collaboratorId: collaborator.id, // collaboratorId interno
+        companyId: undefined, // companyId não vem do profile, vem do JWT
     };
 }

@@ -52,7 +52,7 @@ export default function ChanceTemporaryPasswordScreen() {
     });
 
     const { isLoading, changePassword } = useChangePassword({
-        onSuccess: async (response: BaseResponse<string>) => {
+        onSuccess: async (response) => {
             showToast({ message: response.message ?? "Senha alterada com sucesso", position: 'center', type: 'success' })
             // Remover token antigo antes de fazer novo login para evitar que requisições usem token inválido
             // Usar authService.removeToken() diretamente para não redirecionar para login

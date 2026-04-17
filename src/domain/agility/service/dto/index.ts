@@ -22,5 +22,6 @@ export type {
 
 // Response DTOs
 export type { ServiceResponse, EquipmentResponse } from './response/service.response'
+export type { ServiceMaterialResponse, MaterialStatus, MaterialCheckRequest, MaterialCheckResponse, BatchMaterialCheckRequest, BatchMaterialCheckResponse } from './response/service-material.response'
 
 

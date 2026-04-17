@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useRef } from 'react';
-import { Input, type Input as TextInputRef } from 'react-native';
+import { TextInput as TextInputRN, type TextInput as TextInputRef } from 'react-native';
+const TextInput = TextInputRN;
 
 import { Box, Text, TouchableOpacityBox } from '@/components';
 import { measure } from '@/theme';
@@ -93,7 +94,7 @@ export default function ChatInput({
         )}
 
         <Box flex={1} backgroundColor="primary10" borderRadius="s16" paddingHorizontal="x12" paddingVertical="y8">
-          <Input
+          <TextInput
             ref={inputRef}
             placeholder={placeholder}
             placeholderTextColor="black"

@@ -24,7 +24,7 @@ export const textButtonPresets: Record<TextButtonPreset, TextButtonUI> = {
 
   textUnderline: {
     textStyle: {
-      color: 'colorTextTitle',
+      color: 'colorTextSubTitle',
       textDecorationLine: 'underline',
     },
   },

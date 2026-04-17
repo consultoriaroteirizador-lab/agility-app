@@ -1,20 +1,24 @@
 export type UserAuth = {
     id: string;
-    taxNumber: string;
-    email?: string; // Email address for login
-    roles: string[];
+    email?: string;
     fullname: string;
-    nickname: string;
-    phone?: string; // Phone number
-    gender: string;
-    birthdate: string;
-    familyName: string;
+    familyName?: string;
+    roles: string[];
     status: "ACTIVE" | "BLOCKED_BY_USER" | "BLOCKED_BY_OVERTRYING" | "CANCELED" | "ACTIVE_WITH_TEMPORARY_PASSWORD";
-    noDevice: boolean;
-    phoneNumberVerified: boolean;
-    emailVerified: boolean;
-    driverId?: string; // ID do driver (da tabela Driver) - já vem do profile
-    collaboratorId?: string; // ID do collaborator (da tabela Collaborator) - para usuários não-motoristas
+    driverId?: string; // ID do driver (da tabela Driver) - vem do JWT claim driver_id
+    collaboratorId?: string; // ID do collaborator (da tabela Collaborator) - vem do JWT claim collaborator_id
+    companyId?: string; // ID da empresa/tenant - vem do JWT claim company_id
+    // Campos opcionais - preenchidos sob demanda via GET /collaborators/profile
+    taxNumber?: string;
+    nickname?: string;
+    phone?: string;
+    gender?: string;
+    birthdate?: string;
+    noDevice?: boolean;
+    phoneNumberVerified?: boolean;
+    emailVerified?: boolean;
+    employeeCode?: string;
+    department?: string;
 };
 
 

@@ -1,5 +1,5 @@
 
-import { goTermAndConditionsScreen } from "@/routes/routesService";
+import { Linking } from "react-native";
 import { colors, measure } from "@/theme";
 
 import { Box } from "../BoxBackGround/BoxBackGround";
@@ -24,7 +24,7 @@ export function TermAndConditionsComponent({
 
     function handleGoTermAndConditionsScreen() {
         onCheckedChange(true)
-        goTermAndConditionsScreen();
+        // TODO: implement navigation to Terms and Conditions screen
     }
 
     return (

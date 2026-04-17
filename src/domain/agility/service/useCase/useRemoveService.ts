@@ -3,8 +3,8 @@ import type { Id } from '@/types/base'
 
 import { serviceService } from '../serviceService'
 
-export function useRemoveService(options?: MutationOptions<BaseResponse<void>>) {
-    const mutation = useMutationService<void, Id>({
+export function useRemoveService(options?: MutationOptions<BaseResponse<{ success: boolean; message: string }>>) {
+    const mutation = useMutationService<{ success: boolean; message: string }, Id>({
         action: (id: Id) => serviceService.remove(id),
         onSuccess: options?.onSuccess,
         onError: options?.onError,

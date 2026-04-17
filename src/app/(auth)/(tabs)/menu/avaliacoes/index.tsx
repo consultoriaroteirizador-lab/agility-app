@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
+import { View } from 'react-native';
 
 import { Ionicons } from '@expo/vector-icons';
 import { format } from 'date-fns';
-import { View } from 'react-native';
 
 import { Box, ScreenBase, Text, TouchableOpacityBox } from '@/components';
 import { ButtonBack } from '@/components/Button/ButtonBack';

@@ -43,7 +43,6 @@ export function PasswordValidateUI({
       <Box flexDirection="row" alignItems="center" gap="x4">
         <LocalIcon
           iconName={passwordValidation.length ? 'check' : 'circleClose'}
-          height={measure.y10}
           size={measure.x10}
           color={passwordValidation.length ? 'greenSuccess' : 'redError'}
         />
@@ -54,7 +53,6 @@ export function PasswordValidateUI({
       <Box flexDirection="row" alignItems="center" gap="x4">
         <LocalIcon
           iconName={passwordValidation.hasLowercase ? 'check' : 'circleClose'}
-          height={measure.y10}
           size={measure.x10}
           color={passwordValidation.hasLowercase ? 'greenSuccess' : 'redError'}
         />
@@ -65,7 +63,6 @@ export function PasswordValidateUI({
       <Box flexDirection="row" alignItems="center" gap="x4">
         <LocalIcon
           iconName={passwordValidation.hasUppercase ? 'check' : 'circleClose'}
-          height={measure.y10}
           size={measure.x10}
           color={passwordValidation.hasUppercase ? 'greenSuccess' : 'redError'}
         />
@@ -76,7 +73,6 @@ export function PasswordValidateUI({
       <Box flexDirection="row" alignItems="center" gap="x4">
         <LocalIcon
           iconName={passwordValidation.hasNumber ? 'check' : 'circleClose'}
-          height={measure.y10}
           size={measure.x10}
           color={passwordValidation.hasNumber ? 'greenSuccess' : 'redError'}
         />
@@ -87,7 +83,6 @@ export function PasswordValidateUI({
       <Box flexDirection="row" alignItems="center" gap="x4">
         <LocalIcon
           iconName={passwordValidation.hasSpecialChar ? 'check' : 'circleClose'}
-          height={measure.y10}
           size={measure.x10}
           color={
             passwordValidation.hasSpecialChar ? 'greenSuccess' : 'redError'

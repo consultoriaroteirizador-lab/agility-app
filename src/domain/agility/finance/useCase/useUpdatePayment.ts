@@ -17,11 +17,11 @@ export function useUpdatePayment() {
     },
   });
 
-  const { mutateAsync: updatePayment, isLoading, isError, error, reset } = mutation;
+  const { mutateAsync: updatePayment, isPending, isError, error, reset } = mutation;
 
   return {
     updatePayment,
-    isLoading,
+    isLoading: isPending,
     isError,
     error,
     reset,

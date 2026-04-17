@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 
 import { useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
@@ -9,10 +9,11 @@ import {
   Button,
   Input,
   ScreenBase,
+  ActivityIndicator,
 } from '@/components';
 import { ButtonBack } from '@/components/Button/ButtonBack';
 import type { UpdateCollaboratorRequest } from '@/domain/agility/collaborator/dto';
-import { useUpdateProfile } from '@/domain/agility/collaborator/useCase';
+import { useGetProfile, useUpdateProfile } from '@/domain/agility/collaborator/useCase';
 import { KEY_COLLABORATORS } from '@/domain/queryKeys';
 import { useAuthCredentialsService } from '@/services';
 import { useToastService } from '@/services/Toast/useToast';
@@ -29,10 +30,11 @@ export default function PerfilScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { userAuth, saveUserAuth } = useAuthCredentialsService();
+  const { profile, isLoading: isLoadingProfile } = useGetProfile();
 
   const { showToast } = useToastService();
 
-  const { updateProfile, isLoading } = useUpdateProfile({
+  const { updateProfile, isLoading: isUpdating } = useUpdateProfile({
     onSuccess: (response) => {
       queryClient.invalidateQueries({ queryKey: [KEY_COLLABORATORS, 'profile'] });
       // Atualizar userAuth com os novos dados
@@ -49,12 +51,34 @@ export default function PerfilScreen() {
   });
 
   const [formData, setFormData] = useState<FormData>({
-    fullname: userAuth?.fullname || '',
-    nickname: userAuth?.nickname || '',
-    phone: userAuth?.phone || '',
-    email: userAuth?.email || '',
-    document: userAuth?.taxNumber || '',
+    fullname: '',
+    nickname: '',
+    phone: '',
+    email: '',
+    document: '',
   });
+
+  // Populate form with profile data from API (complete data)
+  useEffect(() => {
+    if (profile) {
+      setFormData({
+        fullname: profile.fullName || userAuth?.fullname || '',
+        nickname: profile.nickname || '',
+        phone: profile.phone || '',
+        email: profile.email || userAuth?.email || '',
+        document: profile.taxNumber || '',
+      });
+    } else if (!isLoadingProfile && userAuth) {
+      // Fallback: use JWT data if profile fetch fails
+      setFormData({
+        fullname: userAuth.fullname || '',
+        nickname: userAuth.nickname || '',
+        phone: userAuth.phone || '',
+        email: userAuth.email || '',
+        document: userAuth.taxNumber || '',
+      });
+    }
+  }, [profile, isLoadingProfile, userAuth]);
 
   const handleInputChange = (field: keyof FormData, value: string) => {
     setFormData(prev => ({
@@ -87,10 +111,6 @@ export default function PerfilScreen() {
     };
 
     updateProfile(payload);
-  };
-
-  const handleCancel = () => {
-    router.back();
   };
 
   const formatPhone = (text: string) => {
@@ -137,6 +157,17 @@ export default function PerfilScreen() {
     handleInputChange('document', formatted);
   };
 
+  if (isLoadingProfile) {
+    return (
+      <ScreenBase buttonLeft={<ButtonBack />} title={<Text preset="textTitleScreen" fontWeight="bold" color="colorTextPrimary">
+        Editar Perfil
+      </Text>}>
+        <Box flex={1} justifyContent="center" alignItems="center">
+          <ActivityIndicator size="large" />
+        </Box>
+      </ScreenBase>
+    );
+  }
 
   return (
     <ScreenBase buttonLeft={<ButtonBack />} title={<Text preset="textTitleScreen" fontWeight="bold" color="colorTextPrimary">
@@ -164,7 +195,7 @@ export default function PerfilScreen() {
               placeholder="Digite seu nome completo"
               value={formData.fullname}
               onChangeText={(text) => handleInputChange('fullname', text)}
-              editable={!isLoading}
+              editable={!isUpdating}
             />
 
             {/* Apelido */}
@@ -173,7 +204,7 @@ export default function PerfilScreen() {
               placeholder="Como gostaria de ser chamado"
               value={formData.nickname}
               onChangeText={(text) => handleInputChange('nickname', text)}
-              editable={!isLoading}
+              editable={!isUpdating}
             />
 
             {/* Telefone */}
@@ -183,7 +214,7 @@ export default function PerfilScreen() {
               value={formData.phone}
               onChangeText={handlePhoneChange}
               keyboardType="phone-pad"
-              editable={!isLoading}
+              editable={!isUpdating}
               maxLength={15}
             />
 
@@ -213,17 +244,17 @@ export default function PerfilScreen() {
             {/* Botões de Ação */}
             <Box flexDirection="row" gap="x16" marginTop="y24">
               <Button
-                title={isLoading ? 'Salvando...' : 'Salvar'}
+                title={isUpdating ? 'Salvando...' : 'Salvar'}
                 preset="main"
                 onPress={handleSave}
-                disabled={isLoading}
+                disabled={isUpdating}
                 flex={1}
               />
               {/* <Button
                 title="Cancelar"
                 preset="outline"
                 onPress={handleCancel}
-                disabled={isLoading}
+                disabled={isUpdating}
                 flex={1}
               /> */}
 

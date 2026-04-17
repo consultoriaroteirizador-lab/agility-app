@@ -114,9 +114,6 @@ export interface CollaboratorResponse {
     /** Has fixed vehicle */
     hasFixedVehicle: boolean;
 
-    /** Work schedule configuration */
-    workSchedule?: WorkSchedule;
-
     /** Creation timestamp */
     createdAt: Date | string;
 

@@ -19,7 +19,7 @@ export function useRefreshToken(options?: UseRefreshTokenOptions) {
 
     const mutation = useMutation({
         mutationFn: async (request: RefreshTokenRequest): Promise<AuthCredentials> => {
-            const credentials = await authService.refreshToken(request.refreshToken, request.username || '');
+            const credentials = await authService.refreshToken(request.refreshToken);
             return credentials;
         },
         onSuccess: async (credentials) => {

@@ -3,9 +3,10 @@ import { AppState, AppStateStatus } from 'react-native';
 
 import { useTrackingWebSocket } from '@/domain/agility/tracking';
 import type { DriverLocationUpdate } from '@/domain/agility/tracking';
+import { useAuthCredentialsService } from '@/services';
 import { initializeGeofenceService, cleanupGeofenceService } from '@/services/geofence';
 import { useLocationTracking } from '@/services/location';
-import { initializeBackgroundGeolocation, cleanupBackgroundGeolocation } from '@/services/location/backgroundLocationService';
+import { initializeBackgroundGeolocation, cleanupBackgroundGeolocation, type TrackingAuthConfig } from '@/services/location/backgroundLocationService';
 
 /**
  * Componente que gerencia o rastreamento de localização automaticamente
@@ -18,6 +19,7 @@ import { initializeBackgroundGeolocation, cleanupBackgroundGeolocation } from '@
  */
 export function LocationTrackingProvider({ children }: { children: React.ReactNode }) {
   const { driverId, startTracking, stopTracking } = useLocationTracking();
+  const { authCredentials } = useAuthCredentialsService();
   const appState = useRef(AppState.currentState);
   const isInitialized = useRef(false);
 
@@ -46,7 +48,12 @@ export function LocationTrackingProvider({ children }: { children: React.ReactNo
         console.log('[LocationTrackingProvider] Inicializando Background Geolocation SDK...');
         
         // Inicializar Background Geolocation
-        await initializeBackgroundGeolocation(driverId);
+        const authConfig: TrackingAuthConfig = {
+          driverId,
+          accessToken: authCredentials?.accessToken || '',
+          tenantId: authCredentials?.tenantId || '',
+        };
+        await initializeBackgroundGeolocation(authConfig);
         
         // Inicializar serviço de geofencing
         initializeGeofenceService();

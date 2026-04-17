@@ -18,8 +18,9 @@ import {
 import { useAuthCredentialsService } from '@/services';
 import { useToastService } from '@/services/Toast/useToast';
 
-export type Attachment = {
-  url: string;
+type Attachment = {
+  uri?: string;
+  url?: string;
   type: 'image' | 'document';
   name?: string;
   size?: number;
@@ -54,7 +55,7 @@ export default function ChatScreen() {
 
         // Fazer upload dos anexos se houver
         if (tempAttachments && tempAttachments.length > 0) {
-          const uris = tempAttachments.map(a => a.url);
+          const uris = tempAttachments.map(a => a.uri || a.url || '').filter(Boolean);
           const uploadResult = await uploadAttachments({ files: uris });
 
           if (uploadResult.success && uploadResult.result?.urls) {
@@ -157,13 +158,13 @@ export default function ChatScreen() {
                       )}
 
                       {/* Exibir anexos da mensagem */}
-                      {message.attachments && message.attachments.length > 0 && (
+                      {Array.isArray(message.attachments) && (message.attachments as unknown as string[]).length > 0 && (
                         <ChatAttachmentView
-                          attachments={message.attachments.map(url => ({
+                          attachments={(message.attachments as unknown as string[]).map((url: string) => ({
                             url,
                             type: url.match(/\.(jpg|jpeg|png|gif|webp)$/i)
-                              ? 'image'
-                              : 'document',
+                              ? 'image' as const
+                              : 'document' as const,
                           }))}
                           compact={true}
                         />
@@ -193,7 +194,7 @@ export default function ChatScreen() {
 
           {/* Input de Mensagem */}
           <ChatInput
-            onSendMessage={handleSendMessage}
+            onSendMessage={handleSendMessage as (content: string, attachments?: any[]) => void}
             onTyping={handleTyping}
             disabled={sending || uploading}
             placeholder="Digite uma mensagem..."

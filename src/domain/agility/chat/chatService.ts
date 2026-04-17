@@ -1,14 +1,15 @@
 import type { BaseResponse } from '@/api/baseResponse'
 import type { Id } from '@/types/base'
 
-import { create, findOne, findByUser, findActiveByUser, getMessages, sendMessage, close, markRead, markDelivered, unreadCount, createDriverSupport, createDriverCustomer, createCustomerSupport, uploadChatAttachment, type ChatItem, type MessageItem } from './chatAPI'
+import { create, findOne, findByUser, findActiveByUser, getMessages, sendMessage, close, markRead, markDelivered, unreadCount, createDriverSupport, createDriverCustomer, createCustomerSupport, uploadChatAttachment } from './chatAPI'
+import type { ChatItem, MessageItem, SendMessagePayload } from './dto/types'
 
 export async function createChatService(payload: Record<string, unknown>): Promise<BaseResponse<ChatItem>> { return create(payload) }
 export async function getChatService(id: Id): Promise<BaseResponse<ChatItem>> { return findOne(id) }
 export async function listChatsByUserService(userId: Id, userType: string = 'DRIVER'): Promise<BaseResponse<ChatItem[]>> { return findByUser(userId, userType) }
 export async function getActiveChatByUserService(userId: Id, userType: string = 'DRIVER'): Promise<BaseResponse<ChatItem | null>> { return findActiveByUser(userId, userType) }
 export async function getChatMessagesService(chatId: Id): Promise<BaseResponse<MessageItem[]>> { return getMessages(chatId) }
-export async function postMessageService(payload: Record<string, unknown>, senderType: string = 'DRIVER'): Promise<BaseResponse<MessageItem>> { return sendMessage(payload, senderType) }
+export async function postMessageService(payload: SendMessagePayload, senderType: string = 'DRIVER'): Promise<BaseResponse<MessageItem>> { return sendMessage(payload, senderType) }
 export async function closeChatService(id: Id): Promise<BaseResponse<ChatItem>> { return close(id) }
 export async function markChatReadService(chatId: Id, userId: Id): Promise<BaseResponse<{ success: boolean }>> { return markRead(chatId, userId) }
 export async function markMessagesDeliveredService(): Promise<BaseResponse<{ success: boolean }>> { return markDelivered() }
