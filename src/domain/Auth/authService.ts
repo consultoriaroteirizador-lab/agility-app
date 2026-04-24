@@ -13,14 +13,13 @@ async function signIn(request: AuthRequest): Promise<BaseResponse<AuthCredential
     return baseResponseAdapter.toBaseResponse(response, authType) as BaseResponse<AuthCredentials>
 }
 
-async function refreshToken(refreshToken: string): Promise<AuthCredentials> {
-    const response = await authApi.refreshToken(refreshToken)
-    
-    // Se o refresh falhou, lançar erro
+async function refreshToken(refreshToken: string, companyId?: string): Promise<AuthCredentials> {
+    const response = await authApi.refreshToken(refreshToken, companyId)
+
     if (!response.success || !response.result) {
         throw new Error(response.message || 'Token refresh failed')
     }
-    
+
     return authAdapter.toAuthResponse(response.result)
 }
 

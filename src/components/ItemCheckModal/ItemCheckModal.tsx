@@ -15,21 +15,38 @@ interface CheckData {
     photoProof?: string;
 }
 
+interface StatusLabels {
+    CHECKED?: string;
+    PARTIAL?: string;
+    MISSING?: string;
+    DAMAGED?: string;
+    REFUSED?: string;
+}
+
 interface ItemCheckModalProps {
     visible: boolean;
     item: ServiceMaterialResponse | null;
     onClose: () => void;
     onConfirm: (data: CheckData) => void;
     loading?: boolean;
+    statusLabels?: StatusLabels;
 }
 
-const STATUS_OPTIONS: { value: CheckStatus; label: string; description: string }[] = [
-    { value: 'CHECKED', label: 'Entregue', description: 'Item entregue com sucesso' },
-    { value: 'PARTIAL', label: 'Parcial', description: 'Entrega parcial' },
-    { value: 'MISSING', label: 'Não encontrado', description: 'Item não estava disponível' },
-    { value: 'DAMAGED', label: 'Danificado', description: 'Item chegou danificado' },
-    { value: 'REFUSED', label: 'Recusado', description: 'Cliente recusou o item' },
-];
+const DEFAULT_STATUS_LABELS: Record<CheckStatus, string> = {
+    CHECKED: 'Entregue',
+    PARTIAL: 'Parcial',
+    MISSING: 'Não encontrado',
+    DAMAGED: 'Danificado',
+    REFUSED: 'Recusado',
+};
+
+const DEFAULT_DESCRIPTIONS: Record<CheckStatus, string> = {
+    CHECKED: 'Item entregue com sucesso',
+    PARTIAL: 'Entrega parcial',
+    MISSING: 'Item não estava disponível',
+    DAMAGED: 'Item chegou danificado',
+    REFUSED: 'Cliente recusou o item',
+};
 
 const DEFAULT_STATE = {
     status: 'CHECKED' as CheckStatus,
@@ -37,7 +54,7 @@ const DEFAULT_STATE = {
     notes: '',
 };
 
-export function ItemCheckModal({ visible, item, onClose, onConfirm, loading }: ItemCheckModalProps) {
+export function ItemCheckModal({ visible, item, onClose, onConfirm, loading, statusLabels }: ItemCheckModalProps) {
     const { top } = useAppSafeArea();
     const [status, setStatus] = useState<CheckStatus>(DEFAULT_STATE.status);
     const [actualQuantity, setActualQuantity] = useState(DEFAULT_STATE.actualQuantity);
@@ -53,6 +70,15 @@ export function ItemCheckModal({ visible, item, onClose, onConfirm, loading }: I
     }, [visible]);
 
     if (!visible || !item) return null;
+
+    const labels = { ...DEFAULT_STATUS_LABELS, ...statusLabels };
+    const statusOptions: { value: CheckStatus; label: string; description: string }[] = [
+        { value: 'CHECKED', label: labels.CHECKED, description: DEFAULT_DESCRIPTIONS.CHECKED },
+        { value: 'PARTIAL', label: labels.PARTIAL, description: DEFAULT_DESCRIPTIONS.PARTIAL },
+        { value: 'MISSING', label: labels.MISSING, description: DEFAULT_DESCRIPTIONS.MISSING },
+        { value: 'DAMAGED', label: labels.DAMAGED, description: DEFAULT_DESCRIPTIONS.DAMAGED },
+        { value: 'REFUSED', label: labels.REFUSED, description: DEFAULT_DESCRIPTIONS.REFUSED },
+    ];
 
     const parsedQuantity = parseFloat(actualQuantity);
     const isPartial = status === 'PARTIAL';
@@ -114,7 +140,7 @@ export function ItemCheckModal({ visible, item, onClose, onConfirm, loading }: I
                             <Text preset="text14" color="colorTextPrimary" fontWeightPreset="semibold">
                                 Status:
                             </Text>
-                            {STATUS_OPTIONS.map((option) => {
+                            {statusOptions.map((option) => {
                                 const isSelected = status === option.value;
                                 return (
                                     <TouchableOpacityBox

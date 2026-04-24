@@ -1,6 +1,5 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
 
-import { jwtDecode } from 'jwt-decode';
 import { io, Socket } from 'socket.io-client';
 
 import { urls } from '@/config/urls';
@@ -125,26 +124,11 @@ export function useChatWebSocket(options: UseChatWebSocketOptions = {}) {
             return;
         }
 
-        let userId: string | null = userAuth?.id || null;
-        console.log('[useChatWebSocket] Initial userId:', userId, 'from userAuth?.id');
-
-        try {
-            const payload = jwtDecode<any>(authCredentials.accessToken);
-            console.log('[useChatWebSocket] JWT payload:', {
-                sub: payload.sub,
-                userId: payload.userId,
-            });
-            userId = payload.sub || payload.userId || userAuth?.id || null;
-            console.log('[useChatWebSocket] Extracted userId from JWT:', userId);
-        } catch (error) {
-            console.error('[useChatWebSocket] Failed to decode token:', error);
-            if (!userId && userAuth?.id) {
-                userId = userAuth.id;
-            }
-        }
+        const userId = userAuth?.id || null;
+        console.log('[useChatWebSocket] userId from userAuth:', userId);
 
         if (!userId) {
-            console.warn('[useChatWebSocket] Could not extract userId');
+            console.warn('[useChatWebSocket] Could not extract userId from userAuth');
             connectingRef.current = false;
             return;
         }

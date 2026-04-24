@@ -1,5 +1,4 @@
 
-import { Linking } from "react-native";
 import { colors, measure } from "@/theme";
 
 import { Box } from "../BoxBackGround/BoxBackGround";

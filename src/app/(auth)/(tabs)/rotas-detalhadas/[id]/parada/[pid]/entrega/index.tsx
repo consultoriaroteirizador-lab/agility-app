@@ -8,9 +8,9 @@ import { measure } from '@/theme';
 import { EtapaCheckItens } from '../_components/entrega/EtapaCheckItens';
 import { EtapaConfirmacao } from '../_components/entrega/EtapaConfirmacao';
 import { EtapaInicial } from '../_components/entrega/EtapaInicial';
-import { EtapaRecebedor } from '../_components/entrega/EtapaRecebedor';
 import { SharedEtapaDados } from '../_components/shared/SharedEtapaDados';
 import { SharedEtapaFinalizacao } from '../_components/shared/SharedEtapaFinalizacao';
+import { SharedEtapaRecebedor } from '../_components/shared/SharedEtapaRecebedor';
 import { ParadaProvider, useParada } from '../_context/ParadaContext';
 
 /**
@@ -95,9 +95,9 @@ function EntregaOrchestrator() {
         return <SharedEtapaDados serviceType="entrega" />;
     }
 
-    // Etapa 3: Seleção de recipient
+    // Etapa 3: Seleção de quem recebeu
     if (etapa === 3 || (delivered && !recipient.tipo && !needsMaterialCheck)) {
-        return <EtapaRecebedor />;
+        return <SharedEtapaRecebedor serviceType="entrega" />;
     }
 
     // Etapa 5: Checklist final

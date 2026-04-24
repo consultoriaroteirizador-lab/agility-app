@@ -51,6 +51,9 @@ export interface ServiceResponse {
     /** Service type */
     serviceType: ServiceType | null
 
+    /** Service sub-type (e.g. MANUTENCAO, VISTORIA, INSTALACAO) */
+    subType: string | null
+
     /** Status */
     status: ServiceStatus
 
@@ -198,6 +201,9 @@ export interface ServiceResponse {
     /** Actual duration in minutes */
     actualDurationMinutes: number | null
 
+    /** Calculated actual duration in minutes */
+    actualDurationMinutesCalculated: number | null
+
     /** Full address object (when available) */
     address: AddressResponse | null
 
@@ -206,6 +212,24 @@ export interface ServiceResponse {
 
     /** Materials list for this service (delivery/pickup items) */
     materials?: ServiceMaterialResponse[]
+
+    /** Routing code */
+    routingCode: string | null
+
+    /** Customer signature file path */
+    customerSignature: string | null
+
+    /** Photo proof file paths */
+    photoProof: string[] | null
+
+    /** Name of person who received the delivery/service */
+    receivedBy: string | null
+
+    /** Completion timestamp */
+    completedAt: Date | string | null
+
+    /** Number of attempts */
+    attemptCount: number
 
     /** Creation timestamp */
     createdAt: Date | string

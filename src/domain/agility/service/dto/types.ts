@@ -11,11 +11,9 @@ export enum ServiceStatus {
 }
 
 export enum ServiceType {
-    INSTALLATION = 'INSTALLATION',
     DELIVERY = 'DELIVERY',
-    MAINTENANCE = 'MAINTENANCE',
-    EXCHANGE = 'EXCHANGE',
     PICKUP = 'PICKUP',
+    SERVICE = 'SERVICE',
 }
 
 export enum PriorityLevel {

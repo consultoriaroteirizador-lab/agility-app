@@ -1,7 +1,6 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
 
 import { useQueryClient } from '@tanstack/react-query';
-import { jwtDecode } from 'jwt-decode';
 import { io, Socket } from 'socket.io-client';
 
 import { urls } from '@/config/urls';
@@ -9,6 +8,8 @@ import { KEY_NOTIFICATIONS } from '@/domain/queryKeys';
 import { useAuthCredentialsService } from '@/services';
 
 import type { NotificationResponse } from '../dto';
+
+
 
 const getWebSocketUrl = () => {
     const baseUrl = urls.agilityApi;
@@ -60,19 +61,8 @@ export function useNotificationWebSocket(options: UseNotificationWebSocketOption
             return;
         }
 
-        // Extrai userId do token JWT ou usa userAuth.id
-        let userId: string | null = userAuth?.id || null;
-
-        try {
-            const payload = jwtDecode<any>(authCredentials.accessToken);
-            userId = payload.sub || payload.userId || userAuth?.id || null;
-        } catch (error) {
-            console.error('[useNotificationWebSocket] Failed to decode token:', error);
-            // Se falhar, tenta usar userAuth
-            if (!userId && userAuth?.id) {
-                userId = userAuth.id;
-            }
-        }
+        // userId = keycloakUserId (JWT sub), already extracted at login
+        const userId = userAuth?.id || null;
 
         if (!userId) {
             console.warn('[useNotificationWebSocket] Could not extract userId');

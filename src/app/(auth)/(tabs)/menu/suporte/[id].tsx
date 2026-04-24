@@ -277,13 +277,11 @@ export default function SuporteChatPage() {
     },
   });
 
-  // ✅ OTIMIZAÇÃO: Usar driverId diretamente do userAuth em vez de buscar o chat
-  // O userAuth já tem o driverId carregado no login via collaboratorService.getProfile()
+  // userAuth.id = keycloakUserId (JWT sub). O backend converte para ID interno automaticamente.
   useEffect(() => {
     if (!userAuth?.id) return;
 
-    // Usar driverId se disponível (motoristas), senão usar keycloakUserId
-    const senderId = userAuth.driverId || userAuth.id;
+    const senderId = userAuth.id;
     setCurrentUserSenderId(senderId);
 
     // Buscar info do chat apenas para status e subject (mais leve)
@@ -300,7 +298,7 @@ export default function SuporteChatPage() {
           console.error('[SuporteChatPage] Error loading chat info:', error);
         });
     }
-  }, [chatId, userAuth?.id, userAuth?.driverId]);
+  }, [chatId, userAuth?.id]);
 
   // Marcar como lida quando carregar mensagens
   useEffect(() => {

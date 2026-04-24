@@ -138,14 +138,7 @@ export default function StopDetailScreen() {
     }
 
     // Service types (INSTALLATION, MAINTENANCE, EXCHANGE)
-    const isServiceType =
-      service.serviceType === ServiceType.INSTALLATION ||
-      service.serviceType === ServiceType.MAINTENANCE ||
-      service.serviceType === ServiceType.EXCHANGE;
-
-    console.log('[StopDetailScreen] isServiceType:', isServiceType);
-
-    if (isServiceType) {
+    if (service.serviceType === ServiceType.SERVICE) {
       console.log('[StopDetailScreen] Redirecting to service');
       router.replace({
         pathname: '/rotas-detalhadas/[id]/parada/[pid]/service',
@@ -198,11 +191,9 @@ export default function StopDetailScreen() {
   const getServiceTypeLabel = useCallback((): string => {
     if (!service) return 'Serviço';
     const typeMap: Record<ServiceType, string> = {
-      [ServiceType.INSTALLATION]: 'Instalação',
       [ServiceType.DELIVERY]: 'Entrega',
-      [ServiceType.MAINTENANCE]: 'Manutenção',
-      [ServiceType.EXCHANGE]: 'Troca',
       [ServiceType.PICKUP]: 'Coleta',
+      [ServiceType.SERVICE]: 'Serviço',
     };
     return typeMap[service.serviceType as ServiceType] ?? service.serviceType ?? 'Serviço';
   }, [service]);

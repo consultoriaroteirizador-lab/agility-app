@@ -5,9 +5,10 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Box, ActivityIndicator, Text } from '@/components';
 import { measure } from '@/theme';
 
-import { ColetaEtapaCheckItens, ColetaEtapaConfirmacao, ColetaEtapaInicial, ColetaEtapaResponsavel } from '../_components/coleta';
+import { ColetaEtapaCheckItens, ColetaEtapaConfirmacao, ColetaEtapaInicial } from '../_components/coleta';
 import { SharedEtapaDados } from '../_components/shared/SharedEtapaDados';
 import { SharedEtapaFinalizacao } from '../_components/shared/SharedEtapaFinalizacao';
+import { SharedEtapaRecebedor } from '../_components/shared/SharedEtapaRecebedor';
 import { ParadaProvider, useParada } from '../_context/ParadaContext';
 
 /**
@@ -94,7 +95,7 @@ function ColetaOrchestrator() {
 
     // Etapa 3: Seleção de quem entregou
     if (etapa === 3 || (delivered && !recipient.tipo && !needsMaterialCheck)) {
-        return <ColetaEtapaResponsavel />;
+        return <SharedEtapaRecebedor serviceType="coleta" />;
     }
 
     // Etapa 5: Checklist final

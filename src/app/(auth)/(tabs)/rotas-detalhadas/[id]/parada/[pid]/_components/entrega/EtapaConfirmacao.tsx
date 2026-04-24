@@ -17,7 +17,7 @@ import { Map } from '../shared/Map';
  * Layout unificado com dados-servico
  */
 export function EtapaConfirmacao() {
-    const { service, setEtapa, setDelivered, isServiceStarted, rotaId } = useParada();
+    const { service, effectiveAddress, setEtapa, setDelivered, isServiceStarted, rotaId } = useParada();
 
     const nomeCliente = service?.fantasyName || service?.responsible || 'Cliente';
 
@@ -50,7 +50,7 @@ export function EtapaConfirmacao() {
             buttonLeft={<ButtonBack onPress={handleBack} />}
             title={
                 <Text preset="textTitleScreen" fontWeightPreset="bold" color="colorTextPrimary">
-                    {formatAddressStreetNumber(service?.address)}
+                    {formatAddressStreetNumber(effectiveAddress)}
                 </Text>
             }
         >
@@ -61,7 +61,7 @@ export function EtapaConfirmacao() {
                     color="colorTextPrimary"
                     style={{ textAlign: 'center', width: '100%' }}
                 >
-                    {formatAddressComplement(service?.address)}
+                    {formatAddressComplement(effectiveAddress)}
                 </Text>
 
                 <Box scrollable style={{ paddingBottom: 32 }}>
@@ -74,8 +74,8 @@ export function EtapaConfirmacao() {
                         <Box width="100%">
                             <Map
                                 variant="entrega"
-                                latitude={service?.address?.latitude ?? null}
-                                longitude={service?.address?.longitude ?? null}
+                                latitude={effectiveAddress?.latitude ?? null}
+                                longitude={effectiveAddress?.longitude ?? null}
                                 customerName={nomeCliente}
                             />
                         </Box>

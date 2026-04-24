@@ -16,7 +16,7 @@ import { Map } from '../shared/Map';
  * Layout unificado com dados-servico
  */
 export function EtapaInicial() {
-    const { service, setEtapa, setArrived, rotaId } = useParada();
+    const { service, effectiveAddress, setEtapa, setArrived, rotaId } = useParada();
     const { handleStartService, isStarting } = useStopActions({
         serviceId: service?.id || '',
         routeId: service?.routingId || '',
@@ -36,7 +36,7 @@ export function EtapaInicial() {
 
     return (
         <ScreenBase buttonLeft={<ButtonBack onPress={handleBack} />} title={<Text preset="textTitleScreen" fontWeightPreset="bold" color="colorTextPrimary">
-            {formatAddressStreetNumber(service?.address)}
+            {formatAddressStreetNumber(effectiveAddress)}
         </Text>}>
             <Box flex={1} backgroundColor="white">
                 <Box scrollable style={{ paddingBottom: 32 }}>
@@ -44,8 +44,8 @@ export function EtapaInicial() {
                         {/* Mapa */}
                         <Map
                             variant="entrega"
-                            latitude={service?.address?.latitude ?? null}
-                            longitude={service?.address?.longitude ?? null}
+                            latitude={effectiveAddress?.latitude ?? null}
+                            longitude={effectiveAddress?.longitude ?? null}
                             customerName={nomeCliente}
                         />
 

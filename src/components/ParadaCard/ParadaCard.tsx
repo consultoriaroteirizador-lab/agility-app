@@ -42,11 +42,9 @@ const STATUS_CONFIG: Record<ParadaStatusType, StatusColorConfig> = {
 };
 
 const SERVICE_TYPE_LABELS: Record<ServiceType, string> = {
-  [ServiceType.INSTALLATION]: 'Instalacao',
   [ServiceType.DELIVERY]: 'Entrega',
-  [ServiceType.MAINTENANCE]: 'Manutencao',
-  [ServiceType.EXCHANGE]: 'Troca',
   [ServiceType.PICKUP]: 'Coleta',
+  [ServiceType.SERVICE]: 'Servico',
 };
 
 function getStatus(parada: ParadaCardData): keyof typeof STATUS_CONFIG {

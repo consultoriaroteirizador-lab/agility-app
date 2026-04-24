@@ -4,6 +4,11 @@ import { measure } from '@/theme';
 
 import { useParada, RecipientType } from '../../_context/ParadaContext';
 
+type ServiceType = 'entrega' | 'servico' | 'coleta';
+
+interface SharedEtapaRecebedorProps {
+    serviceType?: ServiceType;
+}
 
 const RECIPIENT_OPTIONS: { type: RecipientType; label: string }[] = [
     { type: 'cliente', label: 'Cliente' },
@@ -13,10 +18,37 @@ const RECIPIENT_OPTIONS: { type: RecipientType; label: string }[] = [
     { type: 'outro', label: 'Outro' },
 ];
 
-export function ServiceEtapaRecebedor() {
+const CONFIG: Record<ServiceType, {
+    title: string;
+    description: string;
+    selectedColor: string;
+    selectedBg: string;
+}> = {
+    coleta: {
+        title: 'Quem entregou?',
+        description: 'Escolha quem entregou os itens para coleta:',
+        selectedColor: 'secondary100',
+        selectedBg: 'secondary10',
+    },
+    entrega: {
+        title: 'Quem recebeu?',
+        description: 'Escolha para quem foi entregue:',
+        selectedColor: 'primary100',
+        selectedBg: 'primary10',
+    },
+    servico: {
+        title: 'Quem recebeu?',
+        description: 'Escolha para quem foi realizado o serviço:',
+        selectedColor: 'primary100',
+        selectedBg: 'primary10',
+    },
+};
+
+export function SharedEtapaRecebedor({ serviceType = 'servico' }: SharedEtapaRecebedorProps) {
     const { service, recipient, updateRecipient, setEtapa, setDelivered } = useParada();
 
     const customerName = service?.fantasyName || service?.responsible || 'Cliente';
+    const config = CONFIG[serviceType];
 
     const getLabel = (type: RecipientType) => {
         if (type === 'cliente') return customerName;
@@ -28,12 +60,14 @@ export function ServiceEtapaRecebedor() {
         setDelivered(false);
     };
 
+    const isSelected = (type: RecipientType) => recipient.tipo === type;
+
     return (
         <ScreenBase
             buttonLeft={<ButtonBack onPress={handleBack} />}
             title={
                 <Text preset="textTitleScreen" fontWeightPreset="bold" color="colorTextPrimary">
-                    Quem recebeu?
+                    {config.title}
                 </Text>
             }
         >
@@ -42,7 +76,7 @@ export function ServiceEtapaRecebedor() {
                     <Box paddingTop="y24" paddingBottom="y4">
 
                         <Text preset="text14" color="gray600" marginBottom="y12">
-                            Escolha para quem foi realizado o serviço:
+                            {config.description}
                         </Text>
 
                         <Box gap="y8" marginBottom="y12">
@@ -55,28 +89,28 @@ export function ServiceEtapaRecebedor() {
                                     gap="x12"
                                     padding="y12"
                                     borderWidth={measure.m2}
-                                    borderColor={recipient.tipo === option.type ? 'primary100' : 'gray200'}
+                                    borderColor={isSelected(option.type) ? config.selectedColor : 'gray200'}
                                     borderRadius="s12"
-                                    backgroundColor={recipient.tipo === option.type ? 'primary10' : 'white'}
+                                    backgroundColor={isSelected(option.type) ? config.selectedBg : 'white'}
                                 >
                                     <Box
                                         width={measure.x24}
                                         height={measure.y24}
                                         borderRadius="s4"
                                         borderWidth={measure.m2}
-                                        borderColor={recipient.tipo === option.type ? 'primary100' : 'mutedElementsColor'}
-                                        backgroundColor={recipient.tipo === option.type ? 'primary100' : 'transparent'}
+                                        borderColor={isSelected(option.type) ? config.selectedColor : 'mutedElementsColor'}
+                                        backgroundColor={isSelected(option.type) ? config.selectedColor : 'transparent'}
                                         justifyContent="center"
                                         alignItems="center"
                                     >
-                                        {recipient.tipo === option.type && (
+                                        {isSelected(option.type) && (
                                             <Box width={measure.x12} height={measure.y12} borderRadius="s4" backgroundColor="white" />
                                         )}
                                     </Box>
                                     <Text
                                         preset="text16"
                                         color="colorTextPrimary"
-                                        fontWeightPreset={recipient.tipo === option.type ? 'bold' : 'regular'}
+                                        fontWeightPreset={isSelected(option.type) ? 'bold' : 'regular'}
                                     >
                                         {getLabel(option.type)}
                                     </Text>

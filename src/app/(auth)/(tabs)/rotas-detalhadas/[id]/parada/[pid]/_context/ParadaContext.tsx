@@ -9,6 +9,8 @@ import {
 
 import * as ImagePicker from 'expo-image-picker';
 
+import type { AddressResponse } from '@/domain/agility/address/dto';
+import { useFindOneAddress } from '@/domain/agility/address/useCase';
 import type { ServiceMaterialResponse, MaterialStatus } from '@/domain/agility/service/dto/response/service-material.response';
 import { PaymentMethodType, ServiceStatus } from '@/domain/agility/service/dto/types';
 import { serviceService } from '@/domain/agility/service/serviceService';
@@ -39,6 +41,7 @@ export interface MaterialsState {
 interface ParadaContextValue {
   // Dados do serviço
   service: ReturnType<typeof useFindOneService>['service'];
+  effectiveAddress: AddressResponse | null;
   isLoading: boolean;
   serviceError: boolean;
 
@@ -144,6 +147,14 @@ interface ParadaProviderProps {
 export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderProps) {
   // Buscar dados do serviço
   const { service, isLoading, isError } = useFindOneService(serviceId);
+
+  // Fallback de endereço (quando backend não retorna embedded)
+  const embeddedAddress = service?.address ?? null;
+  const shouldFetchAddress = !embeddedAddress && !!service?.addressId;
+  const { address: fetchedAddress } = useFindOneAddress(
+    shouldFetchAddress ? service?.addressId || null : null
+  );
+  const effectiveAddress = embeddedAddress ?? fetchedAddress ?? null;
 
   // Hook para check de material
   const checkMaterialMutation = useCheckMaterial();
@@ -406,6 +417,7 @@ export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderPr
   const value: ParadaContextValue = {
     // Dados do serviço
     service,
+    effectiveAddress,
     isLoading,
     serviceError: isError,
 

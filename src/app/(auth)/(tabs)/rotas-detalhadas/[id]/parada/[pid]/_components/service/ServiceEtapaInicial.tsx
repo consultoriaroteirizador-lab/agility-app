@@ -14,7 +14,7 @@ import { Map } from '../shared/Map';
 import { MaterialsModal } from '../shared/MaterialsModal';
 
 export function ServiceEtapaInicial() {
-    const { service, setEtapa, setArrived, rotaId } = useParada();
+    const { service, effectiveAddress, setEtapa, setArrived, rotaId } = useParada();
     const [showMaterialModal, setShowMaterialModal] = useState(false);
     const { handleStartService, isStarting } = useStopActions({
         serviceId: service?.id || '',
@@ -34,15 +34,15 @@ export function ServiceEtapaInicial() {
     return (
 
         <ScreenBase buttonLeft={<ButtonBack onPress={handleBack} />} title={<Text preset="textTitleScreen" fontWeightPreset="bold" color="colorTextPrimary">
-            {formatAddressStreetNumber(service?.address)}
+            {formatAddressStreetNumber(effectiveAddress)}
         </Text>}>
-            <Box flex={1} >
+            <Box flex={1} backgroundColor="white">
                 <Box scrollable style={{ paddingBottom: 32 }}>
                     <Box paddingTop="y24" paddingBottom="y4">
                         <Map
                             variant="service"
-                            latitude={service?.address?.latitude ?? null}
-                            longitude={service?.address?.longitude ?? null}
+                            latitude={effectiveAddress?.latitude ?? null}
+                            longitude={effectiveAddress?.longitude ?? null}
                             customerName={customerName}
                         />
 
@@ -99,7 +99,7 @@ export function ServiceEtapaInicial() {
                             )}
                         </Box>
 
-                        <Box gap="y12" paddingBottom="y24">
+                        <Box gap="y12" paddingBottom="y24" alignItems='center'>
                             <Button
                                 title={isStarting ? "Iniciando..." : "Indo pra lá"}
                                 preset="outline"

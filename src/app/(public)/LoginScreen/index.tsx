@@ -3,9 +3,9 @@ import { Box, ActivityIndicator, ScreenBase } from '@/components';
 import { useImageBackground, useNavigationNotActionOnBack } from '@/hooks';
 import { measure } from '@/theme';
 
+import { LoginBody } from './_components/LoginBody';
+import { LoginFooter } from './_components/LoginFooter';
 import { useLoginController } from './_hooks/useLoginController';
-import { LoginBody } from './components/LoginBody';
-import { LoginFooter } from './components/LoginFooter';
 
 export default function Login() {
   const backgroundImage = useImageBackground();

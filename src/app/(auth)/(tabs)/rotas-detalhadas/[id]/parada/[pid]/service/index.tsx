@@ -1,13 +1,14 @@
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 
 import { useRouter, useLocalSearchParams } from 'expo-router';
 
 import { Box, ActivityIndicator, Text } from '@/components';
 import { measure } from '@/theme';
 
-import { ServiceEtapaInicial, ServiceEtapaConfirmacao, ServiceEtapaRecebedor } from '../_components/service';
+import { ServiceEtapaInicial, ServiceEtapaConfirmacao, ServiceEtapaCheckEquipamento } from '../_components/service';
 import { SharedEtapaDados } from '../_components/shared/SharedEtapaDados';
 import { SharedEtapaFinalizacao } from '../_components/shared/SharedEtapaFinalizacao';
+import { SharedEtapaRecebedor } from '../_components/shared/SharedEtapaRecebedor';
 import { ParadaProvider, useParada } from '../_context/ParadaContext';
 
 /**
@@ -23,38 +24,28 @@ function ServiceOrchestrator() {
         recipient,
         showSuccess,
         isLoading,
+        materialsState,
+        checkCompleted,
+        fetchMaterials,
     } = useParada();
 
-    // Refs para controle de montagem e cleanup - previne crash ao reiniciar app
-    const isMountedRef = useRef(true);
-    const navigationTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const hasMaterials = materialsState.materials.length > 0;
+    const needsMaterialCheck = hasMaterials && !materialsState.allChecked && !checkCompleted;
 
-    // Cleanup ao desmontar o componente
+    // Buscar materiais quando o servico estiver iniciado
     useEffect(() => {
-        isMountedRef.current = true;
-        return () => {
-            isMountedRef.current = false;
-            if (navigationTimeoutRef.current) {
-                clearTimeout(navigationTimeoutRef.current);
-                navigationTimeoutRef.current = null;
-            }
-        };
-    }, []);
+        if (isServiceStarted && materialsState.materials.length === 0 && !materialsState.loading) {
+            fetchMaterials();
+        }
+    }, [isServiceStarted, materialsState.materials.length, materialsState.loading, fetchMaterials]);
 
-    // Redirecionar após sucesso - com cleanup para prevenir crash
+    // Redirecionar após sucesso
     useEffect(() => {
         if (showSuccess) {
-            navigationTimeoutRef.current = setTimeout(() => {
-                if (isMountedRef.current) {
-                    router.push(`/(auth)/(tabs)/rotas-detalhadas/${rotaId}`);
-                }
+            const timer = setTimeout(() => {
+                router.push(`/(auth)/(tabs)/rotas-detalhadas/${rotaId}`);
             }, 2500);
-            return () => {
-                if (navigationTimeoutRef.current) {
-                    clearTimeout(navigationTimeoutRef.current);
-                    navigationTimeoutRef.current = null;
-                }
-            };
+            return () => clearTimeout(timer);
         }
     }, [showSuccess, router, rotaId]);
 
@@ -81,6 +72,12 @@ function ServiceOrchestrator() {
     }
 
     // Renderizar etapa atual baseado no estado
+
+    // Pre-step: Check de equipamentos (antes de "Indo pra lá")
+    if (!isServiceStarted && needsMaterialCheck) {
+        return <ServiceEtapaCheckEquipamento />;
+    }
+
     // Etapa 1: "Indo pra lá" / "Estou aqui!"
     if (etapa === 1 && !isServiceStarted) {
         return <ServiceEtapaInicial />;
@@ -93,7 +90,7 @@ function ServiceOrchestrator() {
 
     // Etapa 3: Seleção de quem recebeu
     if (etapa === 3 || (delivered && !recipient.tipo)) {
-        return <ServiceEtapaRecebedor />;
+        return <SharedEtapaRecebedor serviceType="servico" />;
     }
 
     // Etapa 4: Formulário de dados

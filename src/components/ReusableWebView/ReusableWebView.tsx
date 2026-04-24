@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 
+import { measure } from '../../theme';
 import { ActivityIndicator } from '../ActivityIndicator/ActivityIndicator';
 import { Box } from '../BoxBackGround/BoxBackGround';
 import { WebViewBox, WebViewBoxProps } from '../RestyleComponent/RestyleComponent';
 import { Text } from '../Text/Text';
-import { measure } from '../../theme';
 
 
 
@@ -58,7 +58,7 @@ export function ReusableWebView({
                     top={measure.t0}
                     bottom={measure.b0}
                     left={measure.l0}
-                   right={measure.r0}
+                    right={measure.r0}
                     justifyContent="center"
                     alignItems="center"
                     opacity={0.9}
@@ -75,7 +75,7 @@ export function ReusableWebView({
                     top={measure.t0}
                     bottom={measure.b0}
                     left={measure.l0}
-                   right={measure.r0}
+                    right={measure.r0}
                     justifyContent="center"
                     alignItems="center"
                     opacity={0.9}

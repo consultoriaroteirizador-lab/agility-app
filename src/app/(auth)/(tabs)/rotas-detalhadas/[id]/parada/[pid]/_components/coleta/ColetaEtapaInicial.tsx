@@ -16,7 +16,7 @@ import { Map } from '../shared/Map';
  * Layout baseado no módulo de entrega
  */
 export function ColetaEtapaInicial() {
-    const { service, setEtapa, setArrived, rotaId } = useParada();
+    const { service, effectiveAddress, setEtapa, setArrived, rotaId } = useParada();
     const { handleStartService, isStarting } = useStopActions({
         serviceId: service?.id || '',
         routeId: service?.routingId || '',
@@ -39,7 +39,7 @@ export function ColetaEtapaInicial() {
             buttonLeft={<ButtonBack onPress={handleBack} />}
             title={
                 <Text preset="textTitleScreen" fontWeightPreset="bold" color="colorTextPrimary">
-                    {formatAddressStreetNumber(service?.address)}
+                    {formatAddressStreetNumber(effectiveAddress)}
                 </Text>
             }
         >
@@ -49,8 +49,8 @@ export function ColetaEtapaInicial() {
                         {/* Mapa */}
                         <Map
                             variant="coleta"
-                            latitude={service?.address?.latitude ?? null}
-                            longitude={service?.address?.longitude ?? null}
+                            latitude={effectiveAddress?.latitude ?? null}
+                            longitude={effectiveAddress?.longitude ?? null}
                             customerName={nomeCliente}
                         />
 

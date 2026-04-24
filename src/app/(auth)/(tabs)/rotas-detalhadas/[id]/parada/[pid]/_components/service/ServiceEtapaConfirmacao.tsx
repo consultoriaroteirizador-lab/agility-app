@@ -14,7 +14,7 @@ import { Map } from '../shared/Map';
 import { MaterialsModal } from '../shared/MaterialsModal';
 
 export function ServiceEtapaConfirmacao() {
-    const { service, setEtapa, setDelivered, isServiceStarted, rotaId } = useParada();
+    const { service, effectiveAddress, setEtapa, setDelivered, isServiceStarted, rotaId } = useParada();
     const [showMaterialModal, setShowMaterialModal] = useState(false);
 
     const customerName = service?.fantasyName || service?.responsible || 'Cliente';
@@ -45,7 +45,7 @@ export function ServiceEtapaConfirmacao() {
             buttonLeft={<ButtonBack onPress={handleBack} />}
             title={
                 <Text preset="textTitleScreen" fontWeightPreset="bold" color="colorTextPrimary">
-                    {formatAddressStreetNumber(service?.address)}
+                    {formatAddressStreetNumber(effectiveAddress)}
                 </Text>
             }
         >
@@ -56,7 +56,7 @@ export function ServiceEtapaConfirmacao() {
                     color="colorTextPrimary"
                     style={{ textAlign: 'center', width: '100%' }}
                 >
-                    {formatAddressComplement(service?.address)}
+                    {formatAddressComplement(effectiveAddress)}
                 </Text>
 
                 <Box scrollable style={{ paddingBottom: 32 }}>
@@ -68,8 +68,8 @@ export function ServiceEtapaConfirmacao() {
                         <Box width="100%">
                             <Map
                                 variant="service"
-                                latitude={service?.address?.latitude ?? null}
-                                longitude={service?.address?.longitude ?? null}
+                                latitude={effectiveAddress?.latitude ?? null}
+                                longitude={effectiveAddress?.longitude ?? null}
                                 customerName={customerName}
                             />
                         </Box>
@@ -83,7 +83,7 @@ export function ServiceEtapaConfirmacao() {
                             <Box flexDirection="row" alignItems="center" justifyContent="space-between">
                                 <Box flexDirection="row" alignItems="center" gap="x8" flex={1}>
                                     <Box>
-                                        <LocalIcon iconName='iconUser' size={measure.m20} />
+                                        <LocalIcon iconName='iconUser' size={measure.m20} color='primary100' />
                                     </Box>
                                     <Box flex={1}>
                                         <Text
@@ -123,7 +123,7 @@ export function ServiceEtapaConfirmacao() {
                                             paddingHorizontal="x8"
                                             borderRadius="s12"
                                             borderWidth={1}
-                                            borderColor="tertiary100"
+                                            borderColor="primary20"
                                             onPress={() => {
                                                 Linking.openURL(`tel:${service.clientPhone}`);
                                             }}
@@ -143,7 +143,7 @@ export function ServiceEtapaConfirmacao() {
                                 </Box>
                             )}
                         </Box>
-                        {service?.description && (
+                        {service?.description &&
                             <Box mb='b14' padding='m14' borderRadius='s10' backgroundColor='gray50' width={"100%"} height={"auto"} gap='y8'>
                                 <Text fontWeightPreset='semibold'>
                                     Observação
@@ -152,7 +152,7 @@ export function ServiceEtapaConfirmacao() {
                                     {service.description}
                                 </Text>
                             </Box>
-                        )}
+                        }
 
                         <Box gap="y12" paddingBottom="y24" alignItems='center'>
                             <Button

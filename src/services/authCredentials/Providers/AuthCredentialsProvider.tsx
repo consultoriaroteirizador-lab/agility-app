@@ -177,7 +177,8 @@ export function AuthCredentialsProvider({ children }: PropsWithChildren) {
                     if (isDevelopment) console.log('[Auth] Access token expirado, tentando refresh...');
                     try {
                         const newAuthCredentials = await authService.refreshToken(
-                            authCredentials.refreshToken
+                            authCredentials.refreshToken,
+                            authCredentials.tenantId,
                         );
                         if (isDevelopment) console.log('[Auth] Refresh bem sucedido no boot');
                         await saveCredentials(newAuthCredentials);
@@ -211,6 +212,12 @@ export function AuthCredentialsProvider({ children }: PropsWithChildren) {
     const failedRequestsAfterRefreshRef = useRef<Set<string>>(new Set());
     const isRedirectingRef = useRef(false);
     const refreshTokenPromiseRef = useRef<Promise<AuthCredentials | null> | null>(null);
+    const authCredentialsRef = useRef<AuthCredentials | null>(null);
+
+    // Mantém a ref sincronizada com o estado
+    useEffect(() => {
+        authCredentialsRef.current = authCredentials;
+    }, [authCredentials]);
 
     useEffect(() => {
         const apis = [
@@ -240,13 +247,11 @@ export function AuthCredentialsProvider({ children }: PropsWithChildren) {
                         });
                     }
 
-                    // Rotas públicas (x-api-key sem Authorization) não precisam de token
-                    // Rotas de refresh também não devem tentar refresh token novamente
+                    // Rotas públicas (x-api-key sem Authorization) não tentam refresh
                     if (responseError.skipRefreshToken || (hasApiKey && !hasAuthHeader)) {
                         if (isDevelopment) {
-                            console.log('[Auth Interceptor] 401 em rota pública (x-api-key sem Authorization):', failedRequestUrl, '- deixando caller tratar (erro de autenticação, não token)');
+                            console.log('[Auth Interceptor] 401 em rota pública:', failedRequestUrl);
                         }
-                        // Se é rota de refresh que falhou, significa que refresh token expirou
                         if (isRefreshRoute && !isRedirectingRef.current) {
                             if (isDevelopment) console.log('[Auth Interceptor] Refresh token expirou, redirecionando para login');
                             isRedirectingRef.current = true;
@@ -255,27 +260,41 @@ export function AuthCredentialsProvider({ children }: PropsWithChildren) {
                         return Promise.reject(responseError);
                     }
 
-                    // Se esta requisição já falhou após refresh token, não tentar novamente (evitar loop)
+                    // Se esta requisição já falhou após refresh token, não tentar novamente
                     if (failedRequestsAfterRefreshRef.current.has(requestKey)) {
-                        if (isDevelopment) console.log('[Auth Interceptor] Requisição já falhou após refresh, rejeitando para evitar loop:', failedRequestUrl);
+                        if (isDevelopment) console.log('[Auth Interceptor] Requisição já falhou após refresh:', failedRequestUrl);
                         return Promise.reject(responseError);
                     }
 
-                    // Verificar se já está redirecionando para evitar múltiplos redirects
+                    // Verificar se já está redirecionando
                     if (isRedirectingRef.current) {
-                        if (isDevelopment) console.log('[Auth Interceptor] Já redirecionando, rejeitando requisição');
+                        if (isDevelopment) console.log('[Auth Interceptor] Já redirecionando, rejeitando');
                         return Promise.reject(responseError);
                     }
 
-                    // Só tenta refresh token se a requisição tem Authorization header (rota autenticada)
+                    // Rota autenticada sem Authorization header - não tenta refresh
                     if (!hasAuthHeader) {
-                        if (isDevelopment) console.log('[Auth Interceptor] 401 sem token na requisição (rota pública), deixando caller tratar');
+                        if (isDevelopment) console.log('[Auth Interceptor] 401 sem Authorization header');
                         return Promise.reject(responseError);
                     }
+
+                    // Pegar credenciais sempre atualizadas via ref
+                    const currentCredentials = authCredentialsRef.current;
 
                     // Se não tem refresh token disponível, vai para login
-                    if (!authCredentials?.refreshToken) {
+                    if (!currentCredentials?.refreshToken) {
                         if (isDevelopment) console.log('[Auth Interceptor] Sem refresh token disponível, redirecionando para login');
+                        isRedirectingRef.current = true;
+                        await removeCredentials();
+                        return Promise.reject(responseError);
+                    }
+
+                    // Verificar validade do refresh token antes de tentar
+                    const refreshTokenExpiration = new Date(currentCredentials.expirationRefreshToken);
+                    const isRefreshTokenValid = refreshTokenExpiration.getTime() > Date.now();
+
+                    if (!isRefreshTokenValid) {
+                        if (isDevelopment) console.log('[Auth Interceptor] Refresh token expirado, redirecionando para login');
                         isRedirectingRef.current = true;
                         await removeCredentials();
                         return Promise.reject(responseError);
@@ -283,7 +302,7 @@ export function AuthCredentialsProvider({ children }: PropsWithChildren) {
 
                     // Se já está fazendo refresh token, aguardar a mesma Promise e retentar
                     if (refreshTokenPromiseRef.current) {
-                        if (isDevelopment) console.log('[Auth Interceptor] Refresh token já em andamento, aguardando...');
+                        if (isDevelopment) console.log('[Auth Interceptor] Refresh já em andamento, aguardando...');
                         try {
                             const newAuthCredentials = await refreshTokenPromiseRef.current;
                             if (newAuthCredentials) {
@@ -297,17 +316,13 @@ export function AuthCredentialsProvider({ children }: PropsWithChildren) {
                         return Promise.reject(responseError);
                     }
 
-
-                    const currentAuthCredentials = authCredentials;
-                    if (!currentAuthCredentials?.refreshToken) {
-                        if (isDevelopment) console.log('[Auth Interceptor] Credenciais não disponíveis para refresh token (possível logout em andamento)');
-                        return Promise.reject(responseError);
-                    }
-
                     const refreshPromise = (async () => {
                         try {
-                            if (isDevelopment) console.log('[Auth Interceptor] Token expirado detectado, tentando refresh token...');
-                            const newAuthCredentials = await authService.refreshToken(currentAuthCredentials.refreshToken);
+                            if (isDevelopment) console.log('[Auth Interceptor] Tentando refresh token...');
+                            const newAuthCredentials = await authService.refreshToken(
+                                currentCredentials.refreshToken,
+                                currentCredentials.tenantId,
+                            );
                             if (isDevelopment) console.log('[Auth Interceptor] Refresh token bem sucedido');
                             await saveCredentials(newAuthCredentials);
                             return newAuthCredentials;
@@ -326,26 +341,21 @@ export function AuthCredentialsProvider({ children }: PropsWithChildren) {
 
                         const retryResponse = await apiInstance(failedRequest);
 
-                        // Se a retentativa foi bem-sucedida, limpar o Set e a Promise para permitir novas tentativas
                         failedRequestsAfterRefreshRef.current.delete(requestKey);
                         refreshTokenPromiseRef.current = null;
                         isRedirectingRef.current = false;
                         return retryResponse;
                     } catch (refreshError: any) {
-                        // Limpar a Promise de refresh token para permitir nova tentativa no futuro
                         refreshTokenPromiseRef.current = null;
 
-                        // Se a retentativa após refresh falhou com 401, marcar para não tentar novamente (evitar loop)
                         if (refreshError?.response?.status === 401 || refreshError?.config?.url === failedRequestUrl) {
                             failedRequestsAfterRefreshRef.current.add(requestKey);
-                            if (isDevelopment) console.log('[Auth Interceptor] Retentativa falhou com 401, marcando requisição para evitar loop:', failedRequestUrl);
+                            if (isDevelopment) console.log('[Auth Interceptor] Retentativa falhou com 401:', failedRequestUrl);
                         }
 
-                        if (isDevelopment) console.log('[Auth Interceptor] Refresh token falhou ou retentativa falhou, redirecionando para login:', refreshError?.message || refreshError);
-                        // Marcar como redirecionando antes para evitar tentativas simultâneas
+                        if (isDevelopment) console.log('[Auth Interceptor] Refresh falhou, redirecionando para login:', refreshError?.message || refreshError);
                         isRedirectingRef.current = true;
                         await removeCredentials();
-                        // Retornar o erro original (401) para que o caller veja o erro correto
                         return Promise.reject(responseError);
                     }
                 }
@@ -366,7 +376,7 @@ export function AuthCredentialsProvider({ children }: PropsWithChildren) {
                 api.interceptors.response.eject(id);
             });
         };
-    }, [authCredentials, userAuth, removeCredentials, saveCredentials]);
+    }, [removeCredentials, saveCredentials]);
 
     return (
         <AuthCredentialsContext.Provider value={{

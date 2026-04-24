@@ -21,12 +21,12 @@ const REFRESH_TOKEN_URL = '/auth/refresh-token';
 
 export async function refreshToken(
   refreshToken: string,
-  _username?: string
+  companyId?: string,
 ): Promise<BaseResponseAPI<AuthCredentialsAPI>> {
 
     const requestBody = {
       refresh_token: refreshToken,
-      // Opcional: companyId, realm, clientId podem ser fornecidos se necessário
+      ...(companyId && { companyId }),
     };
 
     const response = await apiIdentity.post<BaseResponseAPI<AuthCredentialsAPI> >(

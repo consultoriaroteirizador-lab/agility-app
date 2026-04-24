@@ -1,6 +1,6 @@
 import { Box, Button } from '@/components';
-import type { ServiceMaterialResponse } from '@/domain/agility/service/dto';
 import Modal from '@/components/Modal/Modal';
+import type { ServiceMaterialResponse } from '@/domain/agility/service/dto';
 import { measure } from '@/theme';
 
 import { MaterialList } from '../MaterialList';

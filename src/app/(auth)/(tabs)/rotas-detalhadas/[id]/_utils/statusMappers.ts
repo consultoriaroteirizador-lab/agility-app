@@ -25,11 +25,9 @@ import type {
  * Mapa de tipos de serviço para labels em português
  */
 export const SERVICE_TYPE_LABELS: ServiceTypeLabelMap = {
-    [ServiceType.INSTALLATION]: 'Instalação',
     [ServiceType.DELIVERY]: 'Entrega',
-    [ServiceType.MAINTENANCE]: 'Manutenção',
-    [ServiceType.EXCHANGE]: 'Troca',
     [ServiceType.PICKUP]: 'Coleta',
+    [ServiceType.SERVICE]: 'Serviço',
 }
 
 /**

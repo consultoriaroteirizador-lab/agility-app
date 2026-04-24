@@ -1,5 +1,7 @@
 import { useState, useCallback } from 'react';
 
+import { router } from 'expo-router';
+
 import { Box, Button, ScreenBase, Text, ActivityIndicator } from '@/components';
 import { ButtonBack } from '@/components/Button/ButtonBack';
 import { ItemCheckCard } from '@/components/ItemCheckCard';
@@ -11,24 +13,24 @@ import { useParada } from '../../_context/ParadaContext';
 
 type CheckStatus = 'CHECKED' | 'PARTIAL' | 'MISSING' | 'DAMAGED' | 'REFUSED';
 
-/**
- * Etapa 3: Check dos itens da coleta
- * Motorista marca cada produto que coletou
- */
-export function ColetaEtapaCheckItens() {
+const EQUIPMENT_STATUS_LABELS = {
+    CHECKED: 'Levei',
+    PARTIAL: 'Parcial',
+    MISSING: 'Não levei',
+    DAMAGED: 'Danificado',
+    REFUSED: 'Recusado',
+};
+
+export function ServiceEtapaCheckEquipamento() {
     const {
         materialsState,
         checkMaterial,
         completeCheck,
-        goToNextStep,
-        goToPreviousStep,
     } = useParada();
 
     const [selectedItem, setSelectedItem] = useState<ServiceMaterialResponse | null>(null);
     const [modalVisible, setModalVisible] = useState(false);
     const [checking, setChecking] = useState(false);
-
-    // Materiais são carregados pelo Orchestrator, não precisa carregar aqui
 
     const handleOpenCheck = useCallback((item: ServiceMaterialResponse) => {
         setSelectedItem(item);
@@ -70,15 +72,19 @@ export function ColetaEtapaCheckItens() {
     const checkedCount = materialsState.materials.filter(m => m.status !== 'PENDING').length;
 
     const handleBack = useCallback(() => {
-        goToPreviousStep();
-    }, [goToPreviousStep]);
+        router.back();
+    }, []);
+
+    const handleConfirm = useCallback(() => {
+        completeCheck();
+    }, [completeCheck]);
 
     return (
         <ScreenBase
             buttonLeft={<ButtonBack onPress={handleBack} />}
             title={
                 <Text preset="textTitleScreen" fontWeightPreset="bold" color="colorTextPrimary">
-                    Check dos Itens
+                    Check de Equipamentos
                 </Text>
             }
         >
@@ -92,24 +98,32 @@ export function ColetaEtapaCheckItens() {
                             alignItems="center"
                             marginBottom="y16"
                         >
-                            <Box>
-                                <Text preset="text14" color="gray600">
-                                    Itens para coleta
+                            <Box flexShrink={1} marginRight="x12">
+                                <Text preset="text14" color="gray600" numberOfLines={1}>
+                                    Equipamentos para o serviço
                                 </Text>
-                                <Text preset="text20" color="colorTextPrimary" fontWeightPreset="bold">
+                                <Text
+                                    preset="text20"
+                                    color="colorTextPrimary"
+                                    fontWeightPreset="bold"
+                                    numberOfLines={1}
+                                >
                                     {materialsState.materials.length} itens
                                 </Text>
                             </Box>
+
                             <Box
                                 paddingHorizontal="x12"
                                 paddingVertical="y8"
                                 borderRadius="s12"
                                 backgroundColor={materialsState.allChecked ? 'primary10' : 'secondary10'}
+                                flexShrink={0}
                             >
                                 <Text
                                     preset="text14"
                                     color={materialsState.allChecked ? 'primary100' : 'secondary80'}
                                     fontWeightPreset="semibold"
+                                    numberOfLines={1}
                                 >
                                     {checkedCount}/{materialsState.materials.length} checados
                                 </Text>
@@ -121,22 +135,23 @@ export function ColetaEtapaCheckItens() {
                             <Box justifyContent="center" alignItems="center" padding="y32">
                                 <ActivityIndicator size="large" />
                                 <Text preset="text14" color="gray400" marginTop="y12">
-                                    Carregando itens...
+                                    Carregando equipamentos...
+                                </Text>
+                            </Box>
+                        )}
+
+                        {/* Lista vazia */}
+                        {!materialsState.loading && materialsState.materials.length === 0 && (
+                            <Box justifyContent="center" alignItems="center" padding="y32">
+                                <Text preset="text16" color="gray400" textAlign="center">
+                                    Nenhum equipamento cadastrado para este serviço
                                 </Text>
                             </Box>
                         )}
 
                         {/* Lista de itens */}
-                        {!materialsState.loading && materialsState.materials.length === 0 && (
-                            <Box justifyContent="center" alignItems="center" padding="y32">
-                                <Text preset="text16" color="gray400" textAlign="center">
-                                    Nenhum item cadastrado para esta coleta
-                                </Text>
-                            </Box>
-                        )}
-
                         {!materialsState.loading && materialsState.materials.length > 0 && (
-                            <Box gap="y0">
+                            <Box>
                                 {materialsState.materials.map((item) => (
                                     <ItemCheckCard
                                         key={item.id}
@@ -156,26 +171,29 @@ export function ColetaEtapaCheckItens() {
                                 backgroundColor="secondary10"
                                 borderRadius="s12"
                             >
-                                <Text preset="text14" color="secondary100" textAlign="center">
-                                    Você ainda tem {pendingCount} {pendingCount === 1 ? 'item pendente' : 'itens pendentes'} para checar
+                                <Text preset="text14" color="secondary80" textAlign="center">
+                                    Você ainda tem {pendingCount}{' '}
+                                    {pendingCount === 1 ? 'item pendente' : 'itens pendentes'} para checar
                                 </Text>
                             </Box>
                         )}
 
-                        {/* Botão Próximo */}
+                        {/* Botão Confirmar */}
                         <Box marginTop="y24" paddingBottom="y24" alignItems="center">
                             <Button
-                                title="Próximo"
-                                onPress={() => {
-                                    completeCheck();
-                                    goToNextStep();
-                                }}
+                                title="Confirmar"
+                                onPress={handleConfirm}
                                 disabled={!materialsState.allChecked || materialsState.loading}
                                 width={measure.x330}
                             />
                             {!materialsState.allChecked && (
-                                <Text preset="text12" color="redError" textAlign="center" marginTop="y8">
-                                    * Todos os itens devem ser checados antes de prosseguir
+                                <Text
+                                    preset="text12"
+                                    color="redError"
+                                    textAlign="center"
+                                    marginTop="y8"
+                                >
+                                    * Todos os equipamentos devem ser checados antes de prosseguir
                                 </Text>
                             )}
                         </Box>
@@ -189,6 +207,7 @@ export function ColetaEtapaCheckItens() {
                     onClose={handleCloseModal}
                     onConfirm={handleConfirmCheck}
                     loading={checking}
+                    statusLabels={EQUIPMENT_STATUS_LABELS}
                 />
             </Box>
         </ScreenBase>

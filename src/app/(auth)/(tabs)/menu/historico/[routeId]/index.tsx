@@ -38,11 +38,9 @@ function mapServiceStatus(status: ServiceStatus): string {
 
 function mapServiceType(type: ServiceType): string {
   const map: Record<ServiceType, string> = {
-    [ServiceType.INSTALLATION]: 'Instalacao',
     [ServiceType.DELIVERY]: 'Entrega',
-    [ServiceType.MAINTENANCE]: 'Manutencao',
-    [ServiceType.EXCHANGE]: 'Troca',
     [ServiceType.PICKUP]: 'Coleta',
+    [ServiceType.SERVICE]: 'Servico',
   };
   return map[type] ?? type;
 }
