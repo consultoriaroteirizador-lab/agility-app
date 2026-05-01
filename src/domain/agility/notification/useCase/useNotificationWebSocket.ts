@@ -89,6 +89,7 @@ export function useNotificationWebSocket(options: UseNotificationWebSocketOption
 
         const socketConfig: any = {
             auth: {
+                token: authCredentials?.accessToken,
                 userId,
             },
             transports: ['websocket', 'polling'],

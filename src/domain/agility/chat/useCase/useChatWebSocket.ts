@@ -144,6 +144,7 @@ export function useChatWebSocket(options: UseChatWebSocketOptions = {}) {
 
         const socket = io(`${wsUrl}/chat`, {
             auth: {
+                token: authCredentials?.accessToken,
                 userId,
                 userType,
                 tenantId,

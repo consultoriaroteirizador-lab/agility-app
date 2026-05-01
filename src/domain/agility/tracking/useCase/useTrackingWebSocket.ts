@@ -70,8 +70,13 @@ export function useTrackingWebSocket(options: TrackingWebSocketOptions = {}) {
     console.log('[TrackingWebSocket] Conectando a:', wsUrl);
 
     // Criar socket
-    globalSocket = io(wsUrl, {
+    globalSocket = io(`${wsUrl}/monitoring`, {
       path: '/socket.io',
+      auth: {
+        token: authCredentials?.accessToken,
+        tenantId,
+        userId,
+      },
       transports: ['websocket', 'polling'],
       query: {
         tenantId,
