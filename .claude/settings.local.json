@@ -207,7 +207,17 @@
       "Bash(kubectl --context map-services-development exec -n openstreetmap deployment/osm-tile-server -- sh -c 'ls -la /var/cache/renderd/tiles/default/')",
       "Bash(kubectl --context map-services-development exec -n openstreetmap deployment/osm-tile-server -- sh -c 'rm -rf /var/cache/renderd/tiles/default/* && echo \"Cache cleared\"')",
       "Bash(kubectl --context map-services-development exec -n openstreetmap deployment/osm-tile-server -- sh -c 'find /var/cache/renderd/tiles/default -name \"*.meta\" -exec ls -la {} \\\\; | head -10')",
-      "Bash(kubectl --context map-services-development exec -n openstreetmap deployment/osm-tile-server -- sh -c 'cat /run/renderd/renderd.stats')"
+      "Bash(kubectl --context map-services-development exec -n openstreetmap deployment/osm-tile-server -- sh -c 'cat /run/renderd/renderd.stats')",
+      "Bash(ssh-add -l)",
+      "Bash(sshpass -p 'd563ee33aab30c0d3' ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 agilityroute@38.242.243.205 \"sudo systemctl status rke2-server 2>&1 | head -30\")",
+      "Bash(ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 agilityroute@38.242.243.205 \"echo connected\")",
+      "Bash(pacman -Q sshpass)",
+      "Bash(python3 -c ' *)",
+      "Bash(kubectl --context services get deployments,statefulsets --all-namespaces)",
+      "Bash(kubectl --context services-development get deployments,statefulsets --all-namespaces)",
+      "Bash(kubectl --context services get all --all-namespaces)",
+      "Bash(kubectl --context services-development get all --all-namespaces)",
+      "Bash(kubectl --context route-services get all --all-namespaces)"
     ],
     "additionalDirectories": [
       "\\tmp",

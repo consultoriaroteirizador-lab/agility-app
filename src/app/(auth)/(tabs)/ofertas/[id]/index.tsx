@@ -16,11 +16,9 @@ import { measure } from '@/theme';
 import { useUserLocation } from '../../rotas-detalhadas/[id]/parada/[pid]/_hooks/useUserLocation';
 
 const SERVICE_TYPE_LABEL: Record<ServiceType, string> = {
-  [ServiceType.INSTALLATION]: 'Instalação',
   [ServiceType.DELIVERY]: 'Entrega',
-  [ServiceType.MAINTENANCE]: 'Manutenção',
-  [ServiceType.EXCHANGE]: 'Troca',
   [ServiceType.PICKUP]: 'Coleta',
+  [ServiceType.SERVICE]: 'Serviço',
 };
 
 function formatarDistancia(km: number | null | undefined): string {

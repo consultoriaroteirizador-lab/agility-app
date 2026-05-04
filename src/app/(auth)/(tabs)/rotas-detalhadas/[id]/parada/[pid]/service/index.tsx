@@ -7,6 +7,7 @@ import { measure } from '@/theme';
 
 import { ServiceEtapaInicial, ServiceEtapaConfirmacao, ServiceEtapaCheckEquipamento } from '../_components/service';
 import { SharedEtapaDados } from '../_components/shared/SharedEtapaDados';
+import { SharedEtapaFormulario } from '../_components/shared/SharedEtapaFormulario';
 import { SharedEtapaFinalizacao } from '../_components/shared/SharedEtapaFinalizacao';
 import { SharedEtapaRecebedor } from '../_components/shared/SharedEtapaRecebedor';
 import { ParadaProvider, useParada } from '../_context/ParadaContext';
@@ -27,6 +28,8 @@ function ServiceOrchestrator() {
         materialsState,
         checkCompleted,
         fetchMaterials,
+        hasFormGroups,
+        formCompleted,
     } = useParada();
 
     const hasMaterials = materialsState.materials.length > 0;
@@ -88,8 +91,13 @@ function ServiceOrchestrator() {
         return <ServiceEtapaConfirmacao />;
     }
 
+    // Etapa do formulário dinâmico (após confirmação, antes do recebedor)
+    if (delivered && hasFormGroups && !formCompleted) {
+        return <SharedEtapaFormulario serviceType="servico" />;
+    }
+
     // Etapa 3: Seleção de quem recebeu
-    if (etapa === 3 || (delivered && !recipient.tipo)) {
+    if (etapa === 3 || (delivered && !recipient.tipo && (!hasFormGroups || formCompleted))) {
         return <SharedEtapaRecebedor serviceType="servico" />;
     }
 

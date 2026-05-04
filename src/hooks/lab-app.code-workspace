@@ -18,6 +18,9 @@
     {
       "path": "../../../../infra-config",
     },
+    {
+      "path": "../../../../../Cursos/pythondev",
+    },
   ],
   "settings": {},
 }

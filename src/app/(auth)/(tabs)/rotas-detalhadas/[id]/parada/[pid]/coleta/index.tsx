@@ -7,6 +7,7 @@ import { measure } from '@/theme';
 
 import { ColetaEtapaCheckItens, ColetaEtapaConfirmacao, ColetaEtapaInicial } from '../_components/coleta';
 import { SharedEtapaDados } from '../_components/shared/SharedEtapaDados';
+import { SharedEtapaFormulario } from '../_components/shared/SharedEtapaFormulario';
 import { SharedEtapaFinalizacao } from '../_components/shared/SharedEtapaFinalizacao';
 import { SharedEtapaRecebedor } from '../_components/shared/SharedEtapaRecebedor';
 import { ParadaProvider, useParada } from '../_context/ParadaContext';
@@ -27,6 +28,8 @@ function ColetaOrchestrator() {
         materialsState,
         checkCompleted,
         fetchMaterials,
+        hasFormGroups,
+        formCompleted,
     } = useParada();
 
     // Buscar materiais quando entrar na etapa de confirmação (para saber se tem materiais)
@@ -88,13 +91,18 @@ function ColetaOrchestrator() {
         return <ColetaEtapaCheckItens />;
     }
 
+    // Etapa do formulário dinâmico (após check, antes do recebedor)
+    if (delivered && hasFormGroups && !formCompleted) {
+        return <SharedEtapaFormulario serviceType="coleta" />;
+    }
+
     // Etapa 4: Formulário de dados (verificar primeiro)
     if (etapa === 4 && recipient.tipo) {
         return <SharedEtapaDados serviceType="coleta" />;
     }
 
     // Etapa 3: Seleção de quem entregou
-    if (etapa === 3 || (delivered && !recipient.tipo && !needsMaterialCheck)) {
+    if (etapa === 3 || (delivered && !recipient.tipo && !needsMaterialCheck && (!hasFormGroups || formCompleted))) {
         return <SharedEtapaRecebedor serviceType="coleta" />;
     }
 

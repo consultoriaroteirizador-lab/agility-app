@@ -9,6 +9,7 @@ import { EtapaCheckItens } from '../_components/entrega/EtapaCheckItens';
 import { EtapaConfirmacao } from '../_components/entrega/EtapaConfirmacao';
 import { EtapaInicial } from '../_components/entrega/EtapaInicial';
 import { SharedEtapaDados } from '../_components/shared/SharedEtapaDados';
+import { SharedEtapaFormulario } from '../_components/shared/SharedEtapaFormulario';
 import { SharedEtapaFinalizacao } from '../_components/shared/SharedEtapaFinalizacao';
 import { SharedEtapaRecebedor } from '../_components/shared/SharedEtapaRecebedor';
 import { ParadaProvider, useParada } from '../_context/ParadaContext';
@@ -29,6 +30,8 @@ function EntregaOrchestrator() {
         materialsState,
         checkCompleted,
         fetchMaterials,
+        hasFormGroups,
+        formCompleted,
     } = useParada();
 
     // Buscar materiais quando entrar na etapa de confirmação (para saber se tem materiais)
@@ -90,13 +93,18 @@ function EntregaOrchestrator() {
         return <EtapaCheckItens />;
     }
 
+    // Etapa do formulário dinâmico (após check, antes do recebedor)
+    if (delivered && hasFormGroups && !formCompleted) {
+        return <SharedEtapaFormulario serviceType="entrega" />;
+    }
+
     // Etapa 4: Formulário de dados (verificar primeiro)
     if (etapa === 4 && recipient.tipo) {
         return <SharedEtapaDados serviceType="entrega" />;
     }
 
     // Etapa 3: Seleção de quem recebeu
-    if (etapa === 3 || (delivered && !recipient.tipo && !needsMaterialCheck)) {
+    if (etapa === 3 || (delivered && !recipient.tipo && !needsMaterialCheck && (!hasFormGroups || formCompleted))) {
         return <SharedEtapaRecebedor serviceType="entrega" />;
     }
 

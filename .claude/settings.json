@@ -179,7 +179,23 @@
       "Bash(kubectl --context map-services-development logs osm-import-carto-9fkxd -n openstreetmap --tail=1)",
       "Bash(kubectl --context map-services-development get jobs -n openstreetmap)",
       "Bash(kubectl --context map-services-development logs osm-import-carto-9fkxd -n openstreetmap --tail=50)",
-      "Bash(kubectl --context map-services-development get pod osm-import-carto-9fkxd -n openstreetmap -o jsonpath='{.status.containerStatuses[0].state}')"
+      "Bash(kubectl --context map-services-development get pod osm-import-carto-9fkxd -n openstreetmap -o jsonpath='{.status.containerStatuses[0].state}')",
+      "Bash(kubectl --context map-services-development get all --all-namespaces)",
+      "Bash(kubectl --context services get configmaps --all-namespaces)",
+      "Bash(kubectl --context services get namespaces)",
+      "Bash(kubectl --context services get all,configmaps,secrets -n keycloak-dev)",
+      "Bash(kubectl --context services get configmap keycloak-agility-theme -n keycloak-dev -o jsonpath='{.data}')",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\('\\\\n'.join\\(sorted\\(d.keys\\(\\)\\)\\)\\)\")",
+      "Bash(kubectl --context services get configmap keycloak-agility-theme -n keycloak-dev -o json)",
+      "Bash(kubectl --context services get configmap keycloak-agility-theme -n keycloak-dev -o 'go-template={{range $k,$v := .data}}{{$k}}{{\"\\\\n\"}}{{end}}')",
+      "Bash(kubectl --context services rollout status deployment keycloak -n keycloak-dev --timeout=120s)",
+      "Bash(kubectl --context services get configmap keycloak-agility-theme -n keycloak-dev -o jsonpath='{.metadata.labels.theme-version}')",
+      "Bash(kubectl --context services -n cattle-fleet-system get bundles -o wide)",
+      "Bash(kubectl --context services get configmap keycloak-agility-theme -n keycloak-dev -o go-template='{{index .data \"login_template.ftl\"}}')",
+      "Bash(kubectl --context services get configmap keycloak-agility-theme -n keycloak-dev -o go-template='{{index .data \"login_resources_css_styles.css\"}}')",
+      "Bash(kubectl --context services get deployment keycloak -n keycloak-dev -o jsonpath='{.status.observedGeneration}')",
+      "Bash(kubectl --context services get ingress -n keycloak-dev)",
+      "Bash(kubectl --context services logs deployment/keycloak -n keycloak-dev --tail=50)"
     ]
   }
 }

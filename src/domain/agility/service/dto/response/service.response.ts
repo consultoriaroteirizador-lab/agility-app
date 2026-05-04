@@ -1,4 +1,5 @@
 import { AddressResponse } from '@/domain/agility/address/dto'
+import type { FormGroupAnswerResponse } from '@/domain/agility/form-group-answer/dto/form-group-answer.response'
 
 import type { ServiceStatus, ServiceType, PriorityLevel, PersonType, VehicleRequirements } from '../types'
 
@@ -239,6 +240,12 @@ export interface ServiceResponse {
 
     amountItems: number | undefined
     amountVolume: number | undefined
+
+    /** IDs dos form groups vinculados ao service */
+    formGroupIds: string[] | null
+
+    /** Respostas preenchidas dos form groups */
+    formGroupAnswers: FormGroupAnswerResponse[] | null
 }
 
 
