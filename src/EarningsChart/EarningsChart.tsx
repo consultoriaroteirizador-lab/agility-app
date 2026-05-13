@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { Dimensions } from 'react-native';
+
 import Svg, { Polyline, Circle, Line, Text as SvgText } from 'react-native-svg';
 
 import { Box, Text } from '@/components';

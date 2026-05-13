@@ -18,7 +18,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
 
   ios: {
-    supportsTablet: true,
+    supportsTablet: false,
     bundleIdentifier: 'br.com.agility.agilityapp',
     buildNumber: '1',
     infoPlist: {

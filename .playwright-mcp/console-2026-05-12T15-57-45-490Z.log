@@ -1,0 +1,170 @@
+[     559ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js:25630
+[     623ms] [LOG] [config] Environment: development @ webpack-internal:///(app-pages-browser)/./src/config/urls.ts:29
+[     623ms] [LOG] [config] API URL: http://localhost:3000 @ webpack-internal:///(app-pages-browser)/./src/config/urls.ts:30
+[     755ms] [LOG] [init-client] Checking URL for auth code {timestamp: 2026-05-12T15:57:46.243Z, pathname: /company-profile-setup, onLoginPage: false, hasAuthCode: false, storedRealm: false} @ webpack-internal:///(app-pages-browser)/./src/app/init-client.tsx:80
+[     755ms] [LOG] [init-client] Initializing Keycloak... {timestamp: 2026-05-12T15:57:46.245Z, pathname: /company-profile-setup, hasAuthCode: false, onLoginPage: false, storedRealm: false} @ webpack-internal:///(app-pages-browser)/./src/app/init-client.tsx:113
+[     756ms] [WARNING] [keycloak] Missing config, skipping init: {hasUrl: true, hasRealm: false, hasClientId: true, hasStored: false} @ webpack-internal:///(app-pages-browser)/./src/lib/keycloak.ts:66
+[     757ms] [LOG] [AuthGate] useEffect triggered {timestamp: 2026-05-12T15:57:46.246Z, ready: false, authenticated: false, pathname: /company-profile-setup, isChecking: true} @ webpack-internal:///(app-pages-browser)/./src/app/auth-gate.tsx:32
+[     757ms] [LOG] [AuthGate] Not ready yet {timestamp: 2026-05-12T15:57:46.247Z, ready: false} @ webpack-internal:///(app-pages-browser)/./src/app/auth-gate.tsx:41
+[     881ms] [LOG] [AuthProvider] Initial state {timestamp: 2026-05-12T15:57:46.370Z, isKcAuth: false, hasKcToken: false, finalIsAuth: false, finalTokenExists: false} @ webpack-internal:///(app-pages-browser)/./src/context/auth/AuthProvider.tsx:274
+[     885ms] [LOG] [AuthGate] useEffect triggered {timestamp: 2026-05-12T15:57:46.374Z, ready: true, authenticated: false, pathname: /company-profile-setup, isChecking: true} @ webpack-internal:///(app-pages-browser)/./src/app/auth-gate.tsx:32
+[     885ms] [LOG] [AuthGate] Initial token check {timestamp: 2026-05-12T15:57:46.375Z, authenticated: false, hasValidStorageToken: null, hasTokenInStorage: false, pathname: /company-profile-setup} @ webpack-internal:///(app-pages-browser)/./src/app/auth-gate.tsx:81
+[     886ms] [LOG] [AuthGate] No token found, starting polling {timestamp: 2026-05-12T15:57:46.375Z} @ webpack-internal:///(app-pages-browser)/./src/app/auth-gate.tsx:124
+[    1095ms] [LOG] [AuthGate] Polling for token {timestamp: 2026-05-12T15:57:46.585Z, attempt: 1, maxAttempts: 50, hasValidStorageToken: null, authenticated: false} @ webpack-internal:///(app-pages-browser)/./src/app/auth-gate.tsx:135
+[    1286ms] [LOG] [AuthGate] Polling for token {timestamp: 2026-05-12T15:57:46.775Z, attempt: 2, maxAttempts: 50, hasValidStorageToken: null, authenticated: false} @ webpack-internal:///(app-pages-browser)/./src/app/auth-gate.tsx:135
+[    1501ms] [LOG] [AuthGate] Polling for token {timestamp: 2026-05-12T15:57:46.990Z, attempt: 3, maxAttempts: 50, hasValidStorageToken: null, authenticated: false} @ webpack-internal:///(app-pages-browser)/./src/app/auth-gate.tsx:135
+[    1687ms] [LOG] [AuthGate] Polling for token {timestamp: 2026-05-12T15:57:47.177Z, attempt: 4, maxAttempts: 50, hasValidStorageToken: null, authenticated: false} @ webpack-internal:///(app-pages-browser)/./src/app/auth-gate.tsx:135
+[    1891ms] [LOG] [AuthGate] Polling for token {timestamp: 2026-05-12T15:57:47.380Z, attempt: 5, maxAttempts: 50, hasValidStorageToken: null, authenticated: false} @ webpack-internal:///(app-pages-browser)/./src/app/auth-gate.tsx:135
+[    2095ms] [LOG] [AuthGate] Polling for token {timestamp: 2026-05-12T15:57:47.585Z, attempt: 6, maxAttempts: 50, hasValidStorageToken: null, authenticated: false} @ webpack-internal:///(app-pages-browser)/./src/app/auth-gate.tsx:135
+[    2298ms] [LOG] [AuthGate] Polling for token {timestamp: 2026-05-12T15:57:47.787Z, attempt: 7, maxAttempts: 50, hasValidStorageToken: null, authenticated: false} @ webpack-internal:///(app-pages-browser)/./src/app/auth-gate.tsx:135
+[    2499ms] [LOG] [AuthGate] Polling for token {timestamp: 2026-05-12T15:57:47.989Z, attempt: 8, maxAttempts: 50, hasValidStorageToken: null, authenticated: false} @ webpack-internal:///(app-pages-browser)/./src/app/auth-gate.tsx:135
+[    2688ms] [LOG] [AuthGate] Polling for token {timestamp: 2026-05-12T15:57:48.177Z, attempt: 9, maxAttempts: 50, hasValidStorageToken: null, authenticated: false} @ webpack-internal:///(app-pages-browser)/./src/app/auth-gate.tsx:135
+[    2888ms] [LOG] [AuthGate] Polling for token {timestamp: 2026-05-12T15:57:48.377Z, attempt: 10, maxAttempts: 50, hasValidStorageToken: null, authenticated: false} @ webpack-internal:///(app-pages-browser)/./src/app/auth-gate.tsx:135
+[    3091ms] [LOG] [AuthGate] Polling for token {timestamp: 2026-05-12T15:57:48.580Z, attempt: 11, maxAttempts: 50, hasValidStorageToken: null, authenticated: false} @ webpack-internal:///(app-pages-browser)/./src/app/auth-gate.tsx:135
+[    3295ms] [LOG] [AuthGate] Polling for token {timestamp: 2026-05-12T15:57:48.785Z, attempt: 12, maxAttempts: 50, hasValidStorageToken: null, authenticated: false} @ webpack-internal:///(app-pages-browser)/./src/app/auth-gate.tsx:135
+[    3490ms] [LOG] [AuthGate] Polling for token {timestamp: 2026-05-12T15:57:48.980Z, attempt: 13, maxAttempts: 50, hasValidStorageToken: null, authenticated: false} @ webpack-internal:///(app-pages-browser)/./src/app/auth-gate.tsx:135
+[    3687ms] [LOG] [AuthGate] Polling for token {timestamp: 2026-05-12T15:57:49.177Z, attempt: 14, maxAttempts: 50, hasValidStorageToken: null, authenticated: false} @ webpack-internal:///(app-pages-browser)/./src/app/auth-gate.tsx:135
+[    3901ms] [LOG] [AuthGate] Polling for token {timestamp: 2026-05-12T15:57:49.391Z, attempt: 15, maxAttempts: 50, hasValidStorageToken: null, authenticated: false} @ webpack-internal:///(app-pages-browser)/./src/app/auth-gate.tsx:135
+[    4089ms] [LOG] [AuthGate] Polling for token {timestamp: 2026-05-12T15:57:49.579Z, attempt: 16, maxAttempts: 50, hasValidStorageToken: null, authenticated: false} @ webpack-internal:///(app-pages-browser)/./src/app/auth-gate.tsx:135
+[    4292ms] [LOG] [AuthGate] Polling for token {timestamp: 2026-05-12T15:57:49.781Z, attempt: 17, maxAttempts: 50, hasValidStorageToken: null, authenticated: false} @ webpack-internal:///(app-pages-browser)/./src/app/auth-gate.tsx:135
+[    4495ms] [LOG] [AuthGate] Polling for token {timestamp: 2026-05-12T15:57:49.984Z, attempt: 18, maxAttempts: 50, hasValidStorageToken: null, authenticated: false} @ webpack-internal:///(app-pages-browser)/./src/app/auth-gate.tsx:135
+[    4695ms] [LOG] [AuthGate] Polling for token {timestamp: 2026-05-12T15:57:50.184Z, attempt: 19, maxAttempts: 50, hasValidStorageToken: null, authenticated: false} @ webpack-internal:///(app-pages-browser)/./src/app/auth-gate.tsx:135
+[    4902ms] [LOG] [AuthGate] Polling for token {timestamp: 2026-05-12T15:57:50.391Z, attempt: 20, maxAttempts: 50, hasValidStorageToken: null, authenticated: false} @ webpack-internal:///(app-pages-browser)/./src/app/auth-gate.tsx:135
+[    5087ms] [LOG] [AuthGate] Polling for token {timestamp: 2026-05-12T15:57:50.577Z, attempt: 21, maxAttempts: 50, hasValidStorageToken: null, authenticated: false} @ webpack-internal:///(app-pages-browser)/./src/app/auth-gate.tsx:135
+[    5297ms] [LOG] [AuthGate] Polling for token {timestamp: 2026-05-12T15:57:50.787Z, attempt: 22, maxAttempts: 50, hasValidStorageToken: null, authenticated: false} @ webpack-internal:///(app-pages-browser)/./src/app/auth-gate.tsx:135
+[    5488ms] [LOG] [AuthGate] Polling for token {timestamp: 2026-05-12T15:57:50.978Z, attempt: 23, maxAttempts: 50, hasValidStorageToken: null, authenticated: false} @ webpack-internal:///(app-pages-browser)/./src/app/auth-gate.tsx:135
+[    5694ms] [LOG] [AuthGate] Polling for token {timestamp: 2026-05-12T15:57:51.183Z, attempt: 24, maxAttempts: 50, hasValidStorageToken: null, authenticated: false} @ webpack-internal:///(app-pages-browser)/./src/app/auth-gate.tsx:135
+[    5894ms] [LOG] [AuthGate] Polling for token {timestamp: 2026-05-12T15:57:51.383Z, attempt: 25, maxAttempts: 50, hasValidStorageToken: null, authenticated: false} @ webpack-internal:///(app-pages-browser)/./src/app/auth-gate.tsx:135
+[    6095ms] [LOG] [AuthGate] Polling for token {timestamp: 2026-05-12T15:57:51.585Z, attempt: 26, maxAttempts: 50, hasValidStorageToken: null, authenticated: false} @ webpack-internal:///(app-pages-browser)/./src/app/auth-gate.tsx:135
+[    6298ms] [LOG] [AuthGate] Polling for token {timestamp: 2026-05-12T15:57:51.788Z, attempt: 27, maxAttempts: 50, hasValidStorageToken: null, authenticated: false} @ webpack-internal:///(app-pages-browser)/./src/app/auth-gate.tsx:135
+[    6493ms] [LOG] [AuthGate] Polling for token {timestamp: 2026-05-12T15:57:51.983Z, attempt: 28, maxAttempts: 50, hasValidStorageToken: null, authenticated: false} @ webpack-internal:///(app-pages-browser)/./src/app/auth-gate.tsx:135
+[    6696ms] [LOG] [AuthGate] Polling for token {timestamp: 2026-05-12T15:57:52.185Z, attempt: 29, maxAttempts: 50, hasValidStorageToken: null, authenticated: false} @ webpack-internal:///(app-pages-browser)/./src/app/auth-gate.tsx:135
+[    6900ms] [LOG] [AuthGate] Polling for token {timestamp: 2026-05-12T15:57:52.389Z, attempt: 30, maxAttempts: 50, hasValidStorageToken: null, authenticated: false} @ webpack-internal:///(app-pages-browser)/./src/app/auth-gate.tsx:135
+[    7088ms] [LOG] [AuthGate] Polling for token {timestamp: 2026-05-12T15:57:52.578Z, attempt: 31, maxAttempts: 50, hasValidStorageToken: null, authenticated: false} @ webpack-internal:///(app-pages-browser)/./src/app/auth-gate.tsx:135
+[    7294ms] [LOG] [AuthGate] Polling for token {timestamp: 2026-05-12T15:57:52.784Z, attempt: 32, maxAttempts: 50, hasValidStorageToken: null, authenticated: false} @ webpack-internal:///(app-pages-browser)/./src/app/auth-gate.tsx:135
+[    7502ms] [LOG] [AuthGate] Polling for token {timestamp: 2026-05-12T15:57:52.992Z, attempt: 33, maxAttempts: 50, hasValidStorageToken: null, authenticated: false} @ webpack-internal:///(app-pages-browser)/./src/app/auth-gate.tsx:135
+[    7698ms] [LOG] [AuthGate] Polling for token {timestamp: 2026-05-12T15:57:53.187Z, attempt: 34, maxAttempts: 50, hasValidStorageToken: null, authenticated: false} @ webpack-internal:///(app-pages-browser)/./src/app/auth-gate.tsx:135
+[    7899ms] [LOG] [AuthGate] Polling for token {timestamp: 2026-05-12T15:57:53.388Z, attempt: 35, maxAttempts: 50, hasValidStorageToken: null, authenticated: false} @ webpack-internal:///(app-pages-browser)/./src/app/auth-gate.tsx:135
+[    8089ms] [LOG] [AuthGate] Polling for token {timestamp: 2026-05-12T15:57:53.579Z, attempt: 36, maxAttempts: 50, hasValidStorageToken: null, authenticated: false} @ webpack-internal:///(app-pages-browser)/./src/app/auth-gate.tsx:135
+[    8293ms] [LOG] [AuthGate] Polling for token {timestamp: 2026-05-12T15:57:53.783Z, attempt: 37, maxAttempts: 50, hasValidStorageToken: null, authenticated: false} @ webpack-internal:///(app-pages-browser)/./src/app/auth-gate.tsx:135
+[    8497ms] [LOG] [AuthGate] Polling for token {timestamp: 2026-05-12T15:57:53.986Z, attempt: 38, maxAttempts: 50, hasValidStorageToken: null, authenticated: false} @ webpack-internal:///(app-pages-browser)/./src/app/auth-gate.tsx:135
+[    8700ms] [LOG] [AuthGate] Polling for token {timestamp: 2026-05-12T15:57:54.189Z, attempt: 39, maxAttempts: 50, hasValidStorageToken: null, authenticated: false} @ webpack-internal:///(app-pages-browser)/./src/app/auth-gate.tsx:135
+[    8888ms] [LOG] [AuthGate] Polling for token {timestamp: 2026-05-12T15:57:54.377Z, attempt: 40, maxAttempts: 50, hasValidStorageToken: null, authenticated: false} @ webpack-internal:///(app-pages-browser)/./src/app/auth-gate.tsx:135
+[    9090ms] [LOG] [AuthGate] Polling for token {timestamp: 2026-05-12T15:57:54.580Z, attempt: 41, maxAttempts: 50, hasValidStorageToken: null, authenticated: false} @ webpack-internal:///(app-pages-browser)/./src/app/auth-gate.tsx:135
+[    9294ms] [LOG] [AuthGate] Polling for token {timestamp: 2026-05-12T15:57:54.783Z, attempt: 42, maxAttempts: 50, hasValidStorageToken: null, authenticated: false} @ webpack-internal:///(app-pages-browser)/./src/app/auth-gate.tsx:135
+[    9498ms] [LOG] [AuthGate] Polling for token {timestamp: 2026-05-12T15:57:54.987Z, attempt: 43, maxAttempts: 50, hasValidStorageToken: null, authenticated: false} @ webpack-internal:///(app-pages-browser)/./src/app/auth-gate.tsx:135
+[    9700ms] [LOG] [AuthGate] Polling for token {timestamp: 2026-05-12T15:57:55.190Z, attempt: 44, maxAttempts: 50, hasValidStorageToken: null, authenticated: false} @ webpack-internal:///(app-pages-browser)/./src/app/auth-gate.tsx:135
+[    9890ms] [LOG] [AuthGate] Polling for token {timestamp: 2026-05-12T15:57:55.380Z, attempt: 45, maxAttempts: 50, hasValidStorageToken: null, authenticated: false} @ webpack-internal:///(app-pages-browser)/./src/app/auth-gate.tsx:135
+[   10094ms] [LOG] [AuthGate] Polling for token {timestamp: 2026-05-12T15:57:55.583Z, attempt: 46, maxAttempts: 50, hasValidStorageToken: null, authenticated: false} @ webpack-internal:///(app-pages-browser)/./src/app/auth-gate.tsx:135
+[   10298ms] [LOG] [AuthGate] Polling for token {timestamp: 2026-05-12T15:57:55.787Z, attempt: 47, maxAttempts: 50, hasValidStorageToken: null, authenticated: false} @ webpack-internal:///(app-pages-browser)/./src/app/auth-gate.tsx:135
+[   10493ms] [LOG] [AuthGate] Polling for token {timestamp: 2026-05-12T15:57:55.983Z, attempt: 48, maxAttempts: 50, hasValidStorageToken: null, authenticated: false} @ webpack-internal:///(app-pages-browser)/./src/app/auth-gate.tsx:135
+[   10698ms] [LOG] [AuthGate] Polling for token {timestamp: 2026-05-12T15:57:56.187Z, attempt: 49, maxAttempts: 50, hasValidStorageToken: null, authenticated: false} @ webpack-internal:///(app-pages-browser)/./src/app/auth-gate.tsx:135
+[   10899ms] [LOG] [AuthGate] Polling for token {timestamp: 2026-05-12T15:57:56.388Z, attempt: 50, maxAttempts: 50, hasValidStorageToken: null, authenticated: false} @ webpack-internal:///(app-pages-browser)/./src/app/auth-gate.tsx:135
+[   10899ms] [LOG] [AuthGate] Max attempts reached, redirecting to login {timestamp: 2026-05-12T15:57:56.389Z, attempts: 50, maxAttempts: 50} @ webpack-internal:///(app-pages-browser)/./src/app/auth-gate.tsx:216
+[   10946ms] [LOG] [API_SERVICE] Request: GET /skills/collaborators @ webpack-internal:///(app-pages-browser)/./src/api/apiConfig.ts:190
+[   10946ms] [LOG] [API_SERVICE] Full URL: http://localhost:3000/skills/collaborators @ webpack-internal:///(app-pages-browser)/./src/api/apiConfig.ts:191
+[   10946ms] [LOG] [API_SERVICE] Headers: {Authorization: NOT SET, x-tenant-id: NOT SET, X-Real-Host: transportadora-express.localhost:3001, Content-Type: application/json} @ webpack-internal:///(app-pages-browser)/./src/api/apiConfig.ts:192
+[   10947ms] [LOG] [API_SERVICE] Full Headers Object: {
+  "Accept": "application/json",
+  "Content-Type": "application/json",
+  "X-Real-Host": "transportadora-express.localhost:3001"
+} @ webpack-internal:///(app-pages-browser)/./src/api/apiConfig.ts:198
+[   10947ms] [LOG] [API_SERVICE] Token from storage: NOT FOUND @ webpack-internal:///(app-pages-browser)/./src/api/apiConfig.ts:205
+[   10947ms] [LOG] [API_SERVICE] Request: GET /addresses @ webpack-internal:///(app-pages-browser)/./src/api/apiConfig.ts:190
+[   10947ms] [LOG] [API_SERVICE] Full URL: http://localhost:3000/addresses @ webpack-internal:///(app-pages-browser)/./src/api/apiConfig.ts:191
+[   10947ms] [LOG] [API_SERVICE] Headers: {Authorization: NOT SET, x-tenant-id: NOT SET, X-Real-Host: transportadora-express.localhost:3001, Content-Type: application/json} @ webpack-internal:///(app-pages-browser)/./src/api/apiConfig.ts:192
+[   10947ms] [LOG] [API_SERVICE] Full Headers Object: {
+  "Accept": "application/json",
+  "Content-Type": "application/json",
+  "X-Real-Host": "transportadora-express.localhost:3001"
+} @ webpack-internal:///(app-pages-browser)/./src/api/apiConfig.ts:198
+[   10947ms] [LOG] [API_SERVICE] Token from storage: NOT FOUND @ webpack-internal:///(app-pages-browser)/./src/api/apiConfig.ts:205
+[   10947ms] [LOG] [API_SERVICE] Request: GET /collaborators @ webpack-internal:///(app-pages-browser)/./src/api/apiConfig.ts:190
+[   10947ms] [LOG] [API_SERVICE] Full URL: http://localhost:3000/collaborators @ webpack-internal:///(app-pages-browser)/./src/api/apiConfig.ts:191
+[   10947ms] [LOG] [API_SERVICE] Headers: {Authorization: NOT SET, x-tenant-id: NOT SET, X-Real-Host: transportadora-express.localhost:3001, Content-Type: application/json} @ webpack-internal:///(app-pages-browser)/./src/api/apiConfig.ts:192
+[   10947ms] [LOG] [API_SERVICE] Full Headers Object: {
+  "Accept": "application/json",
+  "Content-Type": "application/json",
+  "X-Real-Host": "transportadora-express.localhost:3001"
+} @ webpack-internal:///(app-pages-browser)/./src/api/apiConfig.ts:198
+[   10947ms] [LOG] [API_SERVICE] Token from storage: NOT FOUND @ webpack-internal:///(app-pages-browser)/./src/api/apiConfig.ts:205
+[   10971ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/skills/collaborators:0
+[   10972ms] [LOG] [apiConfig] 401 Unauthorized detected {retryCount: 0, maxRetries: 1} @ webpack-internal:///(app-pages-browser)/./src/api/apiConfig.ts:252
+[   10972ms] [LOG] [apiConfig] Request that failed: {method: get, url: /skills/collaborators, fullURL: http://localhost:3000/skills/collaborators, headers: Object} @ webpack-internal:///(app-pages-browser)/./src/api/apiConfig.ts:256
+[   10973ms] [LOG] [apiConfig] Auth status check: {hasAuthCode: false, kcExists: false, kcAuthenticated: undefined, kcHasToken: false, tokenFromStorage: NOT FOUND} @ webpack-internal:///(app-pages-browser)/./src/api/apiConfig.ts:269
+[   10973ms] [LOG] [apiConfig] No valid authentication found, logging out @ webpack-internal:///(app-pages-browser)/./src/api/apiConfig.ts:382
+[   10973ms] [LOG] [apiConfig] Authentication failed, logging out and redirecting to login @ webpack-internal:///(app-pages-browser)/./src/api/apiConfig.ts:17
+[   10975ms] [ERROR] [apiConfig] API Error: {status: 401, statusText: Unauthorized, data: Object, message: Request failed with status code 401} @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/userspace/app/errors/intercept-console-error.js:56
+[   10980ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/addresses?page=1&limit=6:0
+[   10981ms] [LOG] [apiConfig] 401 Unauthorized detected {retryCount: 0, maxRetries: 1} @ webpack-internal:///(app-pages-browser)/./src/api/apiConfig.ts:252
+[   10981ms] [LOG] [apiConfig] Request that failed: {method: get, url: /addresses, fullURL: http://localhost:3000/addresses, headers: Object} @ webpack-internal:///(app-pages-browser)/./src/api/apiConfig.ts:256
+[   10981ms] [LOG] [apiConfig] Auth status check: {hasAuthCode: false, kcExists: false, kcAuthenticated: undefined, kcHasToken: false, tokenFromStorage: NOT FOUND} @ webpack-internal:///(app-pages-browser)/./src/api/apiConfig.ts:269
+[   10981ms] [LOG] [apiConfig] No valid authentication found, logging out @ webpack-internal:///(app-pages-browser)/./src/api/apiConfig.ts:382
+[   10981ms] [LOG] [apiConfig] Authentication failed, logging out and redirecting to login @ webpack-internal:///(app-pages-browser)/./src/api/apiConfig.ts:17
+[   10984ms] [ERROR] [apiConfig] API Error: {status: 401, statusText: Unauthorized, data: Object, message: Request failed with status code 401} @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/userspace/app/errors/intercept-console-error.js:56
+[   10995ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://localhost:3000/collaborators:0
+[   10995ms] [LOG] [apiConfig] 401 Unauthorized detected {retryCount: 0, maxRetries: 1} @ webpack-internal:///(app-pages-browser)/./src/api/apiConfig.ts:252
+[   10996ms] [LOG] [apiConfig] Request that failed: {method: get, url: /collaborators, fullURL: http://localhost:3000/collaborators, headers: Object} @ webpack-internal:///(app-pages-browser)/./src/api/apiConfig.ts:256
+[   10996ms] [LOG] [apiConfig] Auth status check: {hasAuthCode: false, kcExists: false, kcAuthenticated: undefined, kcHasToken: false, tokenFromStorage: NOT FOUND} @ webpack-internal:///(app-pages-browser)/./src/api/apiConfig.ts:269
+[   10996ms] [LOG] [apiConfig] No valid authentication found, logging out @ webpack-internal:///(app-pages-browser)/./src/api/apiConfig.ts:382
+[   10996ms] [LOG] [apiConfig] Authentication failed, logging out and redirecting to login @ webpack-internal:///(app-pages-browser)/./src/api/apiConfig.ts:17
+[   10997ms] [ERROR] [apiConfig] API Error: {status: 401, statusText: Unauthorized, data: Object, message: Request failed with status code 401} @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/next-devtools/userspace/app/errors/intercept-console-error.js:56
+[   11467ms] [INFO] %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold @ webpack-internal:///(app-pages-browser)/./node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js:25630
+[   11510ms] [LOG] [config] Environment: development @ webpack-internal:///(app-pages-browser)/./src/config/urls.ts:29
+[   11510ms] [LOG] [config] API URL: http://localhost:3000 @ webpack-internal:///(app-pages-browser)/./src/config/urls.ts:30
+[   11556ms] [LOG] [init-client] Skipping Keycloak init for public route: {pathname: /login} @ webpack-internal:///(app-pages-browser)/./src/app/init-client.tsx:62
+[   11557ms] [LOG] [AuthGate] useEffect triggered {timestamp: 2026-05-12T15:57:57.046Z, ready: false, authenticated: false, pathname: /login, isChecking: true} @ webpack-internal:///(app-pages-browser)/./src/app/auth-gate.tsx:32
+[   11557ms] [LOG] [AuthGate] Not ready yet {timestamp: 2026-05-12T15:57:57.046Z, ready: false} @ webpack-internal:///(app-pages-browser)/./src/app/auth-gate.tsx:41
+[   11668ms] [LOG] [AuthProvider] Initial state {timestamp: 2026-05-12T15:57:57.157Z, isKcAuth: false, hasKcToken: false, finalIsAuth: false, finalTokenExists: false} @ webpack-internal:///(app-pages-browser)/./src/context/auth/AuthProvider.tsx:274
+[   11672ms] [LOG] [AuthGate] useEffect triggered {timestamp: 2026-05-12T15:57:57.161Z, ready: true, authenticated: false, pathname: /login, isChecking: true} @ webpack-internal:///(app-pages-browser)/./src/app/auth-gate.tsx:32
+[   11682ms] [LOG] [login] useEffect triggered {timestamp: 2026-05-12T15:57:57.172Z, companyNotFound: false, ready: true, loading: false, hasAttempted: false} @ webpack-internal:///(app-pages-browser)/./src/app/login/page.tsx:41
+[   11683ms] [LOG] [login] Not authenticated, starting discovery {timestamp: 2026-05-12T15:57:57.172Z, authenticated: false, ready: true} @ webpack-internal:///(app-pages-browser)/./src/app/login/page.tsx:112
+[   11686ms] [LOG] [login] Starting discoverAndLogin {timestamp: 2026-05-12T15:57:57.174Z} @ webpack-internal:///(app-pages-browser)/./src/app/login/page.tsx:134
+[   11687ms] [LOG] [login] Calling companyService.discoverByHost() {timestamp: 2026-05-12T15:57:57.177Z} @ webpack-internal:///(app-pages-browser)/./src/app/login/page.tsx:144
+[   11690ms] [LOG] [login] useEffect triggered {timestamp: 2026-05-12T15:57:57.180Z, companyNotFound: false, ready: true, loading: false, hasAttempted: false} @ webpack-internal:///(app-pages-browser)/./src/app/login/page.tsx:41
+[   11691ms] [LOG] [login] Not authenticated, starting discovery {timestamp: 2026-05-12T15:57:57.180Z, authenticated: false, ready: true} @ webpack-internal:///(app-pages-browser)/./src/app/login/page.tsx:112
+[   11691ms] [LOG] [login] Starting discoverAndLogin {timestamp: 2026-05-12T15:57:57.180Z} @ webpack-internal:///(app-pages-browser)/./src/app/login/page.tsx:134
+[   11691ms] [LOG] [login] Calling companyService.discoverByHost() {timestamp: 2026-05-12T15:57:57.181Z} @ webpack-internal:///(app-pages-browser)/./src/app/login/page.tsx:144
+[   11693ms] [LOG] [API_SERVICE] Request: GET /companies/discover @ webpack-internal:///(app-pages-browser)/./src/api/apiConfig.ts:190
+[   11693ms] [LOG] [API_SERVICE] Full URL: http://localhost:3000/companies/discover @ webpack-internal:///(app-pages-browser)/./src/api/apiConfig.ts:191
+[   11693ms] [LOG] [API_SERVICE] Headers: {Authorization: NOT SET, x-tenant-id: NOT SET, X-Real-Host: transportadora-express.localhost:3001, Content-Type: application/json} @ webpack-internal:///(app-pages-browser)/./src/api/apiConfig.ts:192
+[   11693ms] [LOG] [API_SERVICE] Full Headers Object: {
+  "Accept": "application/json",
+  "Content-Type": "application/json",
+  "X-Real-Host": "transportadora-express.localhost:3001"
+} @ webpack-internal:///(app-pages-browser)/./src/api/apiConfig.ts:198
+[   11693ms] [LOG] [API_SERVICE] Token from storage: NOT FOUND @ webpack-internal:///(app-pages-browser)/./src/api/apiConfig.ts:205
+[   11693ms] [LOG] [API_SERVICE] Request: GET /companies/discover @ webpack-internal:///(app-pages-browser)/./src/api/apiConfig.ts:190
+[   11693ms] [LOG] [API_SERVICE] Full URL: http://localhost:3000/companies/discover @ webpack-internal:///(app-pages-browser)/./src/api/apiConfig.ts:191
+[   11693ms] [LOG] [API_SERVICE] Headers: {Authorization: NOT SET, x-tenant-id: NOT SET, X-Real-Host: transportadora-express.localhost:3001, Content-Type: application/json} @ webpack-internal:///(app-pages-browser)/./src/api/apiConfig.ts:192
+[   11694ms] [LOG] [API_SERVICE] Full Headers Object: {
+  "Accept": "application/json",
+  "Content-Type": "application/json",
+  "X-Real-Host": "transportadora-express.localhost:3001"
+} @ webpack-internal:///(app-pages-browser)/./src/api/apiConfig.ts:198
+[   11694ms] [LOG] [API_SERVICE] Token from storage: NOT FOUND @ webpack-internal:///(app-pages-browser)/./src/api/apiConfig.ts:205
+[   11708ms] [LOG] [login] useEffect triggered {timestamp: 2026-05-12T15:57:57.198Z, companyNotFound: false, ready: true, loading: true, hasAttempted: true} @ webpack-internal:///(app-pages-browser)/./src/app/login/page.tsx:41
+[   11709ms] [LOG] [login] Loading or already attempted, returning {timestamp: 2026-05-12T15:57:57.199Z, loading: true, hasAttempted: true} @ webpack-internal:///(app-pages-browser)/./src/app/login/page.tsx:88
+[   12256ms] [LOG] [API_SERVICE] - Response: Status /companies/discover 200 @ webpack-internal:///(app-pages-browser)/./src/api/apiConfig.ts:228
+[   12256ms] [LOG] [API_SERVICE] - Response: Data {success: true, message: null, result: Object, error: null} @ webpack-internal:///(app-pages-browser)/./src/api/apiConfig.ts:229
+[   12256ms] [LOG] [login] Discovery response: {timestamp: 2026-05-12T15:57:57.746Z, discovery: Object} @ webpack-internal:///(app-pages-browser)/./src/app/login/page.tsx:149
+[   12256ms] [LOG] [login] Tenant mode detected from host {slug: transportadora-express} @ webpack-internal:///(app-pages-browser)/./src/app/login/page.tsx:192
+[   12522ms] [LOG] [API_SERVICE] - Response: Status /companies/discover 200 @ webpack-internal:///(app-pages-browser)/./src/api/apiConfig.ts:228
+[   12522ms] [LOG] [API_SERVICE] - Response: Data {success: true, message: null, result: Object, error: null} @ webpack-internal:///(app-pages-browser)/./src/api/apiConfig.ts:229
+[   12522ms] [LOG] [login] Discovery response: {timestamp: 2026-05-12T15:57:58.012Z, discovery: Object} @ webpack-internal:///(app-pages-browser)/./src/app/login/page.tsx:149
+[   12522ms] [LOG] [login] Tenant mode detected from host {slug: transportadora-express} @ webpack-internal:///(app-pages-browser)/./src/app/login/page.tsx:192
+[   14014ms] [LOG] [login] Preparing to redirect to Keycloak {timestamp: 2026-05-12T15:57:59.503Z, realm: company-transportadora-express, tenantId: 9d45e24d-32a0-4c9b-9756-7141f0a52434, isAdmin: false} @ webpack-internal:///(app-pages-browser)/./src/app/login/page.tsx:221
+[   14014ms] [LOG] [login] Calling navigateToLogin {timestamp: 2026-05-12T15:57:59.503Z, redirectUri: http://transportadora-express.localhost:3001/dashboard, targetPath: /dashboard, redirectPath: null} @ webpack-internal:///(app-pages-browser)/./src/app/login/page.tsx:231
+[   14014ms] [LOG] [keycloak] navigateToLogin called with options: {redirectUri: http://transportadora-express.localhost:3001/dashboard, prompt: login} @ webpack-internal:///(app-pages-browser)/./src/lib/keycloak.ts:380
+[   14014ms] [LOG] [keycloak] Keycloak configured {timestamp: 2026-05-12T15:57:59.504Z, url: https://dev.auth.agilitylabs.com.br, realm: company-transportadora-express, clientId: agility-web, hasStoredRealm: true} @ webpack-internal:///(app-pages-browser)/./src/lib/keycloak.ts:263
+[   14015ms] [LOG] [keycloak] Initialized for login (no check-sso) @ webpack-internal:///(app-pages-browser)/./src/lib/keycloak.ts:395
+[   14015ms] [LOG] [keycloak] Using kc.login() to redirect to Keycloak @ webpack-internal:///(app-pages-browser)/./src/lib/keycloak.ts:408
+[   14370ms] [LOG] [login] Preparing to redirect to Keycloak {timestamp: 2026-05-12T15:57:59.860Z, realm: company-transportadora-express, tenantId: 9d45e24d-32a0-4c9b-9756-7141f0a52434, isAdmin: false} @ webpack-internal:///(app-pages-browser)/./src/app/login/page.tsx:221
+[   14370ms] [LOG] [login] Calling navigateToLogin {timestamp: 2026-05-12T15:57:59.860Z, redirectUri: http://transportadora-express.localhost:3001/dashboard, targetPath: /dashboard, redirectPath: null} @ webpack-internal:///(app-pages-browser)/./src/app/login/page.tsx:231
+[   14371ms] [LOG] [keycloak] navigateToLogin called with options: {redirectUri: http://transportadora-express.localhost:3001/dashboard, prompt: login} @ webpack-internal:///(app-pages-browser)/./src/lib/keycloak.ts:380
+[   14371ms] [LOG] [keycloak] Using kc.login() to redirect to Keycloak @ webpack-internal:///(app-pages-browser)/./src/lib/keycloak.ts:408
+[   15522ms] Unexpected token '&'
+[   15522ms] [LOG] Agility Keycloak Theme initialized @ https://dev.auth.agilitylabs.com.br/resources/6j6pj/login/agility/js/scripts.js:339
+[   15947ms] [LOG] Page Load Time: 1563.2000000029802 ms @ https://dev.auth.agilitylabs.com.br/resources/6j6pj/login/agility/js/scripts.js:300
+[   15947ms] [LOG] DOM Ready: 1139.1000000089407 ms @ https://dev.auth.agilitylabs.com.br/resources/6j6pj/login/agility/js/scripts.js:301
+[   17219ms] [ERROR] Failed to load resource: the server responded with a status of 404 () @ https://dev.auth.agilitylabs.com.br/resources/6j6pj/login/agility/images/favicon.ico:0

@@ -9,8 +9,8 @@ import { EtapaCheckItens } from '../_components/entrega/EtapaCheckItens';
 import { EtapaConfirmacao } from '../_components/entrega/EtapaConfirmacao';
 import { EtapaInicial } from '../_components/entrega/EtapaInicial';
 import { SharedEtapaDados } from '../_components/shared/SharedEtapaDados';
-import { SharedEtapaFormulario } from '../_components/shared/SharedEtapaFormulario';
 import { SharedEtapaFinalizacao } from '../_components/shared/SharedEtapaFinalizacao';
+import { SharedEtapaFormulario } from '../_components/shared/SharedEtapaFormulario';
 import { SharedEtapaRecebedor } from '../_components/shared/SharedEtapaRecebedor';
 import { ParadaProvider, useParada } from '../_context/ParadaContext';
 

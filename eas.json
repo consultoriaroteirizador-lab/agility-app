@@ -1,4 +1,7 @@
 {
+    "cli": {
+      "version": ">= 13.2.0"
+    },
     "build": {
       "development": {
         "developmentClient": true,
@@ -17,8 +20,33 @@
         }
       },
       "production": {
+        "autoIncrement": true,
         "android": {
           "buildType": "app-bundle"
+        }
+      }
+    },
+    "submit": {
+      "staging": {
+        "android": {
+          "serviceAccountKeyPath": "./google-play-service-account.json",
+          "track": "internal"
+        },
+        "ios": {
+          "appleId": "daniel_ap21@yahoo.com.br",
+          "ascAppId": "6766254061",
+          "appleTeamId": "TJXJQG6AL2"
+        }
+      },
+      "production": {
+        "android": {
+          "serviceAccountKeyPath": "./google-play-service-account.json",
+          "track": "production"
+        },
+        "ios": {
+          "appleId": "daniel_ap21@yahoo.com.br",
+          "ascAppId": "6766254061",
+          "appleTeamId": "TJXJQG6AL2"
         }
       }
     }

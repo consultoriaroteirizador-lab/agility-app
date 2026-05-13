@@ -11,14 +11,14 @@ import * as ImagePicker from 'expo-image-picker';
 
 import type { AddressResponse } from '@/domain/agility/address/dto';
 import { useFindOneAddress } from '@/domain/agility/address/useCase';
+import type { FormGroupResponse } from '@/domain/agility/form-group/dto/form-group.response';
+import { formGroupService } from '@/domain/agility/form-group/formGroupService';
+import { FormEntityType } from '@/domain/agility/form-group-answer/dto/create-form-group-answer.request';
+import { useCreateFormGroupAnswer } from '@/domain/agility/form-group-answer/useCase/useCreateFormGroupAnswer';
 import type { ServiceMaterialResponse, MaterialStatus } from '@/domain/agility/service/dto/response/service-material.response';
 import { PaymentMethodType, ServiceStatus } from '@/domain/agility/service/dto/types';
 import { serviceService } from '@/domain/agility/service/serviceService';
 import { useFindOneService, useCheckMaterial } from '@/domain/agility/service/useCase';
-import type { FormGroupResponse } from '@/domain/agility/form-group/dto/form-group.response';
-import { formGroupService } from '@/domain/agility/form-group/formGroupService';
-import { useCreateFormGroupAnswer } from '@/domain/agility/form-group-answer/useCase/useCreateFormGroupAnswer';
-import { FormEntityType } from '@/domain/agility/form-group-answer/dto/create-form-group-answer.request';
 
 // Tipos
 export type RecipientType = 'cliente' | 'porteiro' | 'vizinho' | 'familiar' | 'outro';

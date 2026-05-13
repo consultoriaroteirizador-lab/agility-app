@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo } from 'react'
+import React, { useCallback, useMemo, useState } from 'react'
 
 import { Box, Button, ScreenBase, Text } from '@/components'
 import { ButtonBack } from '@/components/Button/ButtonBack'
@@ -6,6 +6,7 @@ import { useToastService } from '@/services/Toast/useToast'
 import { measure } from '@/theme'
 
 import { useParada } from '../../_context/ParadaContext'
+
 import { DynamicQuestionInput } from './DynamicQuestionInput'
 
 interface SharedEtapaFormularioProps {
@@ -14,12 +15,14 @@ interface SharedEtapaFormularioProps {
 
 export function SharedEtapaFormulario({ serviceType }: SharedEtapaFormularioProps) {
   const { showToast } = useToastService()
+  const [submitting, setSubmitting] = useState(false)
   const {
     formGroups,
     formAnswersMap,
     setFormAnswer,
     submitFormAnswers,
     setEtapa,
+    goToNextStep,
   } = useParada()
 
   const handleBack = useCallback(() => {
@@ -48,16 +51,17 @@ export function SharedEtapaFormulario({ serviceType }: SharedEtapaFormularioProp
   }, [allQuestions, formAnswersMap])
 
   const handleSubmit = useCallback(async () => {
-    if (!canProceed) {
-      showToast({ message: 'Preencha todas as perguntas antes de prosseguir', type: 'error' })
-      return
-    }
+    if (!canProceed || submitting) return
+    setSubmitting(true)
     try {
       await submitFormAnswers()
+      goToNextStep()
     } catch {
       showToast({ message: 'Erro ao enviar respostas. Tente novamente.', type: 'error' })
+    } finally {
+      setSubmitting(false)
     }
-  }, [canProceed, submitFormAnswers, showToast])
+  }, [canProceed, submitting, submitFormAnswers, showToast, goToNextStep])
 
   if (formGroups.length === 0) {
     return null
@@ -74,7 +78,7 @@ export function SharedEtapaFormulario({ serviceType }: SharedEtapaFormularioProp
     >
       <Box flex={1} backgroundColor="white">
         <Box scrollable pb="b32">
-          <Box paddingTop="y24" paddingBottom="y4" paddingHorizontal="x16">
+          <Box paddingTop="y24" paddingBottom="y4" >
             {formGroups.map((formGroup) => (
               <Box key={formGroup.id} marginBottom="y20">
                 <Text preset="text18" color="colorTextPrimary" fontWeightPreset="bold" marginBottom="y12">
@@ -104,10 +108,10 @@ export function SharedEtapaFormulario({ serviceType }: SharedEtapaFormularioProp
 
             <Box paddingBottom="y24">
               <Button
-                title="Avançar"
+                title={submitting ? 'Enviando...' : 'Avançar'}
                 onPress={handleSubmit}
                 width={measure.x330}
-                disabled={!canProceed}
+                disabled={!canProceed || submitting}
               />
               {!canProceed && (
                 <Text preset="text12" color="primary100" textAlign="center" marginTop="y8">

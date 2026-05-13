@@ -217,7 +217,9 @@
       "Bash(kubectl --context services-development get deployments,statefulsets --all-namespaces)",
       "Bash(kubectl --context services get all --all-namespaces)",
       "Bash(kubectl --context services-development get all --all-namespaces)",
-      "Bash(kubectl --context route-services get all --all-namespaces)"
+      "Bash(kubectl --context route-services get all --all-namespaces)",
+      "mcp__playwright__browser_navigate",
+      "mcp__playwright__browser_snapshot"
     ],
     "additionalDirectories": [
       "\\tmp",

@@ -7,8 +7,8 @@ import { measure } from '@/theme';
 
 import { ColetaEtapaCheckItens, ColetaEtapaConfirmacao, ColetaEtapaInicial } from '../_components/coleta';
 import { SharedEtapaDados } from '../_components/shared/SharedEtapaDados';
-import { SharedEtapaFormulario } from '../_components/shared/SharedEtapaFormulario';
 import { SharedEtapaFinalizacao } from '../_components/shared/SharedEtapaFinalizacao';
+import { SharedEtapaFormulario } from '../_components/shared/SharedEtapaFormulario';
 import { SharedEtapaRecebedor } from '../_components/shared/SharedEtapaRecebedor';
 import { ParadaProvider, useParada } from '../_context/ParadaContext';
 

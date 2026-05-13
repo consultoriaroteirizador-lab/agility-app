@@ -1,11 +1,13 @@
 import React, { useCallback } from 'react'
 
-import { Box, Input, Text } from '@/components'
-import { MultiPhotoPicker } from '@/components/MultiPhotoPicker'
-import { measure } from '@/theme'
 import * as ImagePicker from 'expo-image-picker'
 
+import { Box, Input, Text } from '@/components'
+import { MultiPhotoPicker } from '@/components/MultiPhotoPicker'
 import type { QuestionResponse, QuestionType } from '@/domain/agility/form-group/dto/form-group.response'
+import { measure } from '@/theme'
+
+
 import { CheckboxGroupInput } from './CheckboxGroupInput'
 import { DatePickerInput } from './DatePickerInput'
 import { RadioGroupInput } from './RadioGroupInput'
