@@ -161,10 +161,11 @@ export default function StopDetailScreen() {
     setHasArrivedAtLocation(true);
   }, [service, handleGoToLocation]);
 
-  // Handle service completed navigation
+  // Handle service completed navigation — usa o fluxo novo (service/) com checklist e
+  // tratamento de requiresPayment. A rota legada dados-servico fica apenas como redirect.
   const handleServiceCompleted = useCallback(() => {
     router.push({
-      pathname: '/rotas-detalhadas/[id]/parada/[pid]/dados-servico',
+      pathname: '/rotas-detalhadas/[id]/parada/[pid]/service',
       params: { id: routeId, pid: serviceId },
     });
   }, [router, routeId, serviceId]);

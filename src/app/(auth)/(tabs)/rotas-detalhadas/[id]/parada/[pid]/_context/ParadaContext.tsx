@@ -513,6 +513,7 @@ export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderPr
     });
     setPaymentAmount('');
     setPaymentMethod(null);
+    setShowPaymentModal(false);
     setFormState({
       formGroups: [],
       formAnswersMap: {},
@@ -520,6 +521,13 @@ export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderPr
       loading: false,
     });
   }, []);
+
+  // Reset payment state quando o serviceId mudar — evita carregar valores da parada anterior
+  useEffect(() => {
+    setShowPaymentModal(false);
+    setPaymentAmount('');
+    setPaymentMethod(null);
+  }, [serviceId]);
 
   const value: ParadaContextValue = {
     // Dados do serviço

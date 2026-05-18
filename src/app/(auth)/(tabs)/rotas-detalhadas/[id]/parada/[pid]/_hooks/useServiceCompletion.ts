@@ -8,6 +8,7 @@ import { serviceService } from '@/domain/agility/service/serviceService';
 import { useCompleteServiceWithDetails } from '@/domain/agility/service/useCase';
 import { KEY_SERVICES, KEY_ROUTINGS } from '@/domain/queryKeys';
 import { useToastService } from '@/services/Toast/useToast';
+import { parseBRLToCents } from '@/utils/parseCurrency';
 
 import { useParada } from '../_context/ParadaContext';
 
@@ -202,14 +203,13 @@ export function useServiceCompletion() {
                 payload.photoProof = photoUrls.length === 1 ? photoUrls[0] : photoUrls.join(',');
             }
 
-            // Adicionar valor de pagamento se o serviço requer cobrança
+            // Adicionar valor de pagamento se o serviço requer cobrança.
+            // Input visual é uma máscara em centavos (digitar 12345 → "R$ 123,45"),
+            // então parseBRLToCents extrai os dígitos diretamente sem ambiguidade.
             if (service?.requiresPayment && paymentAmount) {
-                // Extrair valor numérico do campo formatado
-                const numericString = paymentAmount.replace(/[R$\s.]/g, '').replace(',', '.');
-                const value = parseFloat(numericString);
-                if (!isNaN(value) && value > 0) {
-                    // Converter para centavos
-                    payload.receivedValue = Math.round(value * 100);
+                const cents = parseBRLToCents(paymentAmount);
+                if (cents !== null && cents > 0) {
+                    payload.receivedValue = cents;
                 }
             }
 

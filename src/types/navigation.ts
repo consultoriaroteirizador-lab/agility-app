@@ -77,6 +77,8 @@ export type DynamicAppRoute =
     | `/rotas-detalhadas/${string}/parada/${string}/dados-entrega`
     | `/rotas-detalhadas/${string}/parada/${string}/dados-servico`
     | `/rotas-detalhadas/${string}/parada/${string}/entrega`
+    | `/rotas-detalhadas/${string}/parada/${string}/coleta`
+    | `/rotas-detalhadas/${string}/parada/${string}/service`
     | `/rotas-detalhadas/${string}/parada/${string}/insucesso`
     | `/rotas-detalhadas/${string}/parada/${string}/nao-realizado`
     | RelativeRoutes;

@@ -6,8 +6,10 @@ import { ButtonBack } from '@/components/Button/ButtonBack';
 import Modal from '@/components/Modal/Modal';
 import { SignatureCanvas } from '@/components/SignatureCanvas';
 import { PaymentMethodType } from '@/domain/agility/service/dto/types';
+import { useAuthCredentialsService } from '@/services';
 import { measure } from '@/theme';
 import { formatCurrency } from '@/utils/formatCurrency';
+import { parseBRLToCents } from '@/utils/parseCurrency';
 
 import { useParada } from '../../_context/ParadaContext';
 import { useServiceCompletion } from '../../_hooks/useServiceCompletion';
@@ -118,11 +120,9 @@ export function SharedEtapaFinalizacao({ serviceType }: SharedEtapaFinalizacaoPr
   }, [handleFinalizar, serviceType, service?.requiresPayment, paymentAmount, setShowPaymentModal]);
 
   const handleConfirmPayment = useCallback(() => {
-    // Extrair valor numérico do campo formatado
-    const numericString = paymentAmount.replace(/[R$\s.]/g, '').replace(',', '.');
-    const value = parseFloat(numericString);
+    const cents = parseBRLToCents(paymentAmount);
 
-    if (isNaN(value) || value <= 0) {
+    if (cents === null || cents <= 0) {
       Alert.alert('Valor inválido', 'Digite um valor válido maior que zero.');
       return;
     }
@@ -138,6 +138,15 @@ export function SharedEtapaFinalizacao({ serviceType }: SharedEtapaFinalizacaoPr
       console.error('[SharedEtapaFinalizacao] Erro não tratado:', error);
     });
   }, [paymentAmount, paymentMethod, setShowPaymentModal, handleFinalizar]);
+
+  // Pagamento pendente quando o serviço exige cobrança e ainda não foi preenchido.
+  const paymentPending = !!service?.requiresPayment && (!paymentAmount || !paymentMethod);
+
+  // Inferência: se o user tem collaboratorId no JWT, é colaborador (funcionário CLT).
+  // Cash recebido por colaborador vira dívida na wallet (backend cria DriverAdvance automaticamente).
+  const { userAuth } = useAuthCredentialsService();
+  const isCollaborator = !!userAuth?.collaboratorId;
+  const showCashDebtWarning = isCollaborator && paymentMethod === PaymentMethodType.CASH;
 
   return (
     <ScreenBase
@@ -155,6 +164,34 @@ export function SharedEtapaFinalizacao({ serviceType }: SharedEtapaFinalizacaoPr
             <Text preset="text14" color="gray600" marginBottom="y12">
               Verifique se coletou todos os dados necessários para finalizar {labels.artigo} {labels.substantivo}:
             </Text>
+
+            {service?.requiresPayment && (
+              <Box
+                marginBottom="y12"
+                padding="y12"
+                borderRadius="s12"
+                borderWidth={measure.m1}
+                borderColor="primary100"
+                backgroundColor="primary10"
+              >
+                <Text preset="text14" fontWeightPreset="bold" color="primary100">
+                  Cobrança obrigatória na entrega
+                </Text>
+                <Text preset="text12" color="colorTextPrimary" marginTop="t4">
+                  {paymentAmount && paymentMethod
+                    ? `Pagamento informado: ${paymentAmount} · ${PAYMENT_METHODS.find((m) => m.type === paymentMethod)?.label ?? ''}`
+                    : 'Você precisa registrar valor e método de pagamento antes de finalizar.'}
+                </Text>
+                <TouchableOpacityBox
+                  marginTop="t8"
+                  onPress={() => setShowPaymentModal(true)}
+                >
+                  <Text preset="text12" color="primary100" fontWeightPreset="bold">
+                    {paymentAmount && paymentMethod ? 'Editar pagamento' : 'Registrar pagamento'}
+                  </Text>
+                </TouchableOpacityBox>
+              </Box>
+            )}
 
             <Box gap="y12">
               {/* Documento */}
@@ -304,12 +341,17 @@ export function SharedEtapaFinalizacao({ serviceType }: SharedEtapaFinalizacaoPr
               <Button
                 title={isCompleting ? 'Finalizando...' : 'Finalizar'}
                 onPress={handleFinalizarWrapper}
-                disabled={isCompleting || !canFinalize}
+                disabled={isCompleting || !canFinalize || paymentPending}
                 width={measure.x330}
               />
               {!canFinalize && (
                 <Text preset="text12" color="primary100" textAlign="center" marginTop="y8">
                   * Documento, foto e assinatura são obrigatórios
+                </Text>
+              )}
+              {canFinalize && paymentPending && (
+                <Text preset="text12" color="primary100" textAlign="center" marginTop="y8">
+                  * Registre o pagamento antes de finalizar
                 </Text>
               )}
             </Box>
@@ -410,6 +452,24 @@ export function SharedEtapaFinalizacao({ serviceType }: SharedEtapaFinalizacaoPr
                 ))}
               </Box>
             </Box>
+
+            {showCashDebtWarning && (
+              <Box
+                marginBottom="b12"
+                padding="y10"
+                borderRadius="s8"
+                borderWidth={measure.m1}
+                borderColor="redError"
+                backgroundColor="redError"
+              >
+                <Text preset="text12" color="white" fontWeightPreset="bold">
+                  Atenção: dinheiro em mão
+                </Text>
+                <Text preset="text12" color="white" marginTop="t4">
+                  Esse valor é da empresa. Vai aparecer como dívida na sua carteira até você devolver ao escritório.
+                </Text>
+              </Box>
+            )}
 
             <Button
               title="Confirmar Pagamento"

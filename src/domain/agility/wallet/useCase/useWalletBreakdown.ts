@@ -27,9 +27,9 @@ export interface WalletBreakdown {
  * diferenciando entre ganhos próprios (uberização) e adiantamentos.
  *
  * Fórmula:
- * - uberizationBalance = availableBalance + totalPendingAdvances
- * - advanceObligations = totalPendingAdvances
- * - netAvailableBalance = availableBalance
+ * - uberizationBalance = availableBalance (saldo disponível vindo do backend, já líquido de dívidas registradas como transações)
+ * - advanceObligations = total de DriverAdvance pendentes/parciais (dívidas externas à wallet, ex: cash recebido por colaborador)
+ * - netAvailableBalance = max(0, availableBalance - advanceObligations) — quanto realmente sobra após honrar as devoluções pendentes
  */
 export function useWalletBreakdown() {
     const { wallet, isLoading: isLoadingWallet, isError: isWalletError, refetch: refetchWallet, isRefetching } = useGetWallet();
@@ -41,8 +41,8 @@ export function useWalletBreakdown() {
     const breakdown = useMemo<WalletBreakdown>(() => {
         const advanceObligations = advancesSummary?.totalPending ?? 0;
         const availableBalance = wallet?.availableBalance ?? 0;
-        const uberizationBalance = availableBalance + advanceObligations;
-        const netAvailableBalance = availableBalance;
+        const uberizationBalance = availableBalance;
+        const netAvailableBalance = Math.max(0, availableBalance - advanceObligations);
 
         return {
             uberizationBalance,

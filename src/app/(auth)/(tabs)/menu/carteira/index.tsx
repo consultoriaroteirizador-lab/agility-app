@@ -8,13 +8,14 @@ import { useRouter } from 'expo-router';
 
 import { Box, Text, ScreenBase, TouchableOpacityBox, ActivityIndicator } from '@/components';
 import { ButtonBack } from '@/components/Button/ButtonBack';
-import { useWalletBreakdown } from '@/domain/agility/wallet';
+import { useGetPendingReceivables, useWalletBreakdown } from '@/domain/agility/wallet';
 import { measure } from '@/theme';
 import { formatCurrency } from '@/utils/formatCurrency';
 
 export default function CarteiraScreen() {
     const router = useRouter();
     const { wallet, breakdown, isLoading, isError, refetch, isRefetching } = useWalletBreakdown();
+    const { totalPendingReceivable, count: pendingReceivablesCount } = useGetPendingReceivables();
 
     const formatBalance = (value: number) => formatCurrency(value);
 
@@ -145,6 +146,24 @@ export default function CarteiraScreen() {
                                     </Text>
                                 </Box>
                             )}
+                        </Box>
+                    )}
+
+                    {/* Recebíveis aguardando confirmação (saldo bloqueado por leilão público / receivable) */}
+                    {totalPendingReceivable > 0 && (
+                        <Box mt="t16" mx="m16" p="m16" borderRadius="s12" backgroundColor="primary10" borderWidth={1} borderColor="primary100">
+                            <Box flexDirection="row" alignItems="center" mb="b8">
+                                <Ionicons name="time-outline" size={18} color="#2196F3" />
+                                <Text ml="l8" fontSize={measure.m14} fontWeightPreset='bold' color="primary100">
+                                    Recebíveis aguardando confirmação
+                                </Text>
+                            </Box>
+                            <Text fontSize={measure.m20} fontWeightPreset='bold' color="primary100">
+                                {formatBalance(totalPendingReceivable)}
+                            </Text>
+                            <Text fontSize={measure.m12} color="colorTextSecondary" mt="t4">
+                                {pendingReceivablesCount} pagamento{pendingReceivablesCount > 1 ? 's' : ''} liberado{pendingReceivablesCount > 1 ? 's' : ''} após validação pelo administrador.
+                            </Text>
                         </Box>
                     )}
 
