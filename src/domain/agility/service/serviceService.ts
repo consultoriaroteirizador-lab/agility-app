@@ -11,6 +11,9 @@ import type {
     ChangeServiceStatusRequest,
     ServiceCompletionDetailsRequest,
     ServiceFailRequest,
+    ServiceDraftData,
+    SaveServiceDraftResponse,
+    GetServiceDraftResponse,
 } from './dto'
 import type {
     ServiceMaterialResponse,
@@ -122,6 +125,21 @@ async function checkMaterial(
     return serviceAPI.checkMaterial(serviceId, materialId, payload)
 }
 
+async function saveDraft(
+    id: Id,
+    draft: ServiceDraftData,
+): Promise<BaseResponse<SaveServiceDraftResponse>> {
+    return serviceAPI.saveDraft(id, draft)
+}
+
+async function getDraft(id: Id): Promise<BaseResponse<GetServiceDraftResponse>> {
+    return serviceAPI.getDraft(id)
+}
+
+async function clearDraft(id: Id): Promise<void> {
+    return serviceAPI.clearDraft(id)
+}
+
 export type { ServiceItem, BatchDeleteResult }
 export const serviceService = {
     create,
@@ -143,4 +161,8 @@ export const serviceService = {
     // Materials
     getMaterials,
     checkMaterial,
+    // Draft
+    saveDraft,
+    getDraft,
+    clearDraft,
 }

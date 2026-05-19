@@ -81,11 +81,19 @@ export default function StopDetailScreen() {
 
   // Local state
   const [activeTab, setActiveTab] = useState<TabType>('local');
-  const [hasArrivedAtLocation, setHasArrivedAtLocation] = useState(false);
   const [showCompleteModal, setShowCompleteModal] = useState(false);
   const [showFailureModal, setShowFailureModal] = useState(false);
   const [navModalVisible, setNavModalVisible] = useState(false);
   const [showConcluirRotaModal, setShowConcluirRotaModal] = useState(false);
+
+  // `hasArrivedAtLocation` é derivado do backend — não há mais estado local.
+  // Garante consistência entre "Estou aqui" (PATCH /start) e a UI; se o app reabrir,
+  // o status do serviço já indica que o motorista chegou.
+  const hasArrivedAtLocation = !!(
+    service?.startDate ||
+    service?.isInProgress ||
+    service?.status === 'IN_PROGRESS'
+  );
 
   // Complete routing mutation
   const queryClient = useQueryClient();
@@ -100,16 +108,6 @@ export default function StopDetailScreen() {
       router.replace('/(auth)/(tabs)');
     },
   });
-
-  // Reset state when service changes to IN_PROGRESS
-  useEffect(() => {
-    if (stopStatus.isInProgress) {
-      setHasArrivedAtLocation(false);
-    }
-    if (stopStatus.isCompleted) {
-      setHasArrivedAtLocation(true);
-    }
-  }, [stopStatus.isInProgress, stopStatus.isCompleted]);
 
   // Auto-redirect for DELIVERY and PICKUP service types
   useEffect(() => {
@@ -148,7 +146,9 @@ export default function StopDetailScreen() {
     }
   }, [service, isLoading, isError, router, routeId, serviceId]);
 
-  // Handle arrived at location - must be defined before early returns
+  // Handle arrived at location - dispara PATCH /services/:id/start no backend (via useStopActions.handleGoToLocation).
+  // `hasArrivedAtLocation` é derivado de `service.startDate` / `status === IN_PROGRESS`, então
+  // assim que o refetch trazido pela mutation chegar, a UI flippa sem precisar de flag local.
   const handleArrivedAtLocation = useCallback(() => {
     const canStart = service?.status === 'PENDING' || service?.status === 'ASSIGNED';
     const isAlreadyStarted = service?.isInProgress === true ||
@@ -158,7 +158,6 @@ export default function StopDetailScreen() {
     if (!isAlreadyStarted && canStart) {
       handleGoToLocation();
     }
-    setHasArrivedAtLocation(true);
   }, [service, handleGoToLocation]);
 
   // Handle service completed navigation — usa o fluxo novo (service/) com checklist e

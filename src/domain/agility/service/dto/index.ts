@@ -24,4 +24,16 @@ export type {
 export type { ServiceResponse, EquipmentResponse } from './response/service.response'
 export type { ServiceMaterialResponse, MaterialStatus, MaterialCheckRequest, MaterialCheckResponse, BatchMaterialCheckRequest, BatchMaterialCheckResponse } from './response/service-material.response'
 
+// Draft (in-progress evidence)
+export type {
+    ServiceDraftData,
+    ServiceDraftRecipient,
+    ServiceDraftChecklist,
+    SaveServiceDraftRequest,
+} from './request/service-draft.request'
+export type {
+    SaveServiceDraftResponse,
+    GetServiceDraftResponse,
+} from './response/service-draft.response'
+
 

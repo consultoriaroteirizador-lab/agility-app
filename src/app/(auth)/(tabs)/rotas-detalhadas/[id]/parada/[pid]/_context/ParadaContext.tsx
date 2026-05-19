@@ -5,6 +5,7 @@ import {
   useCallback,
   ReactNode,
   useEffect,
+  useRef,
 } from 'react';
 
 import * as ImagePicker from 'expo-image-picker';
@@ -15,10 +16,24 @@ import type { FormGroupResponse } from '@/domain/agility/form-group/dto/form-gro
 import { formGroupService } from '@/domain/agility/form-group/formGroupService';
 import { FormEntityType } from '@/domain/agility/form-group-answer/dto/create-form-group-answer.request';
 import { useCreateFormGroupAnswer } from '@/domain/agility/form-group-answer/useCase/useCreateFormGroupAnswer';
+import type { ServiceDraftData } from '@/domain/agility/service/dto';
 import type { ServiceMaterialResponse, MaterialStatus } from '@/domain/agility/service/dto/response/service-material.response';
 import { PaymentMethodType, ServiceStatus } from '@/domain/agility/service/dto/types';
 import { serviceService } from '@/domain/agility/service/serviceService';
-import { useFindOneService, useCheckMaterial } from '@/domain/agility/service/useCase';
+import { uploadMultipleServicePhotos, uploadBase64Signature } from '@/domain/agility/service/serviceUploadUtils';
+import {
+  useFindOneService,
+  useCheckMaterial,
+  useGetServiceDraft,
+  useSaveServiceDraft,
+} from '@/domain/agility/service/useCase';
+import {
+  clearParadaDraft,
+  loadParadaDraft,
+  saveParadaDraft,
+  type ParadaDraft,
+} from '@/services/storage/paradaDraftStorage';
+import { parseBRLToCents } from '@/utils/parseCurrency';
 
 // Tipos
 export type RecipientType = 'cliente' | 'porteiro' | 'vizinho' | 'familiar' | 'outro';
@@ -82,7 +97,7 @@ interface ParadaContextValue {
   signature: string | null;
   addFoto: (foto: ImagePicker.ImagePickerAsset) => void;
   removeFoto: (index: number) => void;
-  setPhotos: (photos: ImagePicker.ImagePickerAsset[]) => void;
+  setPhotos: React.Dispatch<React.SetStateAction<ImagePicker.ImagePickerAsset[]>>;
   setSignature: (data: string | null) => void;
 
   // Estados de modais de mídia
@@ -185,8 +200,19 @@ export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderPr
 
   // Estado da etapa
   const [etapa, setEtapa] = useState(1);
-  const [arrived, setArrived] = useState(false);
   const [delivered, setDelivered] = useState(false);
+
+  // `arrived` is derived from the backend service status — never a local source of truth.
+  // The "Estou aqui" handler calls /services/:id/start which sets service.startDate; the
+  // refetch propagates that here and `arrived` flips to true. This eliminates the drift
+  // where the local flag and the backend disagreed.
+  const isServiceStartedRaw = !!(service && (service.status === ServiceStatus.IN_PROGRESS || service.startDate));
+  const arrived = isServiceStartedRaw;
+  const setArrived = useCallback((_value: boolean) => {
+    if (__DEV__) {
+      console.warn('[ParadaContext] setArrived is a no-op — derive from service.startDate / status instead.');
+    }
+  }, []);
 
   // Dados do recipient
   const [recipient, setRecipient] = useState<RecipientData>(RECIPIENT_INITIAL);
@@ -233,11 +259,8 @@ export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderPr
     loading: false,
   });
 
-  // Verificar se o serviço já está iniciado
-  const isServiceStarted =
-    service &&
-    (service.status === ServiceStatus.IN_PROGRESS ||
-      service.startDate);
+  // Verificar se o serviço já está iniciado (mesma fonte de verdade que `arrived`).
+  const isServiceStarted = isServiceStartedRaw;
 
   // Função de checklist (declarada antes de ser usada)
   const updateChecklist = useCallback(
@@ -247,11 +270,11 @@ export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderPr
     []
   );
 
-  // Efeito para ajustar etapa baseado no status do serviço
+  // Efeito para ajustar etapa baseado no status do serviço.
+  // `arrived` é derivado — nada de setArrived aqui.
   useEffect(() => {
     if (isServiceStarted && etapa === 1) {
       setEtapa(2);
-      setArrived(true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isServiceStarted]);
@@ -490,10 +513,295 @@ export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderPr
     }
   }, [service?.formGroupIds]);
 
+  // ========================================================================
+  // Persistência do draft (in-progress evidence) — backend é fonte de verdade,
+  // AsyncStorage é cache local para hidratação sem flicker.
+  // ========================================================================
+  const {
+    draft: backendDraft,
+    draftUpdatedAt: backendDraftUpdatedAt,
+    isFetched: backendDraftFetched,
+  } = useGetServiceDraft(serviceId);
+  const { saveDraft: saveBackendDraft } = useSaveServiceDraft();
+
+  // hydratedRef === serviceId quando aquele serviceId já foi hidratado nesta sessão.
+  // Garante que (a) só hidratamos uma vez por troca de parada e
+  //            (b) edições do usuário após hidratação não são sobrescritas.
+  const hydratedRef = useRef<string | null>(null);
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const SAVE_DEBOUNCE_MS = 800;
+
+  // URIs locais já em upload — evita disparar duas vezes para a mesma foto.
+  const inFlightUploadsRef = useRef<Set<string>>(new Set());
+  const inFlightSignatureRef = useRef<string | null>(null);
+
+  // Status terminal => não persistir nem hidratar nada (e limpar resíduo local).
+  const isTerminalStatus =
+    service?.status === ServiceStatus.COMPLETED ||
+    service?.status === ServiceStatus.FAILED ||
+    service?.status === ServiceStatus.CANCELED;
+
+  // Reset do flag de hidratação quando o serviceId muda.
+  useEffect(() => {
+    hydratedRef.current = null;
+  }, [serviceId]);
+
+  // Hidratação: roda 1x por serviceId, quando o draft do backend já chegou (ou falhou).
+  useEffect(() => {
+    if (!serviceId || !backendDraftFetched) return;
+    if (hydratedRef.current === serviceId) return;
+
+    let cancelled = false;
+    const run = async () => {
+      if (isTerminalStatus) {
+        await clearParadaDraft(serviceId);
+        hydratedRef.current = serviceId;
+        return;
+      }
+
+      const localDraft = await loadParadaDraft(serviceId);
+      if (cancelled) return;
+
+      const backendTs = backendDraftUpdatedAt ? new Date(backendDraftUpdatedAt).getTime() : 0;
+      const localTs = localDraft?.localUpdatedAt ?? 0;
+
+      // Last-write-wins: prefer the most recent. If backend has nothing, fall back to local.
+      let chosen: ServiceDraftData | null = null;
+      if (backendDraft && backendTs >= localTs) {
+        chosen = backendDraft;
+      } else if (localDraft) {
+        chosen = localDraft;
+      } else if (backendDraft) {
+        chosen = backendDraft;
+      }
+
+      if (chosen) {
+        if (chosen.recipient) {
+          setRecipient({
+            tipo: (chosen.recipient.tipo as RecipientType | null) ?? null,
+            nome: chosen.recipient.nome ?? '',
+            tipoDocumento: chosen.recipient.tipoDocumento ?? 'RG',
+            numeroDocumento: chosen.recipient.numeroDocumento ?? '',
+          });
+        }
+        if (chosen.observation !== undefined) setObservation(chosen.observation);
+        if (chosen.checklist) {
+          setChecklist(prev => ({ ...prev, ...chosen.checklist }));
+        }
+        if (chosen.photoUrls && chosen.photoUrls.length > 0) {
+          const restored = chosen.photoUrls.map(url => ({
+            uri: url,
+            width: 0,
+            height: 0,
+            type: 'image',
+            __s3Url: url,
+            __uploadStatus: 'uploaded',
+            __localUri: url,
+          })) as unknown as ImagePicker.ImagePickerAsset[];
+          setPhotos(restored);
+        }
+        if (chosen.signatureUrl) setSignatureState(chosen.signatureUrl);
+        if (chosen.paymentAmountCents !== undefined && chosen.paymentAmountCents > 0) {
+          // Re-format cents back into the BRL-masked string the UI expects.
+          const reais = (chosen.paymentAmountCents / 100).toFixed(2).replace('.', ',');
+          setPaymentAmount(`R$ ${reais}`);
+        }
+        if (chosen.paymentMethod) setPaymentMethod(chosen.paymentMethod as PaymentMethodType);
+        if (chosen.etapa) setEtapa(chosen.etapa);
+        if (chosen.formAnswers && Object.keys(chosen.formAnswers).length > 0) {
+          setFormState(prev => ({
+            ...prev,
+            formAnswersMap: { ...prev.formAnswersMap, ...chosen.formAnswers },
+          }));
+        }
+      }
+
+      hydratedRef.current = serviceId;
+    };
+
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, [serviceId, backendDraftFetched, backendDraft, backendDraftUpdatedAt, isTerminalStatus]);
+
+  // Auto-upload incremental de fotos. Detecta assets adicionados ao array de fotos
+  // (via MultiPhotoPicker ou diretamente via setPhotos) que ainda não têm `__s3Url`,
+  // marca como 'uploading' e sobe ao S3 em background. Quando termina, troca `uri`
+  // pela URL S3 e marca 'uploaded'. Em falha, marca 'failed' para retry manual.
+  useEffect(() => {
+    if (!serviceId || isTerminalStatus) return;
+
+    type MaybeUploadingAsset = ImagePicker.ImagePickerAsset & {
+      __s3Url?: string;
+      __uploadStatus?: 'uploading' | 'uploaded' | 'failed';
+      __localUri?: string;
+    };
+
+    const pending = (photos as MaybeUploadingAsset[]).filter(p => {
+      if (p.__s3Url) return false;
+      if (p.uri.startsWith('http')) return false;
+      if (p.__uploadStatus === 'uploading') return false;
+      if (p.__uploadStatus === 'uploaded') return false;
+      if (p.__uploadStatus === 'failed') return false; // requires manual retry via retryPhotoUpload
+      if (inFlightUploadsRef.current.has(p.uri)) return false;
+      return true;
+    });
+
+    if (pending.length === 0) return;
+
+    // Mark them as uploading synchronously (single setPhotos call) so we don't re-enter.
+    const markedUris = new Set(pending.map(p => p.uri));
+    pending.forEach(p => inFlightUploadsRef.current.add(p.uri));
+    setPhotos(prev =>
+      (prev as MaybeUploadingAsset[]).map(p =>
+        markedUris.has(p.uri)
+          ? ({ ...p, __localUri: p.uri, __uploadStatus: 'uploading' } as unknown as ImagePicker.ImagePickerAsset)
+          : p,
+      ),
+    );
+
+    // Fire-and-forget per-asset uploads.
+    pending.forEach(async (asset) => {
+      try {
+        const urls = await uploadMultipleServicePhotos([asset], serviceId, 'before');
+        const s3Url = urls[0];
+        setPhotos(prev =>
+          (prev as MaybeUploadingAsset[]).map(p => {
+            const localKey = p.__localUri ?? p.uri;
+            if (localKey !== asset.uri) return p;
+            return s3Url
+              ? ({ ...p, uri: s3Url, __s3Url: s3Url, __uploadStatus: 'uploaded', __localUri: localKey } as unknown as ImagePicker.ImagePickerAsset)
+              : ({ ...p, __uploadStatus: 'failed', __localUri: localKey } as unknown as ImagePicker.ImagePickerAsset);
+          }),
+        );
+      } catch (err) {
+        if (__DEV__) {
+          console.warn('[ParadaContext] incremental photo upload failed:', err);
+        }
+        setPhotos(prev =>
+          (prev as MaybeUploadingAsset[]).map(p => {
+            const localKey = p.__localUri ?? p.uri;
+            if (localKey !== asset.uri) return p;
+            return { ...p, __uploadStatus: 'failed', __localUri: localKey } as unknown as ImagePicker.ImagePickerAsset;
+          }),
+        );
+      } finally {
+        inFlightUploadsRef.current.delete(asset.uri);
+      }
+    });
+  }, [photos, serviceId, isTerminalStatus, setPhotos]);
+
+  // Auto-upload incremental da assinatura. Quando recebemos base64 (saveAssinatura
+  // do canvas), sobe ao S3 e troca o valor por URL — assim mesmo um crash não perde
+  // a assinatura coletada.
+  useEffect(() => {
+    if (!serviceId || isTerminalStatus) return;
+    if (!signature) return;
+    if (!signature.startsWith('data:')) return; // já é URL
+    if (inFlightSignatureRef.current === signature) return;
+
+    inFlightSignatureRef.current = signature;
+    uploadBase64Signature(signature, serviceId)
+      .then(url => {
+        if (url) {
+          setSignatureState(url);
+        }
+      })
+      .catch(err => {
+        if (__DEV__) {
+          console.warn('[ParadaContext] incremental signature upload failed:', err);
+        }
+      })
+      .finally(() => {
+        inFlightSignatureRef.current = null;
+      });
+  }, [signature, serviceId, isTerminalStatus]);
+
+  // Auto-save com debounce. Só roda depois da hidratação estar completa para o
+  // serviceId atual. Persiste local imediatamente; backend com debounce de 800ms.
+  // `finalizing` corta TUDO — durante o handleFinalizar o status do service vai virar
+  // COMPLETED e qualquer save em andamento causaria erro/no-op. Cleanup limpa o timer.
+  useEffect(() => {
+    if (!serviceId) return;
+    if (hydratedRef.current !== serviceId) return;
+    if (isTerminalStatus) return;
+    if (finalizing) return;
+
+    const photoUrls = (photos as { uri: string; __s3Url?: string }[])
+      .map(p => p.__s3Url ?? (p.uri.startsWith('http') ? p.uri : undefined))
+      .filter((u): u is string => !!u);
+
+    const sigUrl = signature && signature.startsWith('http') ? signature : undefined;
+    const cents = paymentAmount ? parseBRLToCents(paymentAmount) : null;
+
+    const hasContent =
+      !!recipient.nome ||
+      !!observation ||
+      photoUrls.length > 0 ||
+      !!sigUrl ||
+      (cents !== null && cents > 0) ||
+      !!paymentMethod ||
+      Object.keys(formState.formAnswersMap).length > 0;
+
+    if (!hasContent) return;
+
+    const draft: ServiceDraftData = {
+      recipient: {
+        tipo: recipient.tipo ?? undefined,
+        nome: recipient.nome || undefined,
+        tipoDocumento: recipient.tipoDocumento || undefined,
+        numeroDocumento: recipient.numeroDocumento || undefined,
+      },
+      observation: observation || undefined,
+      photoUrls: photoUrls.length > 0 ? photoUrls : undefined,
+      signatureUrl: sigUrl,
+      paymentAmountCents: cents !== null && cents > 0 ? cents : undefined,
+      paymentMethod: paymentMethod ?? undefined,
+      etapa,
+      checklist,
+      formAnswers:
+        Object.keys(formState.formAnswersMap).length > 0 ? formState.formAnswersMap : undefined,
+    };
+
+    // Local: gravação síncrona-rápida (cache para hidratar sem flicker / offline).
+    const localDraft: ParadaDraft = { ...draft, localUpdatedAt: Date.now() };
+    void saveParadaDraft(serviceId, localDraft);
+
+    // Backend: debounced fire-and-forget. Falhas só são logadas (vide useSaveServiceDraft).
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(() => {
+      saveBackendDraft({
+        id: serviceId,
+        draft: { ...draft, clientDraftUpdatedAt: new Date().toISOString() },
+      });
+    }, SAVE_DEBOUNCE_MS);
+
+    return () => {
+      if (saveTimerRef.current) {
+        clearTimeout(saveTimerRef.current);
+        saveTimerRef.current = null;
+      }
+    };
+  }, [
+    serviceId,
+    isTerminalStatus,
+    finalizing,
+    recipient,
+    observation,
+    photos,
+    signature,
+    paymentAmount,
+    paymentMethod,
+    etapa,
+    checklist,
+    formState.formAnswersMap,
+    saveBackendDraft,
+  ]);
+
   // Função de reset
   const resetState = useCallback(() => {
     setEtapa(1);
-    setArrived(false);
     setDelivered(false);
     setRecipient(RECIPIENT_INITIAL);
     setPhotos([]);
@@ -520,7 +828,12 @@ export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderPr
       formCompleted: false,
       loading: false,
     });
-  }, []);
+    // Limpa o draft local e o do backend (best-effort).
+    if (serviceId) {
+      void clearParadaDraft(serviceId);
+      void serviceService.clearDraft(serviceId).catch(() => {});
+    }
+  }, [serviceId]);
 
   // Reset payment state quando o serviceId mudar — evita carregar valores da parada anterior
   useEffect(() => {

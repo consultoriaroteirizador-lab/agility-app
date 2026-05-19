@@ -8,11 +8,12 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Box, Button, Text, TouchableOpacityBox, ActivityIndicator, ScreenBase, Input } from '@/components';
 import { ButtonBack } from '@/components/Button/ButtonBack';
 import { FailureReason } from '@/domain/agility/service/dto';
-import { uploadMultipleServicePhotos } from '@/domain/agility/service/serviceUploadUtils';
 import { useFailService, useFindOneService } from '@/domain/agility/service/useCase';
 import { KEY_SERVICES } from '@/domain/queryKeys';
 import { useToastService } from '@/services/Toast/useToast';
 import { measure } from '@/theme';
+
+import { useInsucessoDraft } from '../_hooks/useInsucessoDraft';
 
 const FAILURE_REASONS = [
   { value: FailureReason.RECIPIENT_ABSENT, label: 'Destinatário ausente' },
@@ -34,13 +35,25 @@ export default function FalhaScreen() {
   const { showToast } = useToastService();
 
   const { service, isLoading: isLoadingService } = useFindOneService(serviceId || '');
-  const [selectedReason, setSelectedReason] = useState<FailureReason | null>(null);
-  const [notes, setNotes] = useState('');
-  const [photos, setPhotos] = useState<ImagePicker.ImagePickerAsset[]>([]);
+  const {
+    selectedReason,
+    setSelectedReason,
+    notes,
+    setNotes,
+    photos,
+    addPhotos,
+    removePhoto,
+    clearDraft,
+    getUploadedPhotoUrls,
+  } = useInsucessoDraft(serviceId);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const { failService, isLoading: isFailingService } = useFailService({
     onSuccess: async () => {
+      // Backend já limpa o draft em reportFailure; aqui limpamos o cache local
+      // (best-effort; o cleanStaleParadaDrafts global também resolve no próximo open).
+      await clearDraft();
+
       // Invalidar queries relacionadas
       queryClient.invalidateQueries({ queryKey: [KEY_SERVICES, serviceId] });
       queryClient.invalidateQueries({ queryKey: [KEY_SERVICES, 'routing', rotaId] });
@@ -81,7 +94,7 @@ export default function FalhaScreen() {
       });
 
       if (!result.canceled && result.assets[0]) {
-        setPhotos([...photos, result.assets[0]]);
+        addPhotos([result.assets[0]]);
       }
     } catch (error) {
       console.error('Erro ao selecionar imagem:', error);
@@ -105,7 +118,7 @@ export default function FalhaScreen() {
       });
 
       if (!result.canceled && result.assets[0]) {
-        setPhotos([...photos, result.assets[0]]);
+        addPhotos([result.assets[0]]);
       }
     } catch (error) {
       console.error('Erro ao tirar foto:', error);
@@ -121,80 +134,30 @@ export default function FalhaScreen() {
 
     setIsSubmitting(true);
 
-    try {
-      // Preparar payload
-      const payload: {
-        reason: FailureReason;
-        notes?: string;
-        photoProof?: string[];
-      } = {
-        reason: selectedReason,
-      };
+    // Fotos já foram enviadas incrementalmente pelo useInsucessoDraft — aqui só
+    // colhemos as URLs S3 que já estão prontas em memória.
+    const photoUrls = getUploadedPhotoUrls();
 
-      if (notes.trim()) {
-        payload.notes = notes.trim();
-      }
+    const payload: {
+      reason: FailureReason;
+      notes?: string;
+      photoProof?: string[];
+    } = {
+      reason: selectedReason,
+    };
 
-      if (photos.length > 0) {
-        // Fazer upload das photos e obter URLs
-        console.log('[Insucesso] Iniciando upload de photos:', {
-          photosCount: photos.length,
-          serviceId,
-          photos: photos.map(f => ({ uri: f.uri, type: f.type })),
-        });
-
-        const photoUrls = await uploadMultipleServicePhotos(
-          photos,
-          serviceId,
-          'before',
-        );
-
-        console.log('[Insucesso] Upload concluído:', { photoUrls });
-
-        if (photoUrls.length > 0) {
-          payload.photoProof = photoUrls;
-        }
-      }
-
-      failService({
-        id: serviceId,
-        payload,
-      });
-    } catch (error) {
-      console.error('[Insucesso] Erro ao fazer upload das photos:', error);
-
-      // Verificar se é erro de S3 não configurado
-      const errorMessage = (error as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message;
-      const errorStatus = (error as { response?: { status?: number } })?.response?.status;
-
-      console.error('[Insucesso] Detalhes do erro:', {
-        errorMessage,
-        errorStatus,
-        errorData: (error as { response?: { data?: unknown } })?.response?.data,
-      });
-
-      setIsSubmitting(false);
-
-      if (errorMessage?.includes('S3 storage is required')) {
-        console.warn('[Insucesso] S3 não configurado - continuando sem photos');
-        // Continuar sem as photos - tentar enviar apenas o motivo e notas
-        const payloadWithoutPhotos: {
-          reason: FailureReason;
-          notes?: string;
-        } = {
-          reason: selectedReason,
-        };
-        if (notes.trim()) {
-          payloadWithoutPhotos.notes = notes.trim();
-        }
-        failService({
-          id: serviceId,
-          payload: payloadWithoutPhotos,
-        });
-      } else {
-        showToast({ message: 'Não foi possível fazer upload das photos. Tente novamente.', type: 'error' });
-      }
+    if (notes.trim()) {
+      payload.notes = notes.trim();
     }
+
+    if (photoUrls.length > 0) {
+      payload.photoProof = photoUrls;
+    }
+
+    failService({
+      id: serviceId,
+      payload,
+    });
   };
 
   if (isLoadingService) {
@@ -298,10 +261,40 @@ export default function FalhaScreen() {
                       borderRadius="s12"
                       justifyContent="center"
                       alignItems="center"
-                      onPress={() => setPhotos(photos.filter((_, i) => i !== index))}
+                      onPress={() => removePhoto(index)}
                     >
                       <Text color="white" preset="text12">×</Text>
                     </TouchableOpacityBox>
+                    {foto.__uploadStatus === 'uploading' && (
+                      <Box
+                        position="absolute"
+                        bottom={0}
+                        left={0}
+                        right={0}
+                        backgroundColor="overlayBlack70"
+                        borderBottomLeftRadius="s8"
+                        borderBottomRightRadius="s8"
+                        alignItems="center"
+                        py="y4"
+                      >
+                        <Text color="white" preset="text12" fontWeightPreset="bold">Enviando…</Text>
+                      </Box>
+                    )}
+                    {foto.__uploadStatus === 'failed' && (
+                      <Box
+                        position="absolute"
+                        bottom={0}
+                        left={0}
+                        right={0}
+                        backgroundColor="redError"
+                        borderBottomLeftRadius="s8"
+                        borderBottomRightRadius="s8"
+                        alignItems="center"
+                        py="y4"
+                      >
+                        <Text color="white" preset="text12" fontWeightPreset="bold">Falhou</Text>
+                      </Box>
+                    )}
                   </Box>
                 ))}
                 <Box flexDirection="row" gap="x8">

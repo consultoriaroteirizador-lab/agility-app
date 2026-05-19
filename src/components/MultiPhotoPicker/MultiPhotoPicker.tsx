@@ -97,10 +97,13 @@ export default function MultiPhotoPicker({
     item,
     index
   }: {
-    item: ImagePicker.ImagePickerAsset;
+    item: ImagePicker.ImagePickerAsset & { __uploadStatus?: 'uploading' | 'uploaded' | 'failed' };
     index: number;
   }) => {
     const progress = uploadProgress?.get(index);
+    const status = item.__uploadStatus;
+    const showUploadingOverlay = !progress && status === 'uploading';
+    const showFailedBadge = status === 'failed';
 
     return (
       <View
@@ -119,7 +122,7 @@ export default function MultiPhotoPicker({
           }}
         />
 
-        {!progress && (
+        {!progress && !showUploadingOverlay && (
           <View
             style={{
               position: 'absolute',
@@ -159,6 +162,46 @@ export default function MultiPhotoPicker({
           >
             <Text color="white" fontWeightPreset="bold" preset="text14">
               {progress.percentage}%
+            </Text>
+          </View>
+        )}
+
+        {showUploadingOverlay && (
+          <View
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              borderRadius: borderRadii.s8,
+              justifyContent: 'center',
+              alignItems: 'center',
+              backgroundColor: colors.overlayBlack70,
+            }}
+          >
+            <Text color="white" fontWeightPreset="bold" preset="text12">
+              Enviando…
+            </Text>
+          </View>
+        )}
+
+        {showFailedBadge && (
+          <View
+            style={{
+              position: 'absolute',
+              bottom: 4,
+              left: 4,
+              right: 4,
+              backgroundColor: colors.redError,
+              borderRadius: borderRadii.s8,
+              paddingVertical: 2,
+              paddingHorizontal: 4,
+              alignItems: 'center',
+            }}
+          >
+            <Text color="white" fontWeightPreset="bold" preset="text12">
+              Falhou
             </Text>
           </View>
         )}

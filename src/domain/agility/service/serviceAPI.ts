@@ -12,6 +12,10 @@ import type {
     ChangeServiceStatusRequest,
     ServiceCompletionDetailsRequest,
     ServiceFailRequest,
+    ServiceDraftData,
+    SaveServiceDraftRequest,
+    SaveServiceDraftResponse,
+    GetServiceDraftResponse,
 } from './dto'
 import type {
     ServiceMaterialResponse,
@@ -183,6 +187,33 @@ async function checkMaterialsBatch(
     return data
 }
 
+// ============================================
+// DRAFT (in-progress evidence) API
+// ============================================
+
+async function saveDraft(
+    id: Id,
+    draft: ServiceDraftData,
+): Promise<BaseResponse<SaveServiceDraftResponse>> {
+    const payload: SaveServiceDraftRequest = { data: draft }
+    const { data } = await apiAgility.put<BaseResponse<SaveServiceDraftResponse>>(
+        `/services/${id}/draft`,
+        payload,
+    )
+    return data
+}
+
+async function getDraft(id: Id): Promise<BaseResponse<GetServiceDraftResponse>> {
+    const { data } = await apiAgility.get<BaseResponse<GetServiceDraftResponse>>(
+        `/services/${id}/draft`,
+    )
+    return data
+}
+
+async function clearDraft(id: Id): Promise<void> {
+    await apiAgility.delete(`/services/${id}/draft`)
+}
+
 export const serviceAPI = {
     create,
     createBatch,
@@ -204,5 +235,9 @@ export const serviceAPI = {
     getMaterials,
     checkMaterial,
     checkMaterialsBatch,
+    // Draft
+    saveDraft,
+    getDraft,
+    clearDraft,
 }
 
