@@ -12,6 +12,7 @@ export * from './ScreenContainer/ScreenContainer';
 export * from './ScreensBase/ScreenBase';
 export * from './Text/Text';
 export * from './Input/Input';
+export * from './BRLInput/BRLInput';
 export * from './TextInputLogin/TextInputLogin';
 export * from './svg-components/LogoHorizontal';
 export * from './Image/Image';
