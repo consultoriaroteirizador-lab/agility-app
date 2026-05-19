@@ -1,7 +1,7 @@
 // src/app/(auth)/(tabs)/menu/carteira/config/dados-bancarios.tsx
 
-import React, { useState } from 'react';
-import { ScrollView, Alert } from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { ScrollView } from 'react-native';
 
 import { Ionicons } from '@expo/vector-icons';
 
@@ -9,7 +9,9 @@ import { Box, Text, ScreenBase, ActivityIndicator, Input, Button, TouchableOpaci
 import { ButtonBack } from '@/components/Button/ButtonBack';
 import { useGetWallet, useUpdateBankInfo } from '@/domain/agility/wallet';
 import { PixKeyType } from '@/domain/agility/wallet/dto/types';
+import { useToastService } from '@/services/Toast/useToast';
 import { measure } from '@/theme';
+import { PIX_KEY_HINTS, validatePixKey } from '@/utils/validatePix';
 
 const PIX_KEY_TYPE_LABELS: Record<PixKeyType, string> = {
     [PixKeyType.CPF]: 'CPF',
@@ -22,6 +24,7 @@ const PIX_KEY_TYPE_LABELS: Record<PixKeyType, string> = {
 export default function DadosBancariosScreen() {
     const { wallet, isLoading } = useGetWallet();
     const { updateBankInfo, isPending } = useUpdateBankInfo();
+    const { showToast } = useToastService();
 
     const [pixKeyType, setPixKeyType] = useState<PixKeyType | null>(
         wallet?.pixKeyType ?? null
@@ -30,10 +33,21 @@ export default function DadosBancariosScreen() {
     const [bankName, setBankName] = useState(wallet?.bankName ?? '');
     const [bankAgency, setBankAgency] = useState(wallet?.bankAgency ?? '');
     const [bankAccount, setBankAccount] = useState(wallet?.bankAccount ?? '');
+    const [touched, setTouched] = useState(false);
 
-    const handleSave = async () => {
-        if (!pixKey.trim()) {
-            Alert.alert('Campo obrigatório', 'Informe uma chave PIX');
+    // Erro derivado — só aparece quando o usuário começou a editar.
+    const pixError = useMemo(
+        () => (touched ? validatePixKey(pixKey, pixKeyType) : null),
+        [pixKey, pixKeyType, touched],
+    );
+
+    const placeholder = pixKeyType ? PIX_KEY_HINTS[pixKeyType] : 'Informe sua chave PIX';
+
+    async function handleSave() {
+        setTouched(true);
+        const error = validatePixKey(pixKey, pixKeyType);
+        if (error) {
+            showToast({ message: error, type: 'error' });
             return;
         }
 
@@ -45,11 +59,11 @@ export default function DadosBancariosScreen() {
                 bankAgency: bankAgency.trim() || undefined,
                 bankAccount: bankAccount.trim() || undefined,
             });
-            Alert.alert('Sucesso', 'Dados bancários atualizados com sucesso!');
-        } catch (error) {
-            Alert.alert('Erro', 'Não foi possível atualizar os dados bancários.');
+            showToast({ message: 'Dados bancários atualizados com sucesso!', type: 'success' });
+        } catch {
+            showToast({ message: 'Não foi possível atualizar os dados bancários.', type: 'error' });
         }
-    };
+    }
 
     if (isLoading) {
         return (
@@ -85,7 +99,10 @@ export default function DadosBancariosScreen() {
                                     borderWidth={1}
                                     borderColor={pixKeyType === type ? 'primary100' : 'background'}
                                     bg={pixKeyType === type ? 'primary10' : 'background'}
-                                    onPress={() => setPixKeyType(type as PixKeyType)}
+                                    onPress={() => {
+                                        setPixKeyType(type as PixKeyType);
+                                        setTouched(true);
+                                    }}
                                 >
                                     <Text
                                         fontSize={measure.m12}
@@ -99,10 +116,19 @@ export default function DadosBancariosScreen() {
                         </Box>
 
                         <Input
-                            placeholder="Informe sua chave PIX"
+                            placeholder={placeholder}
                             value={pixKey}
-                            onChangeText={setPixKey}
+                            onChangeText={(t) => {
+                                setPixKey(t);
+                                if (!touched) setTouched(true);
+                            }}
+                            messageError={pixError ?? undefined}
                         />
+                        {!pixError && pixKeyType && (
+                            <Text fontSize={measure.m12} color="colorTextSecondary" mt="t4">
+                                Formato esperado: {PIX_KEY_HINTS[pixKeyType]}
+                            </Text>
+                        )}
                     </Box>
 
                     {/* Bank Account Section (Optional) */}
@@ -176,7 +202,7 @@ export default function DadosBancariosScreen() {
                             title="Salvar dados"
                             onPress={handleSave}
                             isLoading={isPending}
-                            disabled={!pixKey.trim()}
+                            disabled={!pixKey.trim() || !pixKeyType}
                         />
                     </Box>
                 </Box>
