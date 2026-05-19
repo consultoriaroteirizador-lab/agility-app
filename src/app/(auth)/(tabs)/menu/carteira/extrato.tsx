@@ -4,6 +4,7 @@ import React, { useState, useMemo } from 'react';
 import { FlatList, RefreshControl } from 'react-native';
 
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 
 import { ActivityIndicator, Box, ButtonBack, ScreenBase, Text, TouchableOpacityBox } from '@/components';
 import { useGetTransactions } from '@/domain/agility/wallet';
@@ -149,6 +150,7 @@ function TransactionItem({ item }: { item: TransactionResponse }) {
 }
 
 export default function ExtratoScreen() {
+    const router = useRouter();
     const [page, setPage] = useState(1);
     const [filter, setFilter] = useState<FilterType>('all');
     const { transactions, meta, isLoading, isError, refetch, isRefetching } = useGetTransactions({
@@ -230,14 +232,28 @@ export default function ExtratoScreen() {
                 onEndReached={loadMore}
                 onEndReachedThreshold={0.5}
                 ListEmptyComponent={
-                    <Box py="y32" alignItems="center">
+                    <Box py="y32" alignItems="center" px="x16">
                         <Ionicons name="document-text-outline" size={48} color="#999" />
-                        <Text mt="t12" color="colorTextSecondary">
+                        <Text mt="t12" color="colorTextSecondary" textAlign="center">
                             {filter === 'all'
-                                ? 'Nenhuma transação encontrada'
-                                : `Nenhuma transação de ${FILTER_OPTIONS.find(f => f.value === filter)?.label.toLowerCase()}`
+                                ? 'Nenhuma transação encontrada ainda.'
+                                : `Nenhuma transação de ${FILTER_OPTIONS.find(f => f.value === filter)?.label.toLowerCase()}.`
                             }
                         </Text>
+                        {filter === 'all' && (
+                            <TouchableOpacityBox
+                                mt="t16"
+                                px="x16"
+                                py="y8"
+                                borderRadius="s8"
+                                backgroundColor="primary100"
+                                onPress={() => router.push('/menu/ganhos')}
+                            >
+                                <Text fontSize={measure.m14} fontWeightPreset='semibold' color="white">
+                                    Ver meus ganhos
+                                </Text>
+                            </TouchableOpacityBox>
+                        )}
                     </Box>
                 }
                 ListFooterComponent={

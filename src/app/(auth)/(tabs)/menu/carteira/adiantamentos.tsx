@@ -1,6 +1,6 @@
 // src/app/(auth)/(tabs)/menu/carteira/adiantamentos.tsx
 
-import React from 'react';
+import React, { useState } from 'react';
 import { FlatList, RefreshControl } from 'react-native';
 
 import { Ionicons } from '@expo/vector-icons';
@@ -88,10 +88,17 @@ function AdvanceItem({ item }: { item: AdvanceResponse }) {
 }
 
 export default function AdiantamentosScreen() {
-    const { advances, isLoading, refetch, isRefetching } = useGetAdvances();
+    const [page, setPage] = useState(1);
+    const { advances, meta, isLoading, refetch, isRefetching } = useGetAdvances(page, 20);
     const { summary } = useGetAdvancesSummary();
 
     const pendingAdvances = advances.filter(a => a.status !== AdvanceStatus.RETURNED && a.status !== AdvanceStatus.CANCELLED);
+
+    const loadMore = () => {
+        if (meta && page < meta.totalPages) {
+            setPage(page + 1);
+        }
+    };
 
     return (
         <ScreenBase buttonLeft={<ButtonBack />} title={<Text preset='textTitleScreen'>Adiantamento</Text>}>
@@ -132,6 +139,15 @@ export default function AdiantamentosScreen() {
                 contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 32 }}
                 refreshControl={
                     <RefreshControl refreshing={isRefetching} onRefresh={refetch} />
+                }
+                onEndReached={loadMore}
+                onEndReachedThreshold={0.5}
+                ListFooterComponent={
+                    meta && page < meta.totalPages ? (
+                        <Box py="y16" alignItems="center">
+                            <ActivityIndicator size="small" />
+                        </Box>
+                    ) : null
                 }
                 ListEmptyComponent={
                     isLoading ? (

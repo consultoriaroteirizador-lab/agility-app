@@ -137,6 +137,10 @@ export default function CarteiraScreen() {
                                 </Text>
                             </Box>
 
+                            <Text fontSize={measure.m11} color="colorTextSecondary" mt="t4">
+                                Saldo disponível menos os adiantamentos que você ainda precisa devolver à empresa.
+                            </Text>
+
                             {/* Alerta de adiantamentos vencidos */}
                             {breakdown.hasOverdueAdvances && (
                                 <Box flexDirection="row" alignItems="center" mt="t8" p="m8" borderRadius="s8" backgroundColor="redError">
@@ -238,9 +242,13 @@ export default function CarteiraScreen() {
                             <Text fontSize={measure.m16} fontWeightPreset='bold'>
                                 Dados bancários
                             </Text>
-                            <TouchableOpacityBox onPress={() => router.push('/menu/carteira/config/dados-bancarios')}>
-                                <Text fontSize={measure.m14} color="colorTextPrimary">Editar</Text>
-                            </TouchableOpacityBox>
+                            {/* CTA "Editar" só aparece quando há dados — o estado vazio
+                                já mostra um botão "Configurar" maior abaixo. */}
+                            {wallet.hasBankInfo && (
+                                <TouchableOpacityBox onPress={() => router.push('/menu/carteira/config/dados-bancarios')}>
+                                    <Text fontSize={measure.m14} color="colorTextPrimary">Editar</Text>
+                                </TouchableOpacityBox>
+                            )}
                         </Box>
 
                         <Box p="m16" borderRadius="s12">

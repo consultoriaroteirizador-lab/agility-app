@@ -54,6 +54,14 @@ export default function GanhosScreen() {
     const { payments, isLoading: paymentsLoading } = useGetPayments();
     const { wallet } = useGetWallet();
 
+    /**
+     * Limite máximo de pagamentos renderizados. A tela usa Box scrollable como
+     * container; sem virtualization, renderizar muitos itens degrada a UI.
+     * Quando truncado, exibimos um aviso e um botão "Carregar mais" abaixo.
+     */
+    const RENDER_LIMIT = 50;
+    const [renderLimit, setRenderLimit] = useState(RENDER_LIMIT);
+
     const formatCurrency = (valueInCents: number): string => {
         const value = valueInCents / 100;
         return new Intl.NumberFormat('pt-BR', {
@@ -336,7 +344,7 @@ export default function GanhosScreen() {
                             </Text>
                         </Box>
                     ) : (
-                        filteredPayments.map(payment => (
+                        filteredPayments.slice(0, renderLimit).map(payment => (
                             <TouchableOpacityBox
                                 key={payment.id}
                                 backgroundColor="white"
@@ -374,9 +382,19 @@ export default function GanhosScreen() {
                                     )}
                                 </Box>
 
-                                {!!payment.routingId && (
+                                {(!!payment.routingCode || !!payment.routingId) && (
                                     <Text preset="text12" color="secondaryTextColor" marginBottom="y2">
-                                        Rota: {payment.routingId}
+                                        Rota: {payment.routingCode ?? `…${payment.routingId!.slice(-8)}`}
+                                    </Text>
+                                )}
+                                {!!payment.serviceTitle && (
+                                    <Text
+                                        preset="text12"
+                                        color="secondaryTextColor"
+                                        marginBottom="y2"
+                                        numberOfLines={1}
+                                    >
+                                        {payment.serviceTitle}
                                     </Text>
                                 )}
 
@@ -391,6 +409,27 @@ export default function GanhosScreen() {
                                 </Text>
                             </TouchableOpacityBox>
                         ))
+                    )}
+
+                    {/* "Carregar mais" quando há registros além do limite renderizado */}
+                    {filteredPayments.length > renderLimit && (
+                        <Box marginTop="y12" alignItems="center">
+                            <Text preset="text12" color="secondaryTextColor" marginBottom="y8" textAlign="center">
+                                Mostrando {renderLimit} de {filteredPayments.length}. Use o filtro de período para refinar.
+                            </Text>
+                            <TouchableOpacityBox
+                                px="x16"
+                                py="y8"
+                                borderRadius="s8"
+                                borderWidth={measure.m1}
+                                borderColor="primary100"
+                                onPress={() => setRenderLimit((prev) => prev + RENDER_LIMIT)}
+                            >
+                                <Text fontSize={measure.m14} color="primary100" fontWeightPreset="semibold">
+                                    Carregar mais
+                                </Text>
+                            </TouchableOpacityBox>
+                        </Box>
                     )}
                 </Box>
 
@@ -426,10 +465,7 @@ export default function GanhosScreen() {
                                 </Box>
 
                                 <Box marginBottom="y12">
-                                    <Text preset="text12" color="secondaryTextColor">
-                                        ID: {selectedPayment.id}
-                                    </Text>
-                                    <Text preset="text14" color="colorTextPrimary" fontWeight="bold" marginTop="y4">
+                                    <Text preset="text14" color="colorTextPrimary" fontWeight="bold">
                                         Cliente: {selectedPayment.customerName}
                                     </Text>
                                 </Box>
@@ -473,24 +509,24 @@ export default function GanhosScreen() {
                                     </Box>
                                 </Box>
 
-                                {!!selectedPayment.routingId && (
+                                {(!!selectedPayment.routingCode || !!selectedPayment.routingId) && (
                                     <Box marginBottom="y12">
                                         <Text preset="text12" color="secondaryTextColor" marginBottom="y4">
                                             Rota
                                         </Text>
                                         <Text preset="text14" color="colorTextPrimary">
-                                            {selectedPayment.routingId}
+                                            {selectedPayment.routingCode ?? `…${selectedPayment.routingId!.slice(-8)}`}
                                         </Text>
                                     </Box>
                                 )}
 
-                                {!!selectedPayment.serviceId && (
+                                {(!!selectedPayment.serviceTitle || !!selectedPayment.serviceId) && (
                                     <Box marginBottom="y12">
                                         <Text preset="text12" color="secondaryTextColor" marginBottom="y4">
                                             Serviço
                                         </Text>
                                         <Text preset="text14" color="colorTextPrimary">
-                                            {selectedPayment.serviceId}
+                                            {selectedPayment.serviceTitle ?? `…${selectedPayment.serviceId!.slice(-8)}`}
                                         </Text>
                                     </Box>
                                 )}

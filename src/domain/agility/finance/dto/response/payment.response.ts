@@ -19,6 +19,10 @@ export interface PaymentResponse {
   notes?: string;
   createdAt: string;
   updatedAt: string;
+  /** Código da rota (snapshot do backend via JOIN). */
+  routingCode?: string | null;
+  /** Título do serviço (snapshot do backend via JOIN). */
+  serviceTitle?: string | null;
 }
 
 export interface DriverSummaryItem {
