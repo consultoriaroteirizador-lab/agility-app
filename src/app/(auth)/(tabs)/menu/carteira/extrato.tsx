@@ -222,7 +222,7 @@ export default function ExtratoScreen() {
             <FlatList
                 data={filteredTransactions}
                 keyExtractor={(item) => item.id}
-                renderItem={TransactionItem}
+                renderItem={({ item }) => <TransactionItem item={item} />}
                 contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 32 }}
                 refreshControl={
                     <RefreshControl refreshing={isRefetching} onRefresh={refetch} />

@@ -128,7 +128,7 @@ export default function AdiantamentosScreen() {
             <FlatList
                 data={pendingAdvances}
                 keyExtractor={(item) => item.id}
-                renderItem={AdvanceItem}
+                renderItem={({ item }) => <AdvanceItem item={item} />}
                 contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 32 }}
                 refreshControl={
                     <RefreshControl refreshing={isRefetching} onRefresh={refetch} />
