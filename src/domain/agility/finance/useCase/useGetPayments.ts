@@ -25,18 +25,22 @@ export function useGetPayments(options?: UseGetPaymentsOptions) {
     retry: false,
   });
 
-  // Handle both paginated and non-paginated responses
+  // O backend pode retornar tanto `result: PaymentResponse[]` (legado) quanto
+  // `result: { data: PaymentResponse[], meta: {...} }` (atual). Desempacota
+  // automaticamente independentemente do flag usePagination — esse flag controla
+  // apenas se `meta` é exposto.
   const isPaginatedResponse = (responseData: any): responseData is PaginatedPaymentsResponse<PaymentResponse> => {
-    return responseData && 'data' in responseData && 'meta' in responseData;
+    return responseData && typeof responseData === 'object' && Array.isArray(responseData.data) && 'meta' in responseData;
   };
 
-  const payments = usePagination && isPaginatedResponse(data?.result)
-    ? data.result.data
-    : (data?.result as PaymentResponse[]) ?? [];
+  const result = data?.result;
+  const paginated = isPaginatedResponse(result);
 
-  const meta = usePagination && isPaginatedResponse(data?.result)
-    ? data.result.meta
-    : null;
+  const payments: PaymentResponse[] = paginated
+    ? result.data
+    : Array.isArray(result) ? result : [];
+
+  const meta = paginated ? result.meta : null;
 
   return {
     payments,
@@ -47,6 +51,6 @@ export function useGetPayments(options?: UseGetPaymentsOptions) {
     refetch,
     isRefetching,
     response: data,
-    isPaginated: usePagination && isPaginatedResponse(data?.result),
+    isPaginated: paginated,
   };
 }
