@@ -25,6 +25,9 @@ export interface TrackingWebSocketOptions {
 // Estado global do socket para evitar múltiplas conexões
 let globalSocket: Socket | null = null;
 let connectionCount = 0;
+// Guardamos o token usado na conexão atual para detectar refresh e forçar
+// reconexão com credenciais novas.
+let connectedAccessToken: string | null = null;
 
 /**
  * Hook para conexão WebSocket com o namespace /monitoring
@@ -43,7 +46,20 @@ export function useTrackingWebSocket(options: TrackingWebSocketOptions = {}) {
    * Conectar ao WebSocket
    */
   const connect = useCallback(() => {
-    // Reutilizar conexão global se existir
+    const currentToken = authCredentials?.accessToken ?? null;
+
+    // Se o socket global já existe mas o token mudou (refresh), derruba para
+    // que o handshake aconteça com o token novo. Sem isso, o socket continua
+    // autenticado com o token velho e cai em loop de reconnect quando expira.
+    if (globalSocket && connectedAccessToken !== currentToken) {
+      console.log('[TrackingWebSocket] Token mudou, recriando conexão');
+      globalSocket.removeAllListeners();
+      globalSocket.disconnect();
+      globalSocket = null;
+      connectedAccessToken = null;
+    }
+
+    // Reutilizar conexão global se existir (e token coincide)
     if (globalSocket?.connected) {
       socketRef.current = globalSocket;
       connectionCount++;
@@ -88,42 +104,46 @@ export function useTrackingWebSocket(options: TrackingWebSocketOptions = {}) {
       reconnectionDelayMax: 5000,
     });
 
-    socketRef.current = globalSocket;
+    // Usar referência local para evitar race com globalSocket sendo nullado
+    // entre a anexação do listener e o fire do evento (ex: refresh de token
+    // durante o handshake).
+    const socket = globalSocket;
+    socketRef.current = socket;
     connectionCount++;
+    connectedAccessToken = authCredentials?.accessToken ?? null;
 
-    // Eventos de conexão
-    globalSocket.on('connect', () => {
+    // Eventos de conexão. `subscribe_routings` precisa ser re-emitido a cada
+    // (re)conexão do socket — antes era chamado apenas uma vez após criar o
+    // socket, então após uma queda + reconexão automática o cliente parava
+    // de receber broadcasts.
+    socket.on('connect', () => {
       console.log('[TrackingWebSocket] Conectado ao namespace /monitoring');
+      socket.emit('subscribe_routings', { tenantId });
       optionsRef.current.onConnect?.();
     });
 
-    globalSocket.on('disconnect', (reason) => {
+    socket.on('disconnect', (reason) => {
       console.log('[TrackingWebSocket] Desconectado:', reason);
       optionsRef.current.onDisconnect?.();
     });
 
-    globalSocket.on('connect_error', (error) => {
+    socket.on('connect_error', (error) => {
       console.error('[TrackingWebSocket] Erro de conexão:', error.message);
       optionsRef.current.onError?.(error);
     });
 
-    // Subscrever ao room do tenant para receber broadcasts
-    globalSocket.emit('subscribe_routings', {
-      tenantId,
-    });
-
     // Escutar atualizações de localização dos motoristas
-    globalSocket.on('driver_location_updated', (data: DriverLocationUpdate) => {
+    socket.on('driver_location_updated', (data: DriverLocationUpdate) => {
       console.log('[TrackingWebSocket] Location update:', data.driverId);
       optionsRef.current.onDriverLocationUpdate?.(data);
     });
 
     // Escutar erros
-    globalSocket.on('error', (error: { message: string }) => {
+    socket.on('error', (error: { message: string }) => {
       console.error('[TrackingWebSocket] Erro do servidor:', error.message);
     });
 
-  }, [userAuth?.id, authCredentials?.tenantId]);
+  }, [userAuth?.id, authCredentials?.tenantId, authCredentials?.accessToken]);
 
   /**
    * Desconectar do WebSocket
@@ -134,9 +154,11 @@ export function useTrackingWebSocket(options: TrackingWebSocketOptions = {}) {
     // Só desconectar se for a última referência
     if (connectionCount <= 0 && globalSocket) {
       console.log('[TrackingWebSocket] Desconectando socket global');
+      globalSocket.removeAllListeners();
       globalSocket.disconnect();
       globalSocket = null;
       connectionCount = 0;
+      connectedAccessToken = null;
     }
 
     socketRef.current = null;

@@ -5,7 +5,7 @@ import { useTrackingWebSocket } from '@/domain/agility/tracking';
 import type { DriverLocationUpdate } from '@/domain/agility/tracking';
 import { useAuthCredentialsService } from '@/services';
 import { initializeGeofenceService, cleanupGeofenceService } from '@/services/geofence';
-import { useLocationTracking } from '@/services/location';
+import { useLocationTracking, updateBackgroundGeolocationAuth } from '@/services/location';
 import { initializeBackgroundGeolocation, cleanupBackgroundGeolocation, type TrackingAuthConfig } from '@/services/location/backgroundLocationService';
 
 /**
@@ -18,8 +18,11 @@ import { initializeBackgroundGeolocation, cleanupBackgroundGeolocation, type Tra
  * que permite rastreamento em segundo plano.
  */
 export function LocationTrackingProvider({ children }: { children: React.ReactNode }) {
-  const { driverId, startTracking, stopTracking } = useLocationTracking();
-  const { authCredentials } = useAuthCredentialsService();
+  const { authCredentials, userAuth } = useAuthCredentialsService();
+  // driverId vem do JWT (claim driver_id) via authAdapter; sem ele o SDK
+  // nunca inicializa porque o useEffect abaixo curto-circuita em !driverId.
+  // Antes era chamado sem argumento — o hook sempre retornava undefined.
+  const { driverId, startTracking, stopTracking } = useLocationTracking(userAuth?.driverId ?? null);
   const appState = useRef(AppState.currentState);
   const isInitialized = useRef(false);
 
@@ -124,6 +127,21 @@ export function LocationTrackingProvider({ children }: { children: React.ReactNo
       stopTracking();
     };
   }, [driverId, startTracking, stopTracking]);
+
+  // Propagar refresh de token para o SDK nativo. O Background Geolocation
+  // armazena os headers HTTP no momento do init/start, então um refresh do
+  // JWT não chegava ao SDK e as requisições POST de localização passariam
+  // a retornar 401 silenciosamente até o app reiniciar.
+  useEffect(() => {
+    if (!isInitialized.current) return;
+    if (!authCredentials?.accessToken || !authCredentials?.tenantId) return;
+    updateBackgroundGeolocationAuth({
+      accessToken: authCredentials.accessToken,
+      tenantId: authCredentials.tenantId,
+    }).catch(err => {
+      console.error('[LocationTrackingProvider] Erro ao atualizar auth do SDK:', err);
+    });
+  }, [authCredentials?.accessToken, authCredentials?.tenantId]);
 
   return <>{children}</>;
 }

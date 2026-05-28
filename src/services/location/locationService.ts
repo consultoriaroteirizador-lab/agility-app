@@ -19,6 +19,7 @@ import {
   getCurrentPosition,
   getTrackingState,
   cleanupBackgroundGeolocation,
+  updateBackgroundGeolocationAuth,
   type TrackingAuthConfig,
 } from './backgroundLocationService';
 
@@ -203,4 +204,5 @@ export {
   getCurrentPosition,
   getTrackingState,
   initializeBackgroundGeolocation,
+  updateBackgroundGeolocationAuth,
 };

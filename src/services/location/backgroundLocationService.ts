@@ -409,6 +409,28 @@ function onGeofencesChangeHandler(event: GeofencesChangeEvent) {
 }
 
 /**
+ * Atualiza apenas os headers de autenticação no SDK sem reiniciar o tracking.
+ * Necessário após refresh do JWT: o SDK guarda os headers no estado do plugin
+ * no momento do init, então requisições HTTP subsequentes usariam o token
+ * antigo e retornariam 401 até que o tracking fosse reiniciado.
+ */
+export async function updateBackgroundGeolocationAuth(
+  authConfig: Pick<TrackingAuthConfig, 'accessToken' | 'tenantId'>
+): Promise<void> {
+  if (!trackingState.isInitialized) {
+    return;
+  }
+  await BackgroundGeolocation.setConfig({
+    http: {
+      headers: {
+        'Authorization': `Bearer ${authConfig.accessToken}`,
+        'x-tenant-id': authConfig.tenantId,
+      },
+    },
+  } as GeolocationSetConfig);
+}
+
+/**
  * Inicia o rastreamento de localização
  */
 export async function startBackgroundTracking(authConfig: TrackingAuthConfig): Promise<void> {
