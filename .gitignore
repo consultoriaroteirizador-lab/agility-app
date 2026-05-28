@@ -27,3 +27,9 @@ expo-env.d.ts
 # @end expo-cli
 
 plans/
+
+# Claude Code local config
+.claude/settings*
+
+# Playwright MCP artifacts
+.playwright-mcp/
