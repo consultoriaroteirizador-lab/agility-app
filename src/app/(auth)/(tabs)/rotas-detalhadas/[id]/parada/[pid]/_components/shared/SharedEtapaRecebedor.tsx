@@ -1,6 +1,6 @@
 import { Box, Button, ScreenBase, Text, TouchableOpacityBox } from '@/components';
 import { ButtonBack } from '@/components/Button/ButtonBack';
-import { measure } from '@/theme';
+import { measure, ThemeColors } from '@/theme';
 
 import { useParada, RecipientType } from '../../_context/ParadaContext';
 
@@ -21,8 +21,8 @@ const RECIPIENT_OPTIONS: { type: RecipientType; label: string }[] = [
 const CONFIG: Record<ServiceType, {
     title: string;
     description: string;
-    selectedColor: string;
-    selectedBg: string;
+    selectedColor: ThemeColors;
+    selectedBg: ThemeColors;
 }> = {
     coleta: {
         title: 'Quem entregou?',

@@ -31,7 +31,8 @@ function mapServiceStatus(status: ServiceStatus): string {
     [ServiceStatus.ASSIGNED]: 'Atribuido',
     [ServiceStatus.IN_PROGRESS]: 'Em andamento',
     [ServiceStatus.COMPLETED]: 'Realizado',
-    [ServiceStatus.CANCELED]: 'Nao realizado',
+    [ServiceStatus.FAILED]: 'Nao realizado',
+    [ServiceStatus.CANCELED]: 'Cancelado',
   };
   return map[status] ?? status;
 }
