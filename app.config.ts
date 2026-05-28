@@ -11,12 +11,6 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   scheme: 'agility-app',
   userInterfaceStyle: 'automatic',
 
-  splash: {
-    image: './assets/images/splash.png',
-    resizeMode: 'cover',
-    backgroundColor: '#4B0082',
-  },
-
   ios: {
     supportsTablet: false,
     bundleIdentifier: 'br.com.agility.agilityapp',
@@ -63,6 +57,15 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
 
   plugins: [
     ['expo-router', { root: 'src/app' }],
+    [
+      'expo-splash-screen',
+      {
+        image: './assets/images/splash-icon.png',
+        resizeMode: 'contain',
+        imageWidth: 280,
+        backgroundColor: '#4B0082',
+      },
+    ],
     'expo-font',
     'expo-video',
     'expo-secure-store',
