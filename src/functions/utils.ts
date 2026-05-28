@@ -16,11 +16,8 @@ export const formatCellphone = (cellphone?: string): string => {
 
 
 export function calculateRemainingTime(futureDate: Date): number {
-    const currentDate = getUTCSPMilliseconds()
-    const differenceInMilliseconds = futureDate.getTime() - currentDate;
-    const time = Math.floor(differenceInMilliseconds / 1000);
-    console.log(time)
-    return time
+    const differenceInMilliseconds = futureDate.getTime() - Date.now();
+    return Math.floor(differenceInMilliseconds / 1000);
 }
 
 export function getDateFormat(date: Date) {
@@ -55,8 +52,10 @@ export function extractDecimalNumberCurrency(value: string): number {
 
     const parts = withoutDots.split(',');
 
+    if (parts.length > 2) return NaN;
+
     const integerPart = parts[0];
-    const decimalPart = parts.length > 1 ? parts.slice(1).join('') : '';
+    const decimalPart = parts.length > 1 ? parts[1] : '';
 
     const finalValue = integerPart + (decimalPart ? '.' + decimalPart : '');
 
@@ -65,9 +64,7 @@ export function extractDecimalNumberCurrency(value: string): number {
 
 
 export function getUTCSPMilliseconds() {
-    const now = Date.now();
-    const displacementUTC3 = 3 * 3600000;
-    return now - displacementUTC3;
+    return Date.now();
 }
 
 export function removeCodeCountryPhoneNumber(phoneNumber: string): string {

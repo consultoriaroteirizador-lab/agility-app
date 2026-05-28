@@ -11,6 +11,7 @@ import { goLoginScreen } from "@/routes";
 import { UserAuth, UserCredentials } from "@/services/userAuthInfo/UserAuthInfoType";
 import { EnhancedError } from "@/utils/errors";
 
+import { authCredentialsStorage } from "../authCredentialsStorage";
 import { AuthCredentialsState } from "../useAuthCredentialsService";
 import { userCredentialsStorage } from "../userCredentialsStorage";
 
@@ -59,12 +60,16 @@ export function AuthCredentialsProvider({ children }: PropsWithChildren) {
 
     const removeUserCredentials = useCallback(async (uc: UserCredentials): Promise<void> => {
         await userCredentialsStorage.remove(uc);
-        if (userCredentialsCurrent?.username === uc.username) {
+        // Ler o "current" do storage para evitar dependência circular com o state
+        // userCredentialsCurrent — que recriaria este callback a cada mudança e
+        // dispararia efeitos em cascata em quem o usa em deps.
+        const current = await userCredentialsStorage.getCurrent();
+        if (current?.username === uc.username) {
             await userCredentialsStorage.removeCurrent();
             setUserCredentialsCurrent(null);
         }
         await refreshUserCredentialsList();
-    }, [userCredentialsCurrent, refreshUserCredentialsList]);
+    }, [refreshUserCredentialsList]);
 
     const switchUserCredentials = useCallback(async (userCredentials: UserCredentials): Promise<void> => {
         await userCredentialsStorage.setCurrent(userCredentials);
@@ -95,6 +100,7 @@ export function AuthCredentialsProvider({ children }: PropsWithChildren) {
         // Update token so API calls are authenticated
         authService.updateToken(ac.accessToken, ac.tenantId);
         setAuthCredentials(ac);
+        await authCredentialsStorage.set(ac);
 
         try {
             // Decode JWT to extract user info from Keycloak custom claims
@@ -131,6 +137,7 @@ export function AuthCredentialsProvider({ children }: PropsWithChildren) {
         setAuthCredentials(null);
         authService.removeToken();
         await removeUserAuth();
+        await authCredentialsStorage.remove();
         // Limpar o Set e flag de redirecionamento ao fazer logout
         failedRequestsAfterRefreshRef.current.clear();
         isRedirectingRef.current = false;
@@ -141,7 +148,10 @@ export function AuthCredentialsProvider({ children }: PropsWithChildren) {
 
     const startAuthCredentials = useCallback(async () => {
         try {
-            if (!authCredentials) {
+            // Hidratar do storage antes de qualquer decisão; se já temos no state, usar o do state
+            const credentials = authCredentials ?? await authCredentialsStorage.get();
+
+            if (!credentials) {
                 setIsLoading(false);
                 return;
             }
@@ -151,7 +161,7 @@ export function AuthCredentialsProvider({ children }: PropsWithChildren) {
             if (!userAuth) {
                 if (isDevelopment) console.log('[Auth] Credentials found but no userAuth, decoding JWT...');
                 try {
-                    const claims = decodeJWT(authCredentials.accessToken);
+                    const claims = decodeJWT(credentials.accessToken);
                     const mappedUserAuth = authAdapter.mapTokenClaimsToUserAuth(claims);
                     setUserAuth(mappedUserAuth);
                     await saveUserAuth(mappedUserAuth);
@@ -161,8 +171,8 @@ export function AuthCredentialsProvider({ children }: PropsWithChildren) {
                 }
             }
 
-            const expirationDate = new Date(authCredentials.expiration);
-            const expirationRefreshTokenDate = new Date(authCredentials.expirationRefreshToken);
+            const expirationDate = new Date(credentials.expiration);
+            const expirationRefreshTokenDate = new Date(credentials.expirationRefreshToken);
             const currentTime = new Date();
 
             if (isNaN(expirationDate.getTime()) || isNaN(expirationRefreshTokenDate.getTime())) {
@@ -173,12 +183,12 @@ export function AuthCredentialsProvider({ children }: PropsWithChildren) {
             const remainingTimeRefreshToken = expirationRefreshTokenDate.getTime() - currentTime.getTime();
 
             if (remainingTimeAccessToken <= 0) {
-                if (remainingTimeRefreshToken > 0 && authCredentials.refreshToken) {
+                if (remainingTimeRefreshToken > 0 && credentials.refreshToken) {
                     if (isDevelopment) console.log('[Auth] Access token expirado, tentando refresh...');
                     try {
                         const newAuthCredentials = await authService.refreshToken(
-                            authCredentials.refreshToken,
-                            authCredentials.tenantId,
+                            credentials.refreshToken,
+                            credentials.tenantId,
                         );
                         if (isDevelopment) console.log('[Auth] Refresh bem sucedido no boot');
                         await saveCredentials(newAuthCredentials);
@@ -195,7 +205,12 @@ export function AuthCredentialsProvider({ children }: PropsWithChildren) {
                 }
             }
 
-            authService.updateToken(authCredentials.accessToken, authCredentials.tenantId);
+            authService.updateToken(credentials.accessToken, credentials.tenantId);
+
+            // Se hidratou do storage, popular o state agora que validamos
+            if (!authCredentials) {
+                setAuthCredentials(credentials);
+            }
         } catch (error) {
             if (isDevelopment) console.error("Erro ao iniciar credenciais de autenticação:", error);
             goLoginScreen();

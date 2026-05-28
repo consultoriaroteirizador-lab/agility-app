@@ -34,8 +34,8 @@ function updateToken(token: string, tenantId?: string) {
 }
 
 function removeToken() {
-    apiAgility.defaults.headers.common.Authorization = null;
-    apiIdentity.defaults.headers.common.Authorization = null;
+    delete apiAgility.defaults.headers.common.Authorization;
+    delete apiIdentity.defaults.headers.common.Authorization;
     delete apiAgility.defaults.headers.common['x-tenant-id'];
     delete apiIdentity.defaults.headers.common['x-tenant-id'];
 }

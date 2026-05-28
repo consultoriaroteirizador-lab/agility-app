@@ -493,8 +493,23 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
       if (isDevelopment) console.log("Logout detectado. Limpando dados de notificação...");
       setTokenRegistered(false);
       registrationAttempted.current = false;
-      AsyncStorage.removeItem(TOKEN_REGISTERED_KEY).catch((e) => isDevelopment && console.error(e));
       clearPendingNavigation();
+
+      // Remover listeners do Expo Notifications: o setup useEffect só os recria
+      // quando authLoading muda, então no ciclo de logout eles continuariam
+      // ativos ouvindo eventos de um usuário deslogado.
+      notificationListener.current?.remove();
+      notificationListener.current = null;
+      responseListener.current?.remove();
+      responseListener.current = null;
+
+      (async () => {
+        try {
+          await AsyncStorage.removeItem(TOKEN_REGISTERED_KEY);
+        } catch (e) {
+          if (isDevelopment) console.error(e);
+        }
+      })();
     }
   }, [isAuthenticated, tokenRegistered, clearPendingNavigation]);
 

@@ -19,7 +19,6 @@ import { useCheckVersion } from '@/domain/mobileVersion/useCase';
 import { useLoadFonts, useInvalidQueryLogout } from '@/hooks';
 import { goChanceTemporaryPasswordScreen, goHomeScreen, goLoginScreen, goRegisterAllowsBiometricScreen, goUpdateVersionScreen } from '@/routes/routesService';
 import { NotificationProvider, useAuthCredentialsService } from '@/services';
-import { authCredentialsStorage } from '@/services/authCredentials/authCredentialsStorage';
 import { AuthCredentialsProvider } from '@/services/authCredentials/Providers/AuthCredentialsProvider';
 import { TenantProvider } from '@/services/tenantStorage/Providers/TenantProvider';
 import { theme } from '@/theme';
@@ -50,21 +49,14 @@ function InitialLayout() {
   }, [checkVersion]);
 
   // Detectar logout e limpar cache do React Query
+  // (Storage é limpo dentro de removeCredentials no AuthCredentialsProvider)
   useEffect(() => {
     const hadCredentials = prevAuthForLogoutRef.current !== null && prevAuthForLogoutRef.current !== undefined;
     const hasCredentials = authCredentials !== null;
 
-    // Detectar logout: tinha credenciais, agora não tem
     if (hadCredentials && !hasCredentials) {
-      // Limpar cache do React Query
       clearQueryCache();
-
-      // Limpar tokens do secure storage
-      authCredentialsStorage.remove().catch((e) => {
-        console.error('[Logout] Erro ao limpar storage:', e);
-      });
-
-      console.log('[Logout] Cache e storage limpos com sucesso');
+      console.log('[Logout] Cache limpo com sucesso');
     }
 
     prevAuthForLogoutRef.current = authCredentials;
