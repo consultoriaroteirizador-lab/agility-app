@@ -565,9 +565,10 @@ export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderPr
       const backendTs = backendDraftUpdatedAt ? new Date(backendDraftUpdatedAt).getTime() : 0;
       const localTs = localDraft?.localUpdatedAt ?? 0;
 
-      // Last-write-wins: prefer the most recent. If backend has nothing, fall back to local.
+      // Last-write-wins: prefer the most recent. Em empate, preferir o local
+      // (que reflete edições do usuário ainda não sincronizadas com o backend).
       let chosen: ServiceDraftData | null = null;
-      if (backendDraft && backendTs >= localTs) {
+      if (backendDraft && backendTs > localTs) {
         chosen = backendDraft;
       } else if (localDraft) {
         chosen = localDraft;
@@ -702,8 +703,26 @@ export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderPr
     if (inFlightSignatureRef.current === signature) return;
 
     inFlightSignatureRef.current = signature;
-    uploadBase64Signature(signature, serviceId)
+
+    // Timeout defensivo: se a request travar (rede caída sem rejeição), libera
+    // o ref para permitir retry em próximos renders.
+    const SIGNATURE_UPLOAD_TIMEOUT_MS = 15000;
+    let timedOut = false;
+    const timeoutPromise = new Promise<null>((resolve) => {
+      setTimeout(() => {
+        timedOut = true;
+        resolve(null);
+      }, SIGNATURE_UPLOAD_TIMEOUT_MS);
+    });
+
+    Promise.race([uploadBase64Signature(signature, serviceId), timeoutPromise])
       .then(url => {
+        if (timedOut) {
+          if (__DEV__) {
+            console.warn('[ParadaContext] signature upload timed out, will retry on next render');
+          }
+          return;
+        }
         if (url) {
           setSignatureState(url);
         }

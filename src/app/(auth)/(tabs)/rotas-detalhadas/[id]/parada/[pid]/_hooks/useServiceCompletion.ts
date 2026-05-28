@@ -54,6 +54,11 @@ export function useServiceCompletion() {
     // Ref para rastrear se o componente está montado (evitar memory leaks)
     const isMountedRef = useRef(true);
 
+    // Guard síncrono contra duplo-tap. O `finalizing` em state é assíncrono — entre
+    // o primeiro clique e o React re-renderizar, um segundo clique passaria pelo check.
+    // O ref bloqueia imediatamente.
+    const finalizingRef = useRef(false);
+
     // Ref para rastrear o timeout de reset
     const resetTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -62,6 +67,7 @@ export function useServiceCompletion() {
         isMountedRef.current = true;
         return () => {
             isMountedRef.current = false;
+            finalizingRef.current = false;
             // Limpar timeout pendente ao desmontar
             if (resetTimeoutRef.current) {
                 clearTimeout(resetTimeoutRef.current);
@@ -122,15 +128,17 @@ export function useServiceCompletion() {
 
     // Finalizar serviço
     const handleFinalizar = useCallback(async () => {
-        // Evitar duplo clique
-        if (finalizing) {
+        // Guard síncrono contra duplo-tap (ref atualiza imediatamente, antes do re-render).
+        if (finalizingRef.current || finalizing) {
             return;
         }
+        finalizingRef.current = true;
 
         try {
             // Validação inicial
             if (!serviceId) {
                 showToast({ message: 'ID do serviço não encontrado.', type: 'error' });
+                finalizingRef.current = false;
                 return;
             }
 
@@ -141,16 +149,32 @@ export function useServiceCompletion() {
 
             if (!hasDocumento) {
                 showToast({ message: 'Preencha os dados do documento antes de finalizar.', type: 'error' });
+                finalizingRef.current = false;
                 return;
             }
 
             if (!hasRealPhotos) {
                 showToast({ message: 'Tire pelo menos uma foto antes de finalizar.', type: 'error' });
+                finalizingRef.current = false;
                 return;
             }
 
             if (!hasRealAssinatura) {
                 showToast({ message: 'Colete a assinatura antes de finalizar.', type: 'error' });
+                finalizingRef.current = false;
+                return;
+            }
+
+            // Bloquear finalização enquanto houver uploads de foto em andamento.
+            // Evita race entre o upload incremental em background e o uploadPhotos() batch
+            // disparado abaixo, que poderia duplicar requisições ou completar o serviço
+            // antes das URLs S3 estarem disponíveis no payload.
+            const photosUploading = (photos as { __uploadStatus?: string }[]).some(
+                p => p.__uploadStatus === 'uploading'
+            );
+            if (photosUploading) {
+                showToast({ message: 'Aguarde o upload das fotos terminar antes de finalizar.', type: 'error' });
+                finalizingRef.current = false;
                 return;
             }
 
@@ -295,6 +319,8 @@ export function useServiceCompletion() {
                 showToast({ message: errorMessage, type: 'error' });
                 setFinalizing(false);
             }
+        } finally {
+            finalizingRef.current = false;
         }
     }, [
         serviceId,
