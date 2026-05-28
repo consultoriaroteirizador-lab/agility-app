@@ -1,6 +1,6 @@
 // src/app/(auth)/(tabs)/menu/carteira/saque.tsx
 
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { ScrollView } from 'react-native';
 
 import { Ionicons } from '@expo/vector-icons';
@@ -23,6 +23,10 @@ export default function SaqueScreen() {
     const [showConfirmModal, setShowConfirmModal] = useState(false);
     const { wallet, isLoading: isLoadingWallet, refetch } = useGetWallet();
     const { requestWithdrawal, isPending } = useRequestWithdrawal();
+    // Guard síncrono contra duplo-tap no botão "Confirmar" do modal.
+    // O `isPending` da mutation só vira true depois que a request inicia,
+    // deixando uma janela onde uma segunda chamada passa sem bloqueio.
+    const isSubmittingRef = useRef(false);
 
     const availableBalance = wallet?.availableBalance ?? 0;
     const value = amountCents ?? 0;
@@ -52,6 +56,8 @@ export default function SaqueScreen() {
     }
 
     async function handleConfirmSaque() {
+        if (isSubmittingRef.current) return;
+        isSubmittingRef.current = true;
         setShowConfirmModal(false);
         try {
             await requestWithdrawal({ amount: value });
@@ -60,6 +66,8 @@ export default function SaqueScreen() {
             refetch();
         } catch (error) {
             showToast({ message: 'Não foi possível processar sua solicitação.', type: 'error' });
+        } finally {
+            isSubmittingRef.current = false;
         }
     }
 

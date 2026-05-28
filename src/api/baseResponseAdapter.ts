@@ -38,10 +38,18 @@ function toBaseResponseError(error: AxiosError<BaseResponseAPI<any>>): BaseRespo
             },
         };
     } else {
+        // Sem `error.response` significa que a request nem chegou ao servidor:
+        // sem internet, timeout ou DNS — diferenciar do erro genérico permite
+        // ao usuário identificar e agir (ex: reconectar) ao invés de pensar
+        // que é uma falha do app.
+        const isTimeout = error.code === 'ECONNABORTED';
+        const message = isTimeout
+            ? 'A requisição demorou demais. Verifique sua conexão e tente novamente.'
+            : 'Sem conexão com o servidor. Verifique sua internet e tente novamente.';
         return {
             success: false,
             error: {
-                message: "Ocorreu um erro desconhecido",
+                message,
                 code: "AU-000"
             }
         };

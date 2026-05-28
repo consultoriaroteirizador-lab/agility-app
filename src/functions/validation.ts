@@ -14,7 +14,8 @@ export function isValidNickName(nickName: string): boolean {
 
 export function isValidPhoneNumber(phoneNumber: string): boolean {
     const phoneJustNumber = extractNumbers(phoneNumber)
-    return phoneJustNumber.length === 11
+    // Aceita 10 (fixo) ou 11 (celular com 9). toPhoneMask suporta ambos.
+    return phoneJustNumber.length === 10 || phoneJustNumber.length === 11
 }
 
 export function isValidTaxNumber(taxNumber: string): boolean {

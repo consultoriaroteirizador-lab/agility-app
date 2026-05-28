@@ -18,7 +18,7 @@ interface BRLInputProps {
 }
 
 function centsToDisplay(cents: number | null | undefined): string {
-    if (cents == null || !Number.isFinite(cents) || cents <= 0) return '';
+    if (cents == null || !Number.isFinite(cents) || cents < 0) return '';
     const reais = cents / 100;
     return `R$ ${reais.toLocaleString('pt-BR', {
         minimumFractionDigits: 2,
