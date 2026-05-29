@@ -113,11 +113,19 @@ export function useTrackingWebSocket(options: TrackingWebSocketOptions = {}) {
     connectedAccessToken = authCredentials?.accessToken ?? null;
 
     // Eventos de conexão. `subscribe_routings` precisa ser re-emitido a cada
-    // (re)conexão do socket — antes era chamado apenas uma vez após criar o
-    // socket, então após uma queda + reconexão automática o cliente parava
-    // de receber broadcasts.
+    // (re)conexão do socket. ATENÇÃO: emitir no `connect` do cliente dispara
+    // ANTES do servidor terminar handleConnection (que é async — busca
+    // tenant no Redis + valida JWT via JWKS). Resultado: o handler de
+    // subscribe responde "Not authenticated" porque client.tenantId ainda
+    // não foi setado pelo backend. O servidor emite o evento `connected`
+    // só depois de toda a auth terminar — esse é o sinal correto para
+    // emitir subscribe.
     socket.on('connect', () => {
-      console.log('[TrackingWebSocket] Conectado ao namespace /monitoring');
+      console.log('[TrackingWebSocket] Conectado ao namespace /monitoring (aguardando confirmação do servidor)');
+    });
+
+    socket.on('connected', () => {
+      console.log('[TrackingWebSocket] Servidor confirmou autenticação, subscrevendo');
       socket.emit('subscribe_routings', { tenantId });
       optionsRef.current.onConnect?.();
     });
