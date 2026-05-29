@@ -132,12 +132,13 @@ export function SharedEtapaFinalizacao({ serviceType }: SharedEtapaFinalizacaoPr
       return;
     }
 
+    // Apenas registra o pagamento e fecha o modal. A finalização real
+    // acontece quando o usuário toca explicitamente no botão "Finalizar"
+    // — antes essa função chamava handleFinalizar() em sequência, e o
+    // botão da tela já aparecia em estado "Finalizando..." sem ação do
+    // usuário, parecendo bug.
     setShowPaymentModal(false);
-    // Prosseguir com a finalização
-    handleFinalizar().catch((error) => {
-      console.error('[SharedEtapaFinalizacao] Erro não tratado:', error);
-    });
-  }, [paymentAmount, paymentMethod, setShowPaymentModal, handleFinalizar]);
+  }, [paymentAmount, paymentMethod, setShowPaymentModal]);
 
   // Pagamento pendente quando o serviço exige cobrança e ainda não foi preenchido.
   const paymentPending = !!service?.requiresPayment && (!paymentAmount || !paymentMethod);

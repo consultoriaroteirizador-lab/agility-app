@@ -79,6 +79,18 @@ export function useServiceCompletion() {
     // Hook para enviar detalhes de conclusão
     const { completeServiceWithDetailsAsync, isLoading: isCompletingWithDetails } = useCompleteServiceWithDetails();
 
+    // Reset defensivo: se o consumer (ex: SharedEtapaFinalizacao) monta com
+    // `finalizing=true` no contexto MAS não há mutation em voo, é resíduo de
+    // um fluxo anterior interrompido (navegou fora, erro engolido, race).
+    // Sem isso, o botão "Finalizar" abre travado em "Finalizando...".
+    useEffect(() => {
+        if (finalizing && !isCompletingWithDetails) {
+            setFinalizing(false);
+        }
+        // só na montagem — não queremos resetar durante um finalize em curso
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
     const invalidateQueries = useCallback(async () => {
         // Otimizado: usar invalidateQueries com refetchType: 'all' ao invés de
         // múltiplos invalidate + refetch separados (reduz de 5 para 2 operações)
