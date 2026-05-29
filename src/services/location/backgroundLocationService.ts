@@ -431,41 +431,35 @@ export async function updateBackgroundGeolocationAuth(
 }
 
 /**
- * Inicia o rastreamento de localização
+ * Inicia o rastreamento de localização.
+ *
+ * Pré-condição: o SDK precisa estar inicializado (via initializeBackgroundGeolocation).
+ * Headers HTTP de autenticação são gerenciados separadamente por
+ * updateBackgroundGeolocationAuth — esta função NÃO os toca para evitar
+ * resetar config em todo refresh de token.
  */
-export async function startBackgroundTracking(authConfig: TrackingAuthConfig): Promise<void> {
-  console.log('[BGGeolocation] Iniciando tracking para driver:', authConfig.driverId);
+export async function startBackgroundTracking(driverId: string): Promise<void> {
+  console.log('[BGGeolocation] Iniciando tracking para driver:', driverId);
 
-  // Inicializar se necessário
   if (!trackingState.isInitialized) {
-    await initializeBackgroundGeolocation(authConfig);
+    console.warn('[BGGeolocation] SDK não inicializado, abortando start');
+    return;
   }
 
-  // IMPORTANTE: Atualizar extras global para garantir que driver_id esteja em cada localização
+  // Garantir que driver_id esteja anexado a cada localização (extras é leve).
   await BackgroundGeolocation.setConfig({
     extras: {
-      driver_id: authConfig.driverId,
+      driver_id: driverId,
       app_version: '1.0.0',
       platform: Platform.OS,
     },
-    http: {
-      headers: {
-        'Authorization': `Bearer ${authConfig.accessToken}`,
-        'x-tenant-id': authConfig.tenantId,
-      },
-    },
   } as GeolocationSetConfig);
 
-  console.log('[BGGeolocation] Config atualizado com extras:', {
-    driver_id: authConfig.driverId,
-  });
-
-  // Iniciar tracking
   await BackgroundGeolocation.start();
 
   trackingState.isTracking = true;
   trackingState.isEnabled = true;
-  trackingState.driverId = authConfig.driverId;
+  trackingState.driverId = driverId;
 
   console.log('[BGGeolocation] Tracking iniciado com sucesso');
 }

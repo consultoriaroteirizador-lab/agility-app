@@ -11,7 +11,6 @@ import { useCallback } from 'react';
 
 import type { UpdateDriverRequest } from '@/domain/agility/driver/dto';
 import { useUpdateDriver } from '@/domain/agility/driver/useCase';
-import { useAuthCredentialsService } from '@/services';
 
 // Importar novo serviço
 import {
@@ -44,15 +43,16 @@ type UpdateDriverCallback = (variables: {
 }) => void;
 
 /**
- * Inicia o rastreamento de localização
- * @param driverId - ID real do driver (da tabela Driver, não o collaboratorId)
- * @param updateDriver - Callback para atualizar o driver no backend
- * @param authConfig - Credenciais de autenticação
+ * Inicia o rastreamento de localização.
+ *
+ * Pré-condição: o SDK precisa estar inicializado com headers de auth
+ * (responsabilidade do LocationTrackingProvider). Esta função apenas
+ * dispara o start() do SDK — não toca em token nem tenantId, então pode
+ * ser chamada várias vezes ao longo da sessão sem desconfigurar nada.
  */
 export async function startLocationTracking(
   driverId: string,
   updateDriver?: UpdateDriverCallback,
-  authConfig?: { accessToken: string; tenantId: string }
 ): Promise<void> {
   if (legacyTrackingActive) {
     console.log('[LocationService] Tracking já está ativo');
@@ -62,20 +62,7 @@ export async function startLocationTracking(
   console.log('[LocationService] Iniciando rastreamento para driver:', driverId);
 
   if (USE_BACKGROUND_GEOLOCATION) {
-    // Verificar se temos as credenciais de autenticação
-    if (!authConfig?.accessToken || !authConfig?.tenantId) {
-      console.error('[LocationService] Credenciais de autenticação não fornecidas');
-      return;
-    }
-
-    // Usar novo Background Geolocation SDK com headers de autenticação
-    const trackingAuthConfig: TrackingAuthConfig = {
-      driverId,
-      accessToken: authConfig.accessToken,
-      tenantId: authConfig.tenantId,
-    };
-
-    await startBackgroundTracking(trackingAuthConfig);
+    await startBackgroundTracking(driverId);
   }
 
   legacyTrackingActive = true;
@@ -161,30 +148,20 @@ export function isTracking(): boolean {
  * @param driverId - ID real do driver (obrigatório, use useFindDriverByCollaborator para obter)
  */
 export function useLocationTracking(driverId?: string | null) {
-  const { authCredentials } = useAuthCredentialsService();
   const { updateDriver } = useUpdateDriver();
 
-  // Identidades estáveis com useCallback: sem isso, cada render do hook gerava
-  // novas referências de startTracking/stopTracking. O LocationTrackingProvider
-  // tem useEffect com essas funções nas deps e re-disparava em loop,
-  // chamando BackgroundGeolocation.start() concorrentemente. O plugin então
-  // rejeitava com "Waiting for previous start action to complete".
-  const accessToken = authCredentials?.accessToken;
-  const tenantId = authCredentials?.tenantId;
+  // startTracking/stopTracking não dependem mais de accessToken/tenantId —
+  // o SDK já carrega isso internamente e o LocationTrackingProvider propaga
+  // refreshes via updateBackgroundGeolocationAuth. Resultado: identidades
+  // estáveis através de rotações de token, sem o ciclo stop→start→stop que
+  // gerava "Waiting for previous start action to complete".
   const startTracking = useCallback(async () => {
     if (!driverId) {
       console.warn('[LocationService] Driver ID não fornecido. Tracking não iniciado.');
       return;
     }
-    await startLocationTracking(
-      driverId,
-      updateDriver,
-      {
-        accessToken: accessToken || '',
-        tenantId: tenantId || '',
-      },
-    );
-  }, [driverId, updateDriver, accessToken, tenantId]);
+    await startLocationTracking(driverId, updateDriver);
+  }, [driverId, updateDriver]);
 
   const stopTracking = useCallback(async () => {
     await stopLocationTracking(driverId || undefined, updateDriver);

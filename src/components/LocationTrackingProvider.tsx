@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
 
 import { useTrackingWebSocket } from '@/domain/agility/tracking';
@@ -6,27 +6,39 @@ import type { DriverLocationUpdate } from '@/domain/agility/tracking';
 import { useAuthCredentialsService } from '@/services';
 import { initializeGeofenceService, cleanupGeofenceService } from '@/services/geofence';
 import { useLocationTracking, updateBackgroundGeolocationAuth } from '@/services/location';
-import { initializeBackgroundGeolocation, cleanupBackgroundGeolocation, type TrackingAuthConfig } from '@/services/location/backgroundLocationService';
+import { initializeBackgroundGeolocation, cleanupBackgroundGeolocation } from '@/services/location/backgroundLocationService';
 
 /**
- * Componente que gerencia o rastreamento de localização automaticamente
- * Inicia o tracking quando o componente é montado e para quando é desmontado
- * 
- * Uso: Colocar este componente em uma tela onde o motorista está ativo (ex: rotas detalhadas)
- * 
- * IMPORTANTE: Este componente inicializa o Background Geolocation SDK
- * que permite rastreamento em segundo plano.
+ * Componente que gerencia o rastreamento de localização automaticamente.
+ *
+ * ARQUITETURA:
+ * O Background Geolocation SDK é nativo e autossuficiente — uma vez iniciado,
+ * envia localizações via HTTP direto do processo nativo, mesmo com o app
+ * em background ou matado pelo SO. O papel do JS é apenas:
+ *
+ *  1. INIT     — uma vez por motorista, quando driverId+credenciais existem
+ *  2. START    — uma vez quando o SDK está pronto
+ *  3. AUTH     — propagar refresh de token via setConfig (leve, sem reinit)
+ *  4. STOP     — apenas em logout / mudança de motorista / unmount
+ *  5. WS       — canal de telemetria separado, pode reciclar sem afetar tracking
+ *
+ * Cada uma vive em um useEffect próprio com deps próprias, evitando que
+ * uma rotação de token (frequente) cause teardown+reinit do SDK (caro e
+ * propenso à race "Waiting for previous start action to complete").
  */
 export function LocationTrackingProvider({ children }: { children: React.ReactNode }) {
   const { authCredentials, userAuth } = useAuthCredentialsService();
-  // driverId vem do JWT (claim driver_id) via authAdapter; sem ele o SDK
-  // nunca inicializa porque o useEffect abaixo curto-circuita em !driverId.
-  // Antes era chamado sem argumento — o hook sempre retornava undefined.
+  // driverId vem do JWT (claim driver_id) via authAdapter.
   const { driverId, startTracking, stopTracking } = useLocationTracking(userAuth?.driverId ?? null);
   const appState = useRef(AppState.currentState);
   const isInitialized = useRef(false);
+  // sdkReady em state (não ref) pra que o effect de "start tracking" só
+  // dispare quando o SDK tiver finalizado a inicialização assíncrona.
+  const [sdkReady, setSdkReady] = useState(false);
 
-  // WebSocket para monitoramento em tempo real
+  // WebSocket de telemetria (canal /monitoring). NÃO é o canal que envia
+  // localizações — o SDK faz isso por HTTP direto. Aqui só recebemos updates
+  // pro backend ver o motorista em tempo real.
   const { connect: connectWebSocket, disconnect: disconnectWebSocket } = useTrackingWebSocket({
     onDriverLocationUpdate: (data: DriverLocationUpdate) => {
       console.log('[LocationTrackingProvider] Localização confirmada via WebSocket:', data.driverId);
@@ -42,103 +54,65 @@ export function LocationTrackingProvider({ children }: { children: React.ReactNo
     },
   });
 
-  // Inicializar SDK uma única vez. NÃO inicializa enquanto `accessToken` ou
-  // `tenantId` não estiverem prontos — antes a inicialização rodava no render
-  // entre `setUserAuth` e `setAuthCredentials` durante a hidratação do boot,
-  // pegando token vazio e gerando 401s no endpoint de tracking até o
-  // re-render seguinte recriar o SDK.
+  // [1] Init SDK + Geofence — UMA VEZ, quando driverId e credenciais ficam
+  // ambos disponíveis. SEM função de cleanup aqui: rotações de token
+  // entram nessas deps e re-disparam o effect, mas o guard isInitialized
+  // garante no-op. Cleanup do SDK fica no effect [2] abaixo.
   useEffect(() => {
     if (!driverId || isInitialized.current) return;
     const accessToken = authCredentials?.accessToken;
     const tenantId = authCredentials?.tenantId;
     if (!accessToken || !tenantId) return;
 
-    const initialize = async () => {
+    (async () => {
       try {
         console.log('[LocationTrackingProvider] Inicializando Background Geolocation SDK...');
-
-        // Inicializar Background Geolocation
-        const authConfig: TrackingAuthConfig = {
-          driverId,
-          accessToken,
-          tenantId,
-        };
-        await initializeBackgroundGeolocation(authConfig);
-
-        // Inicializar serviço de geofencing
+        await initializeBackgroundGeolocation({ driverId, accessToken, tenantId });
         initializeGeofenceService();
-
-        // Conectar WebSocket para monitoramento em tempo real
-        connectWebSocket();
-
         isInitialized.current = true;
-        console.log('[LocationTrackingProvider] SDK e WebSocket inicializados com sucesso');
+        setSdkReady(true);
+        console.log('[LocationTrackingProvider] SDK inicializado');
       } catch (error) {
         console.error('[LocationTrackingProvider] Erro ao inicializar SDK:', error);
       }
-    };
+    })();
+  }, [driverId, authCredentials?.accessToken, authCredentials?.tenantId]);
 
-    initialize();
-
-    return () => {
-      // Cleanup ao desmontar
-      disconnectWebSocket();
-      cleanupGeofenceService();
-      cleanupBackgroundGeolocation();
-      isInitialized.current = false;
-    };
-  }, [driverId, authCredentials?.accessToken, authCredentials?.tenantId, connectWebSocket, disconnectWebSocket]);
-
-  // Controlar tracking baseado no ciclo de vida do app
+  // [2] Teardown do SDK — apenas quando driverId muda (troca de motorista)
+  // ou o provider desmonta (logout). Deps mínimas: token NÃO entra aqui.
   useEffect(() => {
     if (!driverId) return;
-
-    const handleAppStateChange = (nextAppState: AppStateStatus) => {
-      if (
-        appState.current.match(/inactive|background/) &&
-        nextAppState === 'active'
-      ) {
-        console.log('[LocationTrackingProvider] App voltou ao primeiro plano');
-        // O Background Geolocation continua rastreando automaticamente
-        // Reconectar WebSocket se necessário
-        connectWebSocket();
-      } else if (
-        appState.current === 'active' &&
-        nextAppState.match(/inactive|background/)
-      ) {
-        console.log('[LocationTrackingProvider] App foi para segundo plano');
-        // O Background Geolocation continua rastreando em background
-        // WebSocket pode ser mantido ou desconectado para economizar recursos
-      }
-
-      appState.current = nextAppState;
-    };
-
-    // Escutar mudanças de estado do app
-    const subscription = AppState.addEventListener('change', handleAppStateChange);
-
     return () => {
-      subscription.remove();
+      if (isInitialized.current) {
+        console.log('[LocationTrackingProvider] Encerrando SDK (driver mudou ou desmontou)');
+        cleanupGeofenceService();
+        cleanupBackgroundGeolocation();
+        isInitialized.current = false;
+        setSdkReady(false);
+      }
     };
-  }, [driverId, connectWebSocket]);
+  }, [driverId]);
 
-  // Iniciar/parar tracking
+  // [3] Start tracking — uma vez quando o SDK fica pronto. startTracking
+  // não depende mais de token (vide useLocationTracking), então sua
+  // identidade é estável e não causa start→stop→start em rotações.
   useEffect(() => {
-    if (driverId && isInitialized.current) {
-      console.log('[LocationTrackingProvider] Iniciando tracking de localização');
-      startTracking();
-    }
-
+    if (!sdkReady || !driverId) return;
+    console.log('[LocationTrackingProvider] Iniciando tracking de localização');
+    startTracking().catch(err => {
+      console.error('[LocationTrackingProvider] Erro ao iniciar tracking:', err);
+    });
     return () => {
       console.log('[LocationTrackingProvider] Parando tracking de localização');
-      stopTracking();
+      stopTracking().catch(err => {
+        console.error('[LocationTrackingProvider] Erro ao parar tracking:', err);
+      });
     };
-  }, [driverId, startTracking, stopTracking]);
+  }, [sdkReady, driverId, startTracking, stopTracking]);
 
-  // Propagar refresh de token para o SDK nativo. O Background Geolocation
-  // armazena os headers HTTP no momento do init/start, então um refresh do
-  // JWT não chegava ao SDK e as requisições POST de localização passariam
-  // a retornar 401 silenciosamente até o app reiniciar.
+  // [4] Refresh de token → setConfig leve nos headers HTTP do SDK. Sem
+  // reinit, sem stop/start — o SDK continua emitindo localizações com o
+  // token novo a partir do próximo batch.
   useEffect(() => {
     if (!isInitialized.current) return;
     if (!authCredentials?.accessToken || !authCredentials?.tenantId) return;
@@ -149,6 +123,42 @@ export function LocationTrackingProvider({ children }: { children: React.ReactNo
       console.error('[LocationTrackingProvider] Erro ao atualizar auth do SDK:', err);
     });
   }, [authCredentials?.accessToken, authCredentials?.tenantId]);
+
+  // [5] WebSocket de telemetria — vida independente do SDK. Reconecta
+  // livremente em refresh de token sem afetar o tracking de localização.
+  useEffect(() => {
+    if (!driverId) return;
+    if (!authCredentials?.accessToken || !authCredentials?.tenantId) return;
+    connectWebSocket();
+    return () => {
+      disconnectWebSocket();
+    };
+  }, [driverId, authCredentials?.accessToken, authCredentials?.tenantId, connectWebSocket, disconnectWebSocket]);
+
+  // [6] AppState — reconecta WS ao voltar do background. Tracking nativo
+  // continua sozinho, não precisa de ação do JS aqui.
+  useEffect(() => {
+    if (!driverId) return;
+
+    const handleAppStateChange = (nextAppState: AppStateStatus) => {
+      if (
+        appState.current.match(/inactive|background/) &&
+        nextAppState === 'active'
+      ) {
+        console.log('[LocationTrackingProvider] App voltou ao primeiro plano');
+        connectWebSocket();
+      } else if (
+        appState.current === 'active' &&
+        nextAppState.match(/inactive|background/)
+      ) {
+        console.log('[LocationTrackingProvider] App foi para segundo plano');
+      }
+      appState.current = nextAppState;
+    };
+
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+    return () => subscription.remove();
+  }, [driverId, connectWebSocket]);
 
   return <>{children}</>;
 }
