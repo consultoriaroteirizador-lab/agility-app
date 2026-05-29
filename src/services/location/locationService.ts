@@ -7,6 +7,8 @@
  * Mantém compatibilidade com código existente.
  */
 
+import { useCallback } from 'react';
+
 import type { UpdateDriverRequest } from '@/domain/agility/driver/dto';
 import { useUpdateDriver } from '@/domain/agility/driver/useCase';
 import { useAuthCredentialsService } from '@/services';
@@ -162,26 +164,31 @@ export function useLocationTracking(driverId?: string | null) {
   const { authCredentials } = useAuthCredentialsService();
   const { updateDriver } = useUpdateDriver();
 
-  const startTracking = async () => {
+  // Identidades estáveis com useCallback: sem isso, cada render do hook gerava
+  // novas referências de startTracking/stopTracking. O LocationTrackingProvider
+  // tem useEffect com essas funções nas deps e re-disparava em loop,
+  // chamando BackgroundGeolocation.start() concorrentemente. O plugin então
+  // rejeitava com "Waiting for previous start action to complete".
+  const accessToken = authCredentials?.accessToken;
+  const tenantId = authCredentials?.tenantId;
+  const startTracking = useCallback(async () => {
     if (!driverId) {
       console.warn('[LocationService] Driver ID não fornecido. Tracking não iniciado.');
       return;
     }
-
-    // Passar credenciais de autenticação
     await startLocationTracking(
       driverId,
       updateDriver,
       {
-        accessToken: authCredentials?.accessToken || '',
-        tenantId: authCredentials?.tenantId || '',
-      }
+        accessToken: accessToken || '',
+        tenantId: tenantId || '',
+      },
     );
-  };
+  }, [driverId, updateDriver, accessToken, tenantId]);
 
-  const stopTracking = async () => {
+  const stopTracking = useCallback(async () => {
     await stopLocationTracking(driverId || undefined, updateDriver);
-  };
+  }, [driverId, updateDriver]);
 
   return {
     driverId,

@@ -1,3 +1,5 @@
+import { useCallback } from 'react'
+
 import { BaseResponse, MutationOptions, useMutationService } from '@/api'
 import type { Id } from '@/types/base'
 
@@ -16,9 +18,19 @@ export function useUpdateDriver(options?: MutationOptions<BaseResponse<DriverRes
         onError: options?.onError,
     })
 
+    // Identidade estável (vide useSaveServiceDraft): este hook é consumido por
+    // useLocationTracking, que retorna callbacks dependentes dele. Sem a
+    // estabilização, qualquer consumidor com `updateDriver` em dep array
+    // de useEffect/useCallback re-dispara em cada render do mutation.
+    const { mutate } = mutation
+    const updateDriver = useCallback(
+        (variables: UpdateDriverParams) => mutate(variables),
+        [mutate],
+    )
+
     return {
         isLoading: mutation.isLoading,
-        updateDriver: (variables: UpdateDriverParams) => mutation.mutate(variables),
+        updateDriver,
         isSuccess: mutation.isSuccess,
         isError: mutation.isError,
     }
