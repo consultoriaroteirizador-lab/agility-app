@@ -1,3 +1,5 @@
+import { useCallback } from 'react'
+
 import { useMutation } from '@tanstack/react-query'
 
 import type { BaseResponse } from '@/api'
@@ -29,11 +31,26 @@ export function useSaveServiceDraft() {
         },
     })
 
+    // Identidades estáveis: sem o useCallback, cada conclusão da mutation
+    // re-renderiza o consumidor com uma nova arrow function, e qualquer
+    // useEffect que dependa de `saveDraft` re-dispara — gerando um loop de
+    // PUTs (vide auto-save em ParadaContext, que com debounce de 800ms passou
+    // a martelar /services/:id/draft repetidamente).
+    const { mutate, mutateAsync } = mutation
+    const saveDraft = useCallback(
+        (variables: SaveServiceDraftParams) => mutate(variables),
+        [mutate],
+    )
+    const saveDraftAsync = useCallback(
+        (variables: SaveServiceDraftParams) => mutateAsync(variables),
+        [mutateAsync],
+    )
+
     return {
         isLoading: mutation.isPending,
         isSuccess: mutation.isSuccess,
         isError: mutation.isError,
-        saveDraft: (variables: SaveServiceDraftParams) => mutation.mutate(variables),
-        saveDraftAsync: (variables: SaveServiceDraftParams) => mutation.mutateAsync(variables),
+        saveDraft,
+        saveDraftAsync,
     }
 }
