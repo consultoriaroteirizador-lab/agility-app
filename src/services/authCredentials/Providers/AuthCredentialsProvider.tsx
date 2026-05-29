@@ -219,9 +219,20 @@ export function AuthCredentialsProvider({ children }: PropsWithChildren) {
         }
     }, [authCredentials, removeCredentials, saveCredentials, saveUserAuth, userAuth]);
 
+    // Bootstrap único e ordenado: handleUserCredentials carrega o
+    // userCredentialsCurrent (com a flag allowsBiometrics) e PRECISA terminar
+    // antes do startAuthCredentials porque este último libera `isLoading=false`
+    // — o que dispara a navegação inicial no _layout. Se rodam em paralelo, o
+    // boot decide pelo userCredentialsCurrent=null e mandava sempre pra tela
+    // de biometria, mesmo com a flag já persistida.
+    const bootstrappedRef = useRef(false);
     useEffect(() => {
-        handleUserCredentials();
-        startAuthCredentials();
+        if (bootstrappedRef.current) return;
+        bootstrappedRef.current = true;
+        (async () => {
+            await handleUserCredentials();
+            await startAuthCredentials();
+        })();
     }, [handleUserCredentials, startAuthCredentials]);
 
     const failedRequestsAfterRefreshRef = useRef<Set<string>>(new Set());

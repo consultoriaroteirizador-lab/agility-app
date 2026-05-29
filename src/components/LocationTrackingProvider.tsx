@@ -42,28 +42,35 @@ export function LocationTrackingProvider({ children }: { children: React.ReactNo
     },
   });
 
-  // Inicializar SDK uma única vez
+  // Inicializar SDK uma única vez. NÃO inicializa enquanto `accessToken` ou
+  // `tenantId` não estiverem prontos — antes a inicialização rodava no render
+  // entre `setUserAuth` e `setAuthCredentials` durante a hidratação do boot,
+  // pegando token vazio e gerando 401s no endpoint de tracking até o
+  // re-render seguinte recriar o SDK.
   useEffect(() => {
     if (!driverId || isInitialized.current) return;
+    const accessToken = authCredentials?.accessToken;
+    const tenantId = authCredentials?.tenantId;
+    if (!accessToken || !tenantId) return;
 
     const initialize = async () => {
       try {
         console.log('[LocationTrackingProvider] Inicializando Background Geolocation SDK...');
-        
+
         // Inicializar Background Geolocation
         const authConfig: TrackingAuthConfig = {
           driverId,
-          accessToken: authCredentials?.accessToken || '',
-          tenantId: authCredentials?.tenantId || '',
+          accessToken,
+          tenantId,
         };
         await initializeBackgroundGeolocation(authConfig);
-        
+
         // Inicializar serviço de geofencing
         initializeGeofenceService();
-        
+
         // Conectar WebSocket para monitoramento em tempo real
         connectWebSocket();
-        
+
         isInitialized.current = true;
         console.log('[LocationTrackingProvider] SDK e WebSocket inicializados com sucesso');
       } catch (error) {
@@ -80,7 +87,7 @@ export function LocationTrackingProvider({ children }: { children: React.ReactNo
       cleanupBackgroundGeolocation();
       isInitialized.current = false;
     };
-  }, [driverId, connectWebSocket, disconnectWebSocket]);
+  }, [driverId, authCredentials?.accessToken, authCredentials?.tenantId, connectWebSocket, disconnectWebSocket]);
 
   // Controlar tracking baseado no ciclo de vida do app
   useEffect(() => {
