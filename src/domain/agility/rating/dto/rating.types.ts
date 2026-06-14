@@ -2,39 +2,40 @@
 
 export interface DriverRating {
     id: string;
+    companyId?: string;
     driverId: string;
-    customerId: string;
-    customerName?: string;
+    serviceId?: string;
+    collaboratorId?: string;
     score: number; // 1 to 5
-    comment?: string;
     reason?: RatingReason;
+    reasonLabel?: string; // rótulo em PT já enviado pelo back
+    comment?: string;
+    isAnonymous?: boolean;
     createdAt: string;
     updatedAt?: string;
 }
 
+// Espelha LowRatingReason do back (agility-services)
 export type RatingReason =
-    | 'PUNCTUALITY'
-    | 'KINDNESS'
-    | 'VEHICLE_CONDITION'
-    | 'ROUTE_KNOWLEDGE'
-    | 'COMMUNICATION'
-    | 'SAFETY'
-    | 'GENERAL'
-    | 'COMPLAINT';
+    | 'LATE_DELIVERY'
+    | 'POOR_COMMUNICATION'
+    | 'ROUGH_HANDLING'
+    | 'UNPROFESSIONAL'
+    | 'WRONG_DELIVERY'
+    | 'DAMAGED_GOODS'
+    | 'OTHER';
 
 export interface DriverRatingStats {
-    driverId: string;
     averageScore: number;
     totalRatings: number;
-    distribution: RatingDistribution;
-}
-
-export interface RatingDistribution {
-    star5: number;
-    star4: number;
-    star3: number;
-    star2: number;
-    star1: number;
+    fiveStarCount: number;
+    fourStarCount: number;
+    threeStarCount: number;
+    twoStarCount: number;
+    oneStarCount: number;
+    last30DaysAverage: number;
+    last30DaysCount: number;
+    scoreDistribution: Record<number, number>; // { 5: n, 4: n, ... }
 }
 
 export interface PaginatedRatingsResponse {

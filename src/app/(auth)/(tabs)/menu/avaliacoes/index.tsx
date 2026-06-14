@@ -59,24 +59,15 @@ function ProgressBar({
     );
 }
 
-function getReasonLabel(reason: RatingReason): string {
-    const map: Record<RatingReason, string> = {
-        PUNCTUALITY: 'Pontualidade',
-        KINDNESS: 'Simpatia',
-        VEHICLE_CONDITION: 'Veículo',
-        ROUTE_KNOWLEDGE: 'Rota',
-        COMMUNICATION: 'Comunicação',
-        SAFETY: 'Segurança',
-        GENERAL: 'Geral',
-        COMPLAINT: 'Reclamação',
-    };
-    return map[reason] ?? reason;
-}
-
 function getReasonColor(reason: RatingReason): string {
-    if (reason === 'COMPLAINT') return 'redError';
-    if (reason === 'PUNCTUALITY' || reason === 'KINDNESS' || reason === 'SAFETY')
-        return 'colorTextSuccess';
+    // Todos os motivos do back referem-se a avaliações negativas (LowRatingReason)
+    if (
+        reason === 'DAMAGED_GOODS' ||
+        reason === 'WRONG_DELIVERY' ||
+        reason === 'ROUGH_HANDLING'
+    ) {
+        return 'redError';
+    }
     return 'primary100';
 }
 
@@ -111,19 +102,10 @@ function RatingCard({ rating }: { rating: DriverRating }) {
                         paddingHorizontal="x8"
                         alignSelf="flex-start">
                         <Text preset="text10" color="white" fontWeight="bold">
-                            {getReasonLabel(rating.reason)}
+                            {rating.reasonLabel ?? rating.reason}
                         </Text>
                     </Box>
                 </Box>
-            )}
-
-            {rating.customerName && (
-                <Text
-                    preset="text12"
-                    color="secondaryTextColor"
-                    marginBottom="y4">
-                    {rating.customerName}
-                </Text>
             )}
 
             {rating.comment && (
@@ -150,7 +132,7 @@ export default function AvaliacoesScreen() {
 
     const averageScore = stats?.averageScore ?? 0;
     const totalRatings = stats?.totalRatings ?? 0;
-    const distribution = stats?.distribution;
+    const distribution = stats?.scoreDistribution;
 
     const hasMorePages = meta ? page < meta.totalPages : false;
 
@@ -207,11 +189,11 @@ export default function AvaliacoesScreen() {
                     </Text>
 
                     {[
-                        { label: '5 estrelas', value: distribution.star5 },
-                        { label: '4 estrelas', value: distribution.star4 },
-                        { label: '3 estrelas', value: distribution.star3 },
-                        { label: '2 estrelas', value: distribution.star2 },
-                        { label: '1 estrela', value: distribution.star1 },
+                        { label: '5 estrelas', value: distribution[5] ?? 0 },
+                        { label: '4 estrelas', value: distribution[4] ?? 0 },
+                        { label: '3 estrelas', value: distribution[3] ?? 0 },
+                        { label: '2 estrelas', value: distribution[2] ?? 0 },
+                        { label: '1 estrela', value: distribution[1] ?? 0 },
                     ].map(item => (
                         <Box
                             key={item.label}
