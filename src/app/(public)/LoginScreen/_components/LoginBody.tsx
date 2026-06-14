@@ -150,12 +150,12 @@ export function LoginBody({ controller }: Props) {
 
                     {isEmailField || !userCredentialsCurrent ? (
                         <FormTextInputLogin
-                            title='E-mail'
+                            title='E-mail ou CPF'
                             control={control}
                             name="email"
                             iconName="iconUser"
-                            placeholder="Digite seu e-mail"
-                            keyboardType="email-address"
+                            placeholder="Digite seu e-mail ou CPF"
+                            keyboardType="default"
                             autoCapitalize="none"
                             style={{ marginBottom: measure.b16 }}
                         />
