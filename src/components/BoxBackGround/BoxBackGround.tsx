@@ -14,6 +14,7 @@ export interface BoxBackGroundProps extends BoxProps<Theme>, ViewProps {
   children?: React.ReactNode;
   scrollable?: boolean;
   borderRadii?: number;
+  refreshControl?: ScrollViewProps['refreshControl'];
 }
 
 export const Box = forwardRef<View, BoxBackGroundProps>(function Box(

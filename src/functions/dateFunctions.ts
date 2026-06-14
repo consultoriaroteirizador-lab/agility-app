@@ -27,6 +27,19 @@ export function getMonthYearFromDueDate(dueDateString: string): string {
   return `${monthName}${"\n"}${year}`;
 }
 
+/**
+ * Formata um ISO/datetime para 'HH:mm' (hora local). Retorna `fallback`
+ * quando o valor é nulo/ausente ou inválido.
+ */
+export function formatHHmm(value?: string | Date | null, fallback = '--:--'): string {
+  if (!value) return fallback;
+  const date = value instanceof Date ? value : new Date(value);
+  if (isNaN(date.getTime())) return fallback;
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  return `${hours}:${minutes}`;
+}
+
 export function getLocalDateString(dateTimeString: string): string {
   return dateTimeString.split('T')[0];
 }
