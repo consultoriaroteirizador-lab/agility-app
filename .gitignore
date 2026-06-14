@@ -33,3 +33,9 @@ plans/
 
 # Playwright MCP artifacts
 .playwright-mcp/
+
+# Next.js build output
+.next/
+
+# Debug screenshots
+ajudantes-*.png
