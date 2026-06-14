@@ -1,4 +1,4 @@
-import { BaseResponse } from '@/api'
+import { BaseResponse, PaginatedResult } from '@/api'
 import { apiAgility } from '@/api/apiConfig'
 import type { Id } from '@/types/base'
 
@@ -9,8 +9,9 @@ async function findOne(id: Id): Promise<BaseResponse<FormGroupResponse>> {
   return data
 }
 
-async function findAll(): Promise<BaseResponse<FormGroupResponse[]>> {
-  const { data } = await apiAgility.get<BaseResponse<FormGroupResponse[]>>('/form-groups')
+// O back retorna paginado ({ data, meta }).
+async function findAll(): Promise<BaseResponse<PaginatedResult<FormGroupResponse>>> {
+  const { data } = await apiAgility.get<BaseResponse<PaginatedResult<FormGroupResponse>>>('/form-groups')
   return data
 }
 

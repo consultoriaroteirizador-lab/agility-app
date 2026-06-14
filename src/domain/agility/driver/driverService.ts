@@ -1,4 +1,4 @@
-import { BaseResponse } from '@/api'
+import { BaseResponse, PaginatedResult } from '@/api'
 import type { Id } from '@/types/base'
 
 import { driverAPI, type DriverItem } from './driverAPI'
@@ -16,7 +16,7 @@ async function create(payload: CreateDriverRequest): Promise<BaseResponse<Driver
     return driverAPI.create(payload)
 }
 
-async function findAll(params: ListDriversParams = {}): Promise<BaseResponse<DriverResponse[]>> {
+async function findAll(params: ListDriversParams = {}): Promise<BaseResponse<PaginatedResult<DriverResponse> | DriverResponse[]>> {
     return driverAPI.findAll(params)
 }
 

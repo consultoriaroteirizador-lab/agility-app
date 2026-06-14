@@ -21,10 +21,11 @@ async function create(payload: CreateAddressRequest): Promise<BaseResponse<Addre
     return data
 }
 
+// O back sempre retorna paginado ({ data, meta }) neste endpoint.
 async function findAll(
     params: ListAddressesParams = {},
-): Promise<BaseResponse<AddressResponse[] | PaginatedAddressResponse>> {
-    const { data } = await apiService.get<BaseResponse<AddressResponse[] | PaginatedAddressResponse>>('/addresses', {
+): Promise<BaseResponse<PaginatedAddressResponse>> {
+    const { data } = await apiService.get<BaseResponse<PaginatedAddressResponse>>('/addresses', {
         params: {
             ...(params.postalCode && { postalCode: params.postalCode }),
             ...(params.page && { page: params.page }),

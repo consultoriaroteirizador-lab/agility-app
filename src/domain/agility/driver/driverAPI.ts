@@ -1,4 +1,4 @@
-import { BaseResponse } from '@/api'
+import { BaseResponse, PaginatedResult } from '@/api'
 import { apiService } from '@/api/apiConfig'
 import type { Id } from '@/types/base'
 
@@ -21,8 +21,9 @@ async function create(payload: CreateDriverRequest): Promise<BaseResponse<Driver
     return data
 }
 
-async function findAll(params: ListDriversParams = {}): Promise<BaseResponse<DriverResponse[]>> {
-    const { data } = await apiService.get<BaseResponse<DriverResponse[]>>('/drivers', {
+// Sem teamCode o back retorna paginado ({ data, meta }); com teamCode retorna lista.
+async function findAll(params: ListDriversParams = {}): Promise<BaseResponse<PaginatedResult<DriverResponse> | DriverResponse[]>> {
+    const { data } = await apiService.get<BaseResponse<PaginatedResult<DriverResponse> | DriverResponse[]>>('/drivers', {
         params: {
             ...(params.teamCode && { teamCode: params.teamCode }),
             ...(params.page && { page: params.page }),

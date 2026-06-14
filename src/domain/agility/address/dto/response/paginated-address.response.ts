@@ -1,13 +1,9 @@
+import type { PaginatedResult } from '@/api';
+
 import type { AddressResponse } from './address.response';
 
 /**
- * Paginated address response
- * Maps to PaginatedResponseDto<AddressResponse> from backend
+ * Paginated address response.
+ * Maps to PaginatedResponseDto<AddressResponse> do back: { data, meta }.
  */
-export interface PaginatedAddressResponse {
-    items: AddressResponse[];
-    total: number;
-    page: number;
-    limit: number;
-    totalPages: number;
-}
+export type PaginatedAddressResponse = PaginatedResult<AddressResponse>;

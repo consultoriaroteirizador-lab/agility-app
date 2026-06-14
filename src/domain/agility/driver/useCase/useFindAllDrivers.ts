@@ -12,8 +12,11 @@ export function useFindAllDrivers(params?: ListDriversRequest) {
         retry: false,
     })
 
+    const result = data?.result
+    const drivers = Array.isArray(result) ? result : result?.data ?? []
+
     return {
-        drivers: data?.result ?? [],
+        drivers,
         isLoading,
         isError,
         refetch,

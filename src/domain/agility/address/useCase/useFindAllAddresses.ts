@@ -13,7 +13,8 @@ export function useFindAllAddresses(params?: ListAddressesRequest) {
     })
 
     return {
-        addresses: data?.result ?? [],
+        addresses: data?.result?.data ?? [],
+        meta: data?.result?.meta,
         isLoading,
         isError,
         refetch,

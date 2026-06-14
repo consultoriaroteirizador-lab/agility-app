@@ -1,4 +1,4 @@
-import { BaseResponse } from '@/api'
+import { BaseResponse, PaginatedResult } from '@/api'
 import type { Id } from '@/types/base'
 
 import type { FormGroupResponse } from './dto/form-group.response'
@@ -8,7 +8,7 @@ async function findOne(id: Id): Promise<BaseResponse<FormGroupResponse>> {
   return formGroupAPI.findOne(id)
 }
 
-async function findAll(): Promise<BaseResponse<FormGroupResponse[]>> {
+async function findAll(): Promise<BaseResponse<PaginatedResult<FormGroupResponse>>> {
   return formGroupAPI.findAll()
 }
 

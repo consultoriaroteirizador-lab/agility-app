@@ -20,7 +20,7 @@ async function create(
 
 async function findAll(
     params: ListAddressesParams = {},
-): Promise<BaseResponse<AddressResponse[] | PaginatedAddressResponse>> {
+): Promise<BaseResponse<PaginatedAddressResponse>> {
     return addressAPI.findAll(params)
 }
 
