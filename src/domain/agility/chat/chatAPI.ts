@@ -46,13 +46,13 @@ export async function markRead(chatId: Id, userId: Id): Promise<BaseResponse<{ s
   return data
 }
 
-export async function markDelivered(): Promise<BaseResponse<{ success: boolean }>> {
-  const { data } = await apiAgility.patch<BaseResponse<{ success: boolean }>>(`/chats/messages/delivered`)
+export async function markDelivered(messageIds: string[]): Promise<BaseResponse<{ success: boolean }>> {
+  const { data } = await apiAgility.patch<BaseResponse<{ success: boolean }>>(`/chats/messages/delivered`, { messageIds })
   return data
 }
 
-export async function unreadCount(chatId: Id, userId: Id): Promise<BaseResponse<{ count: number }>> {
-  const { data } = await apiAgility.get<BaseResponse<{ count: number }>>(`/chats/${chatId}/unread/${userId}`)
+export async function unreadCount(chatId: Id, userId: Id): Promise<BaseResponse<{ unreadCount: number }>> {
+  const { data } = await apiAgility.get<BaseResponse<{ unreadCount: number }>>(`/chats/${chatId}/unread/${userId}`)
   return data
 }
 
@@ -92,9 +92,10 @@ export async function createCustomerSupport(params: { customerId: string; suppor
 }
 
 /** Upload chat attachment (image or file). Returns public URL(s) to use in send_message. */
-export async function uploadChatAttachment(formData: FormData): Promise<BaseResponse<{ urls: string[] }>> {
+export async function uploadChatAttachment(chatId: Id, formData: FormData): Promise<BaseResponse<{ urls: string[] }>> {
   const { data } = await apiAgility.post<BaseResponse<{ urls: string[]; count?: number }>>('/chats/upload', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' }
+    headers: { 'Content-Type': 'multipart/form-data' },
+    params: { chatId }
   })
   return data
 }

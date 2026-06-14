@@ -475,6 +475,7 @@ export async function uploadBase64Signature(
  */
 export async function uploadChatAttachments(
   files: string[],
+  chatId: string,
   onProgress?: (progress: UploadProgress, index: number) => void,
 ): Promise<{ urls: string[] }> {
   console.log('[uploadChatAttachments] Iniciando upload:', {
@@ -525,6 +526,7 @@ export async function uploadChatAttachments(
       headers: {
         'Content-Type': 'multipart/form-data',
       },
+      params: { chatId },
       onUploadProgress: (progressEvent) => {
         if (onProgress && progressEvent.total) {
           const progress = {

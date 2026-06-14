@@ -6,6 +6,7 @@ import { uploadChatAttachments } from '../../service/serviceUploadUtils';
 
 interface UploadChatAttachmentsParams {
   files: string[]; // URIs dos arquivos no React Native
+  chatId: string; // obrigatório no back (query param)
 }
 
 interface UploadChatAttachmentsResult {
@@ -35,7 +36,7 @@ export function useChatAttachmentUpload(
         files: params.files.map((f: string) => f?.substring(0, 50)),
       });
 
-      const response = await uploadChatAttachments(params.files);
+      const response = await uploadChatAttachments(params.files, params.chatId);
 
       console.log('[useChatAttachmentUpload] Resposta do upload:', {
         urls: response.urls,

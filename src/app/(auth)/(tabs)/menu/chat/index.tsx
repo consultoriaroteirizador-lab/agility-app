@@ -56,7 +56,7 @@ export default function ChatScreen() {
         // Fazer upload dos anexos se houver
         if (tempAttachments && tempAttachments.length > 0) {
           const uris = tempAttachments.map(a => a.uri || a.url || '').filter(Boolean);
-          const uploadResult = await uploadAttachments({ files: uris });
+          const uploadResult = await uploadAttachments({ files: uris, chatId: 'chat-id-here' });
 
           if (uploadResult.success && uploadResult.result?.urls) {
             attachmentUrls = uploadResult.result.urls;

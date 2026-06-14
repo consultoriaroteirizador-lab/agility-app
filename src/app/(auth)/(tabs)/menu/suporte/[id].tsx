@@ -409,7 +409,7 @@ export default function SuporteChatPage() {
           attachmentsCount: tempAttachments.length,
         });
 
-        uploadAttachments({ files: uris })
+        uploadAttachments({ files: uris, chatId })
           .then((uploadResult) => {
             console.log('[handleSendMessage] Upload concluído:', {
               success: uploadResult.success,
