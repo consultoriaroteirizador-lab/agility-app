@@ -46,9 +46,6 @@ export interface UpdateCollaboratorRequest {
     /** Collaborator roles - optional */
     roles?: CollaboratorRole[];
 
-    /** Skills - optional */
-    skills?: string[];
-
     /** Address ID - optional */
     addressId?: string;
 

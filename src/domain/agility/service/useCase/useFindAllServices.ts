@@ -7,7 +7,7 @@ import { serviceService } from '../serviceService'
 
 export function useFindAllServices(params?: ListServicesRequest) {
     const { data, isLoading, isError, refetch, isRefetching } = useQuery({
-        queryKey: [KEY_SERVICES, params?.orderId, params?.assignedToId, params?.page, params?.limit],
+        queryKey: [KEY_SERVICES, params?.assignedToId, params?.page, params?.limit],
         queryFn: () => serviceService.findAll(params || {}),
         retry: false,
     })

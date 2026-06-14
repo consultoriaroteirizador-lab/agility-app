@@ -50,9 +50,6 @@ export interface CreateServiceRequest {
     /** Estimated duration in minutes (flat format) - optional, minimum 0 */
     estimatedDuration?: number
 
-    /** Required skills (flat format) - optional */
-    requiredSkills?: number[]
-
     /** Client/customer information - optional */
     informations?: ServiceClientInfoRequest
 

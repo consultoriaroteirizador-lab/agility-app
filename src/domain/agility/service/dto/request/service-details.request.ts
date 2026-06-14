@@ -16,9 +16,6 @@ export interface ServiceDetailsRequest {
     /** Service type - optional */
     serviceType?: string
 
-    /** Required skills (array of numbers for ORS optimization) - optional */
-    requiredSkills?: number[]
-
     /** Vehicle requirements - optional */
     requiredVehicleSpecifications?: VehicleRequirements
 

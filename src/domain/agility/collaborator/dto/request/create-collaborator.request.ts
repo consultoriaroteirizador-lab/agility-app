@@ -57,9 +57,6 @@ export interface CreateCollaboratorRequest {
     /** Collaborator roles (can have multiple) - optional */
     roles?: CollaboratorRole[];
 
-    /** Skills - optional */
-    skills?: string[];
-
     /** Address ID - optional */
     addressId?: string;
 
@@ -121,9 +118,6 @@ export interface DriverDataRequest {
 
     /** Notes - optional */
     notes?: string;
-
-    /** Skills for ORS optimization (array of numbers) - optional */
-    skills?: number[];
 
     /** Time window start in seconds since midnight - optional */
     timeWindowStart?: number;

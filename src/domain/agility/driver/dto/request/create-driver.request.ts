@@ -48,9 +48,6 @@ export interface CreateDriverRequest {
     /** Notes - optional */
     notes?: string
 
-    /** Skills for ORS optimization (array of numbers) - optional */
-    skills?: number[]
-
     /** Time window start in seconds since midnight (e.g., 28800 = 08:00) - optional, range 0 to 86400 */
     timeWindowStart?: number
 
