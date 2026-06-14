@@ -18,13 +18,15 @@ import type { ServiceResponse } from '@/domain/agility/service/dto'
  * Status possíveis de uma parada
  * 
  * - pendente: Parada ainda não iniciada
- * - em-andamento: Parada em execução
+ * - em-andamento: A caminho do cliente (IN_PROGRESS)
+ * - em-atendimento: Chegou no cliente e está atendendo (IN_ATTENDANCE)
  * - concluida-sucesso: Parada finalizada com sucesso
  * - concluida-insucesso: Parada finalizada com falha/cancelamento
  */
 export type ParadaStatus =
     | 'pendente'
     | 'em-andamento'
+    | 'em-atendimento'
     | 'concluida-sucesso'
     | 'concluida-insucesso'
 
@@ -90,6 +92,9 @@ export interface Parada {
 
     /** Tipo de serviço (Instalação, Entrega, Manutenção, etc.) */
     tipo: string
+
+    /** Parada com coleta/devolução no mesmo stop (entrega + retorno) */
+    hasReturn?: boolean
 
     /** Status atual da parada */
     status: ParadaStatus

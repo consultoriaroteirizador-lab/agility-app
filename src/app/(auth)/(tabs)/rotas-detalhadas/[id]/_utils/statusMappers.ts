@@ -9,6 +9,7 @@
 
 import type { ServiceResponse } from '@/domain/agility/service/dto'
 import { ServiceType } from '@/domain/agility/service/dto/types'
+import { formatHHmm } from '@/functions'
 
 import type {
     Parada,
@@ -28,6 +29,7 @@ export const SERVICE_TYPE_LABELS: ServiceTypeLabelMap = {
     [ServiceType.DELIVERY]: 'Entrega',
     [ServiceType.PICKUP]: 'Coleta',
     [ServiceType.SERVICE]: 'Serviço',
+    [ServiceType.TRANSFER]: 'Transferência',
 }
 
 /**
@@ -36,6 +38,7 @@ export const SERVICE_TYPE_LABELS: ServiceTypeLabelMap = {
 export const PARADA_STATUS_LABELS: Record<ParadaStatus, string> = {
     'pendente': 'Pendente',
     'em-andamento': 'Em andamento',
+    'em-atendimento': 'Em atendimento',
     'concluida-sucesso': 'Concluída',
     'concluida-insucesso': 'Insucesso',
 }
@@ -46,6 +49,7 @@ export const PARADA_STATUS_LABELS: Record<ParadaStatus, string> = {
 export const PARADA_STATUS_COLORS: Record<ParadaStatus, string> = {
     'pendente': 'gray400',
     'em-andamento': 'primary100',
+    'em-atendimento': 'secondary100',
     'concluida-sucesso': 'greenSuccess',
     'concluida-insucesso': 'redError',
 }
@@ -98,6 +102,10 @@ export function getParadaStatus(service: ServiceResponse): ParadaStatus {
         return 'concluida-insucesso'
     }
 
+    if (service.isInAttendance === true || service.status === 'IN_ATTENDANCE') {
+        return 'em-atendimento'
+    }
+
     if (service.isInProgress === true) {
         return 'em-andamento'
     }
@@ -122,8 +130,8 @@ export function getRotaStatus(paradas: Parada[]): RotaStatus {
         return 'pendente'
     }
 
-    // Verifica se há alguma parada em andamento
-    const temEmAndamento = paradas.some(p => p.status === 'em-andamento')
+    // Verifica se há alguma parada em execução (a caminho ou em atendimento)
+    const temEmAndamento = paradas.some(p => p.status === 'em-andamento' || p.status === 'em-atendimento')
     if (temEmAndamento) {
         return 'em-andamento'
     }
@@ -162,14 +170,21 @@ export function mapServiceToParada(service: ServiceResponse, index: number): Par
     const endereco = service.address?.formattedAddress
         ?? (service.addressId ? `Endereço ID: ${service.addressId}` : 'Endereço não disponível')
 
-    const horarioInicio = service.scheduledStartTime ?? '--:--'
-    const horarioFim = service.estimatedCompletionTime ?? '--:--'
+    const horarioInicio = formatHHmm(service.estimatedArrival)
+    const horarioFim = formatHHmm(service.estimatedCompletion)
 
     // Mapear tipo de serviço
     const tipo = getServiceTypeLabel(service.serviceType)
 
     // Determinar status da parada
     const status = getParadaStatus(service)
+
+    // Coleta de retorno no mesmo stop: flag explícita do backend ou inferida de
+    // materiais direction=PICKUP.
+    const hasReturn = !!(
+        service.hasReturn ||
+        (service.materials?.some((m) => m.direction === 'PICKUP') ?? false)
+    )
 
     return {
         numero,
@@ -179,6 +194,7 @@ export function mapServiceToParada(service: ServiceResponse, index: number): Par
         horarioInicio,
         horarioFim,
         tipo,
+        hasReturn,
         status,
     }
 }
@@ -200,7 +216,7 @@ export function isParadaConcluida(status: ParadaStatus): boolean {
  * @returns true se a parada está em andamento ou pendente
  */
 export function isParadaAtiva(status: ParadaStatus): boolean {
-    return status === 'em-andamento' || status === 'pendente'
+    return status === 'em-andamento' || status === 'em-atendimento' || status === 'pendente'
 }
 
 /**

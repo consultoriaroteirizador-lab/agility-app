@@ -36,6 +36,12 @@ const STATUS_CONFIG: Record<ParadaStatus, StatusColorConfig> = {
         textColor: 'primary100',
         borderColor: 'primary100',
     },
+    'em-atendimento': {
+        label: 'Em atendimento',
+        bgColor: 'secondary10',
+        textColor: 'secondary100',
+        borderColor: 'secondary100',
+    },
     'concluida-sucesso': {
         label: 'Concluída',
         bgColor: 'tertiary10',
@@ -167,17 +173,31 @@ export function ParadaListItem({
                 </Box>
 
                 <Box marginBottom="y4">
-                    <Box
-                        backgroundColor="gray200"
-                        paddingHorizontal="x6"
-                        paddingVertical="y2"
-                        borderRadius="s4"
-                        alignSelf="flex-start"
-                        marginBottom="y4"
-                    >
-                        <Text preset="text10" fontWeightPreset='bold' color="gray600">
-                            {parada.tipo.toUpperCase()}
-                        </Text>
+                    <Box flexDirection="row" alignItems="center" gap="x4" marginBottom="y4">
+                        <Box
+                            backgroundColor="gray200"
+                            paddingHorizontal="x6"
+                            paddingVertical="y2"
+                            borderRadius="s4"
+                            alignSelf="flex-start"
+                        >
+                            <Text preset="text10" fontWeightPreset='bold' color="gray600">
+                                {parada.tipo.toUpperCase()}
+                            </Text>
+                        </Box>
+                        {parada.hasReturn && (
+                            <Box
+                                backgroundColor="secondary10"
+                                paddingHorizontal="x6"
+                                paddingVertical="y2"
+                                borderRadius="s4"
+                                alignSelf="flex-start"
+                            >
+                                <Text preset="text10" fontWeightPreset='bold' color="secondary100">
+                                    + RETORNO
+                                </Text>
+                            </Box>
+                        )}
                     </Box>
                     <Text
                         preset="text14"

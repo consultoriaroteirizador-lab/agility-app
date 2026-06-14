@@ -19,6 +19,7 @@ const SERVICE_TYPE_LABEL: Record<ServiceType, string> = {
   [ServiceType.DELIVERY]: 'Entrega',
   [ServiceType.PICKUP]: 'Coleta',
   [ServiceType.SERVICE]: 'Serviço',
+  [ServiceType.TRANSFER]: 'Transferência',
 };
 
 function formatarDistancia(km: number | null | undefined): string {

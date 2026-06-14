@@ -8,9 +8,12 @@ export interface ParadaCardData {
   fantasyName?: string | null;
   responsible?: string | null;
   serviceType?: ServiceType | null;
+  /** Parada com coleta/devolução no mesmo stop (entrega + retorno). */
+  hasReturn?: boolean | null;
   status?: ServiceStatus;
   isPending?: boolean;
   isInProgress?: boolean;
+  isInAttendance?: boolean;
   isCompleted?: boolean;
   isCanceled?: boolean;
   scheduledStartTime?: string | null;
@@ -32,11 +35,12 @@ export interface ParadaCardProps {
   sequenceNumber?: number;
 }
 
-type ParadaStatusType = 'pending' | 'inProgress' | 'completed' | 'canceled';
+type ParadaStatusType = 'pending' | 'inProgress' | 'inAttendance' | 'completed' | 'canceled';
 
 const STATUS_CONFIG: Record<ParadaStatusType, StatusColorConfig> = {
   pending: { label: 'Pendente', bgColor: 'gray100', textColor: 'gray600' },
   inProgress: { label: 'Em andamento', bgColor: 'primary10', textColor: 'primary100' },
+  inAttendance: { label: 'Em atendimento', bgColor: 'secondary10', textColor: 'secondary100' },
   completed: { label: 'Realizado', bgColor: 'tertiary10', textColor: 'tertiary100' },
   canceled: { label: 'Nao realizado', bgColor: 'redError', textColor: 'white' },
 };
@@ -45,11 +49,13 @@ const SERVICE_TYPE_LABELS: Record<ServiceType, string> = {
   [ServiceType.DELIVERY]: 'Entrega',
   [ServiceType.PICKUP]: 'Coleta',
   [ServiceType.SERVICE]: 'Servico',
+  [ServiceType.TRANSFER]: 'Transferencia',
 };
 
 function getStatus(parada: ParadaCardData): keyof typeof STATUS_CONFIG {
   if (parada.isCompleted || parada.status === ServiceStatus.COMPLETED) return 'completed';
   if (parada.isCanceled || parada.status === ServiceStatus.CANCELED) return 'canceled';
+  if (parada.isInAttendance || parada.status === ServiceStatus.IN_ATTENDANCE) return 'inAttendance';
   if (parada.isInProgress || parada.status === ServiceStatus.IN_PROGRESS) return 'inProgress';
   return 'pending';
 }
@@ -115,6 +121,11 @@ export function ParadaCard({
             <Text preset="text14" fontWeightPreset="semibold" color="colorTextPrimary">
               {serviceTypeLabel}
             </Text>
+            {parada.hasReturn && (
+              <Box backgroundColor="secondary10" paddingHorizontal="x6" paddingVertical="y2" borderRadius="s4">
+                <Text preset="text10" fontWeightPreset="bold" color="secondary100">+ RETORNO</Text>
+              </Box>
+            )}
             {isNext && (
               <Box backgroundColor="primary100" paddingHorizontal="x6" paddingVertical="y2" borderRadius="s4">
                 <Text preset="text10" fontWeightPreset="bold" color="white">PROXIMA</Text>
