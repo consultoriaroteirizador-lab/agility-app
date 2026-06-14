@@ -13,7 +13,6 @@ import type {
     RoutingMapDataResponse,
     BroadcastingQueryRequest,
     AcceptRoutingRequest,
-    RoutingsAggregatedSummaryResponse,
 } from './dto'
 import { routingAPI } from './routingAPI'
 
@@ -21,7 +20,7 @@ async function create(payload: CreateRoutingRequest): Promise<BaseResponse<Routi
     return routingAPI.create(payload)
 }
 
-async function findAll(params: ListRoutingsRequest = {}): Promise<BaseResponse<RoutingResponse[] | RoutingsAggregatedSummaryResponse>> {
+async function findAll(params: ListRoutingsRequest = {}): Promise<BaseResponse<RoutingResponse[]>> {
     return routingAPI.findAll(params)
 }
 

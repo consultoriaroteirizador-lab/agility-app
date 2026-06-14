@@ -37,18 +37,8 @@ export async function update(id: Id, payload: UpdateTicketPayload): Promise<Base
   return data
 }
 
-export async function addMessage(id: Id, payload: Record<string, unknown>): Promise<BaseResponse<TicketItem>> {
-  const { data } = await apiAgility.post<BaseResponse<TicketItem>>(`/tickets/${id}/messages`, payload)
-  return data
-}
-
 export async function close(id: Id): Promise<BaseResponse<TicketItem>> {
   const { data } = await apiAgility.patch<BaseResponse<TicketItem>>(`/tickets/${id}/close`)
-  return data
-}
-
-export async function remove(id: Id): Promise<BaseResponse<void>> {
-  const { data } = await apiAgility.delete<BaseResponse<void>>(`/tickets/${id}`)
   return data
 }
 
@@ -80,13 +70,13 @@ export async function findByCustomer(customerId: Id): Promise<BaseResponse<Ticke
 
 // Buscar tickets abertos
 export async function findOpen(): Promise<BaseResponse<TicketItem[]>> {
-  const { data } = await apiAgility.get<BaseResponse<TicketItem[]>>('/tickets/open')
+  const { data } = await apiAgility.get<BaseResponse<TicketItem[]>>('/tickets/open/list')
   return data
 }
 
 // Buscar tickets atribuídos ao usuário atual
 export async function findMyAssigned(): Promise<BaseResponse<TicketItem[]>> {
-  const { data } = await apiAgility.get<BaseResponse<TicketItem[]>>('/tickets/my-assigned')
+  const { data } = await apiAgility.get<BaseResponse<TicketItem[]>>('/tickets/assigned/me')
   return data
 }
 
@@ -106,7 +96,7 @@ export async function start(id: Id): Promise<BaseResponse<TicketItem>> {
 
 // Resolver ticket
 export async function resolve(id: Id, resolution?: string): Promise<BaseResponse<TicketItem>> {
-  const { data } = await apiAgility.patch<BaseResponse<TicketItem>>(`/tickets/${id}/resolve`, { resolution })
+  const { data } = await apiAgility.patch<BaseResponse<TicketItem>>(`/tickets/${id}/resolve`, { resolutionDescription: resolution })
   return data
 }
 

@@ -23,13 +23,12 @@ async function create(payload: CreateRoutingRequest): Promise<BaseResponse<Routi
     return data
 }
 
-async function findAll(params: ListRoutingsRequest = {}): Promise<BaseResponse<RoutingResponse[] | RoutingsAggregatedSummaryResponse>> {
-    const { data } = await apiAgility.get<BaseResponse<RoutingResponse[] | RoutingsAggregatedSummaryResponse>>('/routings', {
+async function findAll(params: ListRoutingsRequest = {}): Promise<BaseResponse<RoutingResponse[]>> {
+    const { data } = await apiAgility.get<BaseResponse<RoutingResponse[]>>('/routings', {
         params: {
             ...(params.status && { status: params.status }),
             ...(params.driverId && { driverId: params.driverId }),
             ...(params.date && { date: params.date }),
-            ...(params.summary !== undefined && { summary: params.summary }),
         },
     })
     return data
@@ -93,9 +92,8 @@ async function update(
     id: Id,
     payload: UpdateRoutingRequest,
 ): Promise<BaseResponse<RoutingResponse>> {
-    // NOTE: Using PATCH for partial updates (all fields in UpdateRoutingRequest are optional)
-    // If backend uses PUT, change to: apiAgility.put
-    const { data } = await apiAgility.patch<BaseResponse<RoutingResponse>>(`/routings/${id}`, payload)
+    // Backend expõe @Put(':id') para atualização (não PATCH).
+    const { data } = await apiAgility.put<BaseResponse<RoutingResponse>>(`/routings/${id}`, payload)
     return data
 }
 

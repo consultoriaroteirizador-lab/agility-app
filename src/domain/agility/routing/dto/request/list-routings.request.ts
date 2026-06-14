@@ -12,9 +12,6 @@ export interface ListRoutingsRequest {
 
     /** Filter by date - optional */
     date?: string
-
-    /** If true, returns aggregated summary instead of list - optional */
-    summary?: boolean
 }
 
 
