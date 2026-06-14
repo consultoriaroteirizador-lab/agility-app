@@ -30,6 +30,7 @@ function mapServiceStatus(status: ServiceStatus): string {
     [ServiceStatus.PENDING]: 'Pendente',
     [ServiceStatus.ASSIGNED]: 'Atribuido',
     [ServiceStatus.IN_PROGRESS]: 'Em andamento',
+    [ServiceStatus.IN_ATTENDANCE]: 'Em atendimento',
     [ServiceStatus.COMPLETED]: 'Realizado',
     [ServiceStatus.FAILED]: 'Nao realizado',
     [ServiceStatus.CANCELED]: 'Cancelado',
@@ -42,6 +43,7 @@ function mapServiceType(type: ServiceType): string {
     [ServiceType.DELIVERY]: 'Entrega',
     [ServiceType.PICKUP]: 'Coleta',
     [ServiceType.SERVICE]: 'Servico',
+    [ServiceType.TRANSFER]: 'Transferencia',
   };
   return map[type] ?? type;
 }
@@ -63,7 +65,7 @@ export default function HistoricoDetalhesScreen() {
 
   const { routing, isLoading: isLoadingRouting } = useFindOneRouting(routeId || '');
   const { services, isLoading: isLoadingServices } = useFindServicesByRoutingId(routeId || '');
-  const { routes: routeSegments, origin, isLoading: isLoadingMapData } = useGetRoutingMapData(routeId || '');
+  const { routes: routeSegments, origin, mapData, isLoading: isLoadingMapData } = useGetRoutingMapData(routeId || '');
 
   const isLoading = isLoadingRouting || isLoadingServices || isLoadingMapData;
 
@@ -94,34 +96,69 @@ export default function HistoricoDetalhesScreen() {
     })
     : [];
 
-  // Converter services para pontos do mapa
-  const mapPoints: MapPoint[] = sortedServices
-    .filter(service => service.address?.latitude && service.address?.longitude)
-    .map((service, index) => ({
-      id: service.id,
-      latitude: service.address!.latitude,
-      longitude: service.address!.longitude,
-      title: service.fantasyName || service.responsible || `Parada ${index + 1}`,
-      variant: service.serviceType === ServiceType.PICKUP ? 'coleta' as const :
-        service.serviceType === ServiceType.DELIVERY ? 'entrega' as const : 'service' as const,
-    }));
+  // Cores dos pinos (iguais ao platform): paradas usam a cor da rota,
+  // origem em verde "O" e retorno em vermelho "F".
+  const STOP_COLOR = colors.primary100; // #7063F0
+  const ORIGIN_COLOR = '#10B981';
+  const RETURN_COLOR = '#EF4444';
 
-  // Adicionar origem se existir
+  // Converter services para pontos do mapa (pinos teardrop numerados, igual ao platform)
+  const mapPoints: MapPoint[] = [];
+
+  // Origem (pino verde "O")
   if (origin?.latitude && origin?.longitude) {
-    mapPoints.unshift({
+    mapPoints.push({
       id: 'origin',
       latitude: origin.latitude,
       longitude: origin.longitude,
       title: 'Origem',
-      variant: 'coleta' as const,
+      label: 'O',
+      color: ORIGIN_COLOR,
     });
   }
 
-  // Extrair geometrias das rotas como array (cada segmento é independente)
-  const routeGeometries = routeSegments
+  // Paradas numeradas 1..N na ordem de sequência
+  sortedServices
+    .filter(service => service.address?.latitude && service.address?.longitude)
+    .forEach((service, index) => {
+      mapPoints.push({
+        id: service.id,
+        latitude: service.address!.latitude,
+        longitude: service.address!.longitude,
+        title: service.fantasyName || service.responsible || `Parada ${index + 1}`,
+        label: index + 1,
+        color: STOP_COLOR,
+      });
+    });
+
+  // Retorno (pino vermelho "F") — apenas quando difere da origem
+  const returnPoint = mapData?.return;
+  if (mapData && !mapData.returnToOrigin && returnPoint?.latitude && returnPoint?.longitude) {
+    mapPoints.push({
+      id: 'return',
+      latitude: returnPoint.latitude,
+      longitude: returnPoint.longitude,
+      title: 'Retorno',
+      label: 'F',
+      color: RETURN_COLOR,
+    });
+  }
+
+  // Extrair geometrias das rotas como array (cada segmento é independente).
+  const segmentGeometries = routeSegments
     ?.filter(segment => segment.geometry)
     .sort((a, b) => a.sequenceOrder - b.sequenceOrder)
     .map(segment => segment.geometry as string) ?? [];
+
+  // Fallback p/ a geometria global da rota: o backend grava os segmentos
+  // (`routes[].geometry`) como null, mas persiste o traçado completo no campo
+  // `geometry` do topo (mesma fonte que o platform usa). Sem isso, nenhuma
+  // linha aparece ligando os pinos.
+  const routeGeometries = segmentGeometries.length > 0
+    ? segmentGeometries
+    : mapData?.geometry
+      ? [mapData.geometry]
+      : [];
 
   // Contar servicos por status
   const servicosRealizados = sortedServices.filter(s => s.status === ServiceStatus.COMPLETED).length;
@@ -184,7 +221,7 @@ export default function HistoricoDetalhesScreen() {
             points={mapPoints}
             geometries={routeGeometries}
             routeColor={colors.primary100}
-            routeWidth={3}
+            routeWidth={4}
             showNavigationButton={false}
           />
         </Box>

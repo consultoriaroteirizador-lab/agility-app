@@ -98,6 +98,13 @@ export interface RoutingMapDataResponse {
     /** Route segments with geometry */
     routes: RouteSegmentResponse[]
 
+    /**
+     * Geometria global da rota (polyline encoded do ORS), traçado completo
+     * origem → paradas → retorno. Fallback usado quando os segmentos
+     * (`routes[].geometry`) vêm nulos — que é o caso atual do backend.
+     */
+    geometry?: string | null
+
     /** Total distance in km */
     totalDistanceKm?: number | null
 

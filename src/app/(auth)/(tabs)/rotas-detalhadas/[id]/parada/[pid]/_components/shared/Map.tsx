@@ -6,10 +6,13 @@ import { LocationObject } from 'expo-location';
 
 import { Box, Text, TouchableOpacityBox, ActivityIndicator, NavigationPopup } from '@/components';
 import { Icon } from '@/components/Icon/Icon';
-import { measure } from '@/theme';
+import { colors, measure } from '@/theme';
 
 import { FREE_TILE_URLS } from '../../_utils/mapConfig';
 import { MapErrorBoundary } from '../MapErrorBoundary';
+
+import { decodePolyline, simplifyCoordinates } from './geo';
+import { StopMarker } from './StopMarker';
 
 type MapVariant = 'coleta' | 'service' | 'entrega';
 
@@ -19,6 +22,15 @@ export interface MapPoint {
     longitude: number;
     title?: string;
     variant?: MapVariant;
+    /**
+     * Rótulo no badge do pino teardrop — número da parada, "O", "F", etc.
+     * Sem rótulo, o pino mostra o badge branco vazio.
+     */
+    label?: string | number;
+    /** Cor do pino. Sem isso, deriva da `variant` (cor do marcador da variante). */
+    color?: string;
+    /** Tamanho do pino em px (default 39). Use menor para destacar menos (ex.: próxima parada). */
+    size?: number;
 }
 
 interface MapProps {
@@ -33,6 +45,12 @@ interface MapProps {
     geometries?: string[];
     /** Geometria única codificada (compatibilidade) */
     geometry?: string;
+    /**
+     * Segmentos de rota já decodificados (`[lng,lat][]`), renderizados como
+     * linhas sem passar pelo decode. Usado para o trecho recortado do traçado
+     * global (parada atual → próxima) — ver `geo.sliceRouteBetween`.
+     */
+    coordinateSegments?: number[][][];
     /** Cor da linha da rota */
     routeColor?: string;
     /** Largura da linha da rota */
@@ -44,67 +62,6 @@ interface MapProps {
     userLocation?: LocationObject | null;
     onNavigatePress?: () => void;
     isLoadingAddress?: boolean;
-}
-
-/**
- * Decodifica uma encoded polyline do Google Maps para array de coordenadas [longitude, latitude]
- * @see https://developers.google.com/maps/documentation/utilities/polylinealgorithm
- */
-function decodePolyline(encoded: string): number[][] {
-    const coords: number[][] = [];
-    let index = 0;
-    let lat = 0;
-    let lng = 0;
-
-    while (index < encoded.length) {
-        let shift = 0;
-        let result = 0;
-        let byte: number;
-
-        do {
-            byte = encoded.charCodeAt(index++) - 63;
-            result |= (byte & 0x1f) << shift;
-            shift += 5;
-        } while (byte >= 0x20);
-
-        lat += result & 1 ? ~(result >> 1) : result >> 1;
-
-        shift = 0;
-        result = 0;
-
-        do {
-            byte = encoded.charCodeAt(index++) - 63;
-            result |= (byte & 0x1f) << shift;
-            shift += 5;
-        } while (byte >= 0x20);
-
-        lng += result & 1 ? ~(result >> 1) : result >> 1;
-
-        // MapLibre usa [longitude, latitude]
-        coords.push([lng / 1e5, lat / 1e5]);
-    }
-
-    return coords;
-}
-
-/**
- * Simplifica uma polyline removendo pontos (Douglas-Peucker simplificado)
- */
-function simplifyCoordinates(coords: number[][], maxPoints: number = 500): number[][] {
-    if (coords.length <= maxPoints) return coords;
-
-    const step = Math.ceil(coords.length / maxPoints);
-    const simplified: number[][] = [];
-
-    // Sempre incluir primeiro e último
-    simplified.push(coords[0]);
-
-    for (let i = step; i < coords.length - 1; i += step) {
-        simplified.push(coords[i]);
-    }
-
-    simplified.push(coords[coords.length - 1]);
-    return simplified;
 }
 
 const VARIANT_CONFIG = {
@@ -164,6 +121,7 @@ export function Map({
     points,
     geometry,
     geometries,
+    coordinateSegments,
     routeColor = '#3B82F6',
     routeWidth = 4,
     showNavigationButton = true,
@@ -204,13 +162,18 @@ export function Map({
             allGeometries.push(geometry);
         }
 
-        if (allGeometries.length === 0) return [];
-
-        // Decodifica cada segmento e simplifica se necessário
-        return allGeometries.map(encoded => ({
+        // Decodifica cada geometria encoded e simplifica se necessário
+        const decoded = allGeometries.map(encoded => ({
             coordinates: simplifyCoordinates(decodePolyline(encoded), 300),
         }));
-    }, [geometry, geometries]);
+
+        // Segmentos já decodificados (ex.: trecho recortado do traçado global)
+        const preDecoded = (coordinateSegments ?? [])
+            .filter(seg => Array.isArray(seg) && seg.length > 1)
+            .map(seg => ({ coordinates: simplifyCoordinates(seg, 300) }));
+
+        return [...decoded, ...preDecoded];
+    }, [geometry, geometries, coordinateSegments]);
 
     // Todas as coordenadas para cálculo de bounds
     const allRouteCoordinates = useMemo(() => {
@@ -374,28 +337,23 @@ export function Map({
                                 )
                             ))}
 
-                            {/* Marcadores dos pontos */}
+                            {/* Marcadores dos pontos — pino teardrop (igual ao platform).
+                                Âncora na ponta inferior do pino (x=0.5, y=1). Cor explícita
+                                (point.color) tem prioridade; senão deriva da variante. Label
+                                explícito tem prioridade; senão numera quando há vários pontos. */}
                             {mapPoints.map((point, index) => {
                                 const pointConfig = point.variant ? VARIANT_CONFIG[point.variant] : config;
+                                const pinColor = point.color ?? colors[pointConfig.markerColor];
+                                const pinLabel = point.label ?? (mapPoints.length > 1 ? index + 1 : undefined);
                                 return (
                                     <MapLibreGL.PointAnnotation
                                         key={point.id}
                                         id={point.id}
                                         coordinate={[point.longitude, point.latitude]}
                                         title={point.title || `Ponto ${index + 1}`}
+                                        anchor={{ x: 0.5, y: 1 }}
                                     >
-                                        <Box
-                                            width={30}
-                                            height={30}
-                                            backgroundColor={pointConfig.markerColor}
-                                            borderRadius="s15"
-                                            justifyContent="center"
-                                            alignItems="center"
-                                        >
-                                            <Text preset="text16" color="white" fontWeightPreset="bold">
-                                                {mapPoints.length > 1 ? `${index + 1}` : '📍'}
-                                            </Text>
-                                        </Box>
+                                        <StopMarker color={pinColor} label={pinLabel} size={point.size} />
                                     </MapLibreGL.PointAnnotation>
                                 );
                             })}
