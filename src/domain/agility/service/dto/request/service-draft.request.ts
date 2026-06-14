@@ -38,6 +38,19 @@ export interface ServiceDraftData {
     failureReason?: FailureReason
     failureNotes?: string
     failurePhotos?: string[]
+
+    /** TRANSFER: perna atual do wizard (coleta na origem → entrega no destino). */
+    transferLeg?: 'pickup' | 'delivery'
+    /** TRANSFER: coleta na origem concluída. */
+    pickupDone?: boolean
+    /** TRANSFER: evidência da coleta na origem (snapshot), para retomar após crash. */
+    pickupEvidence?: {
+        receivedBy?: string
+        signatureUrl?: string
+        photoUrls?: string[]
+        notes?: string
+    }
+
     /** ISO string from the client at the moment of save (used server-side only for logging). */
     clientDraftUpdatedAt?: string
 }

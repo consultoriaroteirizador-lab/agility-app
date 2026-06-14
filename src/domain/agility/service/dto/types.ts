@@ -5,7 +5,8 @@
 export enum ServiceStatus {
     PENDING = 'PENDING',
     ASSIGNED = 'ASSIGNED',
-    IN_PROGRESS = 'IN_PROGRESS',
+    IN_PROGRESS = 'IN_PROGRESS',     // A caminho do cliente
+    IN_ATTENDANCE = 'IN_ATTENDANCE', // Em atendimento (chegou no cliente)
     COMPLETED = 'COMPLETED',
     FAILED = 'FAILED',
     CANCELED = 'CANCELED',
@@ -15,6 +16,7 @@ export enum ServiceType {
     DELIVERY = 'DELIVERY',
     PICKUP = 'PICKUP',
     SERVICE = 'SERVICE',
+    TRANSFER = 'TRANSFER', // Transferência (CD↔CD, loja↔loja) — cargo entre 2 pontos fixos
 }
 
 export enum PriorityLevel {

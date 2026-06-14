@@ -10,6 +10,13 @@ export type MaterialStatus =
   | 'REFUSED'   // Recusado pelo cliente
 
 /**
+ * Direção do material:
+ * - DELIVERY: entregue ao cliente
+ * - PICKUP: coletado/devolvido no mesmo stop (volume de retorno)
+ */
+export type MaterialDirection = 'DELIVERY' | 'PICKUP'
+
+/**
  * Material do serviço com status de check
  */
 export interface ServiceMaterialResponse {
@@ -23,6 +30,8 @@ export interface ServiceMaterialResponse {
   weight?: number
   notes?: string
   serialNumber?: string
+  /** Entrega (DELIVERY) ou coleta de retorno (PICKUP). Default tratável como DELIVERY. */
+  direction?: MaterialDirection
   status: MaterialStatus
   actualQuantity?: number
   checkedAt?: string

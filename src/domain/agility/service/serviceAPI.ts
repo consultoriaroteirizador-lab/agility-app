@@ -42,7 +42,6 @@ async function createBatch(payload: CreateServicesBatchRequest): Promise<BaseRes
 async function findAll(params: ListServicesRequest = {}): Promise<BaseResponse<ServiceResponse[]>> {
     const { data } = await apiAgility.get<BaseResponse<ServiceResponse[]>>('/services', {
         params: {
-            ...(params.orderId && { orderId: params.orderId }),
             ...(params.assignedToId && { assignedToId: params.assignedToId }),
             ...(params.page && { page: params.page }),
             ...(params.limit && { limit: params.limit }),
@@ -88,6 +87,14 @@ async function unassignDriver(id: Id): Promise<BaseResponse<ServiceResponse>> {
 
 async function start(id: Id): Promise<BaseResponse<ServiceResponse>> {
     const { data } = await apiAgility.patch<BaseResponse<ServiceResponse>>(`/services/${id}/start`)
+    return data
+}
+
+async function startAttendance(
+    id: Id,
+    location?: { latitude?: number; longitude?: number; accuracy?: number },
+): Promise<BaseResponse<ServiceResponse>> {
+    const { data } = await apiAgility.patch<BaseResponse<ServiceResponse>>(`/services/${id}/start-attendance`, location ?? {})
     return data
 }
 
@@ -225,6 +232,7 @@ export const serviceAPI = {
     assignDriver,
     unassignDriver,
     start,
+    startAttendance,
     complete,
     completeWithDetails,
     fail,

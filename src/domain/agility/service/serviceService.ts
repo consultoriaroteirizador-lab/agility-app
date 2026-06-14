@@ -73,6 +73,13 @@ async function start(id: Id): Promise<BaseResponse<ServiceResponse>> {
     return serviceAPI.start(id)
 }
 
+async function startAttendance(
+    id: Id,
+    location?: { latitude?: number; longitude?: number; accuracy?: number },
+): Promise<BaseResponse<ServiceResponse>> {
+    return serviceAPI.startAttendance(id, location)
+}
+
 async function complete(id: Id, completionNotes?: string): Promise<BaseResponse<ServiceResponse>> {
     return serviceAPI.complete(id, completionNotes)
 }
@@ -152,6 +159,7 @@ export const serviceService = {
     assignDriver,
     unassignDriver,
     start,
+    startAttendance,
     complete,
     completeWithDetails,
     fail,

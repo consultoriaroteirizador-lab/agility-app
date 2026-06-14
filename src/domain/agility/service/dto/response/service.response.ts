@@ -6,33 +6,6 @@ import type { ServiceStatus, ServiceType, PriorityLevel, PersonType, VehicleRequ
 import type { ServiceMaterialResponse } from './service-material.response'
 
 /**
- * Equipment response DTO
- * Represents equipment associated with a service
- */
-export interface EquipmentResponse {
-    /** Equipment unique identifier */
-    id: string
-
-    /** Equipment name */
-    name?: string
-
-    /** Equipment type */
-    type?: string
-
-    /** Serial number */
-    serialNumber?: string
-
-    /** Model */
-    model?: string
-
-    /** Quantity */
-    quantity?: number
-
-    /** Description */
-    description?: string
-}
-
-/**
  * Service response DTO
  * Maps to ServiceEntity.toJson() from backend
  */
@@ -136,14 +109,14 @@ export interface ServiceResponse {
     /** Scheduled date */
     scheduledDate: Date | string | null
 
-    /** Scheduled start time */
-    scheduledStartTime: string | null
-
     /** Estimated duration */
     estimatedDuration: number | null
 
-    /** Estimated completion time */
-    estimatedCompletionTime: string | null
+    /** Horário estimado de chegada (ORS) — retornado pelo back (ISO datetime). */
+    estimatedArrival: string | null
+
+    /** Horário estimado de conclusão (ORS) — retornado pelo back (ISO datetime). */
+    estimatedCompletion: string | null
 
     /** Start date */
     startDate: Date | string | null
@@ -163,14 +136,14 @@ export interface ServiceResponse {
     /** Price */
     price: number | null
 
-    /** Order ID */
-    orderId: string | null
-
     /** Is pending */
     isPending: boolean
 
-    /** Is in progress */
+    /** Is in progress (a caminho do cliente) */
     isInProgress: boolean
+
+    /** Is in attendance (em atendimento — chegou no cliente) */
+    isInAttendance?: boolean
 
     /** Is completed */
     isCompleted: boolean
@@ -208,8 +181,26 @@ export interface ServiceResponse {
     /** Full address object (when available) */
     address: AddressResponse | null
 
-    /** Equipment list for this service */
-    equipments?: EquipmentResponse[]
+    /**
+     * Endereços de origem (A) e destino (B) para serviços TRANSFER
+     * (transferência ponto-a-ponto). Nulos para os demais tipos.
+     */
+    pickupAddressId?: string | null
+    pickupAddress?: AddressResponse | null
+    deliveryAddressId?: string | null
+    deliveryAddress?: AddressResponse | null
+
+    /**
+     * Evidência da coleta na origem (TRANSFER) — capturada na perna 1 do wizard
+     * e persistida na finalização. Null para os demais tipos.
+     */
+    pickupCompletionData?: {
+        customerSignature?: string | null
+        receivedBy?: string | null
+        photoProof?: string[] | null
+        notes?: string | null
+        completedAt?: string | null
+    } | null
 
     /** Materials list for this service (delivery/pickup items) */
     materials?: ServiceMaterialResponse[]
@@ -240,6 +231,21 @@ export interface ServiceResponse {
 
     amountItems: number | undefined
     amountVolume: number | undefined
+
+    /**
+     * Quantidades COLETADAS no mesmo stop (devolução, casco vazio, retorno).
+     * Presentes quando a parada tem coleta de retorno além da entrega.
+     */
+    pickupAmountWeight?: number | null
+    pickupAmountVolume?: number | null
+    pickupAmountItems?: number | null
+
+    /**
+     * Flag explícito do backend: esta parada tem coleta/devolução no MESMO stop.
+     * Fonte de verdade para o app habilitar a etapa de coleta de retorno.
+     * Pode ser true mesmo com pickupAmount* vazio (qty desconhecida no cadastro).
+     */
+    hasReturn?: boolean
 
     /** IDs dos form groups vinculados ao service */
     formGroupIds: string[] | null

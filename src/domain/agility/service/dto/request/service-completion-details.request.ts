@@ -27,6 +27,27 @@ export interface ServiceCompletionDetailsRequest {
 
     /** Payment method used - required if service.requiresPayment is true */
     paymentMethod?: PaymentMethodType
+
+    /** Latitude de onde o serviço foi finalizado (best-effort) */
+    latitude?: number
+
+    /** Longitude de onde o serviço foi finalizado (best-effort) */
+    longitude?: number
+
+    /** Precisão estimada do GPS em metros (best-effort) */
+    accuracy?: number
+
+    /**
+     * Evidência da COLETA na origem (TRANSFER) — assinatura/recebedor/fotos do
+     * handover em A, capturados na perna 1 e enviados junto na finalização.
+     */
+    pickupCompletion?: {
+        customerSignature?: string
+        receivedBy?: string
+        photoProof?: string
+        notes?: string
+        completedAt?: string
+    }
 }
 
 
