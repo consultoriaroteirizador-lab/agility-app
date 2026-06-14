@@ -9,6 +9,7 @@ interface Service {
     status: ServiceStatus;
     isPending?: boolean;
     isInProgress?: boolean;
+    isInAttendance?: boolean;
     isCompleted?: boolean;
     isCanceled?: boolean;
     isFailed?: boolean;
@@ -32,15 +33,19 @@ export const useStopStatus = ({
     return useMemo(() => {
         // Default values
         const isPending = service?.isPending === true;
-        const isInProgress = service?.isInProgress === true;
+        const isInProgress = service?.isInProgress === true; // a caminho
+        const isInAttendance = service?.isInAttendance === true || service?.status === ServiceStatus.IN_ATTENDANCE; // atendendo
         const isCompleted = service?.isCompleted === true;
         const isCanceled = service?.isCanceled === true;
 
-        // Check if there's another service in progress (different from current)
+        // Outra parada em execução (a caminho OU em atendimento), diferente da atual
         const hasOtherServiceInProgress = allServices.some(
             (s) =>
                 s.id !== currentServiceId &&
-                (s.isInProgress === true || s.status === ServiceStatus.IN_PROGRESS),
+                (s.isInProgress === true ||
+                    s.isInAttendance === true ||
+                    s.status === ServiceStatus.IN_PROGRESS ||
+                    s.status === ServiceStatus.IN_ATTENDANCE),
         );
 
         // Business rule: Cannot start if another service is in progress
@@ -57,6 +62,7 @@ export const useStopStatus = ({
         return {
             isPending,
             isInProgress,
+            isInAttendance,
             isCompleted,
             isCanceled,
             canStartService,

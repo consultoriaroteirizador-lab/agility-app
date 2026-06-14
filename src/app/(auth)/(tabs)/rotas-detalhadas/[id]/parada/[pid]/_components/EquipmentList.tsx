@@ -4,18 +4,19 @@ import { measure } from '@/theme';
 import { EquipmentListProps } from '../_types/stop.types';
 
 /**
- * Component that displays the list of equipment for a stop
+ * Lista de itens/materiais da parada. No back, "equipamento" do serviço é o
+ * próprio material já mapeado (ServiceMaterialResponse).
  */
-export const EquipmentList = ({ equipments }: EquipmentListProps) => {
-    if (equipments && equipments.length > 0) {
+export const EquipmentList = ({ materials }: EquipmentListProps) => {
+    if (materials && materials.length > 0) {
         return (
             <>
                 <Text preset="text14" fontWeightPreset="bold" color="colorTextPrimary" mb="y8">
-                    Equipamentos ({equipments.length})
+                    Materiais ({materials.length})
                 </Text>
-                {equipments.map((equipment, index) => (
+                {materials.map((material, index) => (
                     <Box
-                        key={equipment.id || index}
+                        key={material.id || index}
                         backgroundColor="gray50"
                         p="y12"
                         borderRadius="s12"
@@ -25,30 +26,30 @@ export const EquipmentList = ({ equipments }: EquipmentListProps) => {
                         <Box flexDirection="row" justifyContent="space-between" alignItems="center">
                             <Box flex={1}>
                                 <Text preset="text14" fontWeightPreset="semibold" color="colorTextPrimary">
-                                    {equipment.name || equipment.type || 'Equipamento'}
+                                    {material.material || 'Material'}
                                 </Text>
-                                {equipment.serialNumber && (
+                                {material.serialNumber && (
                                     <Text preset="text12" color="gray500" mt="y2">
-                                        S/N: {equipment.serialNumber}
+                                        S/N: {material.serialNumber}
                                     </Text>
                                 )}
-                                {equipment.model && (
+                                {material.sku && (
                                     <Text preset="text12" color="gray400" mt="y2">
-                                        Modelo: {equipment.model}
+                                        SKU: {material.sku}
                                     </Text>
                                 )}
                             </Box>
-                            {equipment.quantity && (
+                            {material.quantity != null && (
                                 <Box backgroundColor="primary100" px="x8" py="y4" borderRadius="s8">
                                     <Text preset="text12" fontWeightPreset="bold" color="white">
-                                        x{equipment.quantity}
+                                        x{material.quantity}{material.unit ? ` ${material.unit}` : ''}
                                     </Text>
                                 </Box>
                             )}
                         </Box>
-                        {equipment.description && (
+                        {material.notes && (
                             <Text preset="text13" color="gray600" mt="y8">
-                                {equipment.description}
+                                {material.notes}
                             </Text>
                         )}
                     </Box>
@@ -72,7 +73,7 @@ export const EquipmentList = ({ equipments }: EquipmentListProps) => {
                 <LocalIcon iconName="box" size={32} color="gray400" />
             </Box>
             <Text preset="text14" color="gray400" textAlign="center">
-                Nenhum equipamento registrado{'\n'}para esta parada.
+                Nenhum material registrado{'\n'}para esta parada.
             </Text>
         </Box>
     );

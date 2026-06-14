@@ -18,6 +18,7 @@ import { serviceService } from '@/domain/agility/service/serviceService';
 import { uploadMultipleServicePhotos, uploadSignature } from '@/domain/agility/service/serviceUploadUtils';
 import { useCompleteServiceWithDetails, useFindOneService, useStartService } from '@/domain/agility/service/useCase';
 import { KEY_ROUTINGS, KEY_SERVICES } from '@/domain/queryKeys';
+import { formatHHmm } from '@/functions';
 import { useToastService } from '@/services/Toast/useToast';
 import { measure } from '@/theme';
 
@@ -401,9 +402,9 @@ export default function DadosEntregaScreen() {
           <Box backgroundColor="primary10" paddingHorizontal="x12" paddingVertical="y4" borderRadius="s20">
             <Text preset="text13" color="primary100">Entrega</Text>
           </Box>
-          {service?.scheduledStartTime && (
+          {service?.estimatedArrival && (
             <Box backgroundColor="gray100" paddingHorizontal="x12" paddingVertical="y4" borderRadius="s20">
-              <Text preset="text13" color="gray800">{service.scheduledStartTime}</Text>
+              <Text preset="text13" color="gray800">{formatHHmm(service.estimatedArrival)}</Text>
             </Box>
           )}
         </Box>

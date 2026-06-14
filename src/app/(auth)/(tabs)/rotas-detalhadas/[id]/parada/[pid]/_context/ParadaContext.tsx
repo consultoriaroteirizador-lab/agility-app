@@ -18,7 +18,7 @@ import { FormEntityType } from '@/domain/agility/form-group-answer/dto/create-fo
 import { useCreateFormGroupAnswer } from '@/domain/agility/form-group-answer/useCase/useCreateFormGroupAnswer';
 import type { ServiceDraftData } from '@/domain/agility/service/dto';
 import type { ServiceMaterialResponse, MaterialStatus } from '@/domain/agility/service/dto/response/service-material.response';
-import { PaymentMethodType, ServiceStatus } from '@/domain/agility/service/dto/types';
+import { PaymentMethodType, ServiceStatus, ServiceType } from '@/domain/agility/service/dto/types';
 import { serviceService } from '@/domain/agility/service/serviceService';
 import { uploadMultipleServicePhotos, uploadBase64Signature } from '@/domain/agility/service/serviceUploadUtils';
 import {
@@ -49,6 +49,17 @@ export interface ChecklistState {
   documento: boolean;
   foto: boolean;
   signature: boolean;
+}
+
+/**
+ * Snapshot da evidência da COLETA na origem (perna 1 do TRANSFER). Capturado ao
+ * avançar para a entrega e enviado como `pickupCompletion` na finalização.
+ */
+export interface PickupEvidence {
+  receivedBy?: string;
+  signatureUrl?: string;
+  photoUrls: string[];
+  notes?: string;
 }
 
 export interface MaterialsState {
@@ -136,6 +147,20 @@ interface ParadaContextValue {
   checkCompleted: boolean;
   completeCheck: () => void;
 
+  // Coleta de retorno (parada com entrega + devolução no mesmo stop).
+  // `hasReturn` vem do backend (flag explícito) ou é inferido de materiais direction=PICKUP.
+  hasReturn: boolean;
+  returnCheckCompleted: boolean;
+  completeReturnCheck: () => void;
+
+  // TRANSFER: wizard de 2 pernas (coleta na origem A → entrega no destino B).
+  isTransfer: boolean;
+  transferLeg: 'pickup' | 'delivery';
+  setTransferLeg: (leg: 'pickup' | 'delivery') => void;
+  pickupDone: boolean;
+  pickupEvidence: PickupEvidence | null;
+  commitPickupLeg: () => void;
+
   // Utilitários
   isServiceStarted: boolean;
   resetState: () => void;
@@ -184,13 +209,27 @@ export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderPr
   // Buscar dados do serviço
   const { service, isLoading, isError } = useFindOneService(serviceId);
 
+  // TRANSFER: serviço ponto-a-ponto (origem A → destino B). O wizard tem 2 pernas.
+  const isTransfer = service?.serviceType === ServiceType.TRANSFER;
+  // Perna atual do TRANSFER: 'pickup' (coleta na origem) → 'delivery' (entrega no destino).
+  const [transferLeg, setTransferLeg] = useState<'pickup' | 'delivery'>('pickup');
+  // Coleta na origem concluída (evidência capturada). Persistido no draft.
+  const [pickupDone, setPickupDone] = useState(false);
+  // Snapshot da evidência da coleta na origem (perna 1) — guardado ao avançar para a
+  // entrega, pois recipient/photos/signature são reaproveitados na perna 2.
+  const [pickupEvidence, setPickupEvidence] = useState<PickupEvidence | null>(null);
+
   // Fallback de endereço (quando backend não retorna embedded)
   const embeddedAddress = service?.address ?? null;
   const shouldFetchAddress = !embeddedAddress && !!service?.addressId;
   const { address: fetchedAddress } = useFindOneAddress(
     shouldFetchAddress ? service?.addressId || null : null
   );
-  const effectiveAddress = embeddedAddress ?? fetchedAddress ?? null;
+  // Endereço efetivo é leg-aware no TRANSFER: origem na perna de coleta, destino na
+  // perna de entrega. Nos demais tipos, é o endereço único do serviço.
+  const effectiveAddress = isTransfer
+    ? ((transferLeg === 'pickup' ? service?.pickupAddress : service?.deliveryAddress) ?? null)
+    : (embeddedAddress ?? fetchedAddress ?? null);
 
   // Hook para check de material
   const checkMaterialMutation = useCheckMaterial();
@@ -202,11 +241,12 @@ export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderPr
   const [etapa, setEtapa] = useState(1);
   const [delivered, setDelivered] = useState(false);
 
-  // `arrived` is derived from the backend service status — never a local source of truth.
-  // The "Estou aqui" handler calls /services/:id/start which sets service.startDate; the
-  // refetch propagates that here and `arrived` flips to true. This eliminates the drift
-  // where the local flag and the backend disagreed.
-  const isServiceStartedRaw = !!(service && (service.status === ServiceStatus.IN_PROGRESS || service.startDate));
+  // `arrived` é derivado do status do backend — nunca fonte de verdade local.
+  // O botão "Estou aqui" chama /services/:id/start-attendance, que move o serviço
+  // para IN_ATTENDANCE; o refetch propaga aqui e `arrived` vira true. O fluxo de
+  // etapas (confirmação, recebedor, finalização) só abre quando EM ATENDIMENTO —
+  // IN_PROGRESS é apenas "a caminho" e não deve abrir o fluxo.
+  const isServiceStartedRaw = !!(service && (service.status === ServiceStatus.IN_ATTENDANCE || service.isInAttendance === true));
   const arrived = isServiceStartedRaw;
   const setArrived = useCallback((_value: boolean) => {
     if (__DEV__) {
@@ -231,8 +271,11 @@ export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderPr
     allChecked: false,
   });
 
-  // Check completed flag
+  // Check completed flag (itens de entrega)
   const [checkCompleted, setCheckCompleted] = useState(false);
+
+  // Check completed flag (itens de retorno/devolução — direction=PICKUP)
+  const [returnCheckCompleted, setReturnCheckCompleted] = useState(false);
 
   // Checklist
   const [checklist, setChecklist] = useState<ChecklistState>(CHECKLIST_INITIAL);
@@ -273,7 +316,9 @@ export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderPr
   // Efeito para ajustar etapa baseado no status do serviço.
   // `arrived` é derivado — nada de setArrived aqui.
   useEffect(() => {
-    if (isServiceStarted && etapa === 1) {
+    // TRANSFER controla a navegação por perna manualmente (a chegada na origem/destino
+    // é um passo de UI, não derivado do status) — não auto-avança.
+    if (!isTransfer && isServiceStarted && etapa === 1) {
       setEtapa(2);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -355,6 +400,10 @@ export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderPr
   }, []);
 
   // Materials functions
+  // Marca o serviceId cujos materiais já foram buscados (evita loop de fetch em
+  // serviços sem materiais). Resetado quando o serviceId muda.
+  const materialsFetchedRef = useRef<string | null>(null);
+
   const fetchMaterials = useCallback(async () => {
     if (!serviceId) return;
 
@@ -369,6 +418,13 @@ export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderPr
       });
       return;
     }
+
+    // Idempotente por serviceId: serviços SEM materiais retornam lista vazia, mantendo
+    // materials.length === 0 — sem este guard, o useEffect que dispara o fetch
+    // (condicionado a length===0) re-chamaria infinitamente, gerando storm de
+    // requests e 429 (ThrottlerException). Tenta no máximo uma vez por serviceId.
+    if (materialsFetchedRef.current === serviceId) return;
+    materialsFetchedRef.current = serviceId;
 
     // Se não tem materiais no serviço, busca da API
     setMaterialsState(prev => ({ ...prev, loading: true }));
@@ -389,6 +445,15 @@ export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderPr
     } catch (error) {
       console.error('Error fetching materials:', error);
       setMaterialsState(prev => ({ ...prev, loading: false }));
+      // Em ERRO (ex.: 429 transitório, rede), liberamos o guard após um backoff para
+      // permitir nova tentativa — mas com atraso, para não reentrar em storm/throttle.
+      // (Empty-success NÃO cai aqui: mantém marcado, evitando loop em serviços sem itens.)
+      const sid = serviceId;
+      setTimeout(() => {
+        if (materialsFetchedRef.current === sid) {
+          materialsFetchedRef.current = null;
+        }
+      }, 4000);
     }
   }, [serviceId, service?.materials]);
 
@@ -443,6 +508,48 @@ export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderPr
   const completeCheck = useCallback(() => {
     setCheckCompleted(true);
   }, []);
+
+  // Função para marcar o check de retorno como completo
+  const completeReturnCheck = useCallback(() => {
+    setReturnCheckCompleted(true);
+  }, []);
+
+  // `hasReturn`: esta parada tem coleta/devolução no mesmo stop. Fonte de verdade é a
+  // flag do backend; como fallback, inferimos da presença de materiais direction=PICKUP.
+  const hasReturn = !!(
+    service?.hasReturn ||
+    (service?.materials?.some((m) => m.direction === 'PICKUP') ?? false)
+  );
+
+  // TRANSFER: conclui a perna de COLETA na origem. Faz snapshot da evidência atual
+  // (recebedor/assinatura/fotos/obs) em `pickupEvidence`, reseta os campos de evidência
+  // para a perna de ENTREGA e avança o wizard para o destino.
+  const commitPickupLeg = useCallback(() => {
+    const photoUrls = (photos as { uri: string; __s3Url?: string }[])
+      .map((p) => p.__s3Url ?? (p.uri.startsWith('http') ? p.uri : undefined))
+      .filter((u): u is string => !!u);
+    const sigUrl = signature ?? undefined;
+
+    setPickupEvidence({
+      receivedBy: recipient.nome || undefined,
+      signatureUrl: sigUrl,
+      photoUrls,
+      notes: observation || undefined,
+    });
+
+    // Reset da evidência para a perna de entrega (destino B).
+    setRecipient(RECIPIENT_INITIAL);
+    setPhotos([]);
+    setSignatureState(null);
+    setObservation('');
+    setChecklist(CHECKLIST_INITIAL);
+    setCheckCompleted(false);
+    setDelivered(false);
+
+    setPickupDone(true);
+    setTransferLeg('delivery');
+    setEtapa(1);
+  }, [photos, signature, recipient.nome, observation]);
 
   // Formulário dinâmico - se o service tem formGroups
   const hasFormGroups = !!(service?.formGroupIds && service.formGroupIds.length > 0);
@@ -544,6 +651,7 @@ export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderPr
   // Reset do flag de hidratação quando o serviceId muda.
   useEffect(() => {
     hydratedRef.current = null;
+    materialsFetchedRef.current = null;
   }, [serviceId]);
 
   // Hidratação: roda 1x por serviceId, quando o draft do backend já chegou (ou falhou).
@@ -614,6 +722,17 @@ export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderPr
             ...prev,
             formAnswersMap: { ...prev.formAnswersMap, ...chosen.formAnswers },
           }));
+        }
+        // TRANSFER: restaura a perna do wizard + snapshot da evidência da origem.
+        if (chosen.transferLeg) setTransferLeg(chosen.transferLeg);
+        if (chosen.pickupDone) setPickupDone(true);
+        if (chosen.pickupEvidence) {
+          setPickupEvidence({
+            receivedBy: chosen.pickupEvidence.receivedBy,
+            signatureUrl: chosen.pickupEvidence.signatureUrl,
+            photoUrls: chosen.pickupEvidence.photoUrls ?? [],
+            notes: chosen.pickupEvidence.notes,
+          });
         }
       }
 
@@ -761,7 +880,10 @@ export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderPr
       !!sigUrl ||
       (cents !== null && cents > 0) ||
       !!paymentMethod ||
-      Object.keys(formState.formAnswersMap).length > 0;
+      Object.keys(formState.formAnswersMap).length > 0 ||
+      // TRANSFER: a perna/coleta concluída é conteúdo relevante (mesmo sem recebedor),
+      // para retomar a perna de entrega após crash.
+      (isTransfer && (pickupDone || transferLeg === 'delivery'));
 
     if (!hasContent) return;
 
@@ -781,6 +903,21 @@ export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderPr
       checklist,
       formAnswers:
         Object.keys(formState.formAnswersMap).length > 0 ? formState.formAnswersMap : undefined,
+      // TRANSFER: estado do wizard de 2 pernas + snapshot da evidência da origem.
+      ...(isTransfer
+        ? {
+            transferLeg,
+            pickupDone,
+            pickupEvidence: pickupEvidence
+              ? {
+                  receivedBy: pickupEvidence.receivedBy,
+                  signatureUrl: pickupEvidence.signatureUrl,
+                  photoUrls: pickupEvidence.photoUrls,
+                  notes: pickupEvidence.notes,
+                }
+              : undefined,
+          }
+        : {}),
     };
 
     // Local: gravação síncrona-rápida (cache para hidratar sem flicker / offline).
@@ -816,6 +953,10 @@ export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderPr
     checklist,
     formState.formAnswersMap,
     saveBackendDraft,
+    isTransfer,
+    transferLeg,
+    pickupDone,
+    pickupEvidence,
   ]);
 
   // Função de reset
@@ -833,6 +974,10 @@ export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderPr
     setShowSignature(false);
     setUploadProgress(new Map());
     setCheckCompleted(false);
+    setReturnCheckCompleted(false);
+    setTransferLeg('pickup');
+    setPickupDone(false);
+    setPickupEvidence(null);
     setMaterialsState({
       materials: [],
       loading: false,
@@ -932,6 +1077,19 @@ export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderPr
     setMaterials,
     checkCompleted,
     completeCheck,
+
+    // Coleta de retorno
+    hasReturn,
+    returnCheckCompleted,
+    completeReturnCheck,
+
+    // TRANSFER
+    isTransfer,
+    transferLeg,
+    setTransferLeg,
+    pickupDone,
+    pickupEvidence,
+    commitPickupLeg,
 
     // Utilitários
     isServiceStarted: !!isServiceStarted,

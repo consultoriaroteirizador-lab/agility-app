@@ -6,6 +6,7 @@ import { Box, ActivityIndicator, Text } from '@/components';
 import { measure } from '@/theme';
 
 import { EtapaCheckItens } from '../_components/entrega/EtapaCheckItens';
+import { EtapaColetaRetorno } from '../_components/entrega/EtapaColetaRetorno';
 import { EtapaConfirmacao } from '../_components/entrega/EtapaConfirmacao';
 import { EtapaInicial } from '../_components/entrega/EtapaInicial';
 import { SharedEtapaDados } from '../_components/shared/SharedEtapaDados';
@@ -32,18 +33,29 @@ function EntregaOrchestrator() {
         fetchMaterials,
         hasFormGroups,
         formCompleted,
+        hasReturn,
+        returnCheckCompleted,
     } = useParada();
 
     // Buscar materiais quando entrar na etapa de confirmação (para saber se tem materiais)
     useEffect(() => {
-        if (isServiceStarted && materialsState.materials.length === 0 && !materialsState.loading) {
+        if (!isLoading && materialsState.materials.length === 0 && !materialsState.loading) {
             fetchMaterials();
         }
-    }, [isServiceStarted, materialsState.materials.length, materialsState.loading, fetchMaterials]);
+    }, [isLoading, materialsState.materials.length, materialsState.loading, fetchMaterials]);
 
-    // Verificar se tem materiais para check
-    const hasMaterials = materialsState.materials.length > 0;
-    const needsMaterialCheck = hasMaterials && !materialsState.allChecked && !checkCompleted;
+    // Materiais separados por direção: entrega (DELIVERY/legado) vs retorno (PICKUP).
+    const deliveryMaterials = materialsState.materials.filter((m) => m.direction !== 'PICKUP');
+    const returnMaterials = materialsState.materials.filter((m) => m.direction === 'PICKUP');
+
+    const deliveryAllChecked = deliveryMaterials.every((m) => m.status !== 'PENDING');
+    const returnAllChecked = returnMaterials.every((m) => m.status !== 'PENDING');
+
+    // Check dos itens entregues (etapa pós-confirmação).
+    const needsDeliveryCheck = deliveryMaterials.length > 0 && !deliveryAllChecked && !checkCompleted;
+    // Check dos itens de retorno (etapa extra quando a parada tem devolução no mesmo stop).
+    const needsReturnCheck =
+        hasReturn && returnMaterials.length > 0 && !returnAllChecked && !returnCheckCompleted;
 
     // Redirecionar após sucesso
     useEffect(() => {
@@ -88,13 +100,18 @@ function EntregaOrchestrator() {
         return <EtapaConfirmacao />;
     }
 
-    // Etapa 2.5: Check dos itens (se tiver materiais e não estiverem todos checados)
-    if (delivered && needsMaterialCheck) {
+    // Etapa 2.5: Check dos itens ENTREGUES (se tiver materiais de entrega não checados)
+    if (delivered && needsDeliveryCheck) {
         return <EtapaCheckItens />;
     }
 
+    // Etapa 2.6: Coleta de RETORNO (devolução no mesmo stop) — após checar a entrega.
+    if (delivered && !needsDeliveryCheck && needsReturnCheck) {
+        return <EtapaColetaRetorno />;
+    }
+
     // Etapa do formulário dinâmico (após check, antes do recebedor)
-    if (delivered && hasFormGroups && !formCompleted) {
+    if (delivered && !needsDeliveryCheck && !needsReturnCheck && hasFormGroups && !formCompleted) {
         return <SharedEtapaFormulario serviceType="entrega" />;
     }
 
@@ -104,7 +121,7 @@ function EntregaOrchestrator() {
     }
 
     // Etapa 3: Seleção de quem recebeu
-    if (etapa === 3 || (delivered && !recipient.tipo && !needsMaterialCheck && (!hasFormGroups || formCompleted))) {
+    if (etapa === 3 || (delivered && !recipient.tipo && !needsDeliveryCheck && !needsReturnCheck && (!hasFormGroups || formCompleted))) {
         return <SharedEtapaRecebedor serviceType="entrega" />;
     }
 

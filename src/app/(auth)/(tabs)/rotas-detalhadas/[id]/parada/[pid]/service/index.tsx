@@ -37,10 +37,10 @@ function ServiceOrchestrator() {
 
     // Buscar materiais quando o servico estiver iniciado
     useEffect(() => {
-        if (isServiceStarted && materialsState.materials.length === 0 && !materialsState.loading) {
+        if (!isLoading && materialsState.materials.length === 0 && !materialsState.loading) {
             fetchMaterials();
         }
-    }, [isServiceStarted, materialsState.materials.length, materialsState.loading, fetchMaterials]);
+    }, [isLoading, materialsState.materials.length, materialsState.loading, fetchMaterials]);
 
     // Redirecionar após sucesso
     useEffect(() => {

@@ -9,9 +9,12 @@ import {
     useCompleteService,
     useFailService,
     useStartService,
+    useStartAttendance,
 } from '@/domain/agility/service/useCase';
 import { KEY_SERVICES } from '@/domain/queryKeys';
 import { useToastService } from '@/services/Toast/useToast';
+
+import { getCurrentCoords } from './getCurrentCoords';
 
 interface UseStopActionsParams {
     serviceId: string;
@@ -25,9 +28,11 @@ interface UseStopActionsParams {
 interface UseStopActionsReturn {
     handleStartService: () => void;
     handleGoToLocation: () => void;
+    handleStartAttendance: () => void;
     handleCompleteService: () => void;
     handleMarkAsFailed: () => void;
     isStarting: boolean;
+    isStartingAttendance: boolean;
     isCompleting: boolean;
     isFailing: boolean;
 }
@@ -47,9 +52,12 @@ export const useStopActions = ({
     const queryClient = useQueryClient();
     const { showToast } = useToastService();
 
-    const invalidateQueries = useCallback(async () => {
-        await queryClient.invalidateQueries({ queryKey: [KEY_SERVICES, serviceId] });
-        await queryClient.invalidateQueries({ queryKey: [KEY_SERVICES, 'routing', routeId] });
+    const invalidateQueries = useCallback(() => {
+        // Dispara o refetch em background e NÃO aguarda: a UI desbloqueia na hora.
+        // O React Query atualiza a tela do serviço e a lista da rota quando o refetch
+        // retornar. Antes isso era awaited e travava o spinner até a rota inteira voltar.
+        void queryClient.invalidateQueries({ queryKey: [KEY_SERVICES, serviceId] });
+        void queryClient.invalidateQueries({ queryKey: [KEY_SERVICES, 'routing', routeId] });
     }, [queryClient, serviceId, routeId]);
 
     const { startService, isLoading: isStarting } = useStartService({
@@ -73,6 +81,28 @@ export const useStopActions = ({
             }
             console.error('Error starting service:', error)
             showToast({ message: 'Não foi possível iniciar o serviço. Tente novamente.', type: 'error' })
+        },
+    })
+
+    const { startAttendance, isLoading: isStartingAttendance } = useStartAttendance({
+        onSuccess: async () => {
+            await invalidateQueries();
+            onSuccess?.();
+        },
+        onError: (error: any) => {
+            // Se já estava em atendimento, trata como sucesso e segue
+            const errorMessage = error?.error?.message || error?.message || ''
+            if (
+                errorMessage.includes('em atendimento') ||
+                errorMessage.includes('IN_ATTENDANCE') ||
+                error?.error?.code === 'INTERNAL_ERROR'
+            ) {
+                invalidateQueries();
+                onSuccess?.()
+                return
+            }
+            console.error('Error starting attendance:', error)
+            showToast({ message: 'Não foi possível iniciar o atendimento. Tente novamente.', type: 'error' })
         },
     })
 
@@ -133,6 +163,27 @@ export const useStopActions = ({
         invalidateQueries,
     ]);
 
+    const handleStartAttendance = useCallback(async () => {
+        // Bloqueia só estados terminais; backend aceita PENDING/ASSIGNED/IN_PROGRESS → IN_ATTENDANCE.
+        if (
+            serviceStatus === ServiceStatus.COMPLETED ||
+            serviceStatus === ServiceStatus.CANCELED ||
+            serviceStatus === ServiceStatus.FAILED
+        ) {
+            showToast({ message: `Não é possível iniciar o atendimento. Status atual: ${serviceStatus}`, type: 'error' });
+            return;
+        }
+        // Já em atendimento → apenas garante refetch
+        if (serviceStatus === ServiceStatus.IN_ATTENDANCE) {
+            invalidateQueries();
+            onSuccess?.();
+            return;
+        }
+        // Captura a referência de GPS de onde o motorista iniciou o atendimento (best-effort).
+        const location = await getCurrentCoords();
+        startAttendance({ id: serviceId, location });
+    }, [serviceStatus, startAttendance, serviceId, invalidateQueries, onSuccess, showToast]);
+
     const handleCompleteService = useCallback(() => {
         completeService({ id: serviceId });
     }, [completeService, serviceId]);
@@ -150,9 +201,11 @@ export const useStopActions = ({
     return {
         handleStartService,
         handleGoToLocation,
+        handleStartAttendance,
         handleCompleteService,
         handleMarkAsFailed,
         isStarting,
+        isStartingAttendance,
         isCompleting,
         isFailing,
     };

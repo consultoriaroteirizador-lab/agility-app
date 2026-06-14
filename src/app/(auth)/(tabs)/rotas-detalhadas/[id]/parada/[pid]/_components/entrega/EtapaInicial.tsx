@@ -5,26 +5,27 @@ import { router } from 'expo-router';
 import { Box, Button, ScreenBase, Text } from '@/components';
 import { ButtonBack } from '@/components/Button/ButtonBack';
 import { formatAddressStreetNumber } from '@/domain/agility/address/dto';
+import { formatHHmm } from '@/functions';
 import { measure } from '@/theme';
 
 import { useParada } from '../../_context/ParadaContext';
 import { useStopActions } from '../../_hooks/useStopActions';
-import { Map } from '../shared/Map';
+import { StopRouteMap } from '../shared/StopRouteMap';
 
 /**
  * Etapa 1: Tela inicial com "Indo pra lá" e "Estou aqui!"
  * Layout unificado com dados-servico
  */
 export function EtapaInicial() {
-    const { service, effectiveAddress, setEtapa, setArrived, rotaId } = useParada();
-    const { handleStartService, isStarting } = useStopActions({
+    const { service, effectiveAddress, setEtapa, rotaId } = useParada();
+    const { handleStartService, handleStartAttendance, isStarting, isStartingAttendance } = useStopActions({
         serviceId: service?.id || '',
         routeId: service?.routingId || '',
         serviceStatus: service?.status,
         isServiceInProgress: service?.status === 'IN_PROGRESS',
         serviceStartDate: service?.startDate ? String(service.startDate) : null,
         onSuccess: () => {
-            // Continua na tela após iniciar o serviço
+            // Continua na tela após iniciar o atendimento
         },
     });
 
@@ -41,9 +42,11 @@ export function EtapaInicial() {
             <Box flex={1} backgroundColor="white">
                 <Box scrollable style={{ paddingBottom: 32 }}>
                     <Box paddingTop="y24" paddingBottom="y4">
-                        {/* Mapa */}
-                        <Map
+                        {/* Mapa — pino da parada + trecho até a próxima parada */}
+                        <StopRouteMap
                             variant="entrega"
+                            routeId={service?.routingId || rotaId}
+                            serviceId={service?.id}
                             latitude={effectiveAddress?.latitude ?? null}
                             longitude={effectiveAddress?.longitude ?? null}
                             customerName={nomeCliente}
@@ -54,9 +57,9 @@ export function EtapaInicial() {
                             <Box backgroundColor="primary10" paddingHorizontal="x12" paddingVertical="y4" borderRadius="s20">
                                 <Text preset="text13" color="primary100">Entrega</Text>
                             </Box>
-                            {service?.scheduledStartTime && (
+                            {service?.estimatedArrival && (
                                 <Box backgroundColor="gray100" paddingHorizontal="x12" paddingVertical="y4" borderRadius="s20">
-                                    <Text preset="text13" color="gray800">{service.scheduledStartTime}</Text>
+                                    <Text preset="text13" color="gray800">{formatHHmm(service.estimatedArrival)}</Text>
                                 </Box>
                             )}
                         </Box>
@@ -100,17 +103,16 @@ export function EtapaInicial() {
                                 title={isStarting ? "Iniciando..." : "Indo pra lá"}
                                 preset="outline"
                                 onPress={handleStartService}
-                                disabled={isStarting}
+                                disabled={isStarting || isStartingAttendance}
                                 width={measure.x330}
                             />
                             <Button
-                                title={isStarting ? "Iniciando..." : "Estou aqui!"}
+                                title={isStartingAttendance ? "Iniciando atendimento..." : "Estou aqui!"}
                                 onPress={() => {
-                                    handleStartService();
-                                    setArrived(true);
+                                    handleStartAttendance();
                                     setEtapa(2);
                                 }}
-                                disabled={isStarting}
+                                disabled={isStarting || isStartingAttendance}
                                 width={measure.x330}
                             />
                         </Box>

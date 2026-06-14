@@ -1,6 +1,6 @@
 import * as Location from 'expo-location';
 
-import type { EquipmentResponse, ServiceMaterialResponse } from '@/domain/agility/service/dto'
+import type { ServiceMaterialResponse } from '@/domain/agility/service/dto'
 
 export type TabType = 'local' | 'equipment';
 
@@ -16,11 +16,13 @@ export interface MapRegion extends StopCoordinates {
     longitudeDelta: number;
 }
 
-export { EquipmentResponse } from '@/domain/agility/service/dto'
 
 export interface StopStatus {
     isPending: boolean;
+    /** A caminho do cliente (IN_PROGRESS) */
     isInProgress: boolean;
+    /** Em atendimento — chegou no cliente (IN_ATTENDANCE) */
+    isInAttendance: boolean;
     isCompleted: boolean;
     isCanceled: boolean;
     canStartService: boolean;
@@ -47,10 +49,13 @@ export interface StopMapProps {
 }
 
 export interface StopActionsProps extends StopStatus {
+    /** Alias derivado de isInAttendance — mantido para compat. */
     hasArrivedAtLocation: boolean;
     isStarting?: boolean;
+    isStartingAttendance?: boolean;
     isCompletingRouting?: boolean;
     onGoToLocation: () => void;
+    /** "Estou aqui" — inicia o atendimento (IN_ATTENDANCE). */
     onArrivedAtLocation: () => void;
     onServiceCompleted: () => void;
     onServiceNotCompleted: () => void;
@@ -65,7 +70,7 @@ export interface NavigationModalProps {
 }
 
 export interface EquipmentListProps {
-    equipments: EquipmentResponse[];
+    materials: ServiceMaterialResponse[];
 }
 
 export interface StopTabsProps {

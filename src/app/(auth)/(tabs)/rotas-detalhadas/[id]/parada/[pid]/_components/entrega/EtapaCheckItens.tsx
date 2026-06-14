@@ -1,21 +1,48 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 
 import { Box, Button, ScreenBase, Text, ActivityIndicator } from '@/components';
 import { ButtonBack } from '@/components/Button/ButtonBack';
 import { ItemCheckCard } from '@/components/ItemCheckCard';
 import { ItemCheckModal } from '@/components/ItemCheckModal';
-import type { ServiceMaterialResponse, MaterialStatus } from '@/domain/agility/service/dto/response/service-material.response';
+import type { ServiceMaterialResponse, MaterialStatus, MaterialDirection } from '@/domain/agility/service/dto/response/service-material.response';
 import { measure } from '@/theme';
 
 import { useParada } from '../../_context/ParadaContext';
 
 type CheckStatus = 'CHECKED' | 'PARTIAL' | 'MISSING' | 'DAMAGED' | 'REFUSED';
 
+interface EtapaCheckItensProps {
+    /**
+     * Direção dos materiais conferidos nesta etapa:
+     * - DELIVERY (default): itens entregues ao cliente
+     * - PICKUP: itens coletados/devolvidos (volumes de retorno)
+     */
+    direction?: MaterialDirection;
+    /** Título da tela */
+    title?: string;
+    /** Rótulo do resumo (ex.: "Itens para entrega", "Itens para coleta") */
+    summaryLabel?: string;
+    /** Mensagem quando não há itens cadastrados */
+    emptyLabel?: string;
+    /**
+     * Callback ao concluir o check desta etapa (default: completeCheck — itens de entrega).
+     * Para retorno, passar completeReturnCheck.
+     */
+    onComplete?: () => void;
+}
+
 /**
- * Etapa 3: Check dos itens da entrega
- * Motorista marca cada produto que está entregando
+ * Etapa de check de itens — usada tanto para a ENTREGA (direction=DELIVERY)
+ * quanto para a COLETA DE RETORNO (direction=PICKUP). Filtra os materiais do
+ * serviço pela direção e calcula a conclusão localmente sobre a sublista.
  */
-export function EtapaCheckItens() {
+export function EtapaCheckItens({
+    direction = 'DELIVERY',
+    title = 'Check dos Itens',
+    summaryLabel = 'Itens para entrega',
+    emptyLabel = 'Nenhum item cadastrado para esta entrega',
+    onComplete,
+}: EtapaCheckItensProps) {
     const {
         materialsState,
         checkMaterial,
@@ -27,6 +54,16 @@ export function EtapaCheckItens() {
     const [selectedItem, setSelectedItem] = useState<ServiceMaterialResponse | null>(null);
     const [modalVisible, setModalVisible] = useState(false);
     const [checking, setChecking] = useState(false);
+
+    // Materiais desta etapa, filtrados por direção. Materiais legados sem `direction`
+    // são tratados como DELIVERY.
+    const items = useMemo(
+        () =>
+            materialsState.materials.filter((m) =>
+                direction === 'PICKUP' ? m.direction === 'PICKUP' : m.direction !== 'PICKUP',
+            ),
+        [materialsState.materials, direction],
+    );
 
     const handleOpenCheck = useCallback((item: ServiceMaterialResponse) => {
         setSelectedItem(item);
@@ -64,13 +101,14 @@ export function EtapaCheckItens() {
         }
     }, [selectedItem, checkMaterial]);
 
-    const pendingCount = materialsState.materials.filter(m => m.status === 'PENDING').length;
-    const checkedCount = materialsState.materials.filter(m => m.status !== 'PENDING').length;
+    const pendingCount = items.filter(m => m.status === 'PENDING').length;
+    const checkedCount = items.filter(m => m.status !== 'PENDING').length;
+    const allChecked = items.length > 0 && pendingCount === 0;
 
     const handleProximo = useCallback(() => {
-        completeCheck();
+        (onComplete ?? completeCheck)();
         goToNextStep();
-    }, [completeCheck, goToNextStep]);
+    }, [onComplete, completeCheck, goToNextStep]);
 
     const handleBack = useCallback(() => {
         goToPreviousStep();
@@ -81,7 +119,7 @@ export function EtapaCheckItens() {
             buttonLeft={<ButtonBack onPress={handleBack} />}
             title={
                 <Text preset="textTitleScreen" fontWeightPreset="bold" color="colorTextPrimary">
-                    Check dos Itens
+                    {title}
                 </Text>
             }
         >
@@ -98,7 +136,7 @@ export function EtapaCheckItens() {
                         >
                             <Box flexShrink={1} marginRight="x12">
                                 <Text preset="text14" color="gray600" numberOfLines={1}>
-                                    Itens para entrega
+                                    {summaryLabel}
                                 </Text>
                                 <Text
                                     preset="text20"
@@ -106,7 +144,7 @@ export function EtapaCheckItens() {
                                     fontWeightPreset="bold"
                                     numberOfLines={1}
                                 >
-                                    {materialsState.materials.length} itens
+                                    {items.length} itens
                                 </Text>
                             </Box>
 
@@ -114,16 +152,16 @@ export function EtapaCheckItens() {
                                 paddingHorizontal="x12"
                                 paddingVertical="y8"
                                 borderRadius="s12"
-                                backgroundColor={materialsState.allChecked ? 'primary10' : 'secondary10'}
+                                backgroundColor={allChecked ? 'primary10' : 'secondary10'}
                                 flexShrink={0}
                             >
                                 <Text
                                     preset="text14"
-                                    color={materialsState.allChecked ? 'primary100' : 'secondary80'}
+                                    color={allChecked ? 'primary100' : 'secondary80'}
                                     fontWeightPreset="semibold"
                                     numberOfLines={1}
                                 >
-                                    {checkedCount}/{materialsState.materials.length} checados
+                                    {checkedCount}/{items.length} checados
                                 </Text>
                             </Box>
                         </Box>
@@ -139,18 +177,18 @@ export function EtapaCheckItens() {
                         )}
 
                         {/* Lista vazia */}
-                        {!materialsState.loading && materialsState.materials.length === 0 && (
+                        {!materialsState.loading && items.length === 0 && (
                             <Box justifyContent="center" alignItems="center" padding="y32">
                                 <Text preset="text16" color="gray400" textAlign="center">
-                                    Nenhum item cadastrado para esta entrega
+                                    {emptyLabel}
                                 </Text>
                             </Box>
                         )}
 
                         {/* Lista de itens */}
-                        {!materialsState.loading && materialsState.materials.length > 0 && (
+                        {!materialsState.loading && items.length > 0 && (
                             <Box>
-                                {materialsState.materials.map((item) => (
+                                {items.map((item) => (
                                     <ItemCheckCard
                                         key={item.id}
                                         item={item}
@@ -181,10 +219,10 @@ export function EtapaCheckItens() {
                             <Button
                                 title="Próximo"
                                 onPress={handleProximo}
-                                disabled={!materialsState.allChecked || materialsState.loading}
+                                disabled={!allChecked || materialsState.loading}
                                 width={measure.x330}
                             />
-                            {!materialsState.allChecked && (
+                            {!allChecked && (
                                 <Text
                                     preset="text12"
                                     color="redError"

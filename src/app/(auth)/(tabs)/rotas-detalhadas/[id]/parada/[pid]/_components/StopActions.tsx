@@ -9,6 +9,7 @@ import { StopActionsProps } from '../_types/stop.types';
 export const StopActions = ({
     isNextStop,
     isInProgress,
+    isInAttendance,
     isCompleted,
     isCanceled,
     hasArrivedAtLocation,
@@ -16,6 +17,7 @@ export const StopActions = ({
     canStartService,
     canCompleteRouting,
     isStarting = false,
+    isStartingAttendance = false,
     isCompletingRouting = false,
     onGoToLocation,
     onArrivedAtLocation,
@@ -23,10 +25,12 @@ export const StopActions = ({
     onServiceNotCompleted,
     onCompleteRouting,
 }: StopActionsProps) => {
+    // "Atendendo" é a fonte de verdade que abre Realizado/Não realizado.
+    const attending = isInAttendance || hasArrivedAtLocation;
     return (
         <Box gap="y12" mt="y16" justifyContent='center' alignItems='center'                                                                 >
-            {/* If not the next stop and not in progress, show only "Indo pra lá" */}
-            {!isNextStop && !isInProgress && (
+            {/* Não é a próxima e não está em execução → só "Indo pra lá" */}
+            {!isNextStop && !isInProgress && !attending && (
                 <Button
                     title={isStarting ? "Iniciando..." : "Indo pra lá"}
                     preset="outline"
@@ -36,8 +40,8 @@ export const StopActions = ({
                 />
             )}
 
-            {/* If is the next stop and not yet started */}
-            {isNextStop && !isInProgress && !hasArrivedAtLocation && (
+            {/* Próxima parada (PENDING/ASSIGNED), ainda não a caminho nem atendendo */}
+            {isNextStop && !isInProgress && !attending && (
                 <>
                     {hasOtherServiceInProgress && (
                         <Box backgroundColor="alertColor" p="y12" borderRadius="s12" mb="y8">
@@ -54,16 +58,26 @@ export const StopActions = ({
                         width={measure.x330}
                     />
                     <Button
-                        title={isStarting ? "Iniciando..." : "Estou aqui!"}
+                        title={isStartingAttendance ? "Iniciando atendimento..." : "Estou aqui!"}
                         onPress={onArrivedAtLocation}
-                        disabled={!canStartService || isStarting}
+                        disabled={!canStartService || isStartingAttendance}
                         width={measure.x330}
                     />
                 </>
             )}
 
-            {/* If in progress and clicked "Estou aqui" */}
-            {isInProgress && hasArrivedAtLocation && !isCompleted && (
+            {/* A caminho (IN_PROGRESS), ainda não chegou → "Estou aqui" inicia o atendimento */}
+            {isInProgress && !attending && !isCompleted && (
+                <Button
+                    title={isStartingAttendance ? "Iniciando atendimento..." : "Estou aqui!"}
+                    onPress={onArrivedAtLocation}
+                    disabled={isStartingAttendance}
+                    width={measure.x330}
+                />
+            )}
+
+            {/* Em atendimento (IN_ATTENDANCE) → ações de conclusão */}
+            {attending && !isCompleted && !isCanceled && (
                 <>
                     <Button
                         title="Realizado"
@@ -77,15 +91,6 @@ export const StopActions = ({
                         width={measure.x330}
                     />
                 </>
-            )}
-
-            {/* If in progress but hasn't clicked "Estou aqui" yet */}
-            {isInProgress && !hasArrivedAtLocation && !isCompleted && (
-                <Button
-                    title="Estou aqui!"
-                    onPress={onArrivedAtLocation}
-                    width={measure.x330}
-                />
             )}
 
             {/* If completed */}

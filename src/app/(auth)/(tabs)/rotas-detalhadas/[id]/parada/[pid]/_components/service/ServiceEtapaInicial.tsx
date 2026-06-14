@@ -6,17 +6,18 @@ import { Box, Button, ScreenBase, Text } from '@/components';
 import { ButtonBack } from '@/components/Button/ButtonBack';
 import { TouchableOpacityBox } from '@/components/RestyleComponent/RestyleComponent';
 import { formatAddressStreetNumber } from '@/domain/agility/address/dto';
+import { formatHHmm } from '@/functions';
 import { measure } from '@/theme';
 
 import { useParada } from '../../_context/ParadaContext';
 import { useStopActions } from '../../_hooks/useStopActions';
-import { Map } from '../shared/Map';
 import { MaterialsModal } from '../shared/MaterialsModal';
+import { StopRouteMap } from '../shared/StopRouteMap';
 
 export function ServiceEtapaInicial() {
-    const { service, effectiveAddress, setEtapa, setArrived, rotaId } = useParada();
+    const { service, effectiveAddress, setEtapa, rotaId } = useParada();
     const [showMaterialModal, setShowMaterialModal] = useState(false);
-    const { handleStartService, isStarting } = useStopActions({
+    const { handleStartService, handleStartAttendance, isStarting, isStartingAttendance } = useStopActions({
         serviceId: service?.id || '',
         routeId: service?.routingId || '',
         serviceStatus: service?.status,
@@ -39,8 +40,10 @@ export function ServiceEtapaInicial() {
             <Box flex={1} backgroundColor="white">
                 <Box scrollable style={{ paddingBottom: 32 }}>
                     <Box paddingTop="y24" paddingBottom="y4">
-                        <Map
+                        <StopRouteMap
                             variant="service"
+                            routeId={service?.routingId || rotaId}
+                            serviceId={service?.id}
                             latitude={effectiveAddress?.latitude ?? null}
                             longitude={effectiveAddress?.longitude ?? null}
                             customerName={customerName}
@@ -50,9 +53,9 @@ export function ServiceEtapaInicial() {
                             <Box backgroundColor="primary10" paddingHorizontal="x12" paddingVertical="y4" borderRadius="s20">
                                 <Text preset="text13" color="primary100">Serviço</Text>
                             </Box>
-                            {service?.scheduledStartTime && (
+                            {service?.estimatedArrival && (
                                 <Box backgroundColor="gray100" paddingHorizontal="x12" paddingVertical="y4" borderRadius="s20">
-                                    <Text preset="text13" color="gray800">{service.scheduledStartTime}</Text>
+                                    <Text preset="text13" color="gray800">{formatHHmm(service.estimatedArrival)}</Text>
                                 </Box>
                             )}
                         </Box>
@@ -104,17 +107,16 @@ export function ServiceEtapaInicial() {
                                 title={isStarting ? "Iniciando..." : "Indo pra lá"}
                                 preset="outline"
                                 onPress={handleStartService}
-                                disabled={isStarting}
+                                disabled={isStarting || isStartingAttendance}
                                 width={measure.x330}
                             />
                             <Button
-                                title={isStarting ? "Iniciando..." : "Estou aqui!"}
+                                title={isStartingAttendance ? "Iniciando atendimento..." : "Estou aqui!"}
                                 onPress={() => {
-                                    handleStartService();
-                                    setArrived(true);
+                                    handleStartAttendance();
                                     setEtapa(2);
                                 }}
-                                disabled={isStarting}
+                                disabled={isStarting || isStartingAttendance}
                                 width={measure.x330}
                             />
                         </Box>

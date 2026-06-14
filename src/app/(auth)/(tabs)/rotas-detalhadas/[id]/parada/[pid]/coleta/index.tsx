@@ -34,10 +34,10 @@ function ColetaOrchestrator() {
 
     // Buscar materiais quando entrar na etapa de confirmação (para saber se tem materiais)
     useEffect(() => {
-        if (isServiceStarted && materialsState.materials.length === 0 && !materialsState.loading) {
+        if (!isLoading && materialsState.materials.length === 0 && !materialsState.loading) {
             fetchMaterials();
         }
-    }, [isServiceStarted, materialsState.materials.length, materialsState.loading, fetchMaterials]);
+    }, [isLoading, materialsState.materials.length, materialsState.loading, fetchMaterials]);
 
     // Verificar se tem materiais para check
     const hasMaterials = materialsState.materials.length > 0;

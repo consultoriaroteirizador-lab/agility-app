@@ -14,6 +14,7 @@ import { useCompleteRouting } from '@/domain/agility/routing/useCase';
 import { ServiceType } from '@/domain/agility/service/dto/types';
 import { useFindOneService, useFindServicesByRoutingId } from '@/domain/agility/service/useCase';
 import { KEY_ROUTINGS } from '@/domain/queryKeys';
+import { formatHHmm } from '@/functions';
 import { measure } from '@/theme';
 
 import { EquipmentList, StopActions, StopTabs } from './_components';
@@ -66,9 +67,11 @@ export default function StopDetailScreen() {
   // Stop actions
   const {
     handleGoToLocation,
+    handleStartAttendance,
     handleCompleteService,
     handleMarkAsFailed,
     isStarting,
+    isStartingAttendance,
     isCompleting,
     isFailing,
   } = useStopActions({
@@ -86,13 +89,12 @@ export default function StopDetailScreen() {
   const [navModalVisible, setNavModalVisible] = useState(false);
   const [showConcluirRotaModal, setShowConcluirRotaModal] = useState(false);
 
-  // `hasArrivedAtLocation` é derivado do backend — não há mais estado local.
-  // Garante consistência entre "Estou aqui" (PATCH /start) e a UI; se o app reabrir,
-  // o status do serviço já indica que o motorista chegou.
+  // `hasArrivedAtLocation` = está EM ATENDIMENTO (chegou no cliente). Derivado do
+  // backend (IN_ATTENDANCE) — não há estado local. "Estou aqui" → start-attendance.
+  // IN_PROGRESS é apenas "a caminho" e NÃO conta como chegada.
   const hasArrivedAtLocation = !!(
-    service?.startDate ||
-    service?.isInProgress ||
-    service?.status === 'IN_PROGRESS'
+    service?.isInAttendance ||
+    service?.status === 'IN_ATTENDANCE'
   );
 
   // Complete routing mutation
@@ -144,21 +146,29 @@ export default function StopDetailScreen() {
       });
       return;
     }
+
+    // TRANSFER (origem A → destino B): wizard de 2 pernas.
+    // (pathname cast: rota nova entra no typegen do expo-router quando o Metro roda.)
+    if (service.serviceType === ServiceType.TRANSFER) {
+      router.replace({
+        pathname: '/rotas-detalhadas/[id]/parada/[pid]/transfer' as never,
+        params: { id: routeId, pid: serviceId },
+      });
+      return;
+    }
   }, [service, isLoading, isError, router, routeId, serviceId]);
 
-  // Handle arrived at location - dispara PATCH /services/:id/start no backend (via useStopActions.handleGoToLocation).
-  // `hasArrivedAtLocation` é derivado de `service.startDate` / `status === IN_PROGRESS`, então
-  // assim que o refetch trazido pela mutation chegar, a UI flippa sem precisar de flag local.
+  // "Estou aqui" → inicia o ATENDIMENTO: PATCH /services/:id/start-attendance → IN_ATTENDANCE.
+  // Aceito de qualquer estado pré-terminal (PENDING/ASSIGNED/IN_PROGRESS) — o motorista pode
+  // ir direto ao cliente. Quando o refetch trouxer IN_ATTENDANCE, `hasArrivedAtLocation` flippa.
   const handleArrivedAtLocation = useCallback(() => {
-    const canStart = service?.status === 'PENDING' || service?.status === 'ASSIGNED';
-    const isAlreadyStarted = service?.isInProgress === true ||
-      service?.status === 'IN_PROGRESS' ||
-      service?.startDate;
+    const alreadyAttending = service?.isInAttendance === true || service?.status === 'IN_ATTENDANCE';
+    const isTerminal = service?.status === 'COMPLETED' || service?.status === 'CANCELED' || service?.status === 'FAILED';
 
-    if (!isAlreadyStarted && canStart) {
-      handleGoToLocation();
+    if (!alreadyAttending && !isTerminal) {
+      handleStartAttendance();
     }
-  }, [service, handleGoToLocation]);
+  }, [service, handleStartAttendance]);
 
   // Handle service completed navigation — usa o fluxo novo (service/) com checklist e
   // tratamento de requiresPayment. A rota legada dados-servico fica apenas como redirect.
@@ -194,6 +204,7 @@ export default function StopDetailScreen() {
       [ServiceType.DELIVERY]: 'Entrega',
       [ServiceType.PICKUP]: 'Coleta',
       [ServiceType.SERVICE]: 'Serviço',
+      [ServiceType.TRANSFER]: 'Transferência',
     };
     return typeMap[service.serviceType as ServiceType] ?? service.serviceType ?? 'Serviço';
   }, [service]);
@@ -239,8 +250,8 @@ export default function StopDetailScreen() {
   const addressText = formatAddress(service?.address)
     ?? address?.formattedAddress
     ?? (service.addressId ? `Endereço ID: ${service.addressId}` : 'Endereço não disponível');
-  const startTime = service.scheduledStartTime ?? '--:--';
-  const endTime = service.estimatedCompletionTime ?? '--:--';
+  const startTime = formatHHmm(service.estimatedArrival);
+  const endTime = formatHHmm(service.estimatedCompletion);
   const serviceTypeLabel = getServiceTypeLabel();
 
   // Coordinates
@@ -315,6 +326,31 @@ export default function StopDetailScreen() {
         </Text>
       </Box>
 
+      {/* Origem → Destino (TRANSFER ponto-a-ponto) */}
+      {service.serviceType === ServiceType.TRANSFER && (service.pickupAddress || service.deliveryAddress) && (
+        <Box backgroundColor="secondary10" p="y12" borderRadius="s12" gap="y8">
+          <Box flexDirection="row" alignItems="center" gap="x8">
+            <LocalIcon iconName="location" size={measure.m20} color="secondary100" />
+            <Box flex={1}>
+              <Text preset="text12" color="gray600">Origem (coleta)</Text>
+              <Text preset="text14" fontWeightPreset="semibold" color="colorTextPrimary">
+                {formatAddress(service.pickupAddress) ?? 'Origem não informada'}
+              </Text>
+            </Box>
+          </Box>
+          <Text preset="text16" color="secondary100" textAlign="center">↓</Text>
+          <Box flexDirection="row" alignItems="center" gap="x8">
+            <LocalIcon iconName="location" size={measure.m20} color="primary100" />
+            <Box flex={1}>
+              <Text preset="text12" color="gray600">Destino (entrega)</Text>
+              <Text preset="text14" fontWeightPreset="semibold" color="colorTextPrimary">
+                {formatAddress(service.deliveryAddress) ?? 'Destino não informado'}
+              </Text>
+            </Box>
+          </Box>
+        </Box>
+      )}
+
       {/* Observation/Notes */}
       {service.problemDescription && (
         <Box>
@@ -334,6 +370,7 @@ export default function StopDetailScreen() {
         {...stopStatus}
         hasArrivedAtLocation={hasArrivedAtLocation}
         isStarting={isStarting}
+        isStartingAttendance={isStartingAttendance}
         isCompletingRouting={isCompletingRouting}
         onGoToLocation={handleGoToLocation}
         onArrivedAtLocation={handleArrivedAtLocation}
@@ -347,7 +384,7 @@ export default function StopDetailScreen() {
   // Equipment tab content
   const equipmentContent = (
     <Box gap="y16" pb="y24">
-      <EquipmentList equipments={service?.equipments || []} />
+      <EquipmentList materials={service?.materials || []} />
     </Box>
   );
 
