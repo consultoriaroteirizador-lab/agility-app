@@ -3,8 +3,6 @@ import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 
 import type { ServiceCompletionDetailsRequest } from '@/domain/agility/service/dto/request/service-completion-details.request';
-import { ServiceStatus } from '@/domain/agility/service/dto/types';
-import { serviceService } from '@/domain/agility/service/serviceService';
 import { useCompleteServiceWithDetails } from '@/domain/agility/service/useCase';
 import { KEY_SERVICES, KEY_ROUTINGS } from '@/domain/queryKeys';
 import { useToastService } from '@/services/Toast/useToast';
@@ -12,12 +10,8 @@ import { parseBRLToCents } from '@/utils/parseCurrency';
 
 import { useParada } from '../_context/ParadaContext';
 
+import { getCurrentCoords } from './getCurrentCoords';
 import { useServiceUpload } from './useServiceUpload';
-
-// Delay para aguardar propagação do status no backend (race condition)
-// Otimizado: reduzido de 500ms/5 tentativas (2.5s max) para 200ms/3 tentativas (600ms max)
-const STATUS_PROPAGATION_DELAY_MS = 200;
-const MAX_STATUS_CHECK_RETRIES = 3;
 
 /**
  * Hook para gerenciar a finalização do serviço
@@ -46,6 +40,7 @@ export function useServiceCompletion() {
         photos,
         paymentAmount,
         paymentMethod,
+        pickupEvidence,
     } = useParada();
     const { showToast } = useToastService();
 
@@ -91,52 +86,15 @@ export function useServiceCompletion() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    const invalidateQueries = useCallback(async () => {
-        // Otimizado: usar invalidateQueries com refetchType: 'all' ao invés de
-        // múltiplos invalidate + refetch separados (reduz de 5 para 2 operações)
-        await Promise.all([
-            queryClient.invalidateQueries({
-                queryKey: [KEY_SERVICES],
-                refetchType: 'all'
-            }),
-            queryClient.invalidateQueries({
-                queryKey: [KEY_ROUTINGS, rotaId],
-                refetchType: 'all'
-            }),
-        ]);
-    }, [queryClient, rotaId]);
-
-    /**
-     * Aguarda o status do serviço ser propagado no backend
-     * Necessário para evitar race condition entre start() e completion-details
-     */
-    const waitForStatusPropagation = useCallback(async (
-        targetServiceId: string,
-        expectedStatus: ServiceStatus
-    ): Promise<boolean> => {
-        for (let attempt = 0; attempt < MAX_STATUS_CHECK_RETRIES; attempt++) {
-            // Aguardar delay antes de verificar
-            await new Promise(resolve => setTimeout(resolve, STATUS_PROPAGATION_DELAY_MS));
-
-            // Verificar se ainda está montado
-            if (!isMountedRef.current) {
-                return false;
-            }
-
-            try {
-                const response = await serviceService.findOne(targetServiceId);
-                const currentStatus = response.result?.status;
-
-                if (currentStatus === expectedStatus) {
-                    return true;
-                }
-            } catch (error) {
-                console.warn(`[useServiceCompletion] Erro ao verificar status (tentativa ${attempt + 1}):`, error);
-            }
-        }
-
-        return false;
-    }, []);
+    const invalidateQueries = useCallback(() => {
+        // Invalidação cirúrgica em background — NÃO aguardamos o refetch (UI desbloqueia
+        // na hora). Antes usava [KEY_SERVICES] + refetchType:'all', que refazia TODAS as
+        // queries de serviço do app a cada conclusão. Agora mira só o que mudou: este
+        // serviço, a lista da rota e a própria rota.
+        void queryClient.invalidateQueries({ queryKey: [KEY_SERVICES, serviceId] });
+        void queryClient.invalidateQueries({ queryKey: [KEY_SERVICES, 'routing', rotaId] });
+        void queryClient.invalidateQueries({ queryKey: [KEY_ROUTINGS, rotaId] });
+    }, [queryClient, serviceId, rotaId]);
 
     // Finalizar serviço
     const handleFinalizar = useCallback(async () => {
@@ -192,30 +150,23 @@ export function useServiceCompletion() {
 
             setFinalizing(true);
 
-            // Upload de photos com tratamento de erro robusto
-            let photoUrls: string[] = [];
-            try {
-                photoUrls = await uploadPhotos();
-            } catch (photoError) {
-                console.error('[useServiceCompletion] Erro no upload de photos (continuando sem fotos):', photoError);
-                photoUrls = [];
-            }
+            // Upload de fotos e assinatura em PARALELO (são independentes). Ambos são
+            // idempotentes: como o upload já acontece em background ao capturar a mídia,
+            // aqui normalmente retornam de imediato as URLs já enviadas.
+            const [photoUrls, signatureUrl] = await Promise.all([
+                uploadPhotos().catch((photoError) => {
+                    console.error('[useServiceCompletion] Erro no upload de photos (continuando sem fotos):', photoError);
+                    return [] as string[];
+                }),
+                signature
+                    ? uploadSignature(signature).catch((sigError) => {
+                        console.error('[useServiceCompletion] Erro no upload de signature (continuando sem assinatura):', sigError);
+                        return null;
+                    })
+                    : Promise.resolve<string | null>(null),
+            ]);
 
             // Verificar se ainda está montado após operações assíncronas
-            if (!isMountedRef.current) {
-                return;
-            }
-
-            // Upload de signature com tratamento de erro robusto
-            let signatureUrl: string | null = null;
-            try {
-                signatureUrl = signature ? await uploadSignature(signature) : null;
-            } catch (sigError) {
-                console.error('[useServiceCompletion] Erro no upload de signature (continuando sem assinatura):', sigError);
-                signatureUrl = null;
-            }
-
-            // Verificar se ainda está montado
             if (!isMountedRef.current) {
                 return;
             }
@@ -254,44 +205,36 @@ export function useServiceCompletion() {
                 payload.paymentMethod = paymentMethod;
             }
 
-            console.log('[useServiceCompletion] Payload a ser enviado:', JSON.stringify(payload, null, 2));
-
-            // Verificar se o serviço precisa ser iniciado
-            const needsToStart = !service ||
-                (service.status !== ServiceStatus.IN_PROGRESS &&
-                    service.status !== ServiceStatus.COMPLETED);
-
-            if (needsToStart) {
-                // Iniciar o serviço automaticamente antes de finalizar
-                try {
-                    await serviceService.start(serviceId);
-                } catch (startError) {
-                    console.warn('[useServiceCompletion] Erro ao iniciar serviço (pode já estar iniciado):', startError);
-                    // Continuar mesmo com erro - o serviço pode já estar iniciado
-                }
-
-                // Aguardar propagação do status
-                const statusPropagated = await waitForStatusPropagation(serviceId, ServiceStatus.IN_PROGRESS);
-
-                if (!statusPropagated) {
-                    console.warn('[useServiceCompletion] Status não propagou, mas continuando mesmo assim...');
-                }
-
-                // Verificar se ainda está montado
-                if (!isMountedRef.current) {
-                    return;
-                }
-
-                // Invalidar cache para atualizar o estado
-                await queryClient.invalidateQueries({ queryKey: [KEY_SERVICES, serviceId] });
-                await queryClient.invalidateQueries({ queryKey: [KEY_SERVICES, 'routing', rotaId] });
+            // Captura a referência de GPS de onde o serviço foi finalizado (best-effort).
+            const finishCoords = await getCurrentCoords();
+            if (finishCoords) {
+                payload.latitude = finishCoords.latitude;
+                payload.longitude = finishCoords.longitude;
+                payload.accuracy = finishCoords.accuracy;
             }
 
-            // CORREÇÃO: Não chamar complete() separadamente!
-            // O completeWithDetails já chama service.complete() internamente no backend
-            // Se chamarmos complete() antes, o backend vai rejeitar com "Service is already completed"
+            // TRANSFER: anexa a evidência da COLETA na origem (perna 1), capturada antes.
+            if (pickupEvidence) {
+                payload.pickupCompletion = {
+                    customerSignature: pickupEvidence.signatureUrl,
+                    receivedBy: pickupEvidence.receivedBy,
+                    photoProof: pickupEvidence.photoUrls.length > 0
+                        ? pickupEvidence.photoUrls.join(',')
+                        : undefined,
+                    notes: pickupEvidence.notes,
+                };
+            }
 
-            // Usar versão async para poder aguardar e capturar erros corretamente
+            console.log('[useServiceCompletion] Payload a ser enviado:', JSON.stringify(payload, null, 2));
+
+            // O backend conclui de forma atômica a partir de qualquer estado pré-terminal
+            // (PENDING/ASSIGNED/IN_PROGRESS/IN_ATTENDANCE): a passagem pelo "atendimento" é
+            // implícita e ele seta startDate se faltar. Por isso NÃO precisamos mais
+            // pré-iniciar o atendimento nem ficar fazendo polling de propagação de status
+            // antes de finalizar — economiza 1 request + até 600ms de espera fixa.
+
+            // O completeWithDetails já chama service.complete() internamente no backend.
+            // Usar versão async para poder aguardar e capturar erros corretamente.
             try {
                 await completeServiceWithDetailsAsync({
                     id: serviceId,
@@ -307,8 +250,8 @@ export function useServiceCompletion() {
                 return;
             }
 
-            // Sucesso - invalidar queries e mostrar feedback
-            await invalidateQueries();
+            // Sucesso - invalida em background (não bloqueia o feedback de sucesso)
+            invalidateQueries();
 
             if (isMountedRef.current) {
                 setFinalizing(false);
@@ -346,15 +289,13 @@ export function useServiceCompletion() {
         recipient,
         service,
         completeServiceWithDetailsAsync,
-        queryClient,
-        rotaId,
-        waitForStatusPropagation,
         invalidateQueries,
         setShowSuccess,
         resetState,
         photos,
         paymentAmount,
         paymentMethod,
+        pickupEvidence,
     ]);
 
     // Verificar se pode finalizar - validação robusta
