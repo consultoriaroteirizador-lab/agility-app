@@ -437,6 +437,24 @@ export default function SuporteChatPage() {
 
   // ✅ PERFORMANCE: Upload não-bloqueante
   // Mensagem aparece imediatamente com URI local, upload roda em background
+  // Trata falha de envio: se o backend recusou por chat encerrado, trava a tela
+  // (input desabilitado + banner de finalizado) — cobre o caso de o app não ter
+  // recebido o chat_closed em tempo real.
+  const handleSendFailure = useCallback(
+    (error: unknown, fallbackMsg = 'Não foi possível enviar a mensagem') => {
+      const raw = (error as any)?.response?.data?.message ?? (error as any)?.message ?? '';
+      const text = Array.isArray(raw) ? raw.join(' ') : String(raw);
+      if (/encerrad|fechad|closed/i.test(text)) {
+        setChatStatus(ChatStatus.CLOSED);
+        refetchMessages();
+        showToast({ message: 'Este atendimento foi finalizado pelo operador.', type: 'error' });
+        return;
+      }
+      showToast({ message: fallbackMsg, type: 'error' });
+    },
+    [refetchMessages, showToast],
+  );
+
   const handleSendMessage = useCallback(
     (content: string, tempAttachments?: any[]) => {
       if (!chatId || isSending || chatStatus === ChatStatus.CLOSED) return;
@@ -498,7 +516,7 @@ export default function SuporteChatPage() {
                 onError: (error) => {
                   console.error('[handleSendMessage] Erro ao enviar:', error);
                   removeOptimisticMessage(chatId, tempId);
-                  showToast({ message: 'Não foi possível enviar a mensagem', type: 'error' });
+                  handleSendFailure(error);
                 },
               });
             } else {
@@ -527,11 +545,11 @@ export default function SuporteChatPage() {
         // ✅ PERFORMANCE: Não invalidar aqui - usePostMessage já gerencia o cache
         onError: (error) => {
           console.error('Erro ao enviar mensagem:', error);
-          showToast({ message: 'Não foi possível enviar a mensagem', type: 'error' });
+          handleSendFailure(error);
         },
       });
     },
-    [chatId, isSending, chatStatus, uploadAttachments, sendMessageMutation, queryClient, currentUserSenderId, addOptimisticMessage, removeOptimisticMessage],
+    [chatId, isSending, chatStatus, uploadAttachments, sendMessageMutation, queryClient, currentUserSenderId, addOptimisticMessage, removeOptimisticMessage, handleSendFailure],
   );
 
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
