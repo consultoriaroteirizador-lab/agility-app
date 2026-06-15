@@ -493,31 +493,52 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
     }
   }, [isAuthenticated, expoPushToken, authLoading, tokenRegistered, registerTokenToBackend, userAuth?.status]);
 
-  // Limpar dados ao fazer logout
+  // Resetar flags de registro quando o USUÁRIO muda no mesmo device
+  // (logout A → login B sem fechar o app). O token de push é por-usuário no
+  // backend, então B precisa re-registrar. Antes, as flags
+  // (tokenRegistered/registrationAttempted) + o flag global no AsyncStorage
+  // ficavam do usuário anterior e bloqueavam o registro do novo.
+  const previousUserIdRef = useRef<string | undefined>(undefined);
   useEffect(() => {
-    if (!isAuthenticated && tokenRegistered) {
-      if (isDevelopment) console.log("Logout detectado. Limpando dados de notificação...");
-      setTokenRegistered(false);
+    const currentUserId = userAuth?.id;
+    const prevUserId = previousUserIdRef.current;
+    if (prevUserId && currentUserId && prevUserId !== currentUserId) {
+      if (isDevelopment) console.log("Usuário mudou. Resetando flags de registro do token...");
       registrationAttempted.current = false;
-      clearPendingNavigation();
-
-      // Remover listeners do Expo Notifications: o setup useEffect só os recria
-      // quando authLoading muda, então no ciclo de logout eles continuariam
-      // ativos ouvindo eventos de um usuário deslogado.
-      notificationListener.current?.remove();
-      notificationListener.current = null;
-      responseListener.current?.remove();
-      responseListener.current = null;
-
-      (async () => {
-        try {
-          await AsyncStorage.removeItem(TOKEN_REGISTERED_KEY);
-        } catch (e) {
-          if (isDevelopment) console.error(e);
-        }
-      })();
+      setTokenRegistered(false);
+      AsyncStorage.removeItem(TOKEN_REGISTERED_KEY).catch(() => {});
     }
-  }, [isAuthenticated, tokenRegistered, clearPendingNavigation]);
+    previousUserIdRef.current = currentUserId;
+  }, [userAuth?.id]);
+
+  // Limpar dados ao fazer logout — dispara na TRANSIÇÃO logado → deslogado,
+  // NÃO gated em `tokenRegistered`. Antes, se no momento do logout o state
+  // `tokenRegistered` já estivesse false (ex.: reset por mudança de status)
+  // mas o AsyncStorage ainda tivesse 'true', a limpeza não rodava e o próximo
+  // login (outro motorista) via o flag global persistido e pulava o registro.
+  const wasAuthenticatedRef = useRef(false);
+  useEffect(() => {
+    const wasAuthenticated = wasAuthenticatedRef.current;
+    wasAuthenticatedRef.current = isAuthenticated;
+    if (!(wasAuthenticated && !isAuthenticated)) return;
+
+    if (isDevelopment) console.log("Logout detectado. Limpando dados de notificação...");
+    setTokenRegistered(false);
+    registrationAttempted.current = false;
+    clearPendingNavigation();
+
+    // Remover listeners do Expo Notifications: o setup useEffect só os recria
+    // quando authLoading muda, então no ciclo de logout eles continuariam
+    // ativos ouvindo eventos de um usuário deslogado.
+    notificationListener.current?.remove();
+    notificationListener.current = null;
+    responseListener.current?.remove();
+    responseListener.current = null;
+
+    AsyncStorage.removeItem(TOKEN_REGISTERED_KEY).catch((e) => {
+      if (isDevelopment) console.error(e);
+    });
+  }, [isAuthenticated, clearPendingNavigation]);
 
   return (
     <NotificationContext.Provider
