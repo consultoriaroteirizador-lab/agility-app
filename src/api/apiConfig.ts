@@ -68,6 +68,19 @@ function setupResponseInterceptor(apiInstance: ReturnType<typeof axios.create>) 
 
 function setupRequestInterceptor(apiInstance: ReturnType<typeof axios.create>) {
   apiInstance.interceptors.request.use(async (request) => {
+    // Rotas públicas marcam `skipAuth: true` para omitir o Authorization APENAS
+    // nesta request, sem mexer no header default global (`defaults.headers.common`).
+    // Mutar o global causava race: durante o await da chamada pública, requests
+    // autenticadas concorrentes (ex.: query de rotas refetchando no login) saíam
+    // sem token e tomavam 401.
+    if ((request as { skipAuth?: boolean }).skipAuth) {
+      const headers = request.headers as unknown as { delete?: (name: string) => void };
+      if (typeof headers?.delete === 'function') {
+        headers.delete('Authorization');
+      } else if (request.headers) {
+        delete (request.headers as Record<string, unknown>).Authorization;
+      }
+    }
     if (isDevelopment || __DEV__) {
       const apiName = getApiName(request.baseURL || '');
       console.log(`[${apiName}] Request:`, request.method?.toUpperCase(), request.url);
