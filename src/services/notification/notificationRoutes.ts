@@ -57,6 +57,8 @@ export const notificationRoutes: Record<string, (params?: any) => void> = {
     // Menu
     menu: () => router.navigate('/(auth)/(tabs)/menu' as Href),
     chat: (params?: any) => router.navigate({ pathname: '/(auth)/(tabs)/menu/chat' as any, params }),
+    // Chat de suporte (abre a conversa específica via param `id` = chatId)
+    suporte: (params?: any) => router.navigate({ pathname: '/(auth)/(tabs)/menu/suporte/[id]' as any, params }),
     serviceChannel: () => router.navigate('/(auth)/MenuScreen/ServiceChannelScreen' as Href),
     changePassword: () => router.navigate('/(auth)/MenuScreen/ChangePasswordScreen' as Href),
     termsMenu: () => router.navigate('/(auth)/MenuScreen/Terms' as Href),
