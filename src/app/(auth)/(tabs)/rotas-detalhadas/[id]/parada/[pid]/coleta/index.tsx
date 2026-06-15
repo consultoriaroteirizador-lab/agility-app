@@ -6,6 +6,7 @@ import { Box, ActivityIndicator, Text } from '@/components';
 import { measure } from '@/theme';
 
 import { ColetaEtapaCheckItens, ColetaEtapaConfirmacao, ColetaEtapaInicial } from '../_components/coleta';
+import { EtapaConcluida } from '../_components/shared/EtapaConcluida';
 import { SharedEtapaDados } from '../_components/shared/SharedEtapaDados';
 import { SharedEtapaFinalizacao } from '../_components/shared/SharedEtapaFinalizacao';
 import { SharedEtapaFormulario } from '../_components/shared/SharedEtapaFormulario';
@@ -19,6 +20,7 @@ function ColetaOrchestrator() {
     const router = useRouter();
     const {
         rotaId,
+        service,
         etapa,
         isServiceStarted,
         delivered,
@@ -31,6 +33,10 @@ function ColetaOrchestrator() {
         hasFormGroups,
         formCompleted,
     } = useParada();
+
+    // Serviço já finalizado → tela read-only (não reabre o fluxo de execução).
+    const isServiceFinalized =
+        service?.isCompleted === true || service?.isCanceled === true || service?.isFailed === true;
 
     // Buscar materiais quando entrar na etapa de confirmação (para saber se tem materiais)
     useEffect(() => {
@@ -73,6 +79,11 @@ function ColetaOrchestrator() {
                 </Text>
             </Box>
         );
+    }
+
+    // Serviço já finalizado (concluído/insucesso): tela somente leitura.
+    if (isServiceFinalized) {
+        return <EtapaConcluida />;
     }
 
     // Renderizar etapa atual baseado no estado
