@@ -200,6 +200,11 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
         return;
       }
 
+      if (!deviceId) {
+        if (isDevelopment) console.warn("deviceId ainda não disponível. Registro será feito quando estiver pronto.");
+        return;
+      }
+
       // Verifica se já foi registrado
       const alreadyRegistered = await checkTokenRegistration();
       if (alreadyRegistered && tokenRegistered) {
@@ -212,8 +217,9 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
         if (isDevelopment) console.log("Registrando token no backend...");
 
         await registerUserNotification({
-          pushToken: token,
-          platform: Platform.OS === 'android' ? "ANDROID" : "IOS"
+          token,
+          platform: Platform.OS === 'android' ? "ANDROID" : "IOS",
+          deviceId,
         });
 
         registrationAttempted.current = true;
@@ -222,7 +228,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
         setIsRegistering(false);
       }
     },
-    [isAuthenticated, isRegistering, registerUserNotification, tokenRegistered, checkTokenRegistration, userAuth?.status]
+    [isAuthenticated, isRegistering, registerUserNotification, tokenRegistered, checkTokenRegistration, userAuth?.status, deviceId]
   );
 
   // Retry manual do registro

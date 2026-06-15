@@ -1,4 +1,4 @@
-import { apiIdentity, BaseResponseAPI } from "@/api";
+import { apiAgility, apiIdentity, BaseResponseAPI } from "@/api";
 
 import { RegisterUserNotificationRequest } from "./dto/RegisterUserRequest";
 import { RegisterUserServiceNotificationRequest } from "./dto/RegisterUserServiceRequest";
@@ -7,7 +7,7 @@ import { GetBannerPromoResponseAPI } from "./dto/response/GetBannerPromoResponse
 
 
 async function registerUser(request: RegisterUserNotificationRequest): Promise<BaseResponseAPI<string>> {
-    const response = await apiIdentity.post<BaseResponseAPI<string>>("/app/user/register", request);
+    const response = await apiAgility.post<BaseResponseAPI<string>>("/notifications/push-token", request);
     return response.data;
 }
 

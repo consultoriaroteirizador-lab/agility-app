@@ -56,6 +56,7 @@ export const notificationRoutes: Record<string, (params?: any) => void> = {
 
     // Menu
     menu: () => router.navigate('/(auth)/(tabs)/menu' as Href),
+    chat: (params?: any) => router.navigate({ pathname: '/(auth)/(tabs)/menu/chat' as any, params }),
     serviceChannel: () => router.navigate('/(auth)/MenuScreen/ServiceChannelScreen' as Href),
     changePassword: () => router.navigate('/(auth)/MenuScreen/ChangePasswordScreen' as Href),
     termsMenu: () => router.navigate('/(auth)/MenuScreen/Terms' as Href),
