@@ -86,9 +86,37 @@ interface MessageItemProps {
   item: Extract<FlatItem, { type: 'message' }>;
   prevItem: FlatItem | undefined;
   isOwnMessage: (msg: ChatMessage) => boolean;
+  peerReadAt: string | null;
+  peerDeliveredAt: string | null;
 }
 
-function MessageItem({ item, prevItem, isOwnMessage }: MessageItemProps) {
+// Estado de entrega/leitura de uma mensagem própria (estilo WhatsApp)
+type ReadState = 'pending' | 'sent' | 'delivered' | 'read';
+
+function getReadState(
+  msg: ChatMessage,
+  peerReadAt: string | null,
+  peerDeliveredAt: string | null,
+): ReadState {
+  if (msg.id.startsWith('temp-')) return 'pending';
+
+  const createdMs = new Date(msg.createdAt).getTime();
+  const isRead =
+    !!msg.readAt ||
+    msg.status === MessageStatus.READ ||
+    (!!peerReadAt && createdMs <= new Date(peerReadAt).getTime());
+  if (isRead) return 'read';
+
+  const isDelivered =
+    !!msg.deliveredAt ||
+    msg.status === MessageStatus.DELIVERED ||
+    (!!peerDeliveredAt && createdMs <= new Date(peerDeliveredAt).getTime());
+  if (isDelivered) return 'delivered';
+
+  return 'sent';
+}
+
+function MessageItem({ item, prevItem, isOwnMessage, peerReadAt, peerDeliveredAt }: MessageItemProps) {
   const { msg, isLast } = item;
   const prevMsg = prevItem?.type === 'message' ? prevItem.msg : null;
   const isOwn = isOwnMessage(msg);
@@ -201,6 +229,18 @@ function MessageItem({ item, prevItem, isOwnMessage }: MessageItemProps) {
           <Text preset="text12" color={isOwn ? 'white' : 'gray500'} textAlign="right">
             {formatChatTime(msg.createdAt)}
           </Text>
+          {/* Status de entrega/leitura (apenas nas próprias mensagens) */}
+          {isOwn && (() => {
+            const readState = getReadState(msg, peerReadAt, peerDeliveredAt);
+            // ✓ = enviada/pendente; ✓✓ = entregue/lida; cor wazeBlue (ciano) = lida
+            const isDouble = readState === 'delivered' || readState === 'read';
+            const tickColor = readState === 'read' ? 'wazeBlue' : 'whiteTransparent';
+            return (
+              <Text preset="text12" color={tickColor} fontWeightPreset="bold">
+                {isDouble ? '✓✓' : '✓'}
+              </Text>
+            );
+          })()}
         </Box>
       </Box>
     </Box>
@@ -234,6 +274,11 @@ export default function SuporteChatPage() {
   const { ticket } = useGetTicketByChatId(chatId);
 
   const [wsMessages, setWsMessages] = useState<ChatMessage[]>([]);
+
+  // Estilo WhatsApp: marca de leitura/entrega do outro participante (operador).
+  // Guardamos o timestamp do evento; toda mensagem própria anterior a ele é tratada como lida/entregue.
+  const [peerReadAt, setPeerReadAt] = useState<string | null>(null);
+  const [peerDeliveredAt, setPeerDeliveredAt] = useState<string | null>(null);
 
   const convertedApiMessages = useMemo(
     () => (messagesFromAPI || []).map(msg => convertToChatMessage(msg, chatId || '')),
@@ -359,7 +404,7 @@ export default function SuporteChatPage() {
     [chatId, refetchMessages],
   );
 
-  const { isConnected, emitTypingStart, emitTypingStop } = useChatWebSocket({
+  const { isConnected, emitTypingStart, emitTypingStop, markAsRead: markAsReadWS } = useChatWebSocket({
     enabled: !!chatId,
     chatId: chatId,
     onMessage: handleNewMessage,
@@ -367,7 +412,25 @@ export default function SuporteChatPage() {
     onError: (error) => {
       console.error('[SuporteChatPage] WebSocket error:', error);
     },
+    // O operador leu nossas mensagens → marca como lidas (✓✓ azul)
+    onMessagesRead: (data) => {
+      if (data.chatId !== chatId) return;
+      setPeerReadAt(new Date().toISOString());
+    },
+    // Mensagens entregues ao outro participante → ✓✓
+    onMessagesDelivered: (data) => {
+      if (data.chatId !== chatId) return;
+      setPeerDeliveredAt(data.deliveredAt || new Date().toISOString());
+    },
   });
+
+  // Emite o "read" do motorista via WS quando há mensagens e estamos conectados.
+  // O backend repassa 'messages_read' ao operador (em tempo real), além do REST já existente.
+  useEffect(() => {
+    if (!isConnected || !chatId || !messagesFromAPI?.length) return;
+    const last = messagesFromAPI[messagesFromAPI.length - 1];
+    if (last?.id) markAsReadWS(chatId, String(last.id));
+  }, [isConnected, chatId, messagesFromAPI, markAsReadWS]);
 
   // ✅ OTIMIZAÇÃO: Removido useEffect de scroll duplicado
   // O scroll já é feito no onContentSizeChange da FlatList (mais eficiente)
@@ -499,12 +562,18 @@ export default function SuporteChatPage() {
 
   const isOwnMessage = useCallback(
     (msg: ChatMessage) => {
-      if (!currentUserSenderId || !msg.senderId) {
-        return String(msg.senderType).toUpperCase().includes('DRIVER');
+      // 1) servidor envia senderId interno + senderKeycloakUserId → casa com o keycloak do usuário
+      if (msg.senderKeycloakUserId && userAuth?.id && String(msg.senderKeycloakUserId) === String(userAuth.id)) {
+        return true;
       }
-      return String(msg.senderId) === String(currentUserSenderId);
+      // 2) otimística guarda o keycloak em senderId (== currentUserSenderId)
+      if (currentUserSenderId && msg.senderId && String(msg.senderId) === String(currentUserSenderId)) {
+        return true;
+      }
+      // 3) fallback: é o app do motorista, então toda msg do tipo DRIVER é própria
+      return String(msg.senderType).toUpperCase().includes('DRIVER');
     },
-    [currentUserSenderId],
+    [currentUserSenderId, userAuth?.id],
   );
 
   const renderItem = useCallback(
@@ -526,10 +595,12 @@ export default function SuporteChatPage() {
           item={item}
           prevItem={flatData[index - 1]}
           isOwnMessage={isOwnMessage}
+          peerReadAt={peerReadAt}
+          peerDeliveredAt={peerDeliveredAt}
         />
       );
     },
-    [flatData, isOwnMessage],
+    [flatData, isOwnMessage, peerReadAt, peerDeliveredAt],
   );
 
   const keyExtractor = useCallback(

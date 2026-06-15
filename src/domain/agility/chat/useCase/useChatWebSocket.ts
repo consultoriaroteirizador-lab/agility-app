@@ -23,6 +23,8 @@ export interface UseChatWebSocketOptions {
     onError?: (error: Error) => void;
     onTypingStart?: (data: { chatId: string; userId: string }) => void;
     onTypingStop?: (data: { chatId: string; userId: string }) => void;
+    onMessagesRead?: (data: { chatId: string; readBy: string; messageId?: string }) => void;
+    onMessagesDelivered?: (data: { chatId: string; messageIds: string[]; deliveredTo: string; deliveredAt: string }) => void;
 }
 
 export function useChatWebSocket(options: UseChatWebSocketOptions = {}) {
@@ -34,6 +36,8 @@ export function useChatWebSocket(options: UseChatWebSocketOptions = {}) {
         onError,
         onTypingStart,
         onTypingStop,
+        onMessagesRead,
+        onMessagesDelivered,
     } = options;
     const { authCredentials, userAuth } = useAuthCredentialsService();
     const [isConnected, setIsConnected] = useState(false);
@@ -49,6 +53,8 @@ export function useChatWebSocket(options: UseChatWebSocketOptions = {}) {
     const onErrorRef = useRef(onError);
     const onTypingStartRef = useRef(onTypingStart);
     const onTypingStopRef = useRef(onTypingStop);
+    const onMessagesReadRef = useRef(onMessagesRead);
+    const onMessagesDeliveredRef = useRef(onMessagesDelivered);
 
     const setConnectedRef = useRef(useChatStore.getState().setConnected);
     const addTypingUserRef = useRef(useChatStore.getState().addTypingUser);
@@ -61,7 +67,9 @@ export function useChatWebSocket(options: UseChatWebSocketOptions = {}) {
         onErrorRef.current = onError;
         onTypingStartRef.current = onTypingStart;
         onTypingStopRef.current = onTypingStop;
-    }, [onMessage, onChatClosed, onError, onTypingStart, onTypingStop]);
+        onMessagesReadRef.current = onMessagesRead;
+        onMessagesDeliveredRef.current = onMessagesDelivered;
+    }, [onMessage, onChatClosed, onError, onTypingStart, onTypingStop, onMessagesRead, onMessagesDelivered]);
 
     useEffect(() => {
         isMountedRef.current = true;
@@ -261,6 +269,22 @@ export function useChatWebSocket(options: UseChatWebSocketOptions = {}) {
             removeTypingUserRef.current(data.chatId, data.userId);
             if (onTypingStopRef.current) {
                 onTypingStopRef.current(data);
+            }
+        });
+
+        // Outro participante (ex.: operador) leu as mensagens deste chat
+        socket.on('messages_read', (data: { chatId: string; readBy: string; messageId?: string }) => {
+            console.log('[useChatWebSocket] Messages read by peer:', data);
+            if (onMessagesReadRef.current) {
+                onMessagesReadRef.current(data);
+            }
+        });
+
+        // Mensagens foram entregues a outro participante
+        socket.on('messages_delivered', (data: { chatId: string; messageIds: string[]; deliveredTo: string; deliveredAt: string }) => {
+            console.log('[useChatWebSocket] Messages delivered:', data);
+            if (onMessagesDeliveredRef.current) {
+                onMessagesDeliveredRef.current(data);
             }
         });
 
