@@ -39,6 +39,16 @@ export interface ServiceDraftData {
     failureNotes?: string
     failurePhotos?: string[]
 
+    /**
+     * Campos `*Signed` — presigned URLs derivadas pelo backend (GET draft), SÓ
+     * para exibição. As chaves originais (photoUrls/etc.) seguem sendo a fonte de
+     * verdade para persistência/submissão. Restaurar usa estes para o `uri` do
+     * <Image> (a chave crua não carrega) e a chave para `__s3Url`.
+     */
+    photoUrlsSigned?: string[]
+    signatureUrlSigned?: string
+    failurePhotosSigned?: string[]
+
     /** TRANSFER: perna atual do wizard (coleta na origem → entrega no destino). */
     transferLeg?: 'pickup' | 'delivery'
     /** TRANSFER: coleta na origem concluída. */
@@ -49,6 +59,9 @@ export interface ServiceDraftData {
         signatureUrl?: string
         photoUrls?: string[]
         notes?: string
+        /** presigned (exibição) — ver nota em photoUrlsSigned. */
+        photoUrlsSigned?: string[]
+        signatureUrlSigned?: string
     }
 
     /** ISO string from the client at the moment of save (used server-side only for logging). */

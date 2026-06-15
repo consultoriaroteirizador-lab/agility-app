@@ -698,14 +698,16 @@ export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderPr
           setChecklist(prev => ({ ...prev, ...chosen.checklist }));
         }
         if (chosen.photoUrls && chosen.photoUrls.length > 0) {
-          const restored = chosen.photoUrls.map(url => ({
-            uri: url,
+          // `uri` = presigned (carrega no <Image>); `__s3Url` = chave (persistência/submissão).
+          const signed = chosen.photoUrlsSigned;
+          const restored = chosen.photoUrls.map((key, i) => ({
+            uri: signed?.[i] ?? key,
             width: 0,
             height: 0,
             type: 'image',
-            __s3Url: url,
+            __s3Url: key,
             __uploadStatus: 'uploaded',
-            __localUri: url,
+            __localUri: signed?.[i] ?? key,
           })) as unknown as ImagePicker.ImagePickerAsset[];
           setPhotos(restored);
         }
