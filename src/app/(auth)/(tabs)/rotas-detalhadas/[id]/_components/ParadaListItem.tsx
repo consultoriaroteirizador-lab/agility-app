@@ -71,10 +71,14 @@ export function ParadaListItem({
 }: ParadaListItemProps) {
     const { navegarParaParada, abrirNavegacao, routing } = useRota()
 
-    // Paradas só são clicáveis quando a rota está EM ANDAMENTO (IN_PROGRESS).
-    // Em qualquer outro status (não iniciada OU finalizada) os cards ficam esmaecidos —
-    // o clique já é bloqueado em navegarParaParada; aqui é só o feedback visual.
-    const routeNotClickable = routing?.isInProgress !== true
+    // Paradas são clicáveis quando a rota está EM ANDAMENTO (IN_PROGRESS) ou
+    // FINALIZADA (COMPLETED/CANCELLED) — finalizada abre o modo leitura. Só ficam
+    // esmaecidas/“travadas” nos estados intermediários (não iniciada/broadcasting).
+    const routeNotClickable = !(
+        routing?.isInProgress === true ||
+        routing?.isCompleted === true ||
+        routing?.isCancelled === true
+    )
 
     const statusConfig = STATUS_CONFIG[parada.status]
 
