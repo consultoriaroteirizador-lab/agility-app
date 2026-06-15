@@ -121,8 +121,11 @@ export function useInsucessoDraft(serviceId: string | undefined) {
                     prev.map(p => {
                         const localKey = p.__localUri ?? p.uri
                         if (localKey !== asset.uri) return p
+                        // NÃO trocar `uri` pela key do S3 (não é carregável pelo <Image>,
+                        // miniatura em branco). Mantém o `uri` LOCAL pro preview e guarda
+                        // a key em `__s3Url` — submissão e filtro de pendentes usam `__s3Url`.
                         return s3Url
-                            ? ({ ...p, uri: s3Url, __s3Url: s3Url, __uploadStatus: 'uploaded', __localUri: localKey } as InsucessoPhoto)
+                            ? ({ ...p, __s3Url: s3Url, __uploadStatus: 'uploaded', __localUri: localKey } as InsucessoPhoto)
                             : ({ ...p, __uploadStatus: 'failed', __localUri: localKey } as InsucessoPhoto)
                     }),
                 )
