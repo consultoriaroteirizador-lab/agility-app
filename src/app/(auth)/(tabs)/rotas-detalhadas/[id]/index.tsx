@@ -11,7 +11,6 @@ import { useLocalSearchParams } from 'expo-router'
 
 import { ActivityIndicator, Box, Button, ScreenBase, Text, TouchableOpacityBox } from '@/components'
 import { ButtonBack } from '@/components/Button/ButtonBack'
-import { LocationTrackingProvider } from '@/components/LocationTrackingProvider'
 import Modal from '@/components/Modal/Modal'
 import { measure } from '@/theme'
 
@@ -403,10 +402,9 @@ export default function RotaDetalhadaScreen() {
   const { id } = useLocalSearchParams<{ id: string }>()
 
   return (
-    <LocationTrackingProvider>
-      <RotaProvider routeId={id}>
-        <RotaDetalhadaContent />
-      </RotaProvider>
-    </LocationTrackingProvider>
+    // O tracking é gerido globalmente pelo LocationTrackingProvider em (auth)/_layout.
+    <RotaProvider routeId={id}>
+      <RotaDetalhadaContent />
+    </RotaProvider>
   )
 }
