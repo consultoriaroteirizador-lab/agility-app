@@ -87,8 +87,9 @@ export function useServiceUpload() {
             const urls = await uploadMultipleServicePhotos([asset], serviceId, 'before')
             const s3Url = urls[0]
             if (s3Url) {
+                // Mantém o `uri` LOCAL para o preview (a key do S3 não é carregável
+                // pelo <Image>); guarda a key em `__s3Url` para a submissão.
                 updatePhotoByLocalUri(localUri, {
-                    uri: s3Url,
                     __s3Url: s3Url,
                     __uploadStatus: 'uploaded',
                     __localUri: localUri,
@@ -141,12 +142,13 @@ export function useServiceUpload() {
                 },
             );
 
-            // Map each pending asset to its URL by position
+            // Map each pending asset to its URL by position.
+            // Mantém o `uri` LOCAL para o preview (a key do S3 não é carregável pelo
+            // <Image>); guarda a key em `__s3Url` para a submissão.
             pending.forEach((asset, i) => {
                 const url = urls[i]
                 if (!url) return
                 updatePhotoByLocalUri(asset.__localUri ?? asset.uri, {
-                    uri: url,
                     __s3Url: url,
                     __uploadStatus: 'uploaded',
                     __localUri: asset.__localUri ?? asset.uri,

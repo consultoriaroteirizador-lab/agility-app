@@ -790,8 +790,12 @@ export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderPr
           (prev as MaybeUploadingAsset[]).map(p => {
             const localKey = p.__localUri ?? p.uri;
             if (localKey !== asset.uri) return p;
+            // NÃO trocar `uri` pela key do S3: o backend retorna a KEY relativa
+            // (ex.: "services/.../photo.jpg"), que o <Image> não consegue carregar
+            // (miniatura em branco). Mantemos o `uri` LOCAL para o preview e guardamos
+            // a key em `__s3Url` — a submissão e o filtro de pendentes usam `__s3Url`.
             return s3Url
-              ? ({ ...p, uri: s3Url, __s3Url: s3Url, __uploadStatus: 'uploaded', __localUri: localKey } as unknown as ImagePicker.ImagePickerAsset)
+              ? ({ ...p, __s3Url: s3Url, __uploadStatus: 'uploaded', __localUri: localKey } as unknown as ImagePicker.ImagePickerAsset)
               : ({ ...p, __uploadStatus: 'failed', __localUri: localKey } as unknown as ImagePicker.ImagePickerAsset);
           }),
         );
