@@ -1,3 +1,5 @@
+import { useCallback } from "react";
+
 import { useMutation } from "@tanstack/react-query";
 
 import { useModalErrorService } from "@/services/modalError/useModalErrorService";
@@ -52,8 +54,20 @@ export function useMutationService<TData = void, TRequest = void>({
         ...options,
     });
 
-    const mutate = (variables?: TRequest) => mutation.mutate(variables as TRequest);
-    const mutateAsync = (variables?: TRequest) => mutation.mutateAsync(variables as TRequest);
+    // IMPORTANTE: memoizar. `mutation.mutate`/`mutateAsync` do react-query são
+    // estáveis; sem o useCallback, estes wrappers ganhavam nova identidade a cada
+    // render, quebrando qualquer consumidor que coloca `mutate` (ou um callback
+    // derivado dele) em dependência de useEffect/useCallback — causando loops de
+    // re-execução (ex.: LocationTrackingProvider start/stop tracking em loop).
+    const { mutate: rqMutate, mutateAsync: rqMutateAsync } = mutation;
+    const mutate = useCallback(
+        (variables?: TRequest) => rqMutate(variables as TRequest),
+        [rqMutate],
+    );
+    const mutateAsync = useCallback(
+        (variables?: TRequest) => rqMutateAsync(variables as TRequest),
+        [rqMutateAsync],
+    );
 
     return {
         isLoading: mutation.isPending,
