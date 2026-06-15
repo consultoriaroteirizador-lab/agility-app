@@ -69,7 +69,12 @@ export function ParadaListItem({
     onPress,
     showNavigationButton = true,
 }: ParadaListItemProps) {
-    const { navegarParaParada, abrirNavegacao } = useRota()
+    const { navegarParaParada, abrirNavegacao, routing } = useRota()
+
+    // Paradas só são clicáveis quando a rota está EM ANDAMENTO (IN_PROGRESS).
+    // Em qualquer outro status (não iniciada OU finalizada) os cards ficam esmaecidos —
+    // o clique já é bloqueado em navegarParaParada; aqui é só o feedback visual.
+    const routeNotClickable = routing?.isInProgress !== true
 
     const statusConfig = STATUS_CONFIG[parada.status]
 
@@ -103,9 +108,11 @@ export function ParadaListItem({
             alignItems="center"
             gap="x12"
             opacity={
-                parada.status === 'concluida-sucesso' || parada.status === 'concluida-insucesso'
-                    ? 0.7
-                    : 1
+                routeNotClickable
+                    ? 0.5
+                    : parada.status === 'concluida-sucesso' || parada.status === 'concluida-insucesso'
+                        ? 0.7
+                        : 1
             }
         >
             <Box

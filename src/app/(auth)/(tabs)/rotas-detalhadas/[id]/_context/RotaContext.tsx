@@ -12,6 +12,7 @@ import {
     useContext,
     ReactNode,
     useMemo,
+    useCallback,
 } from 'react'
 
 import { useQueryClient } from '@tanstack/react-query'
@@ -19,7 +20,10 @@ import { useRouter } from 'expo-router'
 
 
 import type { RoutingResponse } from '@/domain/agility/routing/dto'
+import { RoutingStatus } from '@/domain/agility/routing/dto/types'
+import { useFindMyRoutings } from '@/domain/agility/routing/useCase'
 import { KEY_ROUTINGS } from '@/domain/queryKeys'
+import { useToastService } from '@/services/Toast/useToast'
 
 import {
     useRouteDetails,
@@ -257,7 +261,7 @@ export function RotaProvider({ children, routeId }: RotaProviderProps) {
 
     // Hook de ações da rota (iniciar, concluir, navegar)
     const {
-        startRoute: iniciarRota,
+        startRoute: iniciarRotaBase,
         completeRoute: concluirRota,
         openNavigation: abrirNavegacao,
         isStarting,
@@ -278,8 +282,52 @@ export function RotaProvider({ children, routeId }: RotaProviderProps) {
 
     // Hook de navegação entre paradas
     const {
-        navigateToStop: navegarParaParada,
+        navigateToStop,
     } = useParadaNavigation(routeId)
+
+    const { showToast } = useToastService()
+
+    // Trava: só permite abrir a parada quando a rota está INICIALIZADA (IN_PROGRESS).
+    // A tela de paradas pode ser aberta por outros caminhos (notificação, lista de
+    // rotas) com a rota ainda ASSIGNED — nesse caso o clique é bloqueado e o motorista
+    // é orientado a iniciar a rota (o CTA "Iniciar Rota" aparece via RouteActions).
+    const navegarParaParada = useCallback(
+        (parada: Parada) => {
+            // SÓ permite abrir a parada quando a rota está EM ANDAMENTO (IN_PROGRESS).
+            // Qualquer outro status não leva a fluxo nenhum:
+            //   - ASSIGNED/pré-start  → orienta a iniciar a rota (toast)
+            //   - finalizada (COMPLETED/CANCELLED) → não acontece nada
+            if (routing?.isInProgress !== true) {
+                if (routing?.isAssigned === true) {
+                    showToast({
+                        message: 'Inicie a rota para acessar as paradas.',
+                        type: 'error',
+                    })
+                }
+                return
+            }
+            navigateToStop(parada)
+        },
+        [routing?.isInProgress, routing?.isAssigned, navigateToStop, showToast],
+    )
+
+    // Trava de iniciar rota: mesma regra da home — não pode iniciar uma segunda rota
+    // enquanto houver OUTRA já em andamento (IN_PROGRESS). Esta tela é acessível por
+    // notificação/lista, então o botão "Iniciar Rota" também precisa dessa validação.
+    const { routings } = useFindMyRoutings()
+    const iniciarRota = useCallback(() => {
+        const outraEmAndamento = routings.find(
+            (r) => r.id !== routeId && r.status === RoutingStatus.IN_PROGRESS,
+        )
+        if (outraEmAndamento) {
+            showToast({
+                message: 'Você já tem uma rota em andamento. Conclua-a antes de iniciar outra.',
+                type: 'error',
+            })
+            return
+        }
+        iniciarRotaBase()
+    }, [routings, routeId, iniciarRotaBase, showToast])
 
     // ========================================
     // VALOR DO CONTEXT
