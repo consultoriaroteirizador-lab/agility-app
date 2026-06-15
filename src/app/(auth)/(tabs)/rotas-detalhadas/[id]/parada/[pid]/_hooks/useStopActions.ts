@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 import { useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
@@ -60,6 +60,29 @@ export const useStopActions = ({
         void queryClient.invalidateQueries({ queryKey: [KEY_SERVICES, 'routing', routeId] });
     }, [queryClient, serviceId, routeId]);
 
+    // Loading "estendido": a mutation resolve rápido, mas o status só reflete na UI
+    // após o refetch (pode levar alguns segundos). Sem isso, o botão volta a ficar
+    // clicável nesse intervalo. Mantemos pendente do clique até o backend confirmar
+    // o novo status (via prop serviceStatus que atualiza no refetch) ou erro.
+    const [pendingStart, setPendingStart] = useState(false);
+    const [pendingAttendance, setPendingAttendance] = useState(false);
+
+    useEffect(() => {
+        // Confirmou "a caminho" (ou já avançou) → limpa pendência do start.
+        if (serviceStatus && serviceStatus !== ServiceStatus.PENDING && serviceStatus !== ServiceStatus.ASSIGNED) {
+            setPendingStart(false);
+        }
+        // Confirmou "em atendimento" (ou terminal) → limpa pendência do atendimento.
+        if (
+            serviceStatus === ServiceStatus.IN_ATTENDANCE ||
+            serviceStatus === ServiceStatus.COMPLETED ||
+            serviceStatus === ServiceStatus.FAILED ||
+            serviceStatus === ServiceStatus.CANCELED
+        ) {
+            setPendingAttendance(false);
+        }
+    }, [serviceStatus]);
+
     const { startService, isLoading: isStarting } = useStartService({
         onSuccess: async () => {
             await invalidateQueries();
@@ -80,6 +103,7 @@ export const useStopActions = ({
                 return
             }
             console.error('Error starting service:', error)
+            setPendingStart(false)
             showToast({ message: 'Não foi possível iniciar o serviço. Tente novamente.', type: 'error' })
         },
     })
@@ -102,6 +126,7 @@ export const useStopActions = ({
                 return
             }
             console.error('Error starting attendance:', error)
+            setPendingAttendance(false)
             showToast({ message: 'Não foi possível iniciar o atendimento. Tente novamente.', type: 'error' })
         },
     })
@@ -130,6 +155,7 @@ export const useStopActions = ({
     });
 
     const handleStartService = useCallback(() => {
+        setPendingStart(true);
         startService(serviceId);
     }, [startService, serviceId]);
 
@@ -153,6 +179,7 @@ export const useStopActions = ({
             return;
         }
 
+        setPendingStart(true);
         startService(serviceId);
     }, [
         isServiceInProgress,
@@ -179,6 +206,9 @@ export const useStopActions = ({
             onSuccess?.();
             return;
         }
+        // Marca pendência ANTES de capturar GPS — o botão já entra em loading no clique,
+        // mesmo durante a captura de localização (até alguns segundos).
+        setPendingAttendance(true);
         // Captura a referência de GPS de onde o motorista iniciou o atendimento (best-effort).
         const location = await getCurrentCoords();
         startAttendance({ id: serviceId, location });
@@ -204,8 +234,9 @@ export const useStopActions = ({
         handleStartAttendance,
         handleCompleteService,
         handleMarkAsFailed,
-        isStarting,
-        isStartingAttendance,
+        // Loading estendido: cobre do clique até o backend confirmar o novo status.
+        isStarting: isStarting || pendingStart,
+        isStartingAttendance: isStartingAttendance || pendingAttendance,
         isCompleting,
         isFailing,
     };

@@ -30,6 +30,8 @@ export function EtapaInicial() {
     });
 
     const nomeCliente = service?.fantasyName || service?.responsible || 'Cliente';
+    // "A caminho" (IN_PROGRESS) — já clicou "Indo pra lá"; agora só falta "Estou aqui".
+    const isEnRoute = service?.isInProgress === true || service?.status === 'IN_PROGRESS';
 
     const handleBack = useCallback(() => {
         router.back();
@@ -100,10 +102,10 @@ export function EtapaInicial() {
                         {/* Botões de ação */}
                         <Box gap="y12" paddingBottom="y24" alignItems='center'>
                             <Button
-                                title={isStarting ? "Iniciando..." : "Indo pra lá"}
+                                title={isStarting ? "Iniciando..." : isEnRoute ? "A caminho ✓" : "Indo pra lá"}
                                 preset="outline"
                                 onPress={handleStartService}
-                                disabled={isStarting || isStartingAttendance}
+                                disabled={isStarting || isStartingAttendance || isEnRoute}
                                 width={measure.x330}
                             />
                             <Button
