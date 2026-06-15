@@ -8,18 +8,19 @@ import { useFindOneRouting, useGetRoutingMapData } from '@/domain/agility/routin
 import { ServiceStatus, ServiceType } from '@/domain/agility/service/dto/types';
 import { useFindServicesByRoutingId } from '@/domain/agility/service/useCase';
 import { colors, measure } from '@/theme';
+import { formatDate, formatDateOnly } from '@/utils/formatDate';
 
 import { Map, MapPoint } from '../../../rotas-detalhadas/[id]/parada/[pid]/_components/shared/Map';
 
 function mapRoutingStatus(status: RoutingStatus): string {
   const map: Record<RoutingStatus, string> = {
-    [RoutingStatus.DRAFT]: 'Nao iniciado',
+    [RoutingStatus.DRAFT]: 'Não iniciado',
     [RoutingStatus.OPTIMIZED]: 'Otimizada',
     [RoutingStatus.PENDING_ASSIGNMENT]: 'Pendente',
-    [RoutingStatus.BROADCASTING]: 'Disponivel',
-    [RoutingStatus.ASSIGNED]: 'Atribuida',
+    [RoutingStatus.BROADCASTING]: 'Disponível',
+    [RoutingStatus.ASSIGNED]: 'Atribuída',
     [RoutingStatus.IN_PROGRESS]: 'Iniciada',
-    [RoutingStatus.COMPLETED]: 'Concluida',
+    [RoutingStatus.COMPLETED]: 'Concluída',
     [RoutingStatus.CANCELLED]: 'Cancelada',
   };
   return map[status] ?? status;
@@ -32,7 +33,7 @@ function mapServiceStatus(status: ServiceStatus): string {
     [ServiceStatus.IN_PROGRESS]: 'Em andamento',
     [ServiceStatus.IN_ATTENDANCE]: 'Em atendimento',
     [ServiceStatus.COMPLETED]: 'Realizado',
-    [ServiceStatus.FAILED]: 'Nao realizado',
+    [ServiceStatus.FAILED]: 'Não realizado',
     [ServiceStatus.CANCELED]: 'Cancelado',
   };
   return map[status] ?? status;
@@ -42,8 +43,8 @@ function mapServiceType(type: ServiceType): string {
   const map: Record<ServiceType, string> = {
     [ServiceType.DELIVERY]: 'Entrega',
     [ServiceType.PICKUP]: 'Coleta',
-    [ServiceType.SERVICE]: 'Servico',
-    [ServiceType.TRANSFER]: 'Transferencia',
+    [ServiceType.SERVICE]: 'Serviço',
+    [ServiceType.TRANSFER]: 'Transferência',
   };
   return map[type] ?? type;
 }
@@ -212,6 +213,28 @@ export default function HistoricoDetalhesScreen() {
               {mapRoutingStatus(routing.status)}
             </Text>
           </Box>
+
+          {/* Datas */}
+          <Box marginTop="y12" gap="y4">
+            {routing.date ? (
+              <Box flexDirection="row" justifyContent="space-between">
+                <Text preset="text13" color="gray500">Agendada</Text>
+                <Text preset="text13" color="colorTextPrimary">{formatDateOnly(routing.date)}</Text>
+              </Box>
+            ) : null}
+            {routing.startedAt ? (
+              <Box flexDirection="row" justifyContent="space-between">
+                <Text preset="text13" color="gray500">Iniciada</Text>
+                <Text preset="text13" color="colorTextPrimary">{formatDate(routing.startedAt)}</Text>
+              </Box>
+            ) : null}
+            {routing.completedAt ? (
+              <Box flexDirection="row" justifyContent="space-between">
+                <Text preset="text13" color="gray500">Concluída</Text>
+                <Text preset="text13" color="colorTextPrimary">{formatDate(routing.completedAt)}</Text>
+              </Box>
+            ) : null}
+          </Box>
         </Box>
 
         {/* Mapa */}
@@ -301,7 +324,7 @@ export default function HistoricoDetalhesScreen() {
               <Text preset="text20" fontWeightPreset="bold" color="white">
                 {servicosNaoRealizados}
               </Text>
-              <Text preset="text12" color="white">Nao realizados</Text>
+              <Text preset="text12" color="white">Não realizados</Text>
             </Box>
 
             <Box flex={1} backgroundColor="gray100" padding="y12" borderRadius="s12" alignItems="center">
@@ -319,12 +342,12 @@ export default function HistoricoDetalhesScreen() {
         {/* Lista de servicos */}
         <Box paddingBottom="y24">
           <Text preset="text16" fontWeightPreset="bold" color="colorTextPrimary" marginBottom="y12">
-            Servicos ({sortedServices.length})
+            Serviços ({sortedServices.length})
           </Text>
 
           {sortedServices.length === 0 ? (
             <Box paddingVertical="y24" alignItems="center">
-              <Text preset="text14" color="gray400">Nenhum servico encontrado</Text>
+              <Text preset="text14" color="gray400">Nenhum serviço encontrado</Text>
             </Box>
           ) : (
             <Box gap="y12">
@@ -333,13 +356,19 @@ export default function HistoricoDetalhesScreen() {
                 const endereco = service.address?.formattedAddress || 'Endereco nao disponivel';
 
                 return (
-                  <Box
+                  <TouchableOpacityBox
                     key={service.id}
                     backgroundColor="white"
                     borderRadius="s12"
                     padding="y16"
                     borderWidth={measure.m1}
                     borderColor="gray200"
+                    onPress={() =>
+                      router.push({
+                        pathname: '/rotas-detalhadas/[id]/parada/[pid]',
+                        params: { id: routeId, pid: service.id },
+                      })
+                    }
                   >
                     <Box flexDirection="row" alignItems="flex-start">
                       {/* Numero da parada */}
@@ -387,7 +416,7 @@ export default function HistoricoDetalhesScreen() {
                         </Text>
                       </Box>
                     </Box>
-                  </Box>
+                  </TouchableOpacityBox>
                 );
               })}
             </Box>
