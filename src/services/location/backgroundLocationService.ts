@@ -126,7 +126,7 @@ const getDefaultConfig = (authConfig: TrackingAuthConfig) => {
         strategy: 'JWT' as const,
         accessToken: authConfig.accessToken,
         refreshToken: authConfig.refreshToken,
-        refreshUrl: `${urls.identity}/auth/refresh-token`,
+        refreshUrl: `${urls.identity}/auth/refresh-token/native`,
         refreshPayload: { refresh_token: '{refreshToken}' },
         ...(authConfig.expiresAt ? { expires: authConfig.expiresAt } : {}),
       }
@@ -180,7 +180,8 @@ const getDefaultConfig = (authConfig: TrackingAuthConfig) => {
   // Authorization (JWT) — o SDK aplica `Authorization: Bearer {accessToken}` em
   // cada request E renova o token sozinho ao expirar / receber 401, INCLUSIVE
   // com o app em background ou terminado (o refresh roda no processo nativo).
-  // refreshUrl aponta para o mesmo endpoint que o app usa no refresh em foreground.
+  // refreshUrl usa a variante /native, que devolve os tokens no top-level (sem o
+  // envelope { result }) para o parser do SDK encontrar access_token/refresh_token.
   ...(authorization ? { authorization } : {}),
 
   // Extras GLOBAL - Este é aplicado a CADA localização no body
@@ -486,7 +487,7 @@ export async function updateBackgroundGeolocationAuth(
         strategy: 'JWT',
         accessToken: authConfig.accessToken,
         refreshToken: authConfig.refreshToken,
-        refreshUrl: `${urls.identity}/auth/refresh-token`,
+        refreshUrl: `${urls.identity}/auth/refresh-token/native`,
         refreshPayload: { refresh_token: '{refreshToken}' },
         ...(authConfig.expiresAt ? { expires: authConfig.expiresAt } : {}),
       },
