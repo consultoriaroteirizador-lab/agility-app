@@ -114,7 +114,6 @@ export function AuthCredentialsProvider({ children }: PropsWithChildren) {
                 failedRequestsAfterRefreshRef.current.clear();
             }
             isRedirectingRef.current = false;
-            setIsLoading(false);
             console.log('[saveCredentials] Finalizado com sucesso via JWT claims');
             return userAuth;
         } catch (error: any) {
@@ -129,6 +128,10 @@ export function AuthCredentialsProvider({ children }: PropsWithChildren) {
             );
 
             throw enhancedError;
+        } finally {
+            // SEMPRE encerra o loading — mesmo se o decode do JWT lançar exceção.
+            // Sem isto, uma falha aqui prendia o app no spinner de boot para sempre.
+            setIsLoading(false);
         }
     }, [saveUserAuth, authCredentials]);
 
