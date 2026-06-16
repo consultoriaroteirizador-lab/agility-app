@@ -147,7 +147,10 @@ const getDefaultConfig = (authConfig: TrackingAuthConfig) => {
 
   // Logger Config (v5.x namespace)
   logger: {
-    debug: __DEV__,
+    // debug:true faz o SDK tocar SONS (bipes) a cada evento de localização/
+    // movimento — atrapalha o teste em campo. Mantido sempre false; logLevel
+    // (sem som) continua dando logs verbosos em dev.
+    debug: false,
     logLevel: __DEV__
       ? BackgroundGeolocation.LogLevel.Verbose
       : BackgroundGeolocation.LogLevel.Off,
