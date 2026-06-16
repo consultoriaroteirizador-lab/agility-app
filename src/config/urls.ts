@@ -15,14 +15,14 @@ const urlsByEnv: Record<EnvironmentType, Urls> = {
   //   identity: 'http://10.156.41.249:3000',
   //   agilityApi: 'http://10.156.41.249:3000',
   // },
-  development: {
-    identity: 'http://192.168.15.11:3000',
-    agilityApi: 'http://192.168.15.11:3000',
-  },
   // development: {
-  //   identity: 'https://dev.agilitylabs.com.br',
-  //   agilityApi: 'https://dev.agilitylabs.com.br',
+  //   identity: 'http://192.168.1.2:3000',
+  //   agilityApi: 'http://192.168.1.2:3000',
   // },
+  development: {
+    identity: 'https://dev.agilitylabs.com.br',
+    agilityApi: 'https://dev.agilitylabs.com.br',
+  },
 };
 
 export const urls = urlsByEnv[currentEnvironment];
