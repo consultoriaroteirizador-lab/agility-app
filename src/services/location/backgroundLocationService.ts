@@ -113,12 +113,14 @@ let motionCallbacks: MotionCallback[] = [];
 const getDefaultConfig = (authConfig: TrackingAuthConfig) => {
   const hasRefresh = !!authConfig.refreshToken;
 
-  // Com refresh token: o SDK gerencia o header Authorization (e o renova sozinho).
-  // Sem refresh token: cai no comportamento anterior (token estático no header).
+  // SEMPRE envia o header Authorization. O bloco `authorization` (abaixo) é só um
+  // bônus de auto-refresh em background; não dá pra depender dele sozinho — se o
+  // SDK não aplicar o Bearer, as requisições vão sem token e o backend devolve 401.
+  // O header é atualizado a cada refresh de token (updateBackgroundGeolocationAuth).
   const httpHeaders: Record<string, string> = {
     'Content-Type': 'application/json',
     'x-tenant-id': authConfig.tenantId,
-    ...(hasRefresh ? {} : { Authorization: `Bearer ${authConfig.accessToken}` }),
+    Authorization: `Bearer ${authConfig.accessToken}`,
   };
 
   const authorization = hasRefresh
@@ -151,6 +153,11 @@ const getDefaultConfig = (authConfig: TrackingAuthConfig) => {
       : BackgroundGeolocation.LogLevel.Off,
     maxLogsToPersist: 100,
   },
+
+  // Reaplica esta config a CADA ready()/launch. Sem isso o SDK mantém a config
+  // persistida da 1ª instalação e ignora mudanças (ex.: header de auth, refreshUrl),
+  // o que deixava requisições saindo com config antiga → 401.
+  reset: true,
 
   // Pede permissão de localização "Sempre" (background). Sem isso o SO mata o
   // tracking ao sair do app, anulando o stopOnTerminate:false.
@@ -477,12 +484,16 @@ export async function updateBackgroundGeolocationAuth(
     return;
   }
 
-  // Com refresh token: atualiza o bloco `authorization` (o SDK passa a usar o
-  // novo access token e mantém a capacidade de auto-renovar). x-tenant-id segue
-  // no header. Sem refresh token: cai no comportamento anterior (header estático).
+  // SEMPRE atualiza o header Authorization (token novo). Com refresh token,
+  // atualiza também o bloco `authorization` para manter o auto-refresh nativo.
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${authConfig.accessToken}`,
+    'x-tenant-id': authConfig.tenantId,
+  };
+
   if (authConfig.refreshToken) {
     await BackgroundGeolocation.setConfig({
-      http: { headers: { 'x-tenant-id': authConfig.tenantId } },
+      http: { headers },
       authorization: {
         strategy: 'JWT',
         accessToken: authConfig.accessToken,
@@ -496,12 +507,7 @@ export async function updateBackgroundGeolocationAuth(
   }
 
   await BackgroundGeolocation.setConfig({
-    http: {
-      headers: {
-        'Authorization': `Bearer ${authConfig.accessToken}`,
-        'x-tenant-id': authConfig.tenantId,
-      },
-    },
+    http: { headers },
   } as unknown as Parameters<typeof BackgroundGeolocation.setConfig>[0]);
 }
 
