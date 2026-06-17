@@ -91,10 +91,14 @@ export function AuthCredentialsProvider({ children }: PropsWithChildren) {
         setUserCredentialsCurrent(current);
     }, [getUserCredentialsList, getUserCredentialsCurrent]);
 
-    const saveCredentials = useCallback(async (ac: AuthCredentials): Promise<UserAuth | null> => {
-        console.log('[saveCredentials] Iniciando...');
+    const saveCredentials = useCallback(async (ac: AuthCredentials, options?: { silent?: boolean }): Promise<UserAuth | null> => {
+        // `silent`: refresh de token em sessão NÃO deve mexer no isLoading global.
+        // Sem isto, o _layout troca toda a árvore do app pelo spinner de boot
+        // (fundo preto) a cada renovação de token disparada por um 401.
+        const silent = options?.silent ?? false;
+        console.log('[saveCredentials] Iniciando...', { silent });
         console.log('[saveCredentials] ac:', ac ? 'existe' : 'null');
-        setIsLoading(true);
+        if (!silent) setIsLoading(true);
         const wasAuthenticated = !!authCredentials;
 
         // Update token so API calls are authenticated
@@ -131,7 +135,8 @@ export function AuthCredentialsProvider({ children }: PropsWithChildren) {
         } finally {
             // SEMPRE encerra o loading — mesmo se o decode do JWT lançar exceção.
             // Sem isto, uma falha aqui prendia o app no spinner de boot para sempre.
-            setIsLoading(false);
+            // Em refresh silencioso não tocamos no isLoading (já está false em sessão).
+            if (!silent) setIsLoading(false);
         }
     }, [saveUserAuth, authCredentials]);
 
@@ -353,7 +358,8 @@ export function AuthCredentialsProvider({ children }: PropsWithChildren) {
                                 currentCredentials.tenantId,
                             );
                             if (isDevelopment) console.log('[Auth Interceptor] Refresh token bem sucedido');
-                            await saveCredentials(newAuthCredentials);
+                            // silent: renovação em sessão não pode colapsar o app no spinner de boot
+                            await saveCredentials(newAuthCredentials, { silent: true });
                             return newAuthCredentials;
                         } catch (error) {
                             refreshTokenPromiseRef.current = null;
@@ -363,10 +369,31 @@ export function AuthCredentialsProvider({ children }: PropsWithChildren) {
 
                     refreshTokenPromiseRef.current = refreshPromise;
 
+                    // ETAPA 1 — refresh do token. Se ELE falhar, a sessão é
+                    // irrecuperável → logout/login.
+                    let newAuthCredentials: AuthCredentials | null;
+                    try {
+                        newAuthCredentials = await refreshPromise;
+                    } catch (refreshError: any) {
+                        refreshTokenPromiseRef.current = null;
+                        if (isDevelopment) console.log('[Auth Interceptor] Refresh falhou, redirecionando para login:', refreshError?.message || refreshError);
+                        isRedirectingRef.current = true;
+                        await removeCredentials();
+                        return Promise.reject(responseError);
+                    }
+
+                    // ETAPA 2 — refresh OK: retenta a request original com o token novo.
+                    // Uma falha AQUI só desloga se for 401 (o token novo também foi
+                    // rejeitado). Erros não-401 (500/timeout/rede) NÃO invalidam a
+                    // sessão — antes, qualquer falha na retentativa deslogava o usuário.
                     try {
                         const failedRequest = responseError.config;
-                        const newAuthCredentials = await refreshPromise;
                         failedRequest.headers.Authorization = `Bearer ${newAuthCredentials.accessToken}`;
+
+                        // Marca ANTES da retentativa: se ela voltar 401, o handler
+                        // recursivo bate no guard de failedRequestsAfterRefresh (acima)
+                        // e rejeita, evitando loop infinito de retry.
+                        failedRequestsAfterRefreshRef.current.add(requestKey);
 
                         const retryResponse = await apiInstance(failedRequest);
 
@@ -374,18 +401,21 @@ export function AuthCredentialsProvider({ children }: PropsWithChildren) {
                         refreshTokenPromiseRef.current = null;
                         isRedirectingRef.current = false;
                         return retryResponse;
-                    } catch (refreshError: any) {
+                    } catch (retryError: any) {
                         refreshTokenPromiseRef.current = null;
+                        const retryStatus = retryError?.response?.status;
 
-                        if (refreshError?.response?.status === 401 || refreshError?.config?.url === failedRequestUrl) {
-                            failedRequestsAfterRefreshRef.current.add(requestKey);
-                            if (isDevelopment) console.log('[Auth Interceptor] Retentativa falhou com 401:', failedRequestUrl);
+                        if (retryStatus === 401) {
+                            if (isDevelopment) console.log('[Auth Interceptor] Retentativa falhou com 401, redirecionando para login:', failedRequestUrl);
+                            isRedirectingRef.current = true;
+                            await removeCredentials();
+                        } else {
+                            // Sessão continua válida — libera o marcador para futuras
+                            // tentativas desta rota e propaga o erro real ao chamador.
+                            failedRequestsAfterRefreshRef.current.delete(requestKey);
+                            if (isDevelopment) console.log('[Auth Interceptor] Retentativa falhou (não-401), sessão mantida:', retryStatus, failedRequestUrl);
                         }
-
-                        if (isDevelopment) console.log('[Auth Interceptor] Refresh falhou, redirecionando para login:', refreshError?.message || refreshError);
-                        isRedirectingRef.current = true;
-                        await removeCredentials();
-                        return Promise.reject(responseError);
+                        return Promise.reject(retryError);
                     }
                 }
                 return Promise.reject(responseError);

@@ -17,7 +17,7 @@ export interface AuthCredentialsState {
     saveUserAuth: (userAuth: UserAuth) => Promise<void>;
     removeUserAuth: () => Promise<void>;
     authCredentials: AuthCredentials | null;
-    saveCredentials: (ac: AuthCredentials) => Promise<UserAuth | null>;
+    saveCredentials: (ac: AuthCredentials, options?: { silent?: boolean }) => Promise<UserAuth | null>;
     removeCredentials: () => Promise<void>;
     switchUserCredentials: (userCredentials: UserCredentials) => Promise<void>;
     isLoading: boolean;

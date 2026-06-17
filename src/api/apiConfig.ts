@@ -105,6 +105,7 @@ function setupRequestInterceptor(apiInstance: ReturnType<typeof axios.create>) {
 
 const apiIdentity = axios.create({
   baseURL: `${urls.identity}`,
+  timeout: 60000, // 60s - sem isto, um refresh-token travado prende o app no spinner de boot para sempre
 });
 
 const apiAgility = axios.create({
