@@ -5,10 +5,11 @@ import { RoutingStatus } from '@/domain/agility/routing/dto/types';
 import { useFindMyRoutings } from '@/domain/agility/routing/useCase';
 import { useTrackingWebSocket } from '@/domain/agility/tracking';
 import type { DriverLocationUpdate } from '@/domain/agility/tracking';
+import { authAdapter } from '@/domain/Auth/authAdapter';
 import { useAuthCredentialsService } from '@/services';
 import { initializeGeofenceService, cleanupGeofenceService } from '@/services/geofence';
 import { useLocationTracking, updateBackgroundGeolocationAuth } from '@/services/location';
-import { initializeBackgroundGeolocation, cleanupBackgroundGeolocation } from '@/services/location/backgroundLocationService';
+import { initializeBackgroundGeolocation, cleanupBackgroundGeolocation, onAuthRefreshed } from '@/services/location/backgroundLocationService';
 
 /**
  * Componente que gerencia o rastreamento de localização automaticamente.
@@ -29,7 +30,11 @@ import { initializeBackgroundGeolocation, cleanupBackgroundGeolocation } from '@
  * propenso à race "Waiting for previous start action to complete").
  */
 export function LocationTrackingProvider({ children }: { children: React.ReactNode }) {
-  const { authCredentials, userAuth } = useAuthCredentialsService();
+  const { authCredentials, userAuth, saveCredentials } = useAuthCredentialsService();
+  // Ref para ler as credenciais atuais dentro do callback de auth-refresh sem
+  // reinscrever a cada rotação de token.
+  const authCredentialsRef = useRef(authCredentials);
+  authCredentialsRef.current = authCredentials;
   // driverId vem do JWT (claim driver_id) via authAdapter.
   const { driverId, startTracking, stopTracking } = useLocationTracking(userAuth?.driverId ?? null);
   const appState = useRef(AppState.currentState);
@@ -144,6 +149,30 @@ export function LocationTrackingProvider({ children }: { children: React.ReactNo
       console.error('[LocationTrackingProvider] Erro ao atualizar auth do SDK:', err);
     });
   }, [authCredentials?.accessToken, authCredentials?.tenantId, authCredentials?.refreshToken, authCredentials?.expiration]);
+
+  // [4.1] Write-back do refresh nativo do SDK. Quando o SDK renova o JWT em
+  // background (onAuthorization), os tokens novos voltam pra cá e gravamos no
+  // storage do app (silent, sem mexer no spinner de boot). Sem isto, o refresh
+  // token do JS fica defasado/revogado pela rotação e o próximo refresh do app
+  // falharia -> logout. Cobre o caso de app vivo/recém-background; o caso de app
+  // totalmente morto depende da reinicialização no boot (validar no device).
+  useEffect(() => {
+    const unsubscribe = onAuthRefreshed(({ accessToken, refreshToken }) => {
+      const current = authCredentialsRef.current;
+      if (!accessToken || !current) return;
+      if (accessToken === current.accessToken) return; // já em sincronia
+      try {
+        const merged = authAdapter.mergeRefreshedTokens(current, { accessToken, refreshToken });
+        console.log('[LocationTrackingProvider] SDK renovou o JWT — sincronizando tokens no app');
+        saveCredentials(merged, { silent: true }).catch((err) => {
+          console.error('[LocationTrackingProvider] Erro ao sincronizar tokens do SDK:', err);
+        });
+      } catch (err) {
+        console.warn('[LocationTrackingProvider] Token renovado pelo SDK é inválido, ignorando:', err);
+      }
+    });
+    return unsubscribe;
+  }, [saveCredentials]);
 
   // [5] WebSocket de telemetria — vida independente do SDK. Reconecta
   // livremente em refresh de token sem afetar o tracking de localização.

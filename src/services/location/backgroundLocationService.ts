@@ -101,9 +101,13 @@ type LocationCallback = (location: LocationData) => void;
 type GeofenceCallback = (event: GeofenceEvent) => void;
 type MotionCallback = (isMoving: boolean) => void;
 
+/** Tokens extraídos da resposta do refreshUrl quando o SDK renova o JWT. */
+type AuthRefreshCallback = (tokens: { accessToken?: string; refreshToken?: string }) => void;
+
 let locationCallbacks: LocationCallback[] = [];
 let geofenceCallbacks: GeofenceCallback[] = [];
 let motionCallbacks: MotionCallback[] = [];
+let authRefreshCallbacks: AuthRefreshCallback[] = [];
 
 /**
  * Configurações padrão do Background Geolocation
@@ -293,6 +297,18 @@ function setupEventListeners() {
     BackgroundGeolocation.onAuthorization((event) => {
       if (event.success) {
         console.log('[BGGeolocation] JWT renovado automaticamente pelo SDK');
+        // Propaga os tokens novos para quem quiser gravá-los de volta no app
+        // (mantém JS e SDK em sincronia e evita refresh token defasado/revogado).
+        const tokens = extractRefreshedTokens(event.response);
+        if (tokens.accessToken) {
+          authRefreshCallbacks.forEach((cb) => {
+            try {
+              cb(tokens);
+            } catch (e) {
+              console.error('[BGGeolocation] Erro no callback de auth refresh:', e);
+            }
+          });
+        }
       } else {
         console.warn('[BGGeolocation] Falha ao renovar JWT (refresh token expirado?):', event.error);
       }
@@ -734,6 +750,29 @@ export function onMotionEvent(callback: MotionCallback): () => void {
 }
 
 /**
+ * Extrai accessToken/refreshToken da resposta do refreshUrl. O parser do SDK é
+ * genérico, então a resposta pode vir em snake_case (Keycloak) ou camelCase.
+ */
+function extractRefreshedTokens(response: unknown): { accessToken?: string; refreshToken?: string } {
+  if (!response || typeof response !== 'object') return {};
+  const r = response as Record<string, unknown>;
+  const accessToken = (r.access_token ?? r.accessToken) as string | undefined;
+  const refreshToken = (r.refresh_token ?? r.refreshToken) as string | undefined;
+  return { accessToken, refreshToken };
+}
+
+/**
+ * Registra callback para quando o SDK renova o JWT em background (onAuthorization
+ * com sucesso). Use para gravar os tokens novos de volta no storage do app.
+ */
+export function onAuthRefreshed(callback: AuthRefreshCallback): () => void {
+  authRefreshCallbacks.push(callback);
+  return () => {
+    authRefreshCallbacks = authRefreshCallbacks.filter(cb => cb !== callback);
+  };
+}
+
+/**
  * Obtém estado atual do tracking
  */
 export function getTrackingState(): TrackingState {
@@ -805,6 +844,7 @@ export async function cleanupBackgroundGeolocation(): Promise<void> {
   locationCallbacks = [];
   geofenceCallbacks = [];
   motionCallbacks = [];
+  authRefreshCallbacks = [];
 
   // Resetar estado
   trackingState = {
