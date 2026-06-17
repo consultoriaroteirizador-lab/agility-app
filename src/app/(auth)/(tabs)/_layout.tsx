@@ -36,6 +36,10 @@ export default function TabsLayout() {
         options={{
           title: 'Menu',
           tabBarLabel: 'Menu',
+          // A aba Menu sempre reabre na sua home: ao sair dela, a pilha aninhada
+          // volta para o topo (evita reabrir direto no Suporte quando ele é
+          // acessado a partir de um pedido em outra aba).
+          popToTopOnBlur: true,
         }}
       />
       <Tabs.Screen
