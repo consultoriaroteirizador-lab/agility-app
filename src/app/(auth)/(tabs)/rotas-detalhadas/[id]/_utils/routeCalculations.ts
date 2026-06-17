@@ -252,9 +252,9 @@ export function filterParadasByStatuses(paradas: Parada[], statuses: ParadaStatu
 // ============================================
 
 /**
- * Encontra a próxima parada (primeira pendente ou em andamento)
- * 
- * Prioridade: em-andamento > pendente
+ * Encontra a próxima parada (em atendimento, em andamento ou pendente)
+ *
+ * Prioridade: em-atendimento > em-andamento > pendente
  * 
  * @param paradas - Lista de paradas
  * @returns Próxima parada ou null se não houver
@@ -268,7 +268,12 @@ export function findProximaParada(paradas: Parada[]): Parada | null {
         return null
     }
 
-    // Prioridade: em-andamento > pendente
+    // Prioridade: em-atendimento (motorista já está na parada) > em-andamento > pendente
+    const emAtendimento = paradas.find(p => p.status === 'em-atendimento')
+    if (emAtendimento) {
+        return emAtendimento
+    }
+
     const emAndamento = paradas.find(p => p.status === 'em-andamento')
     if (emAndamento) {
         return emAndamento
@@ -278,7 +283,7 @@ export function findProximaParada(paradas: Parada[]): Parada | null {
 }
 
 /**
- * Encontra outras paradas pendentes ou em andamento (excluindo a próxima)
+ * Encontra outras paradas ativas (pendente, em andamento ou em atendimento), excluindo a próxima
  * 
  * @param paradas - Lista de paradas
  * @param proximaParada - Próxima parada a ser excluída
@@ -294,7 +299,8 @@ export function findOutrasParadas(paradas: Parada[], proximaParada: Parada | nul
     }
 
     return paradas.filter(p =>
-        p !== proximaParada && (p.status === 'pendente' || p.status === 'em-andamento')
+        p !== proximaParada &&
+        (p.status === 'pendente' || p.status === 'em-andamento' || p.status === 'em-atendimento')
     )
 }
 
