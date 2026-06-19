@@ -196,6 +196,7 @@ export function mapServiceToParada(service: ServiceResponse, index: number): Par
         tipo,
         hasReturn,
         status,
+        deliveryOutcome: service.deliveryOutcome ?? null,
     }
 }
 

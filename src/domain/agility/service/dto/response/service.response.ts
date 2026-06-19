@@ -31,6 +31,9 @@ export interface ServiceResponse {
     /** Status */
     status: ServiceStatus
 
+    /** Resultado da entrega/coleta derivado do check dos materiais (FULL/WITH_ISSUES). */
+    deliveryOutcome?: 'FULL' | 'WITH_ISSUES' | null
+
     /** Responsible person name */
     responsible: string | null
 

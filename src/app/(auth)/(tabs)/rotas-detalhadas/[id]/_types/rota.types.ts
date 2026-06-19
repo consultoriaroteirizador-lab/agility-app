@@ -98,6 +98,9 @@ export interface Parada {
 
     /** Status atual da parada */
     status: ParadaStatus
+
+    /** Resultado derivado do check dos materiais (FULL/WITH_ISSUES) quando concluída. */
+    deliveryOutcome?: 'FULL' | 'WITH_ISSUES' | null
 }
 
 /**

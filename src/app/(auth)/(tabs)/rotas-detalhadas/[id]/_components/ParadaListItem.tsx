@@ -181,6 +181,20 @@ export function ParadaListItem({
                             {statusConfig.label}
                         </Text>
                     </Box>
+
+                    {parada.status === 'concluida-sucesso' && parada.deliveryOutcome === 'WITH_ISSUES' && (
+                        <Box
+                            backgroundColor="secondary10"
+                            paddingHorizontal="x8"
+                            paddingVertical="y2"
+                            borderRadius="s4"
+                            flexShrink={0}
+                        >
+                            <Text preset="text13" color="secondary100">
+                                ⚠ com pendência
+                            </Text>
+                        </Box>
+                    )}
                 </Box>
 
                 <Box marginBottom="y4">
