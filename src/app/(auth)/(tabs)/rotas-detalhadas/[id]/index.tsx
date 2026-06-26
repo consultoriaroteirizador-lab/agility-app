@@ -20,6 +20,7 @@ import {
   EmptyParadasList,
   RouteActions,
 } from './_components'
+import { MapaParadasModal } from './_components/MapaParadasModal'
 import { RotaProvider, useRota } from './_context/RotaContext'
 import type { RotaTabType, Parada } from './_types/rota.types'
 
@@ -322,6 +323,7 @@ function RotaTitle({ routing, proximaParada, totalParadas }: RotaTitleProps) {
 
 function RotaDetalhadaContent() {
   const {
+    rotaId,
     loading,
     error,
     routing,
@@ -339,6 +341,7 @@ function RotaDetalhadaContent() {
   } = useRota()
 
   const [aba, setAba] = useState<RotaTabType>('andamento')
+  const [mapaVisible, setMapaVisible] = useState(false)
 
   // Título dinâmico baseado no tipo de serviço
   const tituloTela = useMemo(() => {
@@ -362,6 +365,14 @@ function RotaDetalhadaContent() {
         proximaParada={proximaParada}
         totalParadas={paradas.length}
       />
+      <Box alignItems="center" marginBottom="y16">
+        <Button
+          title="Ver no mapa"
+          iconName="map"
+          preset="outline"
+          onPress={() => setMapaVisible(true)}
+        />
+      </Box>
       {aba === 'andamento' ? (
         <AndamentoList
           aba={aba}
@@ -389,6 +400,11 @@ function RotaDetalhadaContent() {
         buttonCloseTitle="Cancelar"
         onPress={concluirRota}
         onClose={() => setPopupConcluirRota(false)}
+      />
+      <MapaParadasModal
+        visible={mapaVisible}
+        onClose={() => setMapaVisible(false)}
+        routeId={rotaId}
       />
     </ScreenBase>
   )
