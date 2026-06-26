@@ -85,6 +85,36 @@ export function formatAddress(address: AddressResponse | null | undefined): stri
 }
 
 /**
+ * Formata o endereço completo SEMPRE a partir dos campos individuais — incluindo
+ * o bairro — em vez de confiar no `formattedAddress` do backend (que pode vir sem
+ * o bairro). Campos ausentes são omitidos.
+ *
+ * @example
+ * // { street: 'Rua das Flores', number: '123', complement: 'Apto 4',
+ * //   neighborhood: 'Centro', city: 'São Paulo', state: 'SP', postalCode: '01234-567' }
+ * formatAddressFull(address);
+ * // "Rua das Flores, 123 - Apto 4 - Centro - São Paulo/SP - CEP 01234-567"
+ */
+export function formatAddressFull(address: AddressResponse | null | undefined): string {
+    if (!address) {
+        return 'Endereço não informado';
+    }
+
+    const streetAndNumber = [address.street, address.number].filter(Boolean).join(', ');
+    const cityState = [address.city, address.state].filter(Boolean).join('/');
+
+    const parts = [
+        streetAndNumber,
+        address.complement,
+        address.neighborhood,
+        cityState,
+        address.postalCode ? `CEP ${address.postalCode}` : '',
+    ].filter(Boolean);
+
+    return parts.join(' - ').trim() || 'Endereço não informado';
+}
+
+/**
  * Formata a primeira linha do endereço: Rua, Número
  * @param address - Objeto de endereço
  * @returns String formatada "Rua, Número" ou string vazia se não houver dados

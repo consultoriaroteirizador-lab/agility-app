@@ -6,9 +6,9 @@ const statusConfig: Record<MaterialStatus, { bg: string; text: string; label: st
     PENDING: { bg: 'gray100', text: 'gray400', label: 'Pendente' },
     CHECKED: { bg: 'primary10', text: 'primary100', label: 'Checado' },
     PARTIAL: { bg: 'secondary100', text: 'secondary80', label: 'Parcial' },
-    MISSING: { bg: 'redErrorLight', text: 'redError', label: 'Não encontrado' },
-    DAMAGED: { bg: 'redErrorLight', text: 'redError', label: 'Danificado' },
-    REFUSED: { bg: 'redErrorLight', text: 'redError', label: 'Recusado' },
+    MISSING: { bg: 'redError', text: 'redError', label: 'Não encontrado' },
+    DAMAGED: { bg: 'redError', text: 'redError', label: 'Danificado' },
+    REFUSED: { bg: 'redError', text: 'redError', label: 'Recusado' },
 };
 
 export interface ItemCheckCardProps {

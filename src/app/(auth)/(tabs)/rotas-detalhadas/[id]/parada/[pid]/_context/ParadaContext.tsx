@@ -12,6 +12,7 @@ import * as ImagePicker from 'expo-image-picker';
 
 import type { AddressResponse } from '@/domain/agility/address/dto';
 import { useFindOneAddress } from '@/domain/agility/address/useCase';
+import { useGetProfile } from '@/domain/agility/collaborator/useCase/useGetProfile';
 import type { FormGroupResponse } from '@/domain/agility/form-group/dto/form-group.response';
 import { formGroupService } from '@/domain/agility/form-group/formGroupService';
 import { FormEntityType } from '@/domain/agility/form-group-answer/dto/create-form-group-answer.request';
@@ -23,6 +24,7 @@ import { serviceService } from '@/domain/agility/service/serviceService';
 import { uploadMultipleServicePhotos, uploadBase64Signature } from '@/domain/agility/service/serviceUploadUtils';
 import {
   useFindOneService,
+  useFindServicesByRoutingId,
   useCheckMaterial,
   useGetServiceDraft,
   useSaveServiceDraft,
@@ -34,6 +36,8 @@ import {
   type ParadaDraft,
 } from '@/services/storage/paradaDraftStorage';
 import { parseBRLToCents } from '@/utils/parseCurrency';
+
+import { useStopStatus } from '../_hooks/useStopStatus';
 
 // Tipos
 export type RecipientType = 'cliente' | 'porteiro' | 'vizinho' | 'familiar' | 'outro';
@@ -161,6 +165,12 @@ interface ParadaContextValue {
   pickupEvidence: PickupEvidence | null;
   commitPickupLeg: () => void;
 
+  // Gating de início de parada (regras configuráveis da empresa).
+  // `canStartService` = pode iniciar a parada agora; `startBlockReason` = motivo do
+  // bloqueio (null quando liberado), usado no toast ao tentar iniciar bloqueado.
+  canStartService: boolean;
+  startBlockReason: string | null;
+
   // Utilitários
   isServiceStarted: boolean;
   resetState: () => void;
@@ -230,6 +240,22 @@ export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderPr
   const effectiveAddress = isTransfer
     ? ((transferLeg === 'pickup' ? service?.pickupAddress : service?.deliveryAddress) ?? null)
     : (embeddedAddress ?? fetchedAddress ?? null);
+
+  // ── Gating de início de parada (regras configuráveis por empresa) ─────────
+  // Backend é a fonte de verdade; aqui apenas desabilitamos os botões e
+  // mostramos um toast antecipando a rejeição (UX). Lê os flags do profile.
+  const { profile } = useGetProfile();
+  const companyFeatures = profile?.companyFeatures ?? null;
+  const { services: routeServices } = useFindServicesByRoutingId(service?.routingId || rotaId || '');
+  const stopGate = useStopStatus({
+    service: service ?? null,
+    allServices: routeServices,
+    currentServiceId: serviceId,
+    enforceSingleActiveStop: companyFeatures?.enforceSingleActiveStop === true,
+    enforceStopOrder: companyFeatures?.enforceStopOrder === true,
+  });
+  const canStartService = stopGate.canStartService;
+  const startBlockReason = stopGate.startBlockReason;
 
   // Hook para check de material
   const checkMaterialMutation = useCheckMaterial();
@@ -1096,6 +1122,10 @@ export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderPr
     pickupDone,
     pickupEvidence,
     commitPickupLeg,
+
+    // Gating de início de parada (regras configuráveis da empresa)
+    canStartService,
+    startBlockReason,
 
     // Utilitários
     isServiceStarted: !!isServiceStarted,

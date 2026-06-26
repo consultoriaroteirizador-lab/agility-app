@@ -29,6 +29,11 @@ export interface StopStatus {
     isNextStop: boolean;
     hasOtherServiceInProgress: boolean;
     canCompleteRouting: boolean;
+    /**
+     * Motivo do bloqueio para iniciar a parada (regras configuráveis da empresa),
+     * ou null quando pode iniciar. Usado no toast ao tentar iniciar bloqueado.
+     */
+    startBlockReason: string | null;
 }
 
 export interface StopActionsHandlers {

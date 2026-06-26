@@ -119,5 +119,19 @@ export interface CollaboratorResponse {
 
     /** Last update timestamp */
     updatedAt: Date | string;
+
+    /**
+     * Flags de comportamento da empresa do colaborador, usados pelo app para o
+     * gating proativo ao iniciar paradas (o backend é a fonte de verdade).
+     */
+    companyFeatures?: CompanyFeatures | null;
+}
+
+/** Flags de comportamento operacional da empresa relevantes para o app do motorista. */
+export interface CompanyFeatures {
+    /** Bloqueia iniciar mais de uma parada por vez (a caminho OU em atendimento). */
+    enforceSingleActiveStop?: boolean;
+    /** Obriga iniciar as paradas na ordem definida pelo roteirizador. */
+    enforceStopOrder?: boolean;
 }
 
