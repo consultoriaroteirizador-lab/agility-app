@@ -318,6 +318,16 @@ export default function RetornoScreen() {
             Conferência de devoluções
           </Text>
 
+          {/* Trava visual: a conferência só fica clicável após o check-in. */}
+          {!hasArrived && items.length > 0 ? (
+            <Box flexDirection="row" alignItems="center" gap="x8" backgroundColor="secondary10" p="y12" borderRadius="s12">
+              <LocalIcon iconName="location" size={measure.m20} color="secondary100" />
+              <Text preset="text12" color="gray600" flex={1}>
+                Toque em &quot;Cheguei no retorno&quot; para liberar a conferência dos itens.
+              </Text>
+            </Box>
+          ) : null}
+
           {isLoadingManifest ? (
             <Box py="y16" alignItems="center">
               <ActivityIndicator />
@@ -342,6 +352,7 @@ export default function RetornoScreen() {
                   borderRadius="s12"
                   borderWidth={1}
                   borderColor={checked ? 'primary100' : 'gray100'}
+                  opacity={hasArrived ? 1 : 0.5}
                   disabled={!hasArrived}
                   onPress={() => toggle(idx)}
                 >
@@ -394,7 +405,7 @@ export default function RetornoScreen() {
         ) : null}
 
         {/* Ações */}
-        <Box gap="y12" pb="y24" >
+        <Box gap="y12" pb="y24" alignItems='center'>
           {!hasArrived ? (
             <>
               <Button
