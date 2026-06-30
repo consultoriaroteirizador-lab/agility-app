@@ -12,13 +12,14 @@ import {
   TouchableOpacityBox,
 } from '@/components';
 import { ButtonBack } from '@/components/Button/ButtonBack';
-import { formatAddress } from '@/domain/agility/address/dto/response/address.response';
-import { useReturnManifest } from '@/domain/agility/routing/useCase';
+import { useGetRoutingMapData, useReturnManifest } from '@/domain/agility/routing/useCase';
 import { useFindOneService } from '@/domain/agility/service/useCase';
 import { formatHHmm } from '@/functions';
 import { measure } from '@/theme';
 
-import { useStopActions } from '../_hooks';
+import { splitRouteAtLastStop } from '../_components/shared/geo';
+import { Map, MapPoint } from '../_components/shared/Map';
+import { useStopActions, useUserLocation } from '../_hooks';
 
 /**
  * Tela da parada de RETORNO (CD/origem).
@@ -27,6 +28,9 @@ import { useStopActions } from '../_hooks';
  * das devoluções/itens não entregues (checklist do manifesto) → "Concluir
  * retorno" (complete). Concluir a rota fica liberado só depois disso (gate no
  * backend + a parada de retorno segura o "nenhum andamento" na lista).
+ *
+ * O retorno costuma ter só lat/long (sem Address cadastrado), então o endereço e
+ * o mapa vêm do ponto de retorno do map-data (mapData.return / origin).
  */
 export default function RetornoScreen() {
   const params = useLocalSearchParams<{ id: string; pid: string }>();
@@ -35,6 +39,8 @@ export default function RetornoScreen() {
 
   const { service, isLoading } = useFindOneService(serviceId || '');
   const { items, isLoading: isLoadingManifest } = useReturnManifest(routeId || '');
+  const { mapData, services } = useGetRoutingMapData(routeId || '');
+  const { userLocation } = useUserLocation();
 
   const { handleStartAttendance, handleCompleteService, isStartingAttendance, isCompleting } =
     useStopActions({
@@ -44,6 +50,65 @@ export default function RetornoScreen() {
     });
 
   const hasArrived = !!(service?.isInAttendance || service?.status === 'IN_ATTENDANCE');
+
+  // Ponto de retorno: quando volta à origem, usa a origem; senão o return.
+  const returnPoint = useMemo(() => {
+    const info = mapData?.returnToOrigin ? mapData?.origin : mapData?.return;
+    if (info?.latitude == null || info?.longitude == null) return null;
+    return { latitude: info.latitude, longitude: info.longitude, address: info.address ?? null };
+  }, [mapData]);
+
+  // Última parada real (com coordenadas) — origem do trecho até o retorno.
+  const lastStop = useMemo(() => {
+    const sorted = (services ?? [])
+      .filter(s => s.latitude != null && s.longitude != null && String(s.serviceType ?? '').toUpperCase() !== 'RETURN')
+      .sort((a, b) => (a.sequenceOrder ?? 999) - (b.sequenceOrder ?? 999));
+    return sorted[sorted.length - 1] ?? null;
+  }, [services]);
+
+  // Pinos + trecho (última parada → retorno). Recorta do traçado global; sem
+  // geometria, cai para linha reta entre os dois pontos.
+  const { points, coordinateSegments } = useMemo(() => {
+    if (!returnPoint) return { points: [] as MapPoint[], coordinateSegments: undefined };
+
+    const pts: MapPoint[] = [];
+    if (lastStop) {
+      pts.push({
+        id: 'last-stop',
+        latitude: lastStop.latitude,
+        longitude: lastStop.longitude,
+        title: 'Última parada',
+        color: '#9CA3AF',
+        size: 30,
+      });
+    }
+    pts.push({
+      id: 'return',
+      latitude: returnPoint.latitude,
+      longitude: returnPoint.longitude,
+      title: 'Retorno',
+      color: '#EF4444',
+      label: 'F',
+    });
+
+    let segs: number[][][] | undefined;
+    if (lastStop) {
+      const split = splitRouteAtLastStop(mapData?.geometry, {
+        latitude: lastStop.latitude,
+        longitude: lastStop.longitude,
+      });
+      if (split && split.returnLeg.length > 1) {
+        segs = [split.returnLeg];
+      } else {
+        segs = [[
+          [lastStop.longitude, lastStop.latitude],
+          [returnPoint.longitude, returnPoint.latitude],
+        ]];
+      }
+    }
+
+    return { points: pts, coordinateSegments: segs };
+  }, [returnPoint, lastStop, mapData?.geometry]);
 
   // Conferência: cada item do manifesto é marcado pelo motorista. Quando há
   // itens, todos precisam estar conferidos antes de concluir.
@@ -57,10 +122,11 @@ export default function RetornoScreen() {
     setConferred((prev) => ({ ...prev, [idx]: !prev[idx] }));
   }, []);
 
+  // Endereço do retorno: do ponto de retorno (quando cadastrado); senão as
+  // coordenadas do CD; senão um rótulo padrão.
   const address =
-    formatAddress(service?.address) ??
-    service?.address?.formattedAddress ??
-    'Retorno ao CD/origem';
+    returnPoint?.address ??
+    (returnPoint ? `${returnPoint.latitude.toFixed(5)}, ${returnPoint.longitude.toFixed(5)}` : 'Retorno ao CD/origem');
   const eta = formatHHmm(service?.estimatedArrival);
 
   if (isLoading) {
@@ -82,7 +148,7 @@ export default function RetornoScreen() {
         </Text>
       }
     >
-      <Box flex={1} backgroundColor="white" pt="y8" px="x16" gap="y16">
+      <Box flex={1} pt="y8" gap="y16">
         {/* Cabeçalho do retorno */}
         <Box backgroundColor="secondary10" p="y12" borderRadius="s12" gap="y8">
           <Box flexDirection="row" alignItems="center" gap="x8">
@@ -100,6 +166,19 @@ export default function RetornoScreen() {
             Descarregue e confira as devoluções e os itens não entregues neste ponto para finalizar a rota.
           </Text>
         </Box>
+
+        {/* Mapa do retorno (trecho última parada → CD) */}
+        {returnPoint && (
+          <Map
+            points={points}
+            coordinateSegments={coordinateSegments}
+            routeColor="#EF4444"
+            routeWidth={4}
+            addressText={address}
+            customerName="Retorno"
+            userLocation={userLocation}
+          />
+        )}
 
         {/* Conferência de devoluções */}
         <Box gap="y8">
@@ -158,7 +237,7 @@ export default function RetornoScreen() {
         </Box>
 
         {/* Ações */}
-        <Box gap="y12" pb="y24">
+        <Box gap="y12" pb="y24" >
           {!hasArrived ? (
             <Button
               title={isStartingAttendance ? 'Confirmando...' : 'Cheguei no retorno'}
