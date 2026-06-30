@@ -356,24 +356,31 @@ export default function RetornoScreen() {
                   borderColor={checked ? 'primary100' : 'gray100'}
                   opacity={hasArrived ? 1 : 0.5}
                 >
-                  {/* Check (alvo de toque) */}
-                  <TouchableOpacityBox disabled={!hasArrived} onPress={() => toggle(idx)}>
+                  {/* Toque na área do item (ícone + texto) alterna o check.
+                      Só o input de quantidade fica fora do alvo de toque. */}
+                  <TouchableOpacityBox
+                    flex={1}
+                    flexDirection="row"
+                    alignItems="center"
+                    gap="x12"
+                    disabled={!hasArrived}
+                    onPress={() => toggle(idx)}
+                  >
                     <LocalIcon
                       iconName={checked ? 'check' : 'box'}
                       size={measure.m20}
                       color={checked ? 'primary100' : 'gray400'}
                     />
+                    <Box flex={1}>
+                      <Text preset="text14" fontWeightPreset="semibold" color="colorTextPrimary">
+                        {item.material}
+                      </Text>
+                      <Text preset="text12" color="gray600">
+                        {item.origin === 'PICKUP' ? 'Devolução/coleta' : `Não entregue${reasonLabel(item.reason)}`}
+                        {item.serviceCode ? ` · #${item.serviceCode}` : ''}
+                      </Text>
+                    </Box>
                   </TouchableOpacityBox>
-
-                  <Box flex={1}>
-                    <Text preset="text14" fontWeightPreset="semibold" color="colorTextPrimary">
-                      {item.material}
-                    </Text>
-                    <Text preset="text12" color="gray600">
-                      {item.origin === 'PICKUP' ? 'Devolução/coleta' : `Não entregue${reasonLabel(item.reason)}`}
-                      {item.serviceCode ? ` · #${item.serviceCode}` : ''}
-                    </Text>
-                  </Box>
 
                   {/* Quantidade recebida no CD (default = esperado, editável p/ baixo) */}
                   <Box alignItems="flex-end" gap="y2">
