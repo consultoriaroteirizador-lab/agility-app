@@ -48,6 +48,23 @@ export interface ServiceCompletionDetailsRequest {
         notes?: string
         completedAt?: string
     }
+
+    /**
+     * Conferência das devoluções na parada de RETORNO — snapshot dos itens
+     * conferidos no CD (devoluções/coletas + não entregues).
+     */
+    returnChecklist?: ReturnChecklistItem[]
+}
+
+export interface ReturnChecklistItem {
+    material: string
+    serviceId: string
+    serviceCode?: string | null
+    quantity?: number
+    unit?: string | null
+    origin?: 'PICKUP' | 'UNDELIVERED'
+    checked: boolean
+    notes?: string
 }
 
 

@@ -1,6 +1,8 @@
 import { useCallback, useMemo, useState } from 'react';
 
-import { useLocalSearchParams } from 'expo-router';
+import { useQueryClient } from '@tanstack/react-query';
+import * as ImagePicker from 'expo-image-picker';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import {
   ActivityIndicator,
@@ -13,13 +15,18 @@ import {
 } from '@/components';
 import { ButtonBack } from '@/components/Button/ButtonBack';
 import { useGetRoutingMapData, useReturnManifest } from '@/domain/agility/routing/useCase';
-import { useFindOneService } from '@/domain/agility/service/useCase';
+import type { ReturnChecklistItem } from '@/domain/agility/service/dto/request/service-completion-details.request';
+import { uploadMultipleServicePhotos } from '@/domain/agility/service/serviceUploadUtils';
+import { useCompleteServiceWithDetails, useFindOneService } from '@/domain/agility/service/useCase';
+import { KEY_SERVICES } from '@/domain/queryKeys';
 import { formatHHmm } from '@/functions';
+import { useToastService } from '@/services/Toast/useToast';
 import { measure } from '@/theme';
 
 import { splitRouteAtLastStop } from '../_components/shared/geo';
 import { Map, MapPoint } from '../_components/shared/Map';
 import { useStopActions, useUserLocation } from '../_hooks';
+import { getCurrentCoords } from '../_hooks/getCurrentCoords';
 
 /**
  * Tela da parada de RETORNO (CD/origem).
@@ -42,14 +49,34 @@ export default function RetornoScreen() {
   const { mapData, services } = useGetRoutingMapData(routeId || '');
   const { userLocation } = useUserLocation();
 
-  const { handleStartAttendance, handleCompleteService, isStartingAttendance, isCompleting } =
-    useStopActions({
-      serviceId,
-      routeId,
-      serviceStatus: service?.status,
-    });
+  const router = useRouter();
+  const queryClient = useQueryClient();
+  const { showToast } = useToastService();
+
+  // "Cheguei no retorno" (start-attendance) continua vindo do useStopActions.
+  const { handleStartAttendance, isStartingAttendance } = useStopActions({
+    serviceId,
+    routeId,
+    serviceStatus: service?.status,
+  });
+
+  // Conclusão do retorno: persiste a conferência (+ foto opcional) via completion-details.
+  const { completeServiceWithDetailsAsync, isLoading: isCompleting } = useCompleteServiceWithDetails({
+    onSuccess: async () => {
+      void queryClient.invalidateQueries({ queryKey: [KEY_SERVICES, serviceId] });
+      void queryClient.invalidateQueries({ queryKey: [KEY_SERVICES, 'routing', routeId] });
+      setTimeout(() => router.back(), 400);
+    },
+    onError: () => {
+      showToast({ message: 'Não foi possível concluir o retorno. Tente novamente.', type: 'error' });
+    },
+  });
 
   const hasArrived = !!(service?.isInAttendance || service?.status === 'IN_ATTENDANCE');
+
+  // Foto(s) opcional(is) da carga descarregada no CD.
+  const [photos, setPhotos] = useState<ImagePicker.ImagePickerAsset[]>([]);
+  const [submitting, setSubmitting] = useState(false);
 
   // Ponto de retorno: quando volta à origem, usa a origem; senão o return.
   const returnPoint = useMemo(() => {
@@ -121,6 +148,59 @@ export default function RetornoScreen() {
   const toggle = useCallback((idx: number) => {
     setConferred((prev) => ({ ...prev, [idx]: !prev[idx] }));
   }, []);
+
+  // Foto opcional: abre a câmera e adiciona o asset à lista (upload no concluir).
+  const addPhoto = useCallback(async () => {
+    const perm = await ImagePicker.requestCameraPermissionsAsync();
+    if (!perm.granted) {
+      showToast({ message: 'Permissão de câmera necessária para anexar foto.', type: 'error' });
+      return;
+    }
+    const result = await ImagePicker.launchCameraAsync({ quality: 0.6 });
+    if (!result.canceled && result.assets?.length) {
+      setPhotos((prev) => [...prev, ...result.assets]);
+    }
+  }, [showToast]);
+
+  // Conclui o retorno: monta o checklist conferido, sobe as fotos (se houver) e
+  // finaliza via completion-details (persiste em services.return_checklist).
+  const handleConcluirRetorno = useCallback(async () => {
+    if (submitting || isCompleting) return;
+    setSubmitting(true);
+    try {
+      const returnChecklist: ReturnChecklistItem[] = items.map((item, idx) => ({
+        material: item.material,
+        serviceId: item.serviceId,
+        serviceCode: item.serviceCode,
+        quantity: item.quantity,
+        unit: item.unit,
+        origin: item.origin,
+        checked: !!conferred[idx],
+      }));
+
+      let photoProof: string | undefined;
+      if (photos.length > 0) {
+        const urls = await uploadMultipleServicePhotos(photos, serviceId, 'before');
+        const joined = urls.filter(Boolean).join(',');
+        if (joined) photoProof = joined;
+      }
+
+      const coords = await getCurrentCoords();
+
+      await completeServiceWithDetailsAsync({
+        id: serviceId,
+        details: {
+          returnChecklist,
+          ...(photoProof ? { photoProof } : {}),
+          ...(coords ? { latitude: coords.latitude, longitude: coords.longitude, accuracy: coords.accuracy } : {}),
+        },
+      });
+    } catch {
+      showToast({ message: 'Não foi possível concluir o retorno. Tente novamente.', type: 'error' });
+    } finally {
+      setSubmitting(false);
+    }
+  }, [submitting, isCompleting, items, conferred, photos, serviceId, completeServiceWithDetailsAsync, showToast]);
 
   // Endereço do retorno: do ponto de retorno (quando cadastrado); senão as
   // coordenadas do CD; senão um rótulo padrão.
@@ -236,6 +316,31 @@ export default function RetornoScreen() {
           )}
         </Box>
 
+        {/* Comprovante (opcional): foto da carga descarregada no CD */}
+        {hasArrived ? (
+          <Box gap="y8">
+            <Text preset="text14" fontWeightPreset="bold" color="gray600">
+              Comprovante (opcional)
+            </Text>
+            <TouchableOpacityBox
+              flexDirection="row"
+              alignItems="center"
+              gap="x8"
+              backgroundColor="gray50"
+              p="y12"
+              borderRadius="s12"
+              borderWidth={1}
+              borderColor="gray100"
+              onPress={addPhoto}
+            >
+              <LocalIcon iconName="box" size={measure.m20} color="primary100" />
+              <Text preset="text14" color="colorTextPrimary">
+                {photos.length > 0 ? `${photos.length} foto(s) anexada(s)` : 'Anexar foto'}
+              </Text>
+            </TouchableOpacityBox>
+          </Box>
+        ) : null}
+
         {/* Ações */}
         <Box gap="y12" pb="y24" >
           {!hasArrived ? (
@@ -246,9 +351,9 @@ export default function RetornoScreen() {
             />
           ) : (
             <Button
-              title={isCompleting ? 'Concluindo...' : 'Concluir retorno'}
-              onPress={handleCompleteService}
-              disabled={isCompleting || !allConferred}
+              title={(isCompleting || submitting) ? 'Concluindo...' : 'Concluir retorno'}
+              onPress={handleConcluirRetorno}
+              disabled={isCompleting || submitting || !allConferred}
             />
           )}
           {hasArrived && !allConferred ? (
