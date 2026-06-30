@@ -63,6 +63,8 @@ export interface ReturnChecklistItem {
     quantity?: number
     unit?: string | null
     origin?: 'PICKUP' | 'UNDELIVERED'
+    /** Motivo do retorno (FAILED/PARTIAL/MISSING/DAMAGED/REFUSED). */
+    reason?: string | null
     checked: boolean
     notes?: string
 }

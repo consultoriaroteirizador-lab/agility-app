@@ -169,6 +169,10 @@ export interface ReturnManifestItem {
     unit: string | null
     quantity: number
     origin: 'PICKUP' | 'UNDELIVERED'
+    /** Motivo do retorno (separado da quantidade): FAILED | PARTIAL | MISSING | DAMAGED | REFUSED. */
+    reason?: string | null
+    /** Quantidade efetivamente entregue (o que não volta). */
+    delivered?: number | null
     serviceId: string
     serviceCode: string | null
 }

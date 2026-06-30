@@ -39,6 +39,18 @@ import { getCurrentCoords } from '../_hooks/getCurrentCoords';
  * O retorno costuma ter só lat/long (sem Address cadastrado), então o endereço e
  * o mapa vêm do ponto de retorno do map-data (mapData.return / origin).
  */
+/** Rótulo do motivo do retorno (separado da quantidade). Vazio quando não há. */
+function reasonLabel(reason?: string | null): string {
+  switch (String(reason ?? '').toUpperCase()) {
+    case 'FAILED': return ' · Falha na entrega';
+    case 'PARTIAL': return ' · Entrega parcial';
+    case 'MISSING': return ' · Item ausente';
+    case 'DAMAGED': return ' · Danificado';
+    case 'REFUSED': return ' · Recusado';
+    default: return '';
+  }
+}
+
 export default function RetornoScreen() {
   const params = useLocalSearchParams<{ id: string; pid: string }>();
   const routeId = params.id as string;
@@ -175,6 +187,7 @@ export default function RetornoScreen() {
         quantity: item.quantity,
         unit: item.unit,
         origin: item.origin,
+        reason: item.reason,
         checked: !!conferred[idx],
       }));
 
@@ -306,7 +319,7 @@ export default function RetornoScreen() {
                       {item.quantity}
                       {item.unit ? ` ${item.unit}` : ''}
                       {' · '}
-                      {item.origin === 'PICKUP' ? 'Devolução/coleta' : 'Não entregue'}
+                      {item.origin === 'PICKUP' ? 'Devolução/coleta' : `Não entregue${reasonLabel(item.reason)}`}
                       {item.serviceCode ? ` · #${item.serviceCode}` : ''}
                     </Text>
                   </Box>
