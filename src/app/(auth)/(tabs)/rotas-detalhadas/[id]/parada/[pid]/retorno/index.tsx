@@ -14,11 +14,11 @@ import {
   TouchableOpacityBox,
 } from '@/components';
 import { ButtonBack } from '@/components/Button/ButtonBack';
-import { useGetRoutingMapData, useReturnManifest } from '@/domain/agility/routing/useCase';
+import { useCompleteRouting, useGetRoutingMapData, useReturnManifest } from '@/domain/agility/routing/useCase';
 import type { ReturnChecklistItem } from '@/domain/agility/service/dto/request/service-completion-details.request';
 import { uploadMultipleServicePhotos } from '@/domain/agility/service/serviceUploadUtils';
 import { useCompleteServiceWithDetails, useFindOneService } from '@/domain/agility/service/useCase';
-import { KEY_SERVICES } from '@/domain/queryKeys';
+import { KEY_ROUTINGS, KEY_SERVICES } from '@/domain/queryKeys';
 import { formatHHmm } from '@/functions';
 import { useToastService } from '@/services/Toast/useToast';
 import { measure } from '@/theme';
@@ -73,14 +73,28 @@ export default function RetornoScreen() {
   });
 
   // Conclusão do retorno: persiste a conferência (+ foto opcional) via completion-details.
+  // A navegação é decidida no handler (finaliza a rota OU volta às paradas).
   const { completeServiceWithDetailsAsync, isLoading: isCompleting } = useCompleteServiceWithDetails({
-    onSuccess: async () => {
+    onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: [KEY_SERVICES, serviceId] });
       void queryClient.invalidateQueries({ queryKey: [KEY_SERVICES, 'routing', routeId] });
-      setTimeout(() => router.back(), 400);
     },
     onError: () => {
       showToast({ message: 'Não foi possível concluir o retorno. Tente novamente.', type: 'error' });
+    },
+  });
+
+  // Como o retorno é a ÚLTIMA parada, concluí-lo finaliza a rota: encadeia o
+  // complete da routing e vai pra home (sem voltar pro botão "Concluir Rota").
+  const { completeRouting, isLoading: isCompletingRouting } = useCompleteRouting({
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: [KEY_ROUTINGS] });
+      router.replace('/(auth)/(tabs)');
+    },
+    onError: () => {
+      // Rota não pôde fechar agora (ex.: outra pendência) — volta às paradas.
+      showToast({ message: 'Retorno concluído. Finalize a rota na lista de paradas.', type: 'success' });
+      setTimeout(() => router.back(), 400);
     },
   });
 
@@ -208,12 +222,28 @@ export default function RetornoScreen() {
           ...(coords ? { latitude: coords.latitude, longitude: coords.longitude, accuracy: coords.accuracy } : {}),
         },
       });
+
+      // Retorno é a última parada → finaliza a rota direto (sem voltar pro botão
+      // "Concluir Rota"). Só encadeia se as demais paradas já estão terminais;
+      // caso contrário, volta às paradas (cenário fora de ordem).
+      const terminal = (st?: string | null) =>
+        ['COMPLETED', 'FAILED', 'CANCELED', 'CANCELLED'].includes(String(st ?? '').toUpperCase());
+      const others = (services ?? []).filter(
+        (s) => String(s.serviceType ?? '').toUpperCase() !== 'RETURN',
+      );
+      const allOthersDone = others.every((s) => terminal(s.status));
+
+      if (allOthersDone) {
+        completeRouting(routeId); // onSuccess: invalida + vai pra home; onError: volta às paradas
+      } else {
+        setTimeout(() => router.back(), 300);
+      }
     } catch {
       showToast({ message: 'Não foi possível concluir o retorno. Tente novamente.', type: 'error' });
     } finally {
       setSubmitting(false);
     }
-  }, [submitting, isCompleting, items, conferred, photos, serviceId, completeServiceWithDetailsAsync, showToast]);
+  }, [submitting, isCompleting, items, conferred, photos, serviceId, services, routeId, completeServiceWithDetailsAsync, completeRouting, router, showToast]);
 
   // Endereço do retorno: do ponto de retorno (quando cadastrado); senão as
   // coordenadas do CD; senão um rótulo padrão.
@@ -364,9 +394,9 @@ export default function RetornoScreen() {
             />
           ) : (
             <Button
-              title={(isCompleting || submitting) ? 'Concluindo...' : 'Concluir retorno'}
+              title={(isCompleting || submitting || isCompletingRouting) ? 'Concluindo...' : 'Concluir retorno e finalizar rota'}
               onPress={handleConcluirRetorno}
-              disabled={isCompleting || submitting || !allConferred}
+              disabled={isCompleting || submitting || isCompletingRouting || !allConferred}
             />
           )}
           {hasArrived && !allConferred ? (
