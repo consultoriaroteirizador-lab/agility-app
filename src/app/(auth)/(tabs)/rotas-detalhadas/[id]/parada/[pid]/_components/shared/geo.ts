@@ -135,7 +135,7 @@ export function sliceRouteBetween(
     const end = Math.max(iFrom, iTo);
     const slice = coords.slice(start, end + 1);
 
-    // Mantém o sentido parada-atual → próxima.
+    // Mantém o sentido from → to (ex.: parada anterior → parada atual).
     const ordered = iFrom <= iTo ? slice : slice.slice().reverse();
     return ordered.length >= 2 ? ordered : straight;
 }
