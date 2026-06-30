@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
+import { TextInput } from 'react-native';
 
 import { useQueryClient } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
@@ -183,6 +184,8 @@ export default function RetornoScreen() {
   // Conferência: cada item do manifesto é marcado pelo motorista. Quando há
   // itens, todos precisam estar conferidos antes de concluir.
   const [conferred, setConferred] = useState<Record<number, boolean>>({});
+  // Quantidade recebida no CD por item (string do input; vazio = quantidade cheia).
+  const [received, setReceived] = useState<Record<number, string>>({});
   const allConferred = useMemo(
     () => items.length === 0 || items.every((_, idx) => conferred[idx]),
     [items, conferred],
@@ -191,6 +194,14 @@ export default function RetornoScreen() {
   const toggle = useCallback((idx: number) => {
     setConferred((prev) => ({ ...prev, [idx]: !prev[idx] }));
   }, []);
+
+  // Quantidade recebida efetiva (clampada em [0, esperado]); vazio = cheio.
+  const receivedQty = useCallback((idx: number, expected: number): number => {
+    const raw = received[idx];
+    const parsed = raw != null && raw !== '' ? Number(raw) : expected;
+    if (!Number.isFinite(parsed)) return expected;
+    return Math.max(0, Math.min(expected, parsed));
+  }, [received]);
 
   // Conclui o retorno: monta o checklist conferido, sobe as fotos (se houver) e
   // finaliza via completion-details (persiste em services.return_checklist).
@@ -206,6 +217,7 @@ export default function RetornoScreen() {
         unit: item.unit,
         origin: item.origin,
         reason: item.reason,
+        received: receivedQty(idx, Number(item.quantity ?? 0)),
         checked: !!conferred[idx],
       }));
 
@@ -240,7 +252,7 @@ export default function RetornoScreen() {
     } finally {
       setSubmitting(false);
     }
-  }, [submitting, isCompleting, items, conferred, photos, serviceId, othersDone, routeId, completeServiceWithDetailsAsync, completeRouting, router, showToast]);
+  }, [submitting, isCompleting, items, conferred, receivedQty, photos, serviceId, othersDone, routeId, completeServiceWithDetailsAsync, completeRouting, router, showToast]);
 
   // Endereço do retorno: do ponto de retorno (quando cadastrado); senão as
   // coordenadas do CD; senão um rótulo padrão.
@@ -329,8 +341,10 @@ export default function RetornoScreen() {
           ) : (
             items.map((item, idx) => {
               const checked = !!conferred[idx];
+              const expected = Number(item.quantity ?? 0);
+              const recvValue = received[idx] ?? String(expected);
               return (
-                <TouchableOpacityBox
+                <Box
                   key={`${item.serviceId}-${idx}`}
                   flexDirection="row"
                   alignItems="center"
@@ -341,27 +355,53 @@ export default function RetornoScreen() {
                   borderWidth={1}
                   borderColor={checked ? 'primary100' : 'gray100'}
                   opacity={hasArrived ? 1 : 0.5}
-                  disabled={!hasArrived}
-                  onPress={() => toggle(idx)}
                 >
-                  <LocalIcon
-                    iconName={checked ? 'check' : 'box'}
-                    size={measure.m20}
-                    color={checked ? 'primary100' : 'gray400'}
-                  />
+                  {/* Check (alvo de toque) */}
+                  <TouchableOpacityBox disabled={!hasArrived} onPress={() => toggle(idx)}>
+                    <LocalIcon
+                      iconName={checked ? 'check' : 'box'}
+                      size={measure.m20}
+                      color={checked ? 'primary100' : 'gray400'}
+                    />
+                  </TouchableOpacityBox>
+
                   <Box flex={1}>
                     <Text preset="text14" fontWeightPreset="semibold" color="colorTextPrimary">
                       {item.material}
                     </Text>
                     <Text preset="text12" color="gray600">
-                      {item.quantity}
-                      {item.unit ? ` ${item.unit}` : ''}
-                      {' · '}
                       {item.origin === 'PICKUP' ? 'Devolução/coleta' : `Não entregue${reasonLabel(item.reason)}`}
                       {item.serviceCode ? ` · #${item.serviceCode}` : ''}
                     </Text>
                   </Box>
-                </TouchableOpacityBox>
+
+                  {/* Quantidade recebida no CD (default = esperado, editável p/ baixo) */}
+                  <Box alignItems="flex-end" gap="y2">
+                    <Box
+                      flexDirection="row"
+                      alignItems="center"
+                      gap="x4"
+                      borderWidth={1}
+                      borderColor="gray200"
+                      borderRadius="s8"
+                      paddingHorizontal="x8"
+                      paddingVertical="y4"
+                      backgroundColor="white"
+                    >
+                      <TextInput
+                        value={recvValue}
+                        onChangeText={(t) => setReceived((prev) => ({ ...prev, [idx]: t.replace(/[^\d.]/g, '') }))}
+                        keyboardType="numeric"
+                        editable={hasArrived}
+                        style={{ minWidth: 26, textAlign: 'right', padding: 0, color: '#111827' }}
+                      />
+                      <Text preset="text12" color="gray500">
+                        / {expected}{item.unit ? ` ${item.unit}` : ''}
+                      </Text>
+                    </Box>
+                    <Text preset="text12" color="gray500">recebido</Text>
+                  </Box>
+                </Box>
               );
             })
           )}

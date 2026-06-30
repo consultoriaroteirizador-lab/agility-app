@@ -65,6 +65,8 @@ export interface ReturnChecklistItem {
     origin?: 'PICKUP' | 'UNDELIVERED'
     /** Motivo do retorno (FAILED/PARTIAL/MISSING/DAMAGED/REFUSED). */
     reason?: string | null
+    /** Quantidade efetivamente recebida no CD (divergência quando < quantity). */
+    received?: number
     checked: boolean
     notes?: string
 }
