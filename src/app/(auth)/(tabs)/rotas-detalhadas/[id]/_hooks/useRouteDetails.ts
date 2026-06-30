@@ -158,12 +158,16 @@ export function useRouteDetails(rotaId: string | null | undefined): UseRouteDeta
      * Lista de paradas formatadas e ordenadas
      * Memoizado para evitar recálculos desnecessários
      */
+    // Endereço do retorno vem da routing (returnPoint já resolve origem quando
+    // returnToOrigin); usado só na parada RETURN, que não tem service.address.
+    const returnAddress = routing?.returnPoint?.address ?? routing?.returnAddress ?? null
+
     const paradas = useMemo(() => {
         if (!services || services.length === 0) {
             return []
         }
-        return mapServicesToParadas(services)
-    }, [services])
+        return mapServicesToParadas(services, returnAddress)
+    }, [services, returnAddress])
 
     // ========================================
     // CÁLCULOS DE STATUS E PROGRESSO

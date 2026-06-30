@@ -79,9 +79,9 @@ export function getParadasOrdenadas(services: ServiceResponse[]): ServiceRespons
  * const paradas = mapServicesToParadas(services)
  * // [{ numero: 1, serviceId: 'abc', nome: 'Cliente', ... }, ...]
  */
-export function mapServicesToParadas(services: ServiceResponse[]): Parada[] {
+export function mapServicesToParadas(services: ServiceResponse[], returnAddress?: string | null): Parada[] {
     const sortedServices = getParadasOrdenadas(services)
-    return sortedServices.map((service, index) => mapServiceToParada(service, index))
+    return sortedServices.map((service, index) => mapServiceToParada(service, index, returnAddress))
 }
 
 // ============================================

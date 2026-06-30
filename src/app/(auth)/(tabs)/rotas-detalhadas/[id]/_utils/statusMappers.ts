@@ -163,13 +163,18 @@ export function getRotaStatus(paradas: Parada[]): RotaStatus {
  * const parada = mapServiceToParada(service, 0)
  * // { numero: 1, serviceId: 'abc', nome: 'Cliente', ... }
  */
-export function mapServiceToParada(service: ServiceResponse, index: number): Parada {
+export function mapServiceToParada(service: ServiceResponse, index: number, returnAddress?: string | null): Parada {
     // Usar posição na lista ordenada para numero (evita duplicados quando backend repete sequenceOrder)
     const numero = index + 1
 
-    // Usar endereço completo se disponível, senão mostrar apenas o ID
-    const endereco = service.address?.formattedAddress
-        ?? (service.addressId ? `Endereço ID: ${service.addressId}` : 'Endereço não disponível')
+    const isRetorno = service.serviceType === ServiceType.RETURN
+
+    // O endereço do RETORNO vem da routing (returnPoint/returnAddress), não de
+    // service.address — a parada RETURN normalmente não tem Address cadastrado.
+    const endereco = isRetorno
+        ? (returnAddress ?? 'Retorno ao CD/origem')
+        : (service.address?.formattedAddress
+            ?? (service.addressId ? `Endereço ID: ${service.addressId}` : 'Endereço não disponível'))
 
     const horarioInicio = formatHHmm(service.estimatedArrival)
     const horarioFim = formatHHmm(service.estimatedCompletion)
@@ -187,12 +192,10 @@ export function mapServiceToParada(service: ServiceResponse, index: number): Par
         (service.materials?.some((m) => m.direction === 'PICKUP') ?? false)
     )
 
-    const isRetorno = service.serviceType === ServiceType.RETURN
-
     return {
         numero,
         serviceId: service.id,
-        nome: isRetorno ? 'Retorno ao CD/origem' : (service.fantasyName ?? service.responsible ?? 'Cliente'),
+        nome: isRetorno ? 'Retorno' : (service.fantasyName ?? service.responsible ?? 'Cliente'),
         endereco,
         horarioInicio,
         horarioFim,
