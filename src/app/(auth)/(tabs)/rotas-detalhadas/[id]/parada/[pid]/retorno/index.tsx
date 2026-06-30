@@ -39,6 +39,11 @@ import { getCurrentCoords } from '../_hooks/getCurrentCoords';
  * O retorno costuma ter só lat/long (sem Address cadastrado), então o endereço e
  * o mapa vêm do ponto de retorno do map-data (mapData.return / origin).
  */
+/** Status terminal de parada (concluída/falha/cancelada). */
+function isTerminalStatus(st?: string | null): boolean {
+  return ['COMPLETED', 'FAILED', 'CANCELED', 'CANCELLED'].includes(String(st ?? '').toUpperCase());
+}
+
 /** Rótulo do motivo do retorno (separado da quantidade). Vazio quando não há. */
 function reasonLabel(reason?: string | null): string {
   switch (String(reason ?? '').toUpperCase()) {
@@ -99,6 +104,17 @@ export default function RetornoScreen() {
   });
 
   const hasArrived = !!(service?.isInAttendance || service?.status === 'IN_ATTENDANCE');
+
+  // Trava do retorno: por ser a ÚLTIMA parada, o check-in ("Cheguei no retorno")
+  // só libera quando todas as demais paradas estão terminais. Espelha a trava
+  // das paradas normais. (Se já chegou, mantém liberado para concluir.)
+  const othersDone = useMemo(() => {
+    const others = (services ?? []).filter(
+      (s) => String(s.serviceType ?? '').toUpperCase() !== 'RETURN',
+    );
+    return others.every((s) => isTerminalStatus(s.status));
+  }, [services]);
+  const canCheckIn = hasArrived || othersDone;
 
   // Foto(s) opcional(is) da carga descarregada no CD.
   const [photos, setPhotos] = useState<ImagePicker.ImagePickerAsset[]>([]);
@@ -226,14 +242,7 @@ export default function RetornoScreen() {
       // Retorno é a última parada → finaliza a rota direto (sem voltar pro botão
       // "Concluir Rota"). Só encadeia se as demais paradas já estão terminais;
       // caso contrário, volta às paradas (cenário fora de ordem).
-      const terminal = (st?: string | null) =>
-        ['COMPLETED', 'FAILED', 'CANCELED', 'CANCELLED'].includes(String(st ?? '').toUpperCase());
-      const others = (services ?? []).filter(
-        (s) => String(s.serviceType ?? '').toUpperCase() !== 'RETURN',
-      );
-      const allOthersDone = others.every((s) => terminal(s.status));
-
-      if (allOthersDone) {
+      if (othersDone) {
         completeRouting(routeId); // onSuccess: invalida + vai pra home; onError: volta às paradas
       } else {
         setTimeout(() => router.back(), 300);
@@ -243,7 +252,7 @@ export default function RetornoScreen() {
     } finally {
       setSubmitting(false);
     }
-  }, [submitting, isCompleting, items, conferred, photos, serviceId, services, routeId, completeServiceWithDetailsAsync, completeRouting, router, showToast]);
+  }, [submitting, isCompleting, items, conferred, photos, serviceId, othersDone, routeId, completeServiceWithDetailsAsync, completeRouting, router, showToast]);
 
   // Endereço do retorno: do ponto de retorno (quando cadastrado); senão as
   // coordenadas do CD; senão um rótulo padrão.
@@ -387,11 +396,18 @@ export default function RetornoScreen() {
         {/* Ações */}
         <Box gap="y12" pb="y24" >
           {!hasArrived ? (
-            <Button
-              title={isStartingAttendance ? 'Confirmando...' : 'Cheguei no retorno'}
-              onPress={handleStartAttendance}
-              disabled={isStartingAttendance}
-            />
+            <>
+              <Button
+                title={isStartingAttendance ? 'Confirmando...' : 'Cheguei no retorno'}
+                onPress={handleStartAttendance}
+                disabled={isStartingAttendance || !canCheckIn}
+              />
+              {!canCheckIn ? (
+                <Text preset="text12" color="gray500" textAlign="center">
+                  Conclua as demais paradas antes de ir ao retorno.
+                </Text>
+              ) : null}
+            </>
           ) : (
             <Button
               title={(isCompleting || submitting || isCompletingRouting) ? 'Concluindo...' : 'Concluir retorno e finalizar rota'}
