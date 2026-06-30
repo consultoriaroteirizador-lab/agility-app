@@ -163,6 +163,26 @@ async function acceptRouting(id: Id, payload?: AcceptRoutingRequest): Promise<Ba
     return data
 }
 
+export interface ReturnManifestItem {
+    material: string
+    sku: string | null
+    unit: string | null
+    quantity: number
+    origin: 'PICKUP' | 'UNDELIVERED'
+    serviceId: string
+    serviceCode: string | null
+}
+
+export interface ReturnManifestResponse {
+    routingId: string
+    items: ReturnManifestItem[]
+}
+
+async function getReturnManifest(id: Id): Promise<BaseResponse<ReturnManifestResponse>> {
+    const { data } = await apiAgility.get<BaseResponse<ReturnManifestResponse>>(`/routings/${id}/return-manifest`)
+    return data
+}
+
 export const routingAPI = {
     create,
     findAll,
@@ -186,6 +206,7 @@ export const routingAPI = {
     getMapData,
     acceptRouting,
     getAggregatedSummary,
+    getReturnManifest,
 }
 
 

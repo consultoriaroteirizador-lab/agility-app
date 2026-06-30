@@ -50,6 +50,7 @@ function mapServiceType(type: ServiceType): string {
     [ServiceType.PICKUP]: 'Coleta',
     [ServiceType.SERVICE]: 'Serviço',
     [ServiceType.TRANSFER]: 'Transferência',
+    [ServiceType.RETURN]: 'Retorno',
   };
   return map[type] ?? type;
 }

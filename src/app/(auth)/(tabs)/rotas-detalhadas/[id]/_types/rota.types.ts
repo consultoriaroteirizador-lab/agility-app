@@ -96,6 +96,9 @@ export interface Parada {
     /** Parada com coleta/devolução no mesmo stop (entrega + retorno) */
     hasReturn?: boolean
 
+    /** Parada de RETORNO: última parada no CD/origem (check-in + conferência) */
+    isRetorno?: boolean
+
     /** Status atual da parada */
     status: ParadaStatus
 

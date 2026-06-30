@@ -19,5 +19,6 @@ export { useRemoveRouting } from './useRemoveRouting'
 export { useGetRoutingSummary } from './useGetRoutingSummary'
 export { useGetRoutingMapData } from './useGetRoutingMapData'
 export { useAcceptRouting } from './useAcceptRouting'
+export { useReturnManifest } from './useReturnManifest'
 
 

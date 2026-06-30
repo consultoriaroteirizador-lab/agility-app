@@ -30,6 +30,7 @@ export const SERVICE_TYPE_LABELS: ServiceTypeLabelMap = {
     [ServiceType.PICKUP]: 'Coleta',
     [ServiceType.SERVICE]: 'Serviço',
     [ServiceType.TRANSFER]: 'Transferência',
+    [ServiceType.RETURN]: 'Retorno',
 }
 
 /**
@@ -186,15 +187,18 @@ export function mapServiceToParada(service: ServiceResponse, index: number): Par
         (service.materials?.some((m) => m.direction === 'PICKUP') ?? false)
     )
 
+    const isRetorno = service.serviceType === ServiceType.RETURN
+
     return {
         numero,
         serviceId: service.id,
-        nome: service.fantasyName ?? service.responsible ?? 'Cliente',
+        nome: isRetorno ? 'Retorno ao CD/origem' : (service.fantasyName ?? service.responsible ?? 'Cliente'),
         endereco,
         horarioInicio,
         horarioFim,
         tipo,
         hasReturn,
+        isRetorno,
         status,
         deliveryOutcome: service.deliveryOutcome ?? null,
     }
