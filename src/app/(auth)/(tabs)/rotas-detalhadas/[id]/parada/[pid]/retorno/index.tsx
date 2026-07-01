@@ -270,6 +270,18 @@ export default function RetornoScreen() {
     );
   }
 
+  // Enquanto finaliza (sobe foto → conclui retorno → fecha a rota), mostra um
+  // estado único de "finalizando" para evitar o flicker da tela revertendo ao
+  // "Cheguei no retorno" (o status vira COMPLETED e hasArrived cai) antes de navegar.
+  if (submitting || isCompleting || isCompletingRouting) {
+    return (
+      <Box flex={1} justifyContent="center" alignItems="center" px="x16" py="y32">
+        <ActivityIndicator />
+        <Text mt="y16">Finalizando rota...</Text>
+      </Box>
+    );
+  }
+
   return (
     <ScreenBase
       scrollable
