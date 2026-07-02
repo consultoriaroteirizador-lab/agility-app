@@ -121,6 +121,18 @@ export interface ServiceResponse {
     /** Horário estimado de conclusão (ORS) — retornado pelo back (ISO datetime). */
     estimatedCompletion: string | null
 
+    /** Baseline imutável do primeiro plano (ISO). ETA original antes de re-projeções. */
+    plannedArrival?: Date | string | null
+
+    /** Atrasada vs. ETA do ORS (plano). Derivado no backend no momento do fetch. */
+    isLateToEta?: boolean
+
+    /** Fora da janela contratada do pedido (SLA). Derivado no backend no fetch. */
+    isLateToWindow?: boolean
+
+    /** Minutos de atraso vs. ETA (positivo = atrasado); null quando não se aplica. */
+    delayMinutes?: number | null
+
     /** Start date */
     startDate: Date | string | null
 

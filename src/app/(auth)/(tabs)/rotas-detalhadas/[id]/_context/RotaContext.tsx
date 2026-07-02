@@ -29,6 +29,7 @@ import {
     useRouteDetails,
     useRouteActions,
     useParadaNavigation,
+    useRouteLiveSync,
 } from '../_hooks'
 import type {
     Parada,
@@ -258,6 +259,10 @@ export function RotaProvider({ children, routeId }: RotaProviderProps) {
         nenhumAndamento,
         temMultiplasEmAndamento,
     } = useRouteDetails(routeId)
+
+    // Sincronização ao vivo: re-projeção de ETA por atraso / replan chegam via
+    // socket (/monitoring) e invalidam as queries — a tela reflete sem refresh.
+    useRouteLiveSync(routeId)
 
     // Hook de ações da rota (iniciar, concluir, navegar)
     const {

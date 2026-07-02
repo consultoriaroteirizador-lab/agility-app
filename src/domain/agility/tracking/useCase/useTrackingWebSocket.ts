@@ -17,6 +17,10 @@ import type { DriverLocationUpdate } from '../types';
 // Tipos
 export interface TrackingWebSocketOptions {
   onDriverLocationUpdate?: (data: DriverLocationUpdate) => void;
+  /** Rota atualizada no backend (replan, re-projeção de ETA por atraso, etc.). */
+  onRoutingUpdated?: (data: { id?: string } & Record<string, unknown>) => void;
+  /** Serviço/parada atualizado (status, ETA re-projetada, etc.). */
+  onServiceUpdated?: (data: { id?: string; routingId?: string } & Record<string, unknown>) => void;
   onConnect?: () => void;
   onDisconnect?: () => void;
   onError?: (error: Error) => void;
@@ -144,6 +148,18 @@ export function useTrackingWebSocket(options: TrackingWebSocketOptions = {}) {
     socket.on('driver_location_updated', (data: DriverLocationUpdate) => {
       console.log('[TrackingWebSocket] Location update:', data.driverId);
       optionsRef.current.onDriverLocationUpdate?.(data);
+    });
+
+    // Rota atualizada (replan / re-projeção de ETA por atraso).
+    socket.on('routing_updated', (data: { id?: string }) => {
+      console.log('[TrackingWebSocket] Routing update:', data?.id);
+      optionsRef.current.onRoutingUpdated?.(data);
+    });
+
+    // Serviço/parada atualizado (status, ETA re-projetada).
+    socket.on('service_updated', (data: { id?: string; routingId?: string }) => {
+      console.log('[TrackingWebSocket] Service update:', data?.id);
+      optionsRef.current.onServiceUpdated?.(data);
     });
 
     // Escutar erros

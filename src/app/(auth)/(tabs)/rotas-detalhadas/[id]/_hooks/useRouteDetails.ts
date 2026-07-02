@@ -144,11 +144,15 @@ export function useRouteDetails(rotaId: string | null | undefined): UseRouteDeta
         isRefetching,
     } = useFindOneRouting(rotaId)
 
-    // Buscar serviços da rota
+    // Buscar serviços da rota. Enquanto a rota está em andamento, faz polling de
+    // fallback (60s) caso o socket /monitoring caia — as ETAs re-projetadas por
+    // atraso continuam chegando à tela.
     const {
         services,
         isLoading: isLoadingServices,
-    } = useFindServicesByRoutingId(rotaId ?? undefined)
+    } = useFindServicesByRoutingId(rotaId ?? undefined, {
+        refetchIntervalMs: routing?.isInProgress ? 60_000 : undefined,
+    })
 
     // ========================================
     // MAPEAMENTO DE PARADAS

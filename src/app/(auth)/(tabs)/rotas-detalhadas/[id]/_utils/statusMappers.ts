@@ -199,12 +199,28 @@ export function mapServiceToParada(service: ServiceResponse, index: number, retu
         endereco,
         horarioInicio,
         horarioFim,
+        estimatedArrivalISO: toISO(service.estimatedArrival),
+        plannedArrivalISO: toISO(service.plannedArrival),
+        promisedStartISO: toISO(service.promisedStartDate),
+        promisedEndISO: toISO(service.promisedEndDate),
+        // Conclusão real — usada para "entregue em atraso" (completedAt × promisedEnd).
+        completedAtISO: toISO(service.completedAt ?? service.endDate),
+        isLateToEta: service.isLateToEta ?? undefined,
+        isLateToWindow: service.isLateToWindow ?? undefined,
+        delayMinutes: service.delayMinutes ?? null,
         tipo,
         hasReturn,
         isRetorno,
         status,
         deliveryOutcome: service.deliveryOutcome ?? null,
     }
+}
+
+/** Normaliza Date|string|null → ISO string|null para comparação client-side. */
+function toISO(value?: Date | string | null): string | null {
+    if (!value) return null
+    if (value instanceof Date) return isNaN(value.getTime()) ? null : value.toISOString()
+    return value
 }
 
 /**
