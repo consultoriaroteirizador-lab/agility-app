@@ -15,6 +15,8 @@ import type {
     BroadcastingQueryRequest,
     AcceptRoutingRequest,
     RoutingsAggregatedSummaryResponse,
+    RoutingHandoffRequest,
+    RoutingHandoffResult,
 } from './dto'
 
 
@@ -187,6 +189,11 @@ async function getReturnManifest(id: Id): Promise<BaseResponse<ReturnManifestRes
     return data
 }
 
+async function handoff(id: Id, payload: RoutingHandoffRequest): Promise<BaseResponse<RoutingHandoffResult>> {
+    const { data } = await apiAgility.post<BaseResponse<RoutingHandoffResult>>(`/routings/${id}/handoff`, payload)
+    return data
+}
+
 export const routingAPI = {
     create,
     findAll,
@@ -211,6 +218,7 @@ export const routingAPI = {
     acceptRouting,
     getAggregatedSummary,
     getReturnManifest,
+    handoff,
 }
 
 
