@@ -21,6 +21,7 @@ import {
   RouteActions,
 } from './_components'
 import { MapaParadasModal } from './_components/MapaParadasModal'
+import { TransferLegExecution } from './_components/TransferLegExecution'
 import { RotaProvider, useRota } from './_context/RotaContext'
 import type { RotaTabType, Parada } from './_types/rota.types'
 
@@ -351,6 +352,10 @@ function RotaDetalhadaContent() {
 
   if (loading) return <LoadingState />
   if (error || !routing) return <ErrorState onBack={() => { }} />
+
+  if (routing.legType === 'TRANSFER') {
+    return <TransferLegExecution />
+  }
 
   return (
     <ScreenBase
