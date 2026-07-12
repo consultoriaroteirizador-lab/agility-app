@@ -1,10 +1,9 @@
 import { useState } from 'react';
-import { TextInput } from 'react-native';
 
 import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 
-import { ActivityIndicator, Box, Button, LocalIcon, ScreenBase, Text } from '@/components';
+import { ActivityIndicator, Box, Button, Input, LocalIcon, ScreenBase, Text } from '@/components';
 import { ButtonBack } from '@/components/Button/ButtonBack';
 import { MultiPhotoPicker } from '@/components/MultiPhotoPicker';
 import { SignatureCanvas } from '@/components/SignatureCanvas';
@@ -164,27 +163,13 @@ export function TransferLegExecution() {
             Comprovante de recebimento
           </Text>
 
-          <Box>
-            <Text preset="text12" color="gray600" mb="b4">
-              Nome de quem recebeu no CD *
-            </Text>
-            <Box
-              borderWidth={1}
-              borderColor="gray200"
-              borderRadius="s8"
-              paddingHorizontal="x12"
-              paddingVertical="y8"
-              backgroundColor="white"
-            >
-              <TextInput
-                value={receivedBy}
-                onChangeText={setReceivedBy}
-                placeholder="Nome do recebedor"
-                placeholderTextColor="#999"
-                style={{ fontSize: 16, color: '#333' }}
-              />
-            </Box>
-          </Box>
+          <Input
+            title="Nome de quem recebeu no CD *"
+            placeholder="Nome do recebedor"
+            value={receivedBy}
+            onChangeText={setReceivedBy}
+            width="auto"
+          />
 
           <MultiPhotoPicker
             photos={photos}
