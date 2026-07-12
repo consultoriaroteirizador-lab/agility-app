@@ -137,6 +137,17 @@ export interface RoutingResponse {
     /** Has vehicle */
     hasVehicle: boolean
 
+    /** Cross-docking: papel do trecho na malha. null/undefined em rota comum. */
+    legType?: 'TRANSFER' | 'LAST_MILE' | null
+    /** Cross-docking: rota-mãe da malha. */
+    parentRoutingId?: string | null
+    /** Cross-docking: próximo trecho na cadeia (last-mile ou próximo CD). */
+    nextLegRoutingId?: string | null
+    /** Cross-docking: nome do CD de origem do trecho (faixa de hops). */
+    originFacilityName?: string | null
+    /** Cross-docking: nome do CD de destino do trecho. */
+    destinationFacilityName?: string | null
+
     /** Creation timestamp */
     createdAt: Date | string
 
