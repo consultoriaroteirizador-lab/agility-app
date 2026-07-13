@@ -18,4 +18,8 @@ export interface RoutingHandoffResult {
     arrivedCount: number
     nextLegRoutingId?: string | null
     departedCount?: number
+    /** Trecho foi concluído no handoff (sem retorno). Ausente = degradou no back. */
+    legCompleted?: boolean
+    /** Quando o trecho tem retorno: id do Service RETURN pra abrir o check-in. */
+    returnServiceId?: string | null
 }

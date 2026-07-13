@@ -36,7 +36,19 @@ export function TransferComprovanteStep({ routingId, onBack }: { routingId: stri
     const [done, setDone] = useState(false);
 
     const { handoff } = useRoutingHandoff({
-        onSuccess: () => {
+        onSuccess: (res) => {
+            // Trecho com retorno: o backend materializa o Service RETURN e devolve
+            // seu id. Em vez de encerrar aqui, o motorista segue pro fluxo de
+            // retorno (voltar ao CD de origem + check-in), que fecha o trecho —
+            // igual ao last-mile. Sem retorno: encerra como antes.
+            const returnServiceId = res?.result?.returnServiceId;
+            if (returnServiceId) {
+                router.replace({
+                    pathname: '/rotas-detalhadas/[id]/parada/[pid]/retorno' as never,
+                    params: { id: routingId, pid: returnServiceId } as never,
+                });
+                return;
+            }
             setDone(true);
             setTimeout(() => router.replace('/(auth)/(tabs)'), 2000);
         },
