@@ -3,7 +3,7 @@ import { useState } from 'react';
 import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 
-import { Box, Button, Input, LocalIcon, Text, TouchableOpacityBox } from '@/components';
+import { Box, Button, Input, Text, TouchableOpacityBox } from '@/components';
 import { DocumentCollectionForm, type DocumentData } from '@/components/DocumentCollectionForm';
 import Modal from '@/components/Modal/Modal';
 import { MultiPhotoPicker } from '@/components/MultiPhotoPicker';
@@ -29,7 +29,7 @@ const NOT_RECEIVED_REASONS = ['DANIFICADO', 'FALTOU', 'RECUSADO', 'OUTRO'] as co
  * Task 3), agora enriquecida com DocumentCollectionForm (nome + tipo/número
  * de documento) no lugar do campo de nome solto.
  */
-export function TransferComprovanteStep({ routingId, onBack }: { routingId: string; onBack: () => void }) {
+export function TransferComprovanteStep({ routingId, onBack, onDone }: { routingId: string; onBack: () => void; onDone: () => void }) {
     const { paradas } = useRota();
     const { showToast } = useToastService();
     const [doc, setDoc] = useState<DocumentData>({ recipientName: '', documentType: 'RG', documentNumber: '' });
@@ -37,7 +37,6 @@ export function TransferComprovanteStep({ routingId, onBack }: { routingId: stri
     const [signature, setSignature] = useState<string | null>(null);
     const [showSignature, setShowSignature] = useState(false);
     const [submitting, setSubmitting] = useState(false);
-    const [done, setDone] = useState(false);
 
     // Conferência por pedido (Fase 2): ausente no map = recebido (default).
     const [outcomes, setOutcomes] = useState<Record<string, TransferOrderOutcome>>({});
@@ -91,8 +90,8 @@ export function TransferComprovanteStep({ routingId, onBack }: { routingId: stri
                 });
                 return;
             }
-            setDone(true);
-            setTimeout(() => router.replace('/(auth)/(tabs)'), 2000);
+            // Sem retorno: o host mostra a tela de sucesso full-screen e navega.
+            onDone();
         },
         onError: () => {
             setSubmitting(false);
@@ -156,17 +155,6 @@ export function TransferComprovanteStep({ routingId, onBack }: { routingId: stri
                 items,
             },
         });
-    }
-
-    if (done) {
-        return (
-            <Box flex={1} backgroundColor="primary100" justifyContent="center" alignItems="center" px="x24">
-                <LocalIcon iconName="check" size={measure.m40} color="white" />
-                <Text preset="text18" color="white" textAlign="center" mt="y16">
-                    Transferência concluída{'\n'}com sucesso
-                </Text>
-            </Box>
-        );
     }
 
     return (
