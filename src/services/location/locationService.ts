@@ -45,17 +45,28 @@ let legacyTrackingActive = false;
  * HTTP em background, então não é preciso um update manual aqui.
  */
 export async function startLocationTracking(driverId: string): Promise<void> {
+  console.log('[LocationService] Iniciando rastreamento para driver:', driverId);
+
+  if (USE_BACKGROUND_GEOLOCATION) {
+    // Fonte de verdade é o estado REAL do SDK — não o flag `legacyTrackingActive`.
+    // Esse flag é global de módulo e sobrevive a um remount do provider; num
+    // logout→login rápido o stop (async, do unmount) só o zerava DEPOIS do await,
+    // então o novo start podia vê-lo ainda `true` e virar no-op, deixando o
+    // tracking sem reiniciar. Checar o SDK evita esse race.
+    if (getTrackingState().isTracking) {
+      console.log('[LocationService] Tracking já está ativo (SDK)');
+      legacyTrackingActive = true;
+      return;
+    }
+    await startBackgroundTracking(driverId);
+    legacyTrackingActive = true;
+    return;
+  }
+
   if (legacyTrackingActive) {
     console.log('[LocationService] Tracking já está ativo');
     return;
   }
-
-  console.log('[LocationService] Iniciando rastreamento para driver:', driverId);
-
-  if (USE_BACKGROUND_GEOLOCATION) {
-    await startBackgroundTracking(driverId);
-  }
-
   legacyTrackingActive = true;
 }
 

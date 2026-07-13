@@ -144,11 +144,15 @@ export function useRouteDetails(rotaId: string | null | undefined): UseRouteDeta
         isRefetching,
     } = useFindOneRouting(rotaId)
 
-    // Buscar serviços da rota
+    // Buscar serviços da rota. Enquanto a rota está em andamento, faz polling de
+    // fallback (60s) caso o socket /monitoring caia — as ETAs re-projetadas por
+    // atraso continuam chegando à tela.
     const {
         services,
         isLoading: isLoadingServices,
-    } = useFindServicesByRoutingId(rotaId ?? undefined)
+    } = useFindServicesByRoutingId(rotaId ?? undefined, {
+        refetchIntervalMs: routing?.isInProgress ? 60_000 : undefined,
+    })
 
     // ========================================
     // MAPEAMENTO DE PARADAS
@@ -158,12 +162,16 @@ export function useRouteDetails(rotaId: string | null | undefined): UseRouteDeta
      * Lista de paradas formatadas e ordenadas
      * Memoizado para evitar recálculos desnecessários
      */
+    // Endereço do retorno vem da routing (returnPoint já resolve origem quando
+    // returnToOrigin); usado só na parada RETURN, que não tem service.address.
+    const returnAddress = routing?.returnPoint?.address ?? routing?.returnAddress ?? null
+
     const paradas = useMemo(() => {
         if (!services || services.length === 0) {
             return []
         }
-        return mapServicesToParadas(services)
-    }, [services])
+        return mapServicesToParadas(services, returnAddress)
+    }, [services, returnAddress])
 
     // ========================================
     // CÁLCULOS DE STATUS E PROGRESSO

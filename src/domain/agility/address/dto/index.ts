@@ -8,5 +8,5 @@ export type { AddressResponse } from './response/address.response';
 export type { PaginatedAddressResponse } from './response/paginated-address.response';
 
 // Formatting functions
-export { formatAddress, formatAddressStreetNumber, formatAddressComplement } from './response/address.response';
+export { formatAddress, formatAddressFull, formatAddressStreetNumber, formatAddressComplement } from './response/address.response';
 

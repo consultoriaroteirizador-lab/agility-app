@@ -135,7 +135,39 @@ export function sliceRouteBetween(
     const end = Math.max(iFrom, iTo);
     const slice = coords.slice(start, end + 1);
 
-    // Mantém o sentido parada-atual → próxima.
+    // Mantém o sentido from → to (ex.: parada anterior → parada atual).
     const ordered = iFrom <= iTo ? slice : slice.slice().reverse();
     return ordered.length >= 2 ? ordered : straight;
+}
+
+/**
+ * Divide o traçado global da rota (origem → paradas → retorno) em dois trechos
+ * no ponto da ÚLTIMA parada: a IDA (início → última parada) e o RETORNO
+ * (última parada → fim do traçado).
+ *
+ * Por que não usar `sliceRouteBetween` para o retorno: quando a rota volta à
+ * origem, a coordenada da origem aparece nas DUAS pontas da polyline; o
+ * "vértice mais próximo" do destino cairia no índice 0 (início) e o trecho de
+ * retorno acabaria retraçando a ida. Aqui cortamos pelo índice da última parada
+ * e usamos o final real do traçado como destino.
+ *
+ * Retorna `[lng,lat][]` para cada trecho. Quando a geometria não decodifica
+ * (rota antiga sem traçado), devolve `null` — o chamador decide o fallback
+ * (ex.: linhas retas ligando os pinos).
+ */
+export function splitRouteAtLastStop(
+    encodedGeometry: string | null | undefined,
+    lastStop: LatLng,
+): { outbound: number[][]; returnLeg: number[][] } | null {
+    const coords = encodedGeometry ? decodePolyline(encodedGeometry) : [];
+    if (coords.length < 2) return null;
+
+    const idx = nearestIndex(coords, lastStop.longitude, lastStop.latitude);
+    const outbound = coords.slice(0, idx + 1);
+    const returnLeg = coords.slice(idx);
+
+    return {
+        outbound: outbound.length >= 2 ? outbound : [],
+        returnLeg: returnLeg.length >= 2 ? returnLeg : [],
+    };
 }

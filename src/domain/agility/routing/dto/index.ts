@@ -14,6 +14,11 @@ export type {
 } from './request/add-services-to-routing.request'
 export type { BroadcastingQueryRequest } from './request/broadcasting-query.request'
 export type { AcceptRoutingRequest } from './request/accept-routing.request'
+export type {
+    RoutingHandoffProof,
+    RoutingHandoffRequest,
+    RoutingHandoffResult,
+} from './request/routing-handoff.request'
 
 // Response DTOs
 export type { RoutingResponse } from './response/routing.response'

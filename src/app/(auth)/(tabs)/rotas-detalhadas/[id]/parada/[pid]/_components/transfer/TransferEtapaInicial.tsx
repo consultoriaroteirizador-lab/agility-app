@@ -1,15 +1,18 @@
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 
 import { router } from 'expo-router';
 
 import { Box, Button, ScreenBase, Text } from '@/components';
 import { ButtonBack } from '@/components/Button/ButtonBack';
-import { formatAddressStreetNumber } from '@/domain/agility/address/dto';
+import { TouchableOpacityBox } from '@/components/RestyleComponent/RestyleComponent';
+import { formatAddressFull, formatAddressStreetNumber } from '@/domain/agility/address/dto';
+import { useToastService } from '@/services/Toast/useToast';
 import { measure } from '@/theme';
 
 import { useParada } from '../../_context/ParadaContext';
 import { useStopActions } from '../../_hooks/useStopActions';
 import { Map } from '../shared/Map';
+import { MaterialsModal } from '../shared/MaterialsModal';
 
 import { TransferStepHeader } from './TransferStepHeader';
 
@@ -19,8 +22,12 @@ import { TransferStepHeader } from './TransferStepHeader';
  * entrega, a "chegada" é só um passo de UI (o serviço já está em atendimento).
  */
 export function TransferEtapaInicial() {
-    const { service, effectiveAddress, setEtapa, transferLeg, isServiceStarted } = useParada();
+    const { service, effectiveAddress, setEtapa, transferLeg, isServiceStarted, startBlockReason } = useParada();
+    const { showToast } = useToastService();
     const isPickup = transferLeg === 'pickup';
+    // Gating só na perna de coleta (origem), onde a parada é efetivamente iniciada.
+    const isStartBlocked = isPickup && startBlockReason !== null;
+    const [showVolumesModal, setShowVolumesModal] = useState(false);
 
     const { handleStartService, handleStartAttendance, isStarting, isStartingAttendance } = useStopActions({
         serviceId: service?.id || '',
@@ -36,14 +43,26 @@ export function TransferEtapaInicial() {
         router.back();
     }, []);
 
+    const handleIndoOrigem = useCallback(() => {
+        if (isStartBlocked) {
+            showToast({ message: startBlockReason!, type: 'error' });
+            return;
+        }
+        handleStartService();
+    }, [isStartBlocked, startBlockReason, showToast, handleStartService]);
+
     const handleChegou = useCallback(() => {
+        if (isStartBlocked) {
+            showToast({ message: startBlockReason!, type: 'error' });
+            return;
+        }
         // Na coleta (origem), marca atendimento no backend (uma única vez por TRANSFER).
         // Na entrega (destino), o serviço já está IN_ATTENDANCE — só avança o passo.
         if (isPickup && !isServiceStarted) {
             handleStartAttendance();
         }
         setEtapa(2);
-    }, [isPickup, isServiceStarted, handleStartAttendance, setEtapa]);
+    }, [isStartBlocked, startBlockReason, showToast, isPickup, isServiceStarted, handleStartAttendance, setEtapa]);
 
     return (
         <ScreenBase
@@ -73,12 +92,32 @@ export function TransferEtapaInicial() {
                             <Text preset="text15" fontWeightPreset="bold" color="colorTextPrimary">
                                 {formatAddressStreetNumber(effectiveAddress)}
                             </Text>
+
+                            {/* Endereço completo (header mantém só rua + número) */}
+                            {effectiveAddress && (
+                                <Text preset="text13" color="gray700" marginTop="y4">
+                                    {formatAddressFull(effectiveAddress)}
+                                </Text>
+                            )}
+
                             {service?.materials && service.materials.length > 0 && (
-                                <Box flexDirection="row" alignItems="center" gap="x4" marginTop="y8">
-                                    <Text preset="text13">📦</Text>
-                                    <Text preset="text13" color="gray700">
-                                        {service.materials.length} volumes
-                                    </Text>
+                                <Box flexDirection="row" gap="x8" marginTop="y8">
+                                    <TouchableOpacityBox
+                                        flexDirection="row"
+                                        alignItems="center"
+                                        gap="x4"
+                                        paddingHorizontal="x12"
+                                        paddingVertical="y6"
+                                        backgroundColor="gray100"
+                                        borderRadius="s20"
+                                        onPress={() => setShowVolumesModal(true)}
+                                    >
+                                        <Text preset="text13">📦</Text>
+                                        <Text preset="text13" color="gray700">
+                                            {service.materials.length > 1 ? 'Volumes' : 'Volume'}
+                                        </Text>
+                                        <Text preset="text13" color="primary100">({service.materials.length})</Text>
+                                    </TouchableOpacityBox>
                                 </Box>
                             )}
                         </Box>
@@ -88,8 +127,8 @@ export function TransferEtapaInicial() {
                                 <Button
                                     title={isStarting ? 'Iniciando...' : 'Indo até a origem'}
                                     preset="outline"
-                                    onPress={handleStartService}
-                                    disabled={isStarting || isStartingAttendance}
+                                    onPress={handleIndoOrigem}
+                                    disabled={isStarting || isStartingAttendance || isStartBlocked}
                                     width={measure.x330}
                                 />
                             )}
@@ -100,13 +139,25 @@ export function TransferEtapaInicial() {
                                         : isPickup ? 'Cheguei na origem' : 'Cheguei no destino'
                                 }
                                 onPress={handleChegou}
-                                disabled={isStarting || isStartingAttendance}
+                                disabled={isStarting || isStartingAttendance || isStartBlocked}
                                 width={measure.x330}
                             />
+                            {isStartBlocked && (
+                                <Text preset="text13" color="redError" textAlign="center">
+                                    {startBlockReason}
+                                </Text>
+                            )}
                         </Box>
                     </Box>
                 </Box>
             </Box>
+
+            <MaterialsModal
+                isVisible={showVolumesModal}
+                onClose={() => setShowVolumesModal(false)}
+                materials={service?.materials || []}
+                title="Volumes"
+            />
         </ScreenBase>
     );
 }

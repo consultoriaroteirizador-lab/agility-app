@@ -6,6 +6,7 @@ import { Box, ActivityIndicator, Text } from '@/components';
 import { measure } from '@/theme';
 
 import { EtapaCheckItens } from '../_components/entrega/EtapaCheckItens';
+import { EtapaConcluida } from '../_components/shared/EtapaConcluida';
 import { SharedEtapaDados } from '../_components/shared/SharedEtapaDados';
 import { SharedEtapaFinalizacao } from '../_components/shared/SharedEtapaFinalizacao';
 import { SharedEtapaRecebedor } from '../_components/shared/SharedEtapaRecebedor';
@@ -25,6 +26,7 @@ function TransferOrchestrator() {
     const router = useRouter();
     const {
         rotaId,
+        service,
         etapa,
         delivered,
         recipient,
@@ -38,6 +40,10 @@ function TransferOrchestrator() {
     } = useParada();
 
     const isPickup = transferLeg === 'pickup';
+
+    // Serviço já finalizado → tela read-only (não reabre o wizard de execução).
+    const isServiceFinalized =
+        service?.isCompleted === true || service?.isCanceled === true || service?.isFailed === true;
 
     useEffect(() => {
         if (isServiceStarted && materialsState.materials.length === 0 && !materialsState.loading) {
@@ -77,6 +83,11 @@ function TransferOrchestrator() {
                 </Text>
             </Box>
         );
+    }
+
+    // Serviço já finalizado (concluído/insucesso/cancelado): tela somente leitura.
+    if (isServiceFinalized) {
+        return <EtapaConcluida />;
     }
 
     const sharedType = isPickup ? 'coleta' : 'entrega';

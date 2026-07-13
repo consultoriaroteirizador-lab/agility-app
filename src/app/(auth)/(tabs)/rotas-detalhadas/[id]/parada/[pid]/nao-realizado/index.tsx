@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Linking, Platform } from 'react-native';
 
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, usePathname, useRouter } from 'expo-router';
 
 import { Box, Button, ScreenBase, Text, TouchableOpacityBox } from '@/components';
 import { ButtonBack } from '@/components/Button/ButtonBack';
@@ -13,6 +13,7 @@ import { measure } from '@/theme';
 
 export default function TentativaEntregaScreen() {
   const router = useRouter();
+  const pathname = usePathname();
   const { id, pid } = useLocalSearchParams<{ id: string; pid: string }>();
   const rotaId = id as string;
   const serviceId = pid as string;
@@ -43,7 +44,7 @@ export default function TentativaEntregaScreen() {
 
       if (result.success && result.result) {
         // Navegar para tela de suporte onde o chat será exibido
-        router.push('/(auth)/(tabs)/menu/suporte');
+        router.push({ pathname: '/(auth)/(tabs)/menu/suporte', params: { returnTo: pathname } });
       } else {
         showToast({ message: 'Não foi possível abrir o chat com a torre de controle', type: 'error' });
       }
@@ -73,7 +74,7 @@ export default function TentativaEntregaScreen() {
       if (result.success && result.result) {
         // Navegar para tela de suporte onde o chat será exibido
         // (ou criar uma tela específica de chat com destinatário se necessário)
-        router.push('/(auth)/(tabs)/menu/suporte');
+        router.push({ pathname: '/(auth)/(tabs)/menu/suporte', params: { returnTo: pathname } });
       } else {
         showToast({ message: 'Não foi possível abrir o chat com o destinatário', type: 'error' });
       }

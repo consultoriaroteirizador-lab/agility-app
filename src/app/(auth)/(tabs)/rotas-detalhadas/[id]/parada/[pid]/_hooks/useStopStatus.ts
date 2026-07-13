@@ -7,6 +7,7 @@ import { StopStatus } from '../_types/stop.types';
 interface Service {
     id: string;
     status: ServiceStatus;
+    sequenceOrder?: number | null;
     isPending?: boolean;
     isInProgress?: boolean;
     isInAttendance?: boolean;
@@ -19,16 +20,39 @@ interface UseStopStatusParams {
     service: Service | null;
     allServices: Service[];
     currentServiceId: string;
+    /** Empresa exige uma parada por vez (a caminho OU em atendimento). */
+    enforceSingleActiveStop?: boolean;
+    /** Empresa exige iniciar as paradas na ordem do roteirizador. */
+    enforceStopOrder?: boolean;
+}
+
+const TERMINAL_STATUSES = [
+    ServiceStatus.COMPLETED,
+    ServiceStatus.CANCELED,
+    ServiceStatus.FAILED,
+];
+
+function isTerminal(s: Service): boolean {
+    return (
+        s.isCompleted === true ||
+        s.isCanceled === true ||
+        s.isFailed === true ||
+        TERMINAL_STATUSES.includes(s.status)
+    );
 }
 
 /**
- * Hook to calculate and manage stop/service status
- * Uses ONLY boolean fields from backend as source of truth
+ * Hook to calculate and manage stop/service status.
+ * Uses boolean fields from backend as source of truth and applies the
+ * company-configurable rules (single active stop / mandatory order) when enabled.
+ * O backend continua sendo a fonte de verdade — aqui é apenas gating de UX.
  */
 export const useStopStatus = ({
     service,
     allServices,
     currentServiceId,
+    enforceSingleActiveStop = false,
+    enforceStopOrder = false,
 }: UseStopStatusParams): StopStatus => {
     return useMemo(() => {
         // Default values
@@ -48,8 +72,23 @@ export const useStopStatus = ({
                     s.status === ServiceStatus.IN_ATTENDANCE),
         );
 
-        // Business rule: Cannot start if another service is in progress
-        const canStartService = isPending && !hasOtherServiceInProgress;
+        // Próxima parada esperada na ordem: menor sequenceOrder entre as não-terminais.
+        const nextExpected = [...allServices]
+            .filter((s) => !isTerminal(s))
+            .sort((a, b) => (a.sequenceOrder ?? Number.MAX_SAFE_INTEGER) - (b.sequenceOrder ?? Number.MAX_SAFE_INTEGER))[0];
+        const isNextInOrder = !nextExpected || nextExpected.id === currentServiceId;
+
+        // Regras configuráveis: monta o motivo do bloqueio (null = pode iniciar).
+        let startBlockReason: string | null = null;
+        if (enforceSingleActiveStop && hasOtherServiceInProgress) {
+            startBlockReason = 'Conclua a parada em andamento antes de iniciar outra.';
+        } else if (enforceStopOrder && !isNextInOrder) {
+            const pos = (nextExpected?.sequenceOrder ?? 0) + 1;
+            startBlockReason = `Você deve seguir a ordem das paradas. Inicie a parada #${pos} primeiro.`;
+        }
+
+        // Business rule: Cannot start if pending is false OR if a configurable rule blocks it.
+        const canStartService = isPending && startBlockReason === null;
 
         // Check if this is the next stop (pending or assigned)
         const isNextStop = isPending;
@@ -69,6 +108,7 @@ export const useStopStatus = ({
             isNextStop,
             hasOtherServiceInProgress,
             canCompleteRouting,
+            startBlockReason,
         };
-    }, [service, allServices, currentServiceId]);
+    }, [service, allServices, currentServiceId, enforceSingleActiveStop, enforceStopOrder]);
 };

@@ -1,4 +1,4 @@
-import { TokenClaims } from "@/functions/decodeJwt";
+import { decodeJWT, TokenClaims } from "@/functions/decodeJwt";
 import { UserAuth } from "@/services/userAuthInfo/UserAuthInfoType";
 
 import { AuthCredentials, AuthCredentialsAPI } from "./authType";
@@ -59,7 +59,40 @@ function mapTokenClaimsToUserAuth(
   };
 }
 
+/**
+ * Mescla tokens renovados pelo SDK de Background Geolocation (em background)
+ * de volta em uma AuthCredentials existente.
+ *
+ * O SDK renova o JWT nativamente, mas não grava de volta no app. Sem isto, o
+ * refresh token do JS fica defasado/revogado (rotação) e o próximo refresh do
+ * app falha -> logout. Aqui preservamos os campos que o endpoint /native não
+ * devolve (tenantId, userStatus, scope, expirationRefreshToken) e só atualizamos
+ * os tokens + a expiração (lida do claim `exp` do novo accessToken).
+ *
+ * Lança se o accessToken novo for inválido (não decodificável) — o chamador
+ * deve ignorar a sincronização nesse caso.
+ */
+function mergeRefreshedTokens(
+  current: AuthCredentials,
+  tokens: { accessToken: string; refreshToken?: string },
+  now: Date = new Date(),
+): AuthCredentials {
+  const claims = decodeJWT(tokens.accessToken);
+  const expiration = claims.exp
+    ? new Date(claims.exp * 1000).toISOString()
+    : current.expiration;
+
+  return {
+    ...current,
+    accessToken: tokens.accessToken,
+    refreshToken: tokens.refreshToken || current.refreshToken,
+    expiration,
+    createdAt: now.toISOString(),
+  };
+}
+
 export const authAdapter = {
   toAuthResponse: toAuthCredentials,
-  mapTokenClaimsToUserAuth
+  mapTokenClaimsToUserAuth,
+  mergeRefreshedTokens,
 }

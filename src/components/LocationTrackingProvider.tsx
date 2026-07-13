@@ -1,12 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
 
+import { RoutingStatus } from '@/domain/agility/routing/dto/types';
+import { useFindMyRoutings } from '@/domain/agility/routing/useCase';
 import { useTrackingWebSocket } from '@/domain/agility/tracking';
 import type { DriverLocationUpdate } from '@/domain/agility/tracking';
+import { authAdapter } from '@/domain/Auth/authAdapter';
 import { useAuthCredentialsService } from '@/services';
 import { initializeGeofenceService, cleanupGeofenceService } from '@/services/geofence';
 import { useLocationTracking, updateBackgroundGeolocationAuth } from '@/services/location';
-import { initializeBackgroundGeolocation, cleanupBackgroundGeolocation } from '@/services/location/backgroundLocationService';
+import { initializeBackgroundGeolocation, cleanupBackgroundGeolocation, onAuthRefreshed } from '@/services/location/backgroundLocationService';
 
 /**
  * Componente que gerencia o rastreamento de localização automaticamente.
@@ -27,7 +30,11 @@ import { initializeBackgroundGeolocation, cleanupBackgroundGeolocation } from '@
  * propenso à race "Waiting for previous start action to complete").
  */
 export function LocationTrackingProvider({ children }: { children: React.ReactNode }) {
-  const { authCredentials, userAuth } = useAuthCredentialsService();
+  const { authCredentials, userAuth, saveCredentials } = useAuthCredentialsService();
+  // Ref para ler as credenciais atuais dentro do callback de auth-refresh sem
+  // reinscrever a cada rotação de token.
+  const authCredentialsRef = useRef(authCredentials);
+  authCredentialsRef.current = authCredentials;
   // driverId vem do JWT (claim driver_id) via authAdapter.
   const { driverId, startTracking, stopTracking } = useLocationTracking(userAuth?.driverId ?? null);
   const appState = useRef(AppState.currentState);
@@ -35,6 +42,14 @@ export function LocationTrackingProvider({ children }: { children: React.ReactNo
   // sdkReady em state (não ref) pra que o effect de "start tracking" só
   // dispare quando o SDK tiver finalizado a inicialização assíncrona.
   const [sdkReady, setSdkReady] = useState(false);
+
+  // Rastreamento é dirigido pela ROTA, não pela disponibilidade: liga enquanto
+  // houver rota IN_PROGRESS e desliga ao concluir. Disponibilidade (toggle da
+  // home) controla apenas leilão. A query compartilha cache com a tela de rotas.
+  const { routings } = useFindMyRoutings();
+  const hasInProgressRoute = routings.some(
+    (r) => r.status === RoutingStatus.IN_PROGRESS,
+  );
 
   // WebSocket de telemetria (canal /monitoring). NÃO é o canal que envia
   // localizações — o SDK faz isso por HTTP direto. Aqui só recebemos updates
@@ -63,11 +78,15 @@ export function LocationTrackingProvider({ children }: { children: React.ReactNo
     const accessToken = authCredentials?.accessToken;
     const tenantId = authCredentials?.tenantId;
     if (!accessToken || !tenantId) return;
+    const refreshToken = authCredentials?.refreshToken;
+    const expiresAt = authCredentials?.expiration
+      ? Math.floor(new Date(authCredentials.expiration).getTime() / 1000)
+      : undefined;
 
     (async () => {
       try {
         console.log('[LocationTrackingProvider] Inicializando Background Geolocation SDK...');
-        await initializeBackgroundGeolocation({ driverId, accessToken, tenantId });
+        await initializeBackgroundGeolocation({ driverId, accessToken, tenantId, refreshToken, expiresAt });
         initializeGeofenceService();
         isInitialized.current = true;
         setSdkReady(true);
@@ -93,22 +112,25 @@ export function LocationTrackingProvider({ children }: { children: React.ReactNo
     };
   }, [driverId]);
 
-  // [3] Start tracking — uma vez quando o SDK fica pronto. startTracking
-  // não depende mais de token (vide useLocationTracking), então sua
-  // identidade é estável e não causa start→stop→start em rotações.
+  // [3] Start/stop do tracking dirigido pela ROTA ATIVA (IN_PROGRESS), não pela
+  // disponibilidade nem pela tela aberta. Liga quando há rota em andamento e
+  // desliga ao concluir. startTracking/stopTracking são idempotentes e checam o
+  // estado real do SDK, então re-renders não causam start→stop→start.
   useEffect(() => {
     if (!sdkReady || !driverId) return;
-    console.log('[LocationTrackingProvider] Iniciando tracking de localização');
-    startTracking().catch(err => {
-      console.error('[LocationTrackingProvider] Erro ao iniciar tracking:', err);
-    });
-    return () => {
-      console.log('[LocationTrackingProvider] Parando tracking de localização');
+
+    if (hasInProgressRoute) {
+      console.log('[LocationTrackingProvider] Rota IN_PROGRESS — iniciando tracking');
+      startTracking().catch(err => {
+        console.error('[LocationTrackingProvider] Erro ao iniciar tracking:', err);
+      });
+    } else {
+      console.log('[LocationTrackingProvider] Sem rota IN_PROGRESS — parando tracking');
       stopTracking().catch(err => {
         console.error('[LocationTrackingProvider] Erro ao parar tracking:', err);
       });
-    };
-  }, [sdkReady, driverId, startTracking, stopTracking]);
+    }
+  }, [sdkReady, driverId, hasInProgressRoute, startTracking, stopTracking]);
 
   // [4] Refresh de token → setConfig leve nos headers HTTP do SDK. Sem
   // reinit, sem stop/start — o SDK continua emitindo localizações com o
@@ -119,10 +141,38 @@ export function LocationTrackingProvider({ children }: { children: React.ReactNo
     updateBackgroundGeolocationAuth({
       accessToken: authCredentials.accessToken,
       tenantId: authCredentials.tenantId,
+      refreshToken: authCredentials.refreshToken,
+      expiresAt: authCredentials.expiration
+        ? Math.floor(new Date(authCredentials.expiration).getTime() / 1000)
+        : undefined,
     }).catch(err => {
       console.error('[LocationTrackingProvider] Erro ao atualizar auth do SDK:', err);
     });
-  }, [authCredentials?.accessToken, authCredentials?.tenantId]);
+  }, [authCredentials?.accessToken, authCredentials?.tenantId, authCredentials?.refreshToken, authCredentials?.expiration]);
+
+  // [4.1] Write-back do refresh nativo do SDK. Quando o SDK renova o JWT em
+  // background (onAuthorization), os tokens novos voltam pra cá e gravamos no
+  // storage do app (silent, sem mexer no spinner de boot). Sem isto, o refresh
+  // token do JS fica defasado/revogado pela rotação e o próximo refresh do app
+  // falharia -> logout. Cobre o caso de app vivo/recém-background; o caso de app
+  // totalmente morto depende da reinicialização no boot (validar no device).
+  useEffect(() => {
+    const unsubscribe = onAuthRefreshed(({ accessToken, refreshToken }) => {
+      const current = authCredentialsRef.current;
+      if (!accessToken || !current) return;
+      if (accessToken === current.accessToken) return; // já em sincronia
+      try {
+        const merged = authAdapter.mergeRefreshedTokens(current, { accessToken, refreshToken });
+        console.log('[LocationTrackingProvider] SDK renovou o JWT — sincronizando tokens no app');
+        saveCredentials(merged, { silent: true }).catch((err) => {
+          console.error('[LocationTrackingProvider] Erro ao sincronizar tokens do SDK:', err);
+        });
+      } catch (err) {
+        console.warn('[LocationTrackingProvider] Token renovado pelo SDK é inválido, ignorando:', err);
+      }
+    });
+    return unsubscribe;
+  }, [saveCredentials]);
 
   // [5] WebSocket de telemetria — vida independente do SDK. Reconecta
   // livremente em refresh de token sem afetar o tracking de localização.

@@ -31,6 +31,15 @@ interface GeolocationSetConfig {
   http?: {
     headers?: Record<string, string>;
   };
+  authorization?: {
+    strategy: 'JWT';
+    accessToken: string;
+    refreshToken?: string;
+    refreshUrl?: string;
+    refreshPayload?: Record<string, unknown>;
+    refreshHeaders?: Record<string, string>;
+    expires?: number;
+  };
 }
 
 // Tipos exportados
@@ -70,6 +79,10 @@ export type TrackingAuthConfig = {
   driverId: string;
   accessToken: string;
   tenantId: string;
+  /** Refresh token do Keycloak — permite o SDK renovar o JWT em background. */
+  refreshToken?: string;
+  /** Expiração do access token em epoch SEGUNDOS (opcional). */
+  expiresAt?: number;
 };
 
 // Estado do serviço
@@ -88,16 +101,44 @@ type LocationCallback = (location: LocationData) => void;
 type GeofenceCallback = (event: GeofenceEvent) => void;
 type MotionCallback = (isMoving: boolean) => void;
 
+/** Tokens extraídos da resposta do refreshUrl quando o SDK renova o JWT. */
+type AuthRefreshCallback = (tokens: { accessToken?: string; refreshToken?: string }) => void;
+
 let locationCallbacks: LocationCallback[] = [];
 let geofenceCallbacks: GeofenceCallback[] = [];
 let motionCallbacks: MotionCallback[] = [];
+let authRefreshCallbacks: AuthRefreshCallback[] = [];
 
 /**
  * Configurações padrão do Background Geolocation
  * Na v5.x, a configuração usa namespaces aninhados
  * @see https://transistorsoft.github.io/react-native-background-geolocation/
  */
-const getDefaultConfig = (authConfig: TrackingAuthConfig) => ({
+const getDefaultConfig = (authConfig: TrackingAuthConfig) => {
+  const hasRefresh = !!authConfig.refreshToken;
+
+  // SEMPRE envia o header Authorization. O bloco `authorization` (abaixo) é só um
+  // bônus de auto-refresh em background; não dá pra depender dele sozinho — se o
+  // SDK não aplicar o Bearer, as requisições vão sem token e o backend devolve 401.
+  // O header é atualizado a cada refresh de token (updateBackgroundGeolocationAuth).
+  const httpHeaders: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'x-tenant-id': authConfig.tenantId,
+    Authorization: `Bearer ${authConfig.accessToken}`,
+  };
+
+  const authorization = hasRefresh
+    ? {
+        strategy: 'JWT' as const,
+        accessToken: authConfig.accessToken,
+        refreshToken: authConfig.refreshToken,
+        refreshUrl: `${urls.identity}/auth/refresh-token/native`,
+        refreshPayload: { refresh_token: '{refreshToken}' },
+        ...(authConfig.expiresAt ? { expires: authConfig.expiresAt } : {}),
+      }
+    : undefined;
+
+  return {
   // Geolocation Config (v5.x namespace)
   geolocation: {
     desiredAccuracy: BackgroundGeolocation.DesiredAccuracy.High,
@@ -110,12 +151,24 @@ const getDefaultConfig = (authConfig: TrackingAuthConfig) => ({
 
   // Logger Config (v5.x namespace)
   logger: {
-    debug: __DEV__,
+    // debug:true faz o SDK tocar SONS (bipes) a cada evento de localização/
+    // movimento — atrapalha o teste em campo. Mantido sempre false; logLevel
+    // (sem som) continua dando logs verbosos em dev.
+    debug: false,
     logLevel: __DEV__
       ? BackgroundGeolocation.LogLevel.Verbose
       : BackgroundGeolocation.LogLevel.Off,
     maxLogsToPersist: 100,
   },
+
+  // Reaplica esta config a CADA ready()/launch. Sem isso o SDK mantém a config
+  // persistida da 1ª instalação e ignora mudanças (ex.: header de auth, refreshUrl),
+  // o que deixava requisições saindo com config antiga → 401.
+  reset: true,
+
+  // Pede permissão de localização "Sempre" (background). Sem isso o SO mata o
+  // tracking ao sair do app, anulando o stopOnTerminate:false.
+  locationAuthorizationRequest: 'Always' as const,
 
   // App Config (v5.x namespace)
   app: {
@@ -133,14 +186,17 @@ const getDefaultConfig = (authConfig: TrackingAuthConfig) => ({
     maxBatchSize: 50, // Máximo de 50 localizações por request
     maxRecordsToPersist: -1, // Sem limite de registros
     httpTimeout: 60000,
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${authConfig.accessToken}`,
-      'x-tenant-id': authConfig.tenantId,
-    },
+    headers: httpHeaders,
     // NOTA: params e extras no http config podem não ser aplicados ao body
     // Vamos usar o extras global (fora do http) para garantir
   },
+
+  // Authorization (JWT) — o SDK aplica `Authorization: Bearer {accessToken}` em
+  // cada request E renova o token sozinho ao expirar / receber 401, INCLUSIVE
+  // com o app em background ou terminado (o refresh roda no processo nativo).
+  // refreshUrl usa a variante /native, que devolve os tokens no top-level (sem o
+  // envelope { result }) para o parser do SDK encontrar access_token/refresh_token.
+  ...(authorization ? { authorization } : {}),
 
   // Extras GLOBAL - Este é aplicado a CADA localização no body
   extras: {
@@ -162,7 +218,8 @@ const getDefaultConfig = (authConfig: TrackingAuthConfig) => ({
   activityRecognition: {
     stopTimeout: 5, // 5 minutos sem movimento para parar
   },
-});
+  };
+};
 
 /**
  * Inicializa o serviço de Background Geolocation
@@ -231,6 +288,31 @@ function setupEventListeners() {
   // Evento: HTTP response
   subscriptions.push(
     BackgroundGeolocation.onHttp(onHttpHandler)
+  );
+
+  // Evento: Authorization (refresh automático de JWT). Disparado quando o SDK
+  // bate no refreshUrl após 401/expiração. success=false = refresh token também
+  // expirou → o app precisará de re-login (tratado quando voltar ao foreground).
+  subscriptions.push(
+    BackgroundGeolocation.onAuthorization((event) => {
+      if (event.success) {
+        console.log('[BGGeolocation] JWT renovado automaticamente pelo SDK');
+        // Propaga os tokens novos para quem quiser gravá-los de volta no app
+        // (mantém JS e SDK em sincronia e evita refresh token defasado/revogado).
+        const tokens = extractRefreshedTokens(event.response);
+        if (tokens.accessToken) {
+          authRefreshCallbacks.forEach((cb) => {
+            try {
+              cb(tokens);
+            } catch (e) {
+              console.error('[BGGeolocation] Erro no callback de auth refresh:', e);
+            }
+          });
+        }
+      } else {
+        console.warn('[BGGeolocation] Falha ao renovar JWT (refresh token expirado?):', event.error);
+      }
+    })
   );
 
   // Evento: Heartbeat
@@ -415,19 +497,37 @@ function onGeofencesChangeHandler(event: GeofencesChangeEvent) {
  * antigo e retornariam 401 até que o tracking fosse reiniciado.
  */
 export async function updateBackgroundGeolocationAuth(
-  authConfig: Pick<TrackingAuthConfig, 'accessToken' | 'tenantId'>
+  authConfig: Pick<TrackingAuthConfig, 'accessToken' | 'tenantId' | 'refreshToken' | 'expiresAt'>
 ): Promise<void> {
   if (!trackingState.isInitialized) {
     return;
   }
-  await BackgroundGeolocation.setConfig({
-    http: {
-      headers: {
-        'Authorization': `Bearer ${authConfig.accessToken}`,
-        'x-tenant-id': authConfig.tenantId,
+
+  // SEMPRE atualiza o header Authorization (token novo). Com refresh token,
+  // atualiza também o bloco `authorization` para manter o auto-refresh nativo.
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${authConfig.accessToken}`,
+    'x-tenant-id': authConfig.tenantId,
+  };
+
+  if (authConfig.refreshToken) {
+    await BackgroundGeolocation.setConfig({
+      http: { headers },
+      authorization: {
+        strategy: 'JWT',
+        accessToken: authConfig.accessToken,
+        refreshToken: authConfig.refreshToken,
+        refreshUrl: `${urls.identity}/auth/refresh-token/native`,
+        refreshPayload: { refresh_token: '{refreshToken}' },
+        ...(authConfig.expiresAt ? { expires: authConfig.expiresAt } : {}),
       },
-    },
-  } as GeolocationSetConfig);
+    } as unknown as Parameters<typeof BackgroundGeolocation.setConfig>[0]);
+    return;
+  }
+
+  await BackgroundGeolocation.setConfig({
+    http: { headers },
+  } as unknown as Parameters<typeof BackgroundGeolocation.setConfig>[0]);
 }
 
 /**
@@ -438,6 +538,35 @@ export async function updateBackgroundGeolocationAuth(
  * updateBackgroundGeolocationAuth — esta função NÃO os toca para evitar
  * resetar config em todo refresh de token.
  */
+/**
+ * Garante as permissões necessárias para rastrear em background:
+ *  - Permissão de localização "Sempre" (Always / ACCESS_BACKGROUND_LOCATION).
+ *  - Isenção de otimização de bateria (Android/OEMs agressivos).
+ * Best-effort: falhas não bloqueiam o tracking, apenas logam.
+ */
+export async function ensureTrackingPermissions(): Promise<void> {
+  try {
+    const status = await BackgroundGeolocation.requestPermission();
+    console.log('[BGGeolocation] Permissão de localização:', status);
+  } catch (error) {
+    console.warn('[BGGeolocation] Falha ao solicitar permissão de localização:', error);
+  }
+
+  if (Platform.OS === 'android') {
+    try {
+      const isIgnoring = await BackgroundGeolocation.deviceSettings.isIgnoringBatteryOptimizations();
+      if (!isIgnoring) {
+        const request = await BackgroundGeolocation.deviceSettings.showIgnoreBatteryOptimizations();
+        if (!request.seen) {
+          await BackgroundGeolocation.deviceSettings.show(request);
+        }
+      }
+    } catch (error) {
+      console.warn('[BGGeolocation] Não foi possível checar otimização de bateria:', error);
+    }
+  }
+}
+
 export async function startBackgroundTracking(driverId: string): Promise<void> {
   console.log('[BGGeolocation] Iniciando tracking para driver:', driverId);
 
@@ -446,6 +575,9 @@ export async function startBackgroundTracking(driverId: string): Promise<void> {
     return;
   }
 
+  // Garante permissão "Sempre" + isenção de bateria antes de ligar o GPS.
+  await ensureTrackingPermissions();
+
   // Garantir que driver_id esteja anexado a cada localização (extras é leve).
   await BackgroundGeolocation.setConfig({
     extras: {
@@ -453,7 +585,7 @@ export async function startBackgroundTracking(driverId: string): Promise<void> {
       app_version: '1.0.0',
       platform: Platform.OS,
     },
-  } as GeolocationSetConfig);
+  } as unknown as Parameters<typeof BackgroundGeolocation.setConfig>[0]);
 
   await BackgroundGeolocation.start();
 
@@ -618,6 +750,29 @@ export function onMotionEvent(callback: MotionCallback): () => void {
 }
 
 /**
+ * Extrai accessToken/refreshToken da resposta do refreshUrl. O parser do SDK é
+ * genérico, então a resposta pode vir em snake_case (Keycloak) ou camelCase.
+ */
+function extractRefreshedTokens(response: unknown): { accessToken?: string; refreshToken?: string } {
+  if (!response || typeof response !== 'object') return {};
+  const r = response as Record<string, unknown>;
+  const accessToken = (r.access_token ?? r.accessToken) as string | undefined;
+  const refreshToken = (r.refresh_token ?? r.refreshToken) as string | undefined;
+  return { accessToken, refreshToken };
+}
+
+/**
+ * Registra callback para quando o SDK renova o JWT em background (onAuthorization
+ * com sucesso). Use para gravar os tokens novos de volta no storage do app.
+ */
+export function onAuthRefreshed(callback: AuthRefreshCallback): () => void {
+  authRefreshCallbacks.push(callback);
+  return () => {
+    authRefreshCallbacks = authRefreshCallbacks.filter(cb => cb !== callback);
+  };
+}
+
+/**
  * Obtém estado atual do tracking
  */
 export function getTrackingState(): TrackingState {
@@ -673,6 +828,14 @@ export async function destroyLocations(): Promise<void> {
 export async function cleanupBackgroundGeolocation(): Promise<void> {
   console.log('[BGGeolocation] Fazendo cleanup...');
 
+  // Parar o SDK nativo. Como stopOnTerminate:false, sem este stop o serviço
+  // continuaria postando localizações mesmo após logout/troca de motorista.
+  try {
+    await BackgroundGeolocation.stop();
+  } catch (error) {
+    console.error('[BGGeolocation] Erro ao parar SDK no cleanup:', error);
+  }
+
   // Remover todos os subscriptions
   subscriptions.forEach(sub => sub.remove());
   subscriptions = [];
@@ -681,6 +844,7 @@ export async function cleanupBackgroundGeolocation(): Promise<void> {
   locationCallbacks = [];
   geofenceCallbacks = [];
   motionCallbacks = [];
+  authRefreshCallbacks = [];
 
   // Resetar estado
   trackingState = {

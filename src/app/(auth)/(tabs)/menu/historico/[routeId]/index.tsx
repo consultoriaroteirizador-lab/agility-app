@@ -1,25 +1,31 @@
 
+import { useState } from 'react';
+
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
-import { ActivityIndicator, Box, ScreenBase, Text, TouchableOpacityBox } from '@/components';
+import { ActivityIndicator, Box, Button, ScreenBase, Text, TouchableOpacityBox } from '@/components';
 import { ButtonBack } from '@/components/Button/ButtonBack';
 import { RoutingStatus } from '@/domain/agility/routing/dto/types';
-import { useFindOneRouting, useGetRoutingMapData } from '@/domain/agility/routing/useCase';
+import { useFindOneRouting } from '@/domain/agility/routing/useCase';
 import { ServiceStatus, ServiceType } from '@/domain/agility/service/dto/types';
 import { useFindServicesByRoutingId } from '@/domain/agility/service/useCase';
 import { colors, measure } from '@/theme';
+import { formatDate, formatDateOnly } from '@/utils/formatDate';
 
-import { Map, MapPoint } from '../../../rotas-detalhadas/[id]/parada/[pid]/_components/shared/Map';
+import { MapaParadasModal } from '../../../rotas-detalhadas/[id]/_components/MapaParadasModal';
+import { Map } from '../../../rotas-detalhadas/[id]/parada/[pid]/_components/shared/Map';
+import { RouteMapLegend } from '../../../rotas-detalhadas/[id]/parada/[pid]/_components/shared/RouteMapLegend';
+import { useRouteMapView } from '../../../rotas-detalhadas/[id]/parada/[pid]/_components/shared/useRouteMapView';
 
 function mapRoutingStatus(status: RoutingStatus): string {
   const map: Record<RoutingStatus, string> = {
-    [RoutingStatus.DRAFT]: 'Nao iniciado',
+    [RoutingStatus.DRAFT]: 'Não iniciado',
     [RoutingStatus.OPTIMIZED]: 'Otimizada',
     [RoutingStatus.PENDING_ASSIGNMENT]: 'Pendente',
-    [RoutingStatus.BROADCASTING]: 'Disponivel',
-    [RoutingStatus.ASSIGNED]: 'Atribuida',
+    [RoutingStatus.BROADCASTING]: 'Disponível',
+    [RoutingStatus.ASSIGNED]: 'Atribuída',
     [RoutingStatus.IN_PROGRESS]: 'Iniciada',
-    [RoutingStatus.COMPLETED]: 'Concluida',
+    [RoutingStatus.COMPLETED]: 'Concluída',
     [RoutingStatus.CANCELLED]: 'Cancelada',
   };
   return map[status] ?? status;
@@ -32,7 +38,7 @@ function mapServiceStatus(status: ServiceStatus): string {
     [ServiceStatus.IN_PROGRESS]: 'Em andamento',
     [ServiceStatus.IN_ATTENDANCE]: 'Em atendimento',
     [ServiceStatus.COMPLETED]: 'Realizado',
-    [ServiceStatus.FAILED]: 'Nao realizado',
+    [ServiceStatus.FAILED]: 'Não realizado',
     [ServiceStatus.CANCELED]: 'Cancelado',
   };
   return map[status] ?? status;
@@ -42,8 +48,9 @@ function mapServiceType(type: ServiceType): string {
   const map: Record<ServiceType, string> = {
     [ServiceType.DELIVERY]: 'Entrega',
     [ServiceType.PICKUP]: 'Coleta',
-    [ServiceType.SERVICE]: 'Servico',
-    [ServiceType.TRANSFER]: 'Transferencia',
+    [ServiceType.SERVICE]: 'Serviço',
+    [ServiceType.TRANSFER]: 'Transferência',
+    [ServiceType.RETURN]: 'Retorno',
   };
   return map[type] ?? type;
 }
@@ -63,9 +70,20 @@ export default function HistoricoDetalhesScreen() {
   const router = useRouter();
   const { routeId } = useLocalSearchParams<{ routeId: string }>();
 
+  const [mapaVisible, setMapaVisible] = useState(false);
+
   const { routing, isLoading: isLoadingRouting } = useFindOneRouting(routeId || '');
   const { services, isLoading: isLoadingServices } = useFindServicesByRoutingId(routeId || '');
-  const { routes: routeSegments, origin, mapData, isLoading: isLoadingMapData } = useGetRoutingMapData(routeId || '');
+
+  // Mapa de todas as paradas (pinos por status + ida sólida / retorno tracejado).
+  // Mesma fonte do modal de tela cheia — ver useRouteMapView.
+  const {
+    mapPoints,
+    outboundSegments,
+    dashedSegments,
+    hasPoints,
+    isLoading: isLoadingMapData,
+  } = useRouteMapView(routeId || '');
 
   const isLoading = isLoadingRouting || isLoadingServices || isLoadingMapData;
 
@@ -95,70 +113,6 @@ export default function HistoricoDetalhesScreen() {
       return orderA - orderB;
     })
     : [];
-
-  // Cores dos pinos (iguais ao platform): paradas usam a cor da rota,
-  // origem em verde "O" e retorno em vermelho "F".
-  const STOP_COLOR = colors.primary100; // #7063F0
-  const ORIGIN_COLOR = '#10B981';
-  const RETURN_COLOR = '#EF4444';
-
-  // Converter services para pontos do mapa (pinos teardrop numerados, igual ao platform)
-  const mapPoints: MapPoint[] = [];
-
-  // Origem (pino verde "O")
-  if (origin?.latitude && origin?.longitude) {
-    mapPoints.push({
-      id: 'origin',
-      latitude: origin.latitude,
-      longitude: origin.longitude,
-      title: 'Origem',
-      label: 'O',
-      color: ORIGIN_COLOR,
-    });
-  }
-
-  // Paradas numeradas 1..N na ordem de sequência
-  sortedServices
-    .filter(service => service.address?.latitude && service.address?.longitude)
-    .forEach((service, index) => {
-      mapPoints.push({
-        id: service.id,
-        latitude: service.address!.latitude,
-        longitude: service.address!.longitude,
-        title: service.fantasyName || service.responsible || `Parada ${index + 1}`,
-        label: index + 1,
-        color: STOP_COLOR,
-      });
-    });
-
-  // Retorno (pino vermelho "F") — apenas quando difere da origem
-  const returnPoint = mapData?.return;
-  if (mapData && !mapData.returnToOrigin && returnPoint?.latitude && returnPoint?.longitude) {
-    mapPoints.push({
-      id: 'return',
-      latitude: returnPoint.latitude,
-      longitude: returnPoint.longitude,
-      title: 'Retorno',
-      label: 'F',
-      color: RETURN_COLOR,
-    });
-  }
-
-  // Extrair geometrias das rotas como array (cada segmento é independente).
-  const segmentGeometries = routeSegments
-    ?.filter(segment => segment.geometry)
-    .sort((a, b) => a.sequenceOrder - b.sequenceOrder)
-    .map(segment => segment.geometry as string) ?? [];
-
-  // Fallback p/ a geometria global da rota: o backend grava os segmentos
-  // (`routes[].geometry`) como null, mas persiste o traçado completo no campo
-  // `geometry` do topo (mesma fonte que o platform usa). Sem isso, nenhuma
-  // linha aparece ligando os pinos.
-  const routeGeometries = segmentGeometries.length > 0
-    ? segmentGeometries
-    : mapData?.geometry
-      ? [mapData.geometry]
-      : [];
 
   // Contar servicos por status
   const servicosRealizados = sortedServices.filter(s => s.status === ServiceStatus.COMPLETED).length;
@@ -212,6 +166,28 @@ export default function HistoricoDetalhesScreen() {
               {mapRoutingStatus(routing.status)}
             </Text>
           </Box>
+
+          {/* Datas */}
+          <Box marginTop="y12" gap="y4">
+            {routing.date ? (
+              <Box flexDirection="row" justifyContent="space-between">
+                <Text preset="text13" color="gray500">Agendada</Text>
+                <Text preset="text13" color="colorTextPrimary">{formatDateOnly(routing.date)}</Text>
+              </Box>
+            ) : null}
+            {routing.startedAt ? (
+              <Box flexDirection="row" justifyContent="space-between">
+                <Text preset="text13" color="gray500">Iniciada</Text>
+                <Text preset="text13" color="colorTextPrimary">{formatDate(routing.startedAt)}</Text>
+              </Box>
+            ) : null}
+            {routing.completedAt ? (
+              <Box flexDirection="row" justifyContent="space-between">
+                <Text preset="text13" color="gray500">Concluída</Text>
+                <Text preset="text13" color="colorTextPrimary">{formatDate(routing.completedAt)}</Text>
+              </Box>
+            ) : null}
+          </Box>
         </Box>
 
         {/* Mapa */}
@@ -219,11 +195,24 @@ export default function HistoricoDetalhesScreen() {
           <Map
             height={measure.x260}
             points={mapPoints}
-            geometries={routeGeometries}
+            coordinateSegments={outboundSegments}
+            dashedSegments={dashedSegments}
             routeColor={colors.primary100}
+            dashedColor={colors.gray500}
             routeWidth={4}
             showNavigationButton={false}
           />
+          {hasPoints && (
+            <Box marginBottom="y12" gap="y8">
+              <RouteMapLegend />
+              <Button
+                title="Ver no mapa"
+                iconName="map"
+                preset="outline"
+                onPress={() => setMapaVisible(true)}
+              />
+            </Box>
+          )}
         </Box>
 
         {/* Resumo */}
@@ -301,7 +290,7 @@ export default function HistoricoDetalhesScreen() {
               <Text preset="text20" fontWeightPreset="bold" color="white">
                 {servicosNaoRealizados}
               </Text>
-              <Text preset="text12" color="white">Nao realizados</Text>
+              <Text preset="text12" color="white">Não realizados</Text>
             </Box>
 
             <Box flex={1} backgroundColor="gray100" padding="y12" borderRadius="s12" alignItems="center">
@@ -319,12 +308,12 @@ export default function HistoricoDetalhesScreen() {
         {/* Lista de servicos */}
         <Box paddingBottom="y24">
           <Text preset="text16" fontWeightPreset="bold" color="colorTextPrimary" marginBottom="y12">
-            Servicos ({sortedServices.length})
+            Serviços ({sortedServices.length})
           </Text>
 
           {sortedServices.length === 0 ? (
             <Box paddingVertical="y24" alignItems="center">
-              <Text preset="text14" color="gray400">Nenhum servico encontrado</Text>
+              <Text preset="text14" color="gray400">Nenhum serviço encontrado</Text>
             </Box>
           ) : (
             <Box gap="y12">
@@ -333,13 +322,19 @@ export default function HistoricoDetalhesScreen() {
                 const endereco = service.address?.formattedAddress || 'Endereco nao disponivel';
 
                 return (
-                  <Box
+                  <TouchableOpacityBox
                     key={service.id}
                     backgroundColor="white"
                     borderRadius="s12"
                     padding="y16"
                     borderWidth={measure.m1}
                     borderColor="gray200"
+                    onPress={() =>
+                      router.push({
+                        pathname: '/rotas-detalhadas/[id]/parada/[pid]',
+                        params: { id: routeId, pid: service.id },
+                      })
+                    }
                   >
                     <Box flexDirection="row" alignItems="flex-start">
                       {/* Numero da parada */}
@@ -387,7 +382,7 @@ export default function HistoricoDetalhesScreen() {
                         </Text>
                       </Box>
                     </Box>
-                  </Box>
+                  </TouchableOpacityBox>
                 );
               })}
             </Box>
@@ -395,6 +390,11 @@ export default function HistoricoDetalhesScreen() {
         </Box>
       </Box>
 
+      <MapaParadasModal
+        visible={mapaVisible}
+        onClose={() => setMapaVisible(false)}
+        routeId={routeId || ''}
+      />
     </ScreenBase>
 
   );

@@ -27,8 +27,9 @@ interface StopRouteMapProps {
     longitude?: number | null;
 }
 
-// Cor da próxima parada (esmaecida, secundária) e do trecho de rota.
-const NEXT_STOP_COLOR = '#9CA3AF'; // cinza
+// Cores: origem (verde), parada anterior já concluída (cinza) e trecho de rota.
+const ORIGIN_COLOR = '#10B981'; // verde (mesma da origem no mapa da rota)
+const PREV_STOP_COLOR = '#9CA3AF'; // cinza (parada anterior, esmaecida)
 const ROUTE_COLOR = colors.primary100; // #7063F0 (mesmo do platform)
 
 interface StopCoords {
@@ -39,11 +40,14 @@ interface StopCoords {
 }
 
 /**
- * Mapa de uma parada que, além do pino da parada atual, traça o trecho até a
- * PRÓXIMA parada. Fonte do traçado, em ordem de preferência:
- *   1. ORS Directions ao vivo (segue as ruas) — {@link useRouteDirections};
- *   2. recorte do traçado global da roteirização (`mapData.geometry`);
- *   3. linha reta entre as duas paradas (último recurso).
+ * Mapa de uma parada que, além do pino da parada atual, traça o trecho que o
+ * motorista percorre PARA CHEGAR nela: da parada ANTERIOR (ou da origem, quando
+ * é a primeira parada) até a parada atual. Fonte do traçado, em ordem de
+ * preferência:
+ *   1. geometry do SEGMENTO exato (anterior→atual) vinda do map-data;
+ *   2. recorte do traçado GLOBAL persistido (`mapData.geometry`);
+ *   3. ORS Directions ao vivo (segue as ruas) — {@link useRouteDirections};
+ *   4. linha reta entre os dois pontos (último recurso).
  *
  * A lista de paradas vem de `useFindServicesByRoutingId` (mesma fonte do
  * histórico, com coordenadas via `address`).
@@ -60,10 +64,11 @@ export function StopRouteMap({
     longitude,
 }: StopRouteMapProps) {
     const { services } = useFindServicesByRoutingId(routeId || undefined);
-    const { mapData, routes } = useGetRoutingMapData(routeId || '');
+    const { mapData, routes, origin } = useGetRoutingMapData(routeId || '');
 
-    // Resolve parada atual + próxima (com coordenadas) na ordem da sequência.
-    const { current, next, currentIdx } = useMemo(() => {
+    // Resolve parada atual + ANTERIOR (com coordenadas) na ordem da sequência.
+    // Para a 1ª parada, a "anterior" é a ORIGEM da rota.
+    const { current, prev, currentIdx } = useMemo(() => {
         const sorted: StopCoords[] = (services ?? [])
             .map(s => ({
                 id: s.id,
@@ -75,17 +80,25 @@ export function StopRouteMap({
             .sort((a, b) => a.sequenceOrder - b.sequenceOrder);
 
         const idx = sorted.findIndex(s => s.id === serviceId);
+
+        let previous: StopCoords | null = null;
+        if (idx > 0) {
+            previous = sorted[idx - 1];
+        } else if (idx === 0 && origin?.latitude != null && origin?.longitude != null) {
+            previous = { id: 'origin', latitude: origin.latitude, longitude: origin.longitude, sequenceOrder: -1 };
+        }
+
         return {
             current: idx >= 0 ? sorted[idx] : null,
-            next: idx >= 0 ? sorted[idx + 1] ?? null : null,
+            prev: previous,
             currentIdx: idx,
         };
-    }, [services, serviceId]);
+    }, [services, serviceId, origin]);
 
-    // Traçado ao vivo (ORS) parada atual → próxima. Null enquanto carrega/falha.
+    // Traçado ao vivo (ORS) anterior → atual. Null enquanto carrega/falha.
     const roadGeometry = useRouteDirections(
+        prev ? { latitude: prev.latitude, longitude: prev.longitude } : null,
         current ? { latitude: current.latitude, longitude: current.longitude } : null,
-        next ? { latitude: next.latitude, longitude: next.longitude } : null,
     );
 
     const { points, geometries, coordinateSegments } = useMemo(() => {
@@ -119,26 +132,28 @@ export function StopRouteMap({
         let geoms: string[] | undefined;
         let segs: number[][][] | undefined;
 
-        if (next) {
+        if (prev) {
+            const isOrigin = prev.id === 'origin';
             pts.push({
-                id: next.id,
-                latitude: next.latitude,
-                longitude: next.longitude,
-                title: 'Próxima parada',
-                color: NEXT_STOP_COLOR,
+                id: prev.id,
+                latitude: prev.latitude,
+                longitude: prev.longitude,
+                title: isOrigin ? 'Origem' : 'Parada anterior',
+                color: isOrigin ? ORIGIN_COLOR : PREV_STOP_COLOR,
                 size: 30,
-                label: currentIdx + 2,
+                // Origem = "O"; senão, o número da parada anterior (= currentIdx).
+                label: isOrigin ? 'O' : currentIdx,
             });
 
             // Ordem de preferência do traçado (mais fiel ao backend primeiro):
-            // 1) geometry do SEGMENTO exato (origem→destino) vindo do map-data;
+            // 1) geometry do SEGMENTO exato (anterior→atual) vindo do map-data;
             // 2) recorte do traçado GLOBAL persistido (map-data.geometry);
             // 3) ORS ao vivo (segue as ruas);
             // 4) linha reta.
             const segmentGeom = (routes ?? []).find(
                 r => r.geometry &&
-                    r.originServiceId === current.id &&
-                    r.destinationServiceId === next.id,
+                    r.originServiceId === prev.id &&
+                    r.destinationServiceId === current.id,
             )?.geometry;
 
             if (segmentGeom) {
@@ -146,22 +161,22 @@ export function StopRouteMap({
             } else if (mapData?.geometry) {
                 const seg = sliceRouteBetween(
                     mapData.geometry,
+                    { latitude: prev.latitude, longitude: prev.longitude },
                     { latitude: current.latitude, longitude: current.longitude },
-                    { latitude: next.latitude, longitude: next.longitude },
                 );
                 if (seg.length >= 2) segs = [seg];
             } else if (roadGeometry) {
                 geoms = [roadGeometry];
             } else {
                 segs = [[
+                    [prev.longitude, prev.latitude],
                     [current.longitude, current.latitude],
-                    [next.longitude, next.latitude],
                 ]];
             }
         }
 
         return { points: pts, geometries: geoms, coordinateSegments: segs };
-    }, [current, next, currentIdx, roadGeometry, mapData, routes, latitude, longitude, customerName, variant]);
+    }, [current, prev, currentIdx, roadGeometry, mapData, routes, latitude, longitude, customerName, variant]);
 
     return (
         <Map

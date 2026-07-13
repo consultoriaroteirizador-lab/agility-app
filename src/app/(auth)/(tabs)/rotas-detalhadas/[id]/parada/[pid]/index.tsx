@@ -156,6 +156,15 @@ export default function StopDetailScreen() {
       });
       return;
     }
+
+    // RETURN: parada final no CD/origem — check-in + conferência das devoluções.
+    if (service.serviceType === ServiceType.RETURN) {
+      router.replace({
+        pathname: '/rotas-detalhadas/[id]/parada/[pid]/retorno' as never,
+        params: { id: routeId, pid: serviceId },
+      });
+      return;
+    }
   }, [service, isLoading, isError, router, routeId, serviceId]);
 
   // "Estou aqui" → inicia o ATENDIMENTO: PATCH /services/:id/start-attendance → IN_ATTENDANCE.
@@ -205,6 +214,7 @@ export default function StopDetailScreen() {
       [ServiceType.PICKUP]: 'Coleta',
       [ServiceType.SERVICE]: 'Serviço',
       [ServiceType.TRANSFER]: 'Transferência',
+      [ServiceType.RETURN]: 'Retorno',
     };
     return typeMap[service.serviceType as ServiceType] ?? service.serviceType ?? 'Serviço';
   }, [service]);

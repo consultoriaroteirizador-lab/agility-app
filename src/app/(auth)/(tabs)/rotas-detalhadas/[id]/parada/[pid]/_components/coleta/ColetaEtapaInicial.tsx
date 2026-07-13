@@ -1,15 +1,18 @@
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 
 import { router } from 'expo-router';
 
 import { Box, Button, ScreenBase, Text } from '@/components';
 import { ButtonBack } from '@/components/Button/ButtonBack';
-import { formatAddressStreetNumber } from '@/domain/agility/address/dto';
+import { TouchableOpacityBox } from '@/components/RestyleComponent/RestyleComponent';
+import { formatAddressFull, formatAddressStreetNumber } from '@/domain/agility/address/dto';
 import { formatHHmm } from '@/functions';
+import { useToastService } from '@/services/Toast/useToast';
 import { measure } from '@/theme';
 
 import { useParada } from '../../_context/ParadaContext';
 import { useStopActions } from '../../_hooks/useStopActions';
+import { MaterialsModal } from '../shared/MaterialsModal';
 import { StopRouteMap } from '../shared/StopRouteMap';
 
 /**
@@ -17,7 +20,9 @@ import { StopRouteMap } from '../shared/StopRouteMap';
  * Layout baseado no módulo de entrega
  */
 export function ColetaEtapaInicial() {
-    const { service, effectiveAddress, setEtapa, rotaId } = useParada();
+    const { service, effectiveAddress, setEtapa, rotaId, startBlockReason } = useParada();
+    const { showToast } = useToastService();
+    const [showVolumesModal, setShowVolumesModal] = useState(false);
     const { handleStartService, handleStartAttendance, isStarting, isStartingAttendance } = useStopActions({
         serviceId: service?.id || '',
         routeId: service?.routingId || '',
@@ -33,9 +38,29 @@ export function ColetaEtapaInicial() {
     // "A caminho" (IN_PROGRESS) — já clicou "Indo pra lá"; agora só falta "Estou aqui".
     const isEnRoute = service?.isInProgress === true || service?.status === 'IN_PROGRESS';
 
+    // Regras configuráveis da empresa (uma parada por vez / ordem obrigatória).
+    const isStartBlocked = startBlockReason !== null;
+
     const handleBack = useCallback(() => {
         router.back();
     }, []);
+
+    const handleGoToLocation = useCallback(() => {
+        if (isStartBlocked) {
+            showToast({ message: startBlockReason!, type: 'error' });
+            return;
+        }
+        handleStartService();
+    }, [isStartBlocked, startBlockReason, showToast, handleStartService]);
+
+    const handleArrived = useCallback(() => {
+        if (isStartBlocked) {
+            showToast({ message: startBlockReason!, type: 'error' });
+            return;
+        }
+        handleStartAttendance();
+        setEtapa(2);
+    }, [isStartBlocked, startBlockReason, showToast, handleStartAttendance, setEtapa]);
 
     return (
         <ScreenBase
@@ -87,14 +112,35 @@ export function ColetaEtapaInicial() {
                                 </Box>
                             </Box>
 
-                            {/* Tags de volumes */}
-                            {service?.materials && <Box flexDirection="row" gap="x8" marginTop="y8">
-                                <Box flexDirection="row" alignItems="center" gap="x4" paddingHorizontal="x12" paddingVertical="y6" backgroundColor="gray100" borderRadius="s20">
-                                    <Text preset="text13">📦 </Text>
-                                    <Text preset="text13">{service?.materials?.length}</Text>
-                                    <Text preset="text13" color="gray700"> {service?.materials?.length > 1 ? "Volumes" : "Volume"}</Text>
+                            {/* Tags de volumes — toca para abrir a lista de itens */}
+                            {service?.materials && service.materials.length > 0 && (
+                                <Box flexDirection="row" gap="x8" marginTop="y8">
+                                    <TouchableOpacityBox
+                                        flexDirection="row"
+                                        alignItems="center"
+                                        gap="x4"
+                                        paddingHorizontal="x12"
+                                        paddingVertical="y6"
+                                        backgroundColor="gray100"
+                                        borderRadius="s20"
+                                        onPress={() => setShowVolumesModal(true)}
+                                    >
+                                        <Text preset="text13">📦</Text>
+                                        <Text preset="text13" color="gray700">
+                                            {service.materials.length > 1 ? 'Volumes' : 'Volume'}
+                                        </Text>
+                                        <Text preset="text13" color="primary100">({service.materials.length})</Text>
+                                    </TouchableOpacityBox>
                                 </Box>
-                            </Box>}
+                            )}
+
+                            {/* Endereço completo (header mantém só rua + número) */}
+                            {effectiveAddress && (
+                                <Box marginTop="y12">
+                                    <Text preset="text13" fontWeightPreset="bold" color="gray600" marginBottom="y4">Endereço completo</Text>
+                                    <Text preset="text13" color="gray700">{formatAddressFull(effectiveAddress)}</Text>
+                                </Box>
+                            )}
 
                             {service?.problemDescription && (
                                 <Box marginTop="y12">
@@ -109,24 +155,32 @@ export function ColetaEtapaInicial() {
                             <Button
                                 title={isStarting ? "Iniciando..." : isEnRoute ? "A caminho ✓" : "Indo pra lá"}
                                 preset="outline"
-                                onPress={handleStartService}
-                                disabled={isStarting || isStartingAttendance || isEnRoute}
+                                onPress={handleGoToLocation}
+                                disabled={isStarting || isStartingAttendance || isEnRoute || isStartBlocked}
                                 width={measure.x330}
                             />
                             <Button
                                 title={isStartingAttendance ? "Iniciando atendimento..." : "Estou aqui!"}
-                                onPress={() => {
-                                    handleStartAttendance();
-                                    setEtapa(2);
-                                }}
-                                disabled={isStarting || isStartingAttendance}
+                                onPress={handleArrived}
+                                disabled={isStarting || isStartingAttendance || isStartBlocked}
                                 width={measure.x330}
                             />
+                            {isStartBlocked && (
+                                <Text preset="text13" color="redError" textAlign="center">
+                                    {startBlockReason}
+                                </Text>
+                            )}
                         </Box>
                     </Box>
                 </Box>
             </Box>
 
+            <MaterialsModal
+                isVisible={showVolumesModal}
+                onClose={() => setShowVolumesModal(false)}
+                materials={service?.materials || []}
+                title="Volumes"
+            />
         </ScreenBase >
 
     );

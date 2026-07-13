@@ -6,7 +6,6 @@ import { useUpdateDriver } from '@/domain/agility/driver/useCase';
 import { RoutingStatus } from '@/domain/agility/routing/dto/types';
 import { useFindMyRoutings, useStartRouting } from '@/domain/agility/routing/useCase';
 import { useAuthCredentialsService } from '@/services';
-import { useLocationTracking } from '@/services/location/locationService';
 
 import { useRoutesModals } from './useRoutesModals';
 
@@ -107,8 +106,6 @@ export function useRoutesScreen() {
         setIsAvailable,
     } = useDriverAvailability();
 
-    const { startTracking, stopTracking } = useLocationTracking(driverId);
-
     const { routes, isLoading, isError, refreshing, onRefresh, refetch } = useRoutesList();
 
     const {
@@ -139,17 +136,14 @@ export function useRoutesScreen() {
         },
     });
 
+    // O toggle controla APENAS a disponibilidade para leilão. O rastreamento é
+    // dirigido pela rota IN_PROGRESS no LocationTrackingProvider — marcar-se
+    // indisponível não para mais o tracking de uma rota em andamento.
     const handleToggleAvailability = useCallback(async () => {
         if (!driverId || isUpdatingAvailability) return;
 
         const newAvailability = !isAvailable;
         setIsAvailable(newAvailability);
-
-        if (newAvailability) {
-            startTracking();
-        } else {
-            stopTracking();
-        }
 
         await toggleAvailability(newAvailability);
     }, [
@@ -157,8 +151,6 @@ export function useRoutesScreen() {
         isAvailable,
         isUpdatingAvailability,
         setIsAvailable,
-        startTracking,
-        stopTracking,
         toggleAvailability,
     ]);
 

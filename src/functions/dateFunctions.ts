@@ -27,17 +27,33 @@ export function getMonthYearFromDueDate(dueDateString: string): string {
   return `${monthName}${"\n"}${year}`;
 }
 
+/** Fuso oficial da operação. O backend roda com TZ=America/Sao_Paulo. */
+export const APP_TIMEZONE = 'America/Sao_Paulo';
+
 /**
- * Formata um ISO/datetime para 'HH:mm' (hora local). Retorna `fallback`
- * quando o valor é nulo/ausente ou inválido.
+ * Formata um ISO/datetime para 'HH:mm' no fuso da operação
+ * (America/Sao_Paulo), independentemente do fuso do aparelho. O backend emite
+ * datetimes em UTC (ISO 'Z'); formatar no fuso do device fazia a ETA aparecer
+ * deslocada em celulares com fuso/relógio divergente. Fallback para hora local
+ * do device caso o runtime não tenha suporte a timeZone no Intl.
+ * Retorna `fallback` quando o valor é nulo/ausente ou inválido.
  */
 export function formatHHmm(value?: string | Date | null, fallback = '--:--'): string {
   if (!value) return fallback;
   const date = value instanceof Date ? value : new Date(value);
   if (isNaN(date.getTime())) return fallback;
-  const hours = String(date.getHours()).padStart(2, '0');
-  const minutes = String(date.getMinutes()).padStart(2, '0');
-  return `${hours}:${minutes}`;
+  try {
+    return new Intl.DateTimeFormat('pt-BR', {
+      timeZone: APP_TIMEZONE,
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    }).format(date);
+  } catch {
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    return `${hours}:${minutes}`;
+  }
 }
 
 export function getLocalDateString(dateTimeString: string): string {

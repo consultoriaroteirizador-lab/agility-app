@@ -90,14 +90,42 @@ export interface Parada {
     /** Horário de término previsto (formato HH:MM) */
     horarioFim: string
 
+    /** ETA prevista crua (ISO) — previsão atual (reprojetada na execução) */
+    estimatedArrivalISO?: string | null
+
+    /** Baseline do primeiro plano (ISO) — usada p/ medir atraso vs. plano original */
+    plannedArrivalISO?: string | null
+
+    /** Janela de atendimento contratada do pedido (ISO) — compromisso com o cliente */
+    promisedStartISO?: string | null
+    promisedEndISO?: string | null
+
+    /** Conclusão real (ISO) — usada para "entregue em atraso" (× promisedEnd). */
+    completedAtISO?: string | null
+
+    /** Atrasada vs. ETA do ORS (plano). Snapshot do backend no fetch. */
+    isLateToEta?: boolean
+
+    /** Fora da janela contratada (SLA). Snapshot do backend no fetch. */
+    isLateToWindow?: boolean
+
+    /** Minutos de atraso vs. ETA (positivo = atrasado); null quando não se aplica. */
+    delayMinutes?: number | null
+
     /** Tipo de serviço (Instalação, Entrega, Manutenção, etc.) */
     tipo: string
 
     /** Parada com coleta/devolução no mesmo stop (entrega + retorno) */
     hasReturn?: boolean
 
+    /** Parada de RETORNO: última parada no CD/origem (check-in + conferência) */
+    isRetorno?: boolean
+
     /** Status atual da parada */
     status: ParadaStatus
+
+    /** Resultado derivado do check dos materiais (FULL/WITH_ISSUES) quando concluída. */
+    deliveryOutcome?: 'FULL' | 'WITH_ISSUES' | null
 }
 
 /**

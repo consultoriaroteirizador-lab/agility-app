@@ -5,3 +5,4 @@ export * from './useLoadFonts';
 export * from './useNavigationExitOnBack';
 export * from './useActionDebounceTimer';
 export * from './useInvalidQueryLogout';
+export * from './useNow';

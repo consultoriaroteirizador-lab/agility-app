@@ -3,10 +3,57 @@
  */
 
 import { Box, Text, TouchableOpacityBox } from '@/components'
+import { formatHHmm } from '@/functions/dateFunctions'
+import { useNow } from '@/hooks'
 import { measure, StatusColorConfig, ThemeColors } from '@/theme';
 
 import { useRota } from '../_context/RotaContext'
 import type { Parada, ParadaStatus } from '../_types/rota.types'
+
+/**
+ * Recalcula os sinais de atraso ao vivo (relógio local) com fallback para o
+ * snapshot do backend. Só vale para paradas em aberto (não concluídas).
+ */
+function computeLateness(parada: Parada, now: Date) {
+    const concluded = parada.status === 'concluida-sucesso' || parada.status === 'concluida-insucesso'
+    const windowEnd = parada.promisedEndISO ? new Date(parada.promisedEndISO) : null
+    const windowEndValid = windowEnd && !isNaN(windowEnd.getTime()) ? windowEnd : null
+
+    // Parada CONCLUÍDA → "entregue em atraso": conclusão real (completedAt) depois do
+    // prazo prometido (promisedEnd). Independe do relógio (é um fato consolidado).
+    if (concluded) {
+        const done = parada.completedAtISO ? new Date(parada.completedAtISO) : null
+        const doneValid = done && !isNaN(done.getTime()) ? done : null
+        const deliveredLate = !!(doneValid && windowEndValid && doneValid.getTime() > windowEndValid.getTime())
+        const deliveredLateMin = deliveredLate
+            ? Math.max(0, Math.round((doneValid!.getTime() - windowEndValid!.getTime()) / 60_000))
+            : null
+        return { lateEta: false, lateWindow: false, delayMin: null as number | null, deliveredLate, deliveredLateMin }
+    }
+
+    const eta = parada.estimatedArrivalISO ? new Date(parada.estimatedArrivalISO) : null
+    const etaValid = eta && !isNaN(eta.getTime()) ? eta : null
+    // Baseline = plano original; sem ele (linha legada) cai na própria ETA atual.
+    const plannedRaw = parada.plannedArrivalISO ? new Date(parada.plannedArrivalISO) : null
+    const baseline = plannedRaw && !isNaN(plannedRaw.getTime()) ? plannedRaw : etaValid
+
+    // Atraso = quando a parada de fato acontecerá (max(now, ETA atual)) vs. plano.
+    // Assim o atraso continua visível mesmo depois de a ETA ser reprojetada pra frente.
+    let delayMin: number | null = null
+    if (baseline && etaValid) {
+        const willHappenAt = Math.max(now.getTime(), etaValid.getTime())
+        delayMin = Math.max(0, Math.round((willHappenAt - baseline.getTime()) / 60_000))
+    } else {
+        delayMin = parada.delayMinutes ?? null
+    }
+
+    const lateEta = delayMin != null ? delayMin > 0 : !!parada.isLateToEta
+    const lateWindow = windowEndValid
+        ? now.getTime() > windowEndValid.getTime()
+        : !!parada.isLateToWindow
+
+    return { lateEta, lateWindow, delayMin, deliveredLate: false, deliveredLateMin: null as number | null }
+}
 
 // ============================================
 // TIPOS
@@ -71,12 +118,23 @@ export function ParadaListItem({
 }: ParadaListItemProps) {
     const { navegarParaParada, abrirNavegacao, routing } = useRota()
 
-    // Paradas só são clicáveis quando a rota está EM ANDAMENTO (IN_PROGRESS).
-    // Em qualquer outro status (não iniciada OU finalizada) os cards ficam esmaecidos —
-    // o clique já é bloqueado em navegarParaParada; aqui é só o feedback visual.
-    const routeNotClickable = routing?.isInProgress !== true
+    // Paradas são clicáveis quando a rota está EM ANDAMENTO (IN_PROGRESS) ou
+    // FINALIZADA (COMPLETED/CANCELLED) — finalizada abre o modo leitura. Só ficam
+    // esmaecidas/“travadas” nos estados intermediários (não iniciada/broadcasting).
+    const routeNotClickable = !(
+        routing?.isInProgress === true ||
+        routing?.isCompleted === true ||
+        routing?.isCancelled === true
+    )
 
     const statusConfig = STATUS_CONFIG[parada.status]
+
+    // Relógio vivo (60s) para marcar atraso mesmo entre refetches.
+    const now = useNow(60_000)
+    const { lateEta, lateWindow, delayMin, deliveredLate, deliveredLateMin } = computeLateness(parada, now)
+    const janelaContratada = (parada.promisedStartISO || parada.promisedEndISO)
+        ? `${formatHHmm(parada.promisedStartISO)}–${formatHHmm(parada.promisedEndISO)}`
+        : null
 
     const handlePress = () => {
         if (onPress) {
@@ -177,6 +235,62 @@ export function ParadaListItem({
                             {statusConfig.label}
                         </Text>
                     </Box>
+
+                    {parada.status === 'concluida-sucesso' && parada.deliveryOutcome === 'WITH_ISSUES' && (
+                        <Box
+                            backgroundColor="secondary10"
+                            paddingHorizontal="x8"
+                            paddingVertical="y2"
+                            borderRadius="s4"
+                            flexShrink={0}
+                        >
+                            <Text preset="text13" color="secondary100">
+                                ⚠ com pendência
+                            </Text>
+                        </Box>
+                    )}
+
+                    {/* SLA: fora da janela contratada (prioridade sobre atraso de plano) */}
+                    {lateWindow ? (
+                        <Box
+                            backgroundColor="redError"
+                            paddingHorizontal="x8"
+                            paddingVertical="y2"
+                            borderRadius="s4"
+                            flexShrink={0}
+                        >
+                            <Text preset="text13" color="white">
+                                ⚠ Fora da janela
+                            </Text>
+                        </Box>
+                    ) : lateEta ? (
+                        <Box
+                            backgroundColor="secondary10"
+                            paddingHorizontal="x8"
+                            paddingVertical="y2"
+                            borderRadius="s4"
+                            flexShrink={0}
+                        >
+                            <Text preset="text13" color="secondary100">
+                                ⏱ Atrasado{delayMin && delayMin > 0 ? ` +${delayMin}min` : ''}
+                            </Text>
+                        </Box>
+                    ) : null}
+
+                    {/* Parada CONCLUÍDA fora do prazo prometido → entregue em atraso */}
+                    {deliveredLate && (
+                        <Box
+                            backgroundColor="redError"
+                            paddingHorizontal="x8"
+                            paddingVertical="y2"
+                            borderRadius="s4"
+                            flexShrink={0}
+                        >
+                            <Text preset="text13" color="white">
+                                ⚠ Entregue em atraso{deliveredLateMin && deliveredLateMin > 0 ? ` +${deliveredLateMin}min` : ''}
+                            </Text>
+                        </Box>
+                    )}
                 </Box>
 
                 <Box marginBottom="y4">
@@ -228,21 +342,28 @@ export function ParadaListItem({
 
                 {(parada.horarioInicio || parada.horarioFim) && (
                     <Box flexDirection="row" alignItems="center" gap="x4" marginTop="y8">
-                        {parada.horarioInicio && (
-                            <Text preset="text12" color="gray400">
-                                ⏰ {parada.horarioInicio}
-                            </Text>
-                        )}
+                        <Text preset="text12" color={lateEta || lateWindow ? 'redError' : 'gray400'}>
+                            ⏰ {parada.horarioInicio}
+                        </Text>
                         {parada.horarioInicio && parada.horarioFim && (
                             <Text preset="text12" color="gray300">
                                 -
                             </Text>
                         )}
                         {parada.horarioFim && (
-                            <Text preset="text12" color="gray400">
+                            <Text preset="text12" color={lateEta || lateWindow ? 'redError' : 'gray400'}>
                                 {parada.horarioFim}
                             </Text>
                         )}
+                    </Box>
+                )}
+
+                {/* Janela de atendimento contratada (compromisso com o cliente/SLA) */}
+                {janelaContratada && (
+                    <Box marginTop="y2">
+                        <Text preset="text12" color="gray400">
+                            📄 Janela contratada: {janelaContratada}
+                        </Text>
                     </Box>
                 )}
             </Box>

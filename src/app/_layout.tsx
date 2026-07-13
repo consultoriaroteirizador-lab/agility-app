@@ -48,15 +48,26 @@ function InitialLayout() {
     }
   }, [checkVersion]);
 
-  // Detectar logout e limpar cache do React Query
+  // Limpar o cache do React Query nas TRANSIÇÕES de auth (logout E login).
   // (Storage é limpo dentro de removeCredentials no AuthCredentialsProvider)
+  //
+  // Por que também no LOGIN: sem fechar o app, a Home pode continuar montada.
+  // Durante o logout o token é removido e a query de rotas (active observer)
+  // refetcha sem Authorization -> 401 -> fica em estado de erro/vazio no cache.
+  // No re-login o token volta, mas nada força o refetch dessa query travada
+  // (staleTime de 5min), então a lista de rotas não carregava até fechar e
+  // reabrir o app (que cria um QueryClient novo). Limpar no login força a busca
+  // fresh com o token novo.
   useEffect(() => {
     const hadCredentials = prevAuthForLogoutRef.current !== null && prevAuthForLogoutRef.current !== undefined;
     const hasCredentials = authCredentials !== null;
 
-    if (hadCredentials && !hasCredentials) {
+    const isLogout = hadCredentials && !hasCredentials;
+    const isLogin = !hadCredentials && hasCredentials;
+
+    if (isLogout || isLogin) {
       clearQueryCache();
-      console.log('[Logout] Cache limpo com sucesso');
+      if (__DEV__) console.log(`[Auth] Cache do React Query limpo (${isLogout ? 'logout' : 'login'})`);
     }
 
     prevAuthForLogoutRef.current = authCredentials;

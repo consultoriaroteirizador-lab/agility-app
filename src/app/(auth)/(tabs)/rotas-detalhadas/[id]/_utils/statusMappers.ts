@@ -30,6 +30,7 @@ export const SERVICE_TYPE_LABELS: ServiceTypeLabelMap = {
     [ServiceType.PICKUP]: 'Coleta',
     [ServiceType.SERVICE]: 'Serviço',
     [ServiceType.TRANSFER]: 'Transferência',
+    [ServiceType.RETURN]: 'Retorno',
 }
 
 /**
@@ -162,13 +163,18 @@ export function getRotaStatus(paradas: Parada[]): RotaStatus {
  * const parada = mapServiceToParada(service, 0)
  * // { numero: 1, serviceId: 'abc', nome: 'Cliente', ... }
  */
-export function mapServiceToParada(service: ServiceResponse, index: number): Parada {
+export function mapServiceToParada(service: ServiceResponse, index: number, returnAddress?: string | null): Parada {
     // Usar posição na lista ordenada para numero (evita duplicados quando backend repete sequenceOrder)
     const numero = index + 1
 
-    // Usar endereço completo se disponível, senão mostrar apenas o ID
-    const endereco = service.address?.formattedAddress
-        ?? (service.addressId ? `Endereço ID: ${service.addressId}` : 'Endereço não disponível')
+    const isRetorno = service.serviceType === ServiceType.RETURN
+
+    // O endereço do RETORNO vem da routing (returnPoint/returnAddress), não de
+    // service.address — a parada RETURN normalmente não tem Address cadastrado.
+    const endereco = isRetorno
+        ? (returnAddress ?? 'Retorno ao CD/origem')
+        : (service.address?.formattedAddress
+            ?? (service.addressId ? `Endereço ID: ${service.addressId}` : 'Endereço não disponível'))
 
     const horarioInicio = formatHHmm(service.estimatedArrival)
     const horarioFim = formatHHmm(service.estimatedCompletion)
@@ -189,14 +195,32 @@ export function mapServiceToParada(service: ServiceResponse, index: number): Par
     return {
         numero,
         serviceId: service.id,
-        nome: service.fantasyName ?? service.responsible ?? 'Cliente',
+        nome: isRetorno ? 'Retorno' : (service.fantasyName ?? service.responsible ?? 'Cliente'),
         endereco,
         horarioInicio,
         horarioFim,
+        estimatedArrivalISO: toISO(service.estimatedArrival),
+        plannedArrivalISO: toISO(service.plannedArrival),
+        promisedStartISO: toISO(service.promisedStartDate),
+        promisedEndISO: toISO(service.promisedEndDate),
+        // Conclusão real — usada para "entregue em atraso" (completedAt × promisedEnd).
+        completedAtISO: toISO(service.completedAt ?? service.endDate),
+        isLateToEta: service.isLateToEta ?? undefined,
+        isLateToWindow: service.isLateToWindow ?? undefined,
+        delayMinutes: service.delayMinutes ?? null,
         tipo,
         hasReturn,
+        isRetorno,
         status,
+        deliveryOutcome: service.deliveryOutcome ?? null,
     }
+}
+
+/** Normaliza Date|string|null → ISO string|null para comparação client-side. */
+function toISO(value?: Date | string | null): string | null {
+    if (!value) return null
+    if (value instanceof Date) return isNaN(value.getTime()) ? null : value.toISOString()
+    return value
 }
 
 /**

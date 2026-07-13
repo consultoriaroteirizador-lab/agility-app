@@ -48,6 +48,27 @@ export interface ServiceCompletionDetailsRequest {
         notes?: string
         completedAt?: string
     }
+
+    /**
+     * Conferência das devoluções na parada de RETORNO — snapshot dos itens
+     * conferidos no CD (devoluções/coletas + não entregues).
+     */
+    returnChecklist?: ReturnChecklistItem[]
+}
+
+export interface ReturnChecklistItem {
+    material: string
+    serviceId: string
+    serviceCode?: string | null
+    quantity?: number
+    unit?: string | null
+    origin?: 'PICKUP' | 'UNDELIVERED'
+    /** Motivo do retorno (FAILED/PARTIAL/MISSING/DAMAGED/REFUSED). */
+    reason?: string | null
+    /** Quantidade efetivamente recebida no CD (divergência quando < quantity). */
+    received?: number
+    checked: boolean
+    notes?: string
 }
 
 

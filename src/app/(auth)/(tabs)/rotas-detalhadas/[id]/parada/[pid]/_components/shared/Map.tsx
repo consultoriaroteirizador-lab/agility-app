@@ -35,6 +35,11 @@ export interface MapPoint {
 
 interface MapProps {
     height?: number;
+    /**
+     * Ocupa todo o espaço do container pai (flex:1) em vez de altura fixa.
+     * Usado para o mapa em tela cheia (modal de todas as paradas).
+     */
+    fill?: boolean;
     variant?: MapVariant;
     /** Coordenada única do destino (compatibilidade) */
     latitude?: number | null;
@@ -51,8 +56,16 @@ interface MapProps {
      * global (parada atual → próxima) — ver `geo.sliceRouteBetween`.
      */
     coordinateSegments?: number[][][];
+    /**
+     * Segmentos já decodificados (`[lng,lat][]`) renderizados com linha
+     * TRACEJADA. Usado para destacar o trecho de retorno (última parada →
+     * origem/retorno) no mapa de todas as paradas.
+     */
+    dashedSegments?: number[][][];
     /** Cor da linha da rota */
     routeColor?: string;
+    /** Cor da linha tracejada (default: usa `routeColor`) */
+    dashedColor?: string;
     /** Largura da linha da rota */
     routeWidth?: number;
     /** Mostrar botão de navegação (default: true) */
@@ -115,6 +128,7 @@ const OSM_STYLE = {
  */
 export function Map({
     height = 180,
+    fill = false,
     variant = 'service',
     latitude,
     longitude,
@@ -122,7 +136,9 @@ export function Map({
     geometry,
     geometries,
     coordinateSegments,
+    dashedSegments,
     routeColor = '#3B82F6',
+    dashedColor,
     routeWidth = 4,
     showNavigationButton = true,
     addressText,
@@ -175,10 +191,17 @@ export function Map({
         return [...decoded, ...preDecoded];
     }, [geometry, geometries, coordinateSegments]);
 
+    // Segmentos tracejados já decodificados (ex.: trecho de retorno)
+    const dashedRouteSegments = useMemo(() => {
+        return (dashedSegments ?? [])
+            .filter(seg => Array.isArray(seg) && seg.length > 1)
+            .map(seg => ({ coordinates: simplifyCoordinates(seg, 300) }));
+    }, [dashedSegments]);
+
     // Todas as coordenadas para cálculo de bounds
     const allRouteCoordinates = useMemo(() => {
-        return routeSegments.flatMap(segment => segment.coordinates);
-    }, [routeSegments]);
+        return [...routeSegments, ...dashedRouteSegments].flatMap(segment => segment.coordinates);
+    }, [routeSegments, dashedRouteSegments]);
 
     // Calcula o centro do mapa
     const center = useMemo((): [number, number] | null => {
@@ -251,15 +274,18 @@ export function Map({
         type: config.label,
     } : null;
 
+    // Layout do container: altura fixa (default) ou flex:1 em tela cheia.
+    const containerLayout = fill
+        ? ({ flex: 1 } as const)
+        : ({ height, borderRadius: 's12', marginBottom: 'y12' } as const);
+
     if (!hasValidData) {
         return (
             <Box
-                height={height}
+                {...containerLayout}
                 backgroundColor="gray100"
                 justifyContent="center"
                 alignItems="center"
-                borderRadius="s12"
-                marginBottom="y12"
             >
                 <Text preset="text14" color="gray400">
                     Coordenadas não disponíveis
@@ -271,10 +297,8 @@ export function Map({
     return (
         <MapErrorBoundary>
             <Box
-                height={height}
-                borderRadius="s12"
+                {...containerLayout}
                 overflow="hidden"
-                marginBottom="y12"
                 position="relative"
             >
                 {isLoadingAddress ? (
@@ -331,6 +355,35 @@ export function Map({
                                                 lineWidth: routeWidth,
                                                 lineCap: 'round',
                                                 lineJoin: 'round',
+                                            }}
+                                        />
+                                    </MapLibreGL.ShapeSource>
+                                )
+                            ))}
+
+                            {/* Linhas tracejadas (ex.: trecho de retorno) */}
+                            {dashedRouteSegments.map((segment, idx) => (
+                                segment.coordinates.length > 1 && (
+                                    <MapLibreGL.ShapeSource
+                                        key={`dashed-${idx}`}
+                                        id={`dashedSource-${idx}`}
+                                        shape={{
+                                            type: 'Feature',
+                                            geometry: {
+                                                type: 'LineString',
+                                                coordinates: segment.coordinates,
+                                            },
+                                            properties: {},
+                                        }}
+                                    >
+                                        <MapLibreGL.LineLayer
+                                            id={`dashedLine-${idx}`}
+                                            style={{
+                                                lineColor: dashedColor ?? routeColor,
+                                                lineWidth: routeWidth,
+                                                lineCap: 'round',
+                                                lineJoin: 'round',
+                                                lineDasharray: [2, 2],
                                             }}
                                         />
                                     </MapLibreGL.ShapeSource>

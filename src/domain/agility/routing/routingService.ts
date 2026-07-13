@@ -13,8 +13,10 @@ import type {
     RoutingMapDataResponse,
     BroadcastingQueryRequest,
     AcceptRoutingRequest,
+    RoutingHandoffRequest,
+    RoutingHandoffResult,
 } from './dto'
-import { routingAPI } from './routingAPI'
+import { routingAPI, type ReturnManifestResponse } from './routingAPI'
 
 async function create(payload: CreateRoutingRequest): Promise<BaseResponse<RoutingResponse>> {
     return routingAPI.create(payload)
@@ -106,6 +108,14 @@ async function acceptRouting(id: Id, payload?: AcceptRoutingRequest): Promise<Ba
     return routingAPI.acceptRouting(id, payload)
 }
 
+async function getReturnManifest(id: Id): Promise<BaseResponse<ReturnManifestResponse>> {
+    return routingAPI.getReturnManifest(id)
+}
+
+async function handoff(id: Id, payload: RoutingHandoffRequest): Promise<BaseResponse<RoutingHandoffResult>> {
+    return routingAPI.handoff(id, payload)
+}
+
 export const routingService = {
     create,
     findAll,
@@ -128,6 +138,8 @@ export const routingService = {
     getSummary,
     getMapData,
     acceptRouting,
+    getReturnManifest,
+    handoff,
 }
 
 

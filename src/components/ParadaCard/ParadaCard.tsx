@@ -50,6 +50,7 @@ const SERVICE_TYPE_LABELS: Record<ServiceType, string> = {
   [ServiceType.PICKUP]: 'Coleta',
   [ServiceType.SERVICE]: 'Servico',
   [ServiceType.TRANSFER]: 'Transferencia',
+  [ServiceType.RETURN]: 'Retorno',
 };
 
 function getStatus(parada: ParadaCardData): keyof typeof STATUS_CONFIG {

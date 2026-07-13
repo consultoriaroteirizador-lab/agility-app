@@ -120,19 +120,33 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
             // ✅ CORREÇÃO: Comparar por conteúdo + remetente + timestamp (não por ID)
             // IDs otimísticos (temp-xxx) nunca vão bater com UUIDs do servidor
             const isConfirmedByServer = (optimisticMsg: ChatMessage): boolean => {
+                const optIsAttachment = !!optimisticMsg.attachmentUrl;
                 return serverMessages.some(serverMsg => {
-                    // Mesmo conteúdo
-                    const sameContent = serverMsg.content === optimisticMsg.content;
-                    // Mesmo remetente
-                    const sameSender = String(serverMsg.senderId) === String(optimisticMsg.senderId);
-                    // Timestamp dentro de 10 segundos (para lidar com diferenças de relógio)
+                    // Mesmo remetente. A otimística guarda o keycloakUserId em senderId; o servidor
+                    // usa senderId interno + senderKeycloakUserId. Casar pelos dois evita duplicação.
+                    const sameSender =
+                        String(serverMsg.senderId) === String(optimisticMsg.senderId) ||
+                        (!!serverMsg.senderKeycloakUserId &&
+                            String(serverMsg.senderKeycloakUserId) === String(optimisticMsg.senderId));
+                    if (!sameSender) return false;
+
+                    // Janela de 60s tolera diferença de relógio cliente/servidor
                     const timeDiff = Math.abs(
                         new Date(serverMsg.createdAt).getTime() -
                         new Date(optimisticMsg.createdAt).getTime()
                     );
-                    const closeTime = timeDiff < 10000; // 10 segundos
+                    if (timeDiff >= 60000) return false;
 
-                    return sameContent && sameSender && closeTime;
+                    // Anexo: a URL muda (local -> S3), então NÃO comparar URL/conteúdo.
+                    // Casar por ser um anexo do mesmo tipo do mesmo remetente na janela.
+                    if (optIsAttachment) {
+                        const sameType =
+                            (serverMsg.attachmentType ?? null) === (optimisticMsg.attachmentType ?? null);
+                        return !!serverMsg.attachmentUrl && sameType;
+                    }
+
+                    // Texto: casar por conteúdo
+                    return serverMsg.content === optimisticMsg.content;
                 });
             };
 

@@ -11,7 +11,6 @@ import { useLocalSearchParams } from 'expo-router'
 
 import { ActivityIndicator, Box, Button, ScreenBase, Text, TouchableOpacityBox } from '@/components'
 import { ButtonBack } from '@/components/Button/ButtonBack'
-import { LocationTrackingProvider } from '@/components/LocationTrackingProvider'
 import Modal from '@/components/Modal/Modal'
 import { measure } from '@/theme'
 
@@ -21,6 +20,8 @@ import {
   EmptyParadasList,
   RouteActions,
 } from './_components'
+import { MapaParadasModal } from './_components/MapaParadasModal'
+import { TransferLegExecution } from './_components/TransferLegExecution'
 import { RotaProvider, useRota } from './_context/RotaContext'
 import type { RotaTabType, Parada } from './_types/rota.types'
 
@@ -323,6 +324,7 @@ function RotaTitle({ routing, proximaParada, totalParadas }: RotaTitleProps) {
 
 function RotaDetalhadaContent() {
   const {
+    rotaId,
     loading,
     error,
     routing,
@@ -340,6 +342,7 @@ function RotaDetalhadaContent() {
   } = useRota()
 
   const [aba, setAba] = useState<RotaTabType>('andamento')
+  const [mapaVisible, setMapaVisible] = useState(false)
 
   // Título dinâmico baseado no tipo de serviço
   const tituloTela = useMemo(() => {
@@ -349,6 +352,10 @@ function RotaDetalhadaContent() {
 
   if (loading) return <LoadingState />
   if (error || !routing) return <ErrorState onBack={() => { }} />
+
+  if (routing.legType === 'TRANSFER') {
+    return <TransferLegExecution />
+  }
 
   return (
     <ScreenBase
@@ -363,6 +370,14 @@ function RotaDetalhadaContent() {
         proximaParada={proximaParada}
         totalParadas={paradas.length}
       />
+      <Box alignItems="center" marginBottom="y16">
+        <Button
+          title="Ver no mapa"
+          iconName="map"
+          preset="outline"
+          onPress={() => setMapaVisible(true)}
+        />
+      </Box>
       {aba === 'andamento' ? (
         <AndamentoList
           aba={aba}
@@ -391,6 +406,11 @@ function RotaDetalhadaContent() {
         onPress={concluirRota}
         onClose={() => setPopupConcluirRota(false)}
       />
+      <MapaParadasModal
+        visible={mapaVisible}
+        onClose={() => setMapaVisible(false)}
+        routeId={rotaId}
+      />
     </ScreenBase>
   )
 }
@@ -403,10 +423,9 @@ export default function RotaDetalhadaScreen() {
   const { id } = useLocalSearchParams<{ id: string }>()
 
   return (
-    <LocationTrackingProvider>
-      <RotaProvider routeId={id}>
-        <RotaDetalhadaContent />
-      </RotaProvider>
-    </LocationTrackingProvider>
+    // O tracking é gerido globalmente pelo LocationTrackingProvider em (auth)/_layout.
+    <RotaProvider routeId={id}>
+      <RotaDetalhadaContent />
+    </RotaProvider>
   )
 }

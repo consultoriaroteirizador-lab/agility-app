@@ -82,13 +82,23 @@ export function ItemCheckModal({ visible, item, onClose, onConfirm, loading, sta
 
     const parsedQuantity = parseFloat(actualQuantity);
     const isPartial = status === 'PARTIAL';
-    const isQuantityValid = !isPartial || (!!actualQuantity && parsedQuantity > 0 && parsedQuantity <= item.quantity);
+    const isDamaged = status === 'DAMAGED';
+    // "Quantidade entregue" aparece em PARTIAL (obrigatório) e DAMAGED (opcional —
+    // ex.: entreguei 1, o outro veio danificado). O restante volta ao CD.
+    const needsQuantity = isPartial || isDamaged;
+    const hasQty = !!actualQuantity;
+    const qtyInRange = parsedQuantity >= 0 && parsedQuantity <= item.quantity;
+    const isQuantityValid = isPartial
+        ? (hasQty && parsedQuantity > 0 && parsedQuantity <= item.quantity)
+        : (!hasQty || qtyInRange); // DAMAGED: opcional; se preenchido, 0..quantidade
     const isConfirmDisabled = loading || !isQuantityValid;
 
     const handleConfirm = () => {
+        // Envia actualQuantity quando é PARTIAL, ou DAMAGED com quantidade informada.
+        const sendQuantity = isPartial || (isDamaged && hasQty);
         onConfirm({
             status,
-            ...(isPartial && { actualQuantity: parsedQuantity }),
+            ...(sendQuantity && { actualQuantity: parsedQuantity }),
             ...(notes.trim() && { notes: notes.trim() }),
         });
     };
@@ -183,17 +193,22 @@ export function ItemCheckModal({ visible, item, onClose, onConfirm, loading, sta
                             })}
                         </Box>
 
-                        {/* Quantidade real — só aparece quando PARTIAL */}
-                        {isPartial && (
+                        {/* Quantidade entregue — PARTIAL (obrigatório) e DAMAGED (opcional) */}
+                        {needsQuantity && (
                             <Box>
                                 <Input
-                                    title="Quantidade entregue:"
+                                    title={isPartial ? 'Quantidade entregue:' : 'Quantidade entregue (opcional):'}
                                     borderType="all"
                                     value={actualQuantity}
                                     onChangeText={setActualQuantity}
                                     placeholder={`Máx: ${item.quantity}`}
                                     keyboardType="numeric"
                                 />
+                                {isDamaged && (
+                                    <Text preset="text12" color="gray400">
+                                        Informe quanto você entregou; o restante volta ao CD.
+                                    </Text>
+                                )}
                                 {!!actualQuantity && !isQuantityValid && (
                                     <Text preset="text12" color="redError">
                                         Quantidade não pode exceder {item.quantity} {item.unit ?? 'un'}

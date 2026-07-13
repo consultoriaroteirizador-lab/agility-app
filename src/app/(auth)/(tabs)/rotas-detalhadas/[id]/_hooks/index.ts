@@ -41,7 +41,13 @@ export {
 export {
     // Hook
     useParadaNavigation,
-    
+
     // Tipos
     type UseParadaNavigationResult,
 } from './useParadaNavigation'
+
+// ============================================
+// USE ROUTE LIVE SYNC
+// ============================================
+
+export { useRouteLiveSync } from './useRouteLiveSync'

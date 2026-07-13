@@ -7,6 +7,7 @@ import { ButtonBack } from '@/components/Button/ButtonBack';
 import { RoutingStatus } from '@/domain/agility/routing/dto/types';
 import { useFindMyRoutings } from '@/domain/agility/routing/useCase';
 import { measure } from '@/theme';
+import { formatDate, formatDateOnly } from '@/utils/formatDate';
 
 // --- Helpers ---
 
@@ -46,6 +47,13 @@ function getStatusColor(status: RoutingStatus) {
   return 'gray400';
 }
 
+// Fundo suave do badge de status, casando com a cor do texto.
+function getStatusBgColor(status: RoutingStatus) {
+  if (status === RoutingStatus.COMPLETED) return 'tertiary10';
+  if (status === RoutingStatus.CANCELLED) return 'redError';
+  return 'gray100';
+}
+
 // --- Subcomponentes ---
 
 function EmptyState() {
@@ -77,6 +85,9 @@ interface RouteCardProps {
 }
 
 function RouteCard({ rota, onPress }: RouteCardProps) {
+  const isCancelled = rota.status === RoutingStatus.CANCELLED;
+  const badgeTextColor = isCancelled ? 'white' : getStatusColor(rota.status);
+
   return (
     <TouchableOpacityBox
       backgroundColor="white"
@@ -86,15 +97,44 @@ function RouteCard({ rota, onPress }: RouteCardProps) {
       borderColor="gray200"
       onPress={onPress}
     >
-      <Box flexDirection="row" justifyContent="space-between" alignItems="center" mb="y12" gap="x8">
+      {/* Cabeçalho: nome + badge de status */}
+      <Box flexDirection="row" justifyContent="space-between" alignItems="flex-start" mb="y12" gap="x8">
         <Text preset="text16" fontWeightPreset='semibold' color="colorTextPrimary" flex={1} numberOfLines={2}>
           {rota.name ?? `Rota ${rota.code ?? rota.id}`}
         </Text>
-        <Text preset="text13" color={getStatusColor(rota.status)} flexShrink={0}>
-          {STATUS_LABEL[rota.status] ?? rota.status}
-        </Text>
+        <Box
+          backgroundColor={getStatusBgColor(rota.status)}
+          paddingHorizontal="x12"
+          paddingVertical="y4"
+          borderRadius="s20"
+          flexShrink={0}
+        >
+          <Text preset="text12" fontWeightPreset="semibold" color={badgeTextColor}>
+            {STATUS_LABEL[rota.status] ?? rota.status}
+          </Text>
+        </Box>
       </Box>
 
+      {/* Datas: agendada + concluída */}
+      <Box gap="y4" mb="y12">
+        {rota.date ? (
+          <Box flexDirection="row" justifyContent="space-between">
+            <Text preset="text13" color="gray500">Agendada</Text>
+            <Text preset="text13" color="gray600">{formatDateOnly(rota.date)}</Text>
+          </Box>
+        ) : null}
+        {rota.completedAt ? (
+          <Box flexDirection="row" justifyContent="space-between">
+            <Text preset="text13" color="gray500">Concluída</Text>
+            <Text preset="text13" color="gray600">{formatDate(rota.completedAt)}</Text>
+          </Box>
+        ) : null}
+      </Box>
+
+      {/* Divisor */}
+      <Box height={measure.m1} backgroundColor="gray200" mb="y12" />
+
+      {/* Métricas */}
       <Box flexDirection="row" flexWrap="wrap" gap="x12">
         <Text preset="text14" color="gray600">{rota.totalServices ?? 0} paradas</Text>
         <Text preset="text14" color="gray600">{formatPrice(rota.totalValue)}</Text>
