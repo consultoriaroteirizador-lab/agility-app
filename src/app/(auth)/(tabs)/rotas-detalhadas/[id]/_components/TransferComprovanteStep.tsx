@@ -9,6 +9,7 @@ import { MultiPhotoPicker } from '@/components/MultiPhotoPicker';
 import { SignatureCanvas } from '@/components/SignatureCanvas';
 import { useRoutingHandoff } from '@/domain/agility/routing/useCase/useRoutingHandoff';
 import { uploadBase64Signature, uploadMultipleServicePhotos } from '@/domain/agility/service/serviceUploadUtils';
+import { useToastService } from '@/services/Toast/useToast';
 import { measure } from '@/theme';
 
 import { useRota } from '../_context/RotaContext';
@@ -23,6 +24,7 @@ import { useRota } from '../_context/RotaContext';
  */
 export function TransferComprovanteStep({ routingId, onBack }: { routingId: string; onBack: () => void }) {
     const { paradas } = useRota();
+    const { showToast } = useToastService();
     const [doc, setDoc] = useState<DocumentData>({ recipientName: '', documentType: 'RG', documentNumber: '' });
     const [photos, setPhotos] = useState<ImagePicker.ImagePickerAsset[]>([]);
     const [signature, setSignature] = useState<string | null>(null);
@@ -34,7 +36,10 @@ export function TransferComprovanteStep({ routingId, onBack }: { routingId: stri
             setDone(true);
             setTimeout(() => router.replace('/(auth)/(tabs)'), 2000);
         },
-        onError: () => setSubmitting(false),
+        onError: () => {
+            setSubmitting(false);
+            showToast({ message: 'Não foi possível registrar a entrega. Tente novamente.', type: 'error' });
+        },
     });
 
     const canSubmit = doc.recipientName.trim().length > 0 && (photos.length > 0 || !!signature);
@@ -51,6 +56,16 @@ export function TransferComprovanteStep({ routingId, onBack }: { routingId: stri
                 ? uploadBase64Signature(signature, routingId).catch(() => null)
                 : Promise.resolve<string | null>(null),
         ]);
+
+        // Se o motorista anexou comprovante mas TUDO falhou no upload (ex.: rede
+        // ruim no CD), NÃO seguir com um handoff sem prova — o comprovante é o
+        // motivo desta tela. Aborta e pede pra tentar de novo.
+        const anexouProva = photos.length > 0 || !!signature;
+        if (anexouProva && photoUrls.length === 0 && !signatureUrl) {
+            setSubmitting(false);
+            showToast({ message: 'Falha ao enviar foto/assinatura. Verifique a conexão e tente novamente.', type: 'error' });
+            return;
+        }
 
         const docNote = doc.documentNumber.trim() ? `${doc.documentType}: ${doc.documentNumber.trim()}` : undefined;
 
