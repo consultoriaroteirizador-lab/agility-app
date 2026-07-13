@@ -15,6 +15,7 @@ import {
   TouchableOpacityBox,
 } from '@/components';
 import { ButtonBack } from '@/components/Button/ButtonBack';
+import { Icon } from '@/components/Icon/Icon';
 import { MultiPhotoPicker } from '@/components/MultiPhotoPicker';
 import { useCompleteRouting, useGetRoutingMapData, useReturnManifest } from '@/domain/agility/routing/useCase';
 import type { ReturnChecklistItem } from '@/domain/agility/service/dto/request/service-completion-details.request';
@@ -181,14 +182,34 @@ export default function RetornoScreen() {
     return { points: pts, coordinateSegments: segs };
   }, [returnPoint, lastStop, mapData?.geometry]);
 
+  // Pedidos que voltam (transferência de malha): serviços FAILED do trecho que
+  // NÃO têm material no manifesto. Regra dedupe: se o serviço já aparece como
+  // material (last-mile), NÃO vira card de pedido — evita duplicar. No transfer,
+  // o pedido falho não tem material → aparece aqui.
+  const pedidosVolta = useMemo(() => {
+    return (services ?? []).filter((s) => {
+      const st = String(s.status ?? '').toUpperCase();
+      const isReturn = String(s.serviceType ?? '').toUpperCase() === 'RETURN';
+      const jaNoManifesto = items.some((it) => it.serviceId === s.id);
+      return st === 'FAILED' && !isReturn && !jaNoManifesto;
+    });
+  }, [services, items]);
+  const [pedidoConferred, setPedidoConferred] = useState<Record<string, boolean>>({});
+  const togglePedido = useCallback((id: string) => {
+    setPedidoConferred((prev) => ({ ...prev, [id]: !prev[id] }));
+  }, []);
+
   // Conferência: cada item do manifesto é marcado pelo motorista. Quando há
-  // itens, todos precisam estar conferidos antes de concluir.
+  // itens, todos precisam estar conferidos antes de concluir. Pedidos falhos
+  // (transferência de malha) entram no mesmo gate.
   const [conferred, setConferred] = useState<Record<number, boolean>>({});
   // Quantidade recebida no CD por item (string do input; vazio = quantidade cheia).
   const [received, setReceived] = useState<Record<number, string>>({});
   const allConferred = useMemo(
-    () => items.length === 0 || items.every((_, idx) => conferred[idx]),
-    [items, conferred],
+    () =>
+      (items.length === 0 || items.every((_, idx) => conferred[idx])) &&
+      pedidosVolta.every((p) => pedidoConferred[p.id]),
+    [items, conferred, pedidosVolta, pedidoConferred],
   );
 
   const toggle = useCallback((idx: number) => {
@@ -254,11 +275,9 @@ export default function RetornoScreen() {
     }
   }, [submitting, isCompleting, items, conferred, receivedQty, photos, serviceId, othersDone, routeId, completeServiceWithDetailsAsync, completeRouting, router, showToast]);
 
-  // Endereço do retorno: do ponto de retorno (quando cadastrado); senão as
-  // coordenadas do CD; senão um rótulo padrão.
-  const address =
-    returnPoint?.address ??
-    (returnPoint ? `${returnPoint.latitude.toFixed(5)}, ${returnPoint.longitude.toFixed(5)}` : 'Retorno ao CD/origem');
+  // Endereço do retorno: do ponto de retorno (quando cadastrado); senão um
+  // rótulo padrão. NUNCA mostra lat/long cru no cabeçalho.
+  const address = returnPoint?.address || 'CD de origem';
   const eta = formatHHmm(service?.estimatedArrival);
 
   if (isLoading) {
@@ -293,45 +312,63 @@ export default function RetornoScreen() {
       }
     >
       <Box flex={1} pt="y8" gap="y16">
-        {/* Cabeçalho do retorno */}
-        <Box backgroundColor="secondary10" p="y12" borderRadius="s12" gap="y8">
-          <Box flexDirection="row" alignItems="center" gap="x8">
-            <LocalIcon iconName="location" size={measure.m20} color="secondary100" />
-            <Box flex={1}>
-              <Text preset="text12" color="gray600">
-                Última parada {eta ? `· previsão ${eta}` : ''}
-              </Text>
-              <Text preset="text14" fontWeightPreset="semibold" color="colorTextPrimary">
-                {address}
-              </Text>
-            </Box>
+        {/* Cabeçalho do retorno: card de destino, no mesmo padrão do CD na
+            visão de transferência (quadrado colorido + ícone casinha). */}
+        <Box
+          backgroundColor="gray50"
+          borderWidth={1}
+          borderColor="gray200"
+          borderRadius="s12"
+          p="y12"
+          flexDirection="row"
+          alignItems="flex-start"
+        >
+          <Box
+            width={measure.m36}
+            height={measure.m36}
+            borderRadius="s20"
+            justifyContent="center"
+            alignItems="center"
+            backgroundColor="secondary100"
+          >
+            <Icon name="warehouse" size={measure.m20} color="white" />
           </Box>
-          <Text preset="text13" color="gray600">
-            Descarregue e confira as devoluções e os itens não entregues neste ponto para finalizar a rota.
-          </Text>
+          <Box flex={1} marginLeft="x12">
+            <Text preset="text12" color="gray600">
+              Retorno ao CD de origem{eta ? ` · previsão ${eta}` : ''}
+            </Text>
+            <Text preset="text14" fontWeightPreset="bold" color="colorTextPrimary" marginTop="y2">
+              {address}
+            </Text>
+            <Text preset="text12" color="gray500" marginTop="y4">
+              Descarregue e confira as devoluções e os itens não entregues neste ponto para finalizar a rota.
+            </Text>
+          </Box>
         </Box>
 
         {/* Mapa do retorno (trecho última parada → CD) */}
         {returnPoint && (
-          <Map
-            points={points}
-            coordinateSegments={coordinateSegments}
-            routeColor="#EF4444"
-            routeWidth={4}
-            addressText={address}
-            customerName="Retorno"
-            userLocation={userLocation}
-          />
+          <Box borderRadius="s12" overflow="hidden">
+            <Map
+              points={points}
+              coordinateSegments={coordinateSegments}
+              routeColor="#EF4444"
+              routeWidth={4}
+              addressText={address}
+              customerName="Retorno"
+              userLocation={userLocation}
+            />
+          </Box>
         )}
 
-        {/* Conferência de devoluções */}
+        {/* Conferência de retorno: pedidos falhos (transferência) + materiais (last-mile) */}
         <Box gap="y8">
           <Text preset="text14" fontWeightPreset="bold" color="gray600">
-            Conferência de devoluções
+            Conferência de retorno
           </Text>
 
           {/* Trava visual: a conferência só fica clicável após o check-in. */}
-          {!hasArrived && items.length > 0 ? (
+          {!hasArrived && (items.length > 0 || pedidosVolta.length > 0) ? (
             <Box flexDirection="row" alignItems="center" gap="x8" backgroundColor="secondary10" p="y12" borderRadius="s12">
               <LocalIcon iconName="location" size={measure.m20} color="secondary100" />
               <Text preset="text12" color="gray600" flex={1}>
@@ -344,85 +381,122 @@ export default function RetornoScreen() {
             <Box py="y16" alignItems="center">
               <ActivityIndicator />
             </Box>
-          ) : items.length === 0 ? (
+          ) : items.length === 0 && pedidosVolta.length === 0 ? (
             <Box backgroundColor="gray50" p="y12" borderRadius="s12">
               <Text preset="text14" color="gray600">
                 Nenhum item de devolução nesta rota. Confirme a chegada para concluir.
               </Text>
             </Box>
           ) : (
-            items.map((item, idx) => {
-              const checked = !!conferred[idx];
-              const expected = Number(item.quantity ?? 0);
-              const recvValue = received[idx] ?? String(expected);
-              return (
-                <Box
-                  key={`${item.serviceId}-${idx}`}
-                  flexDirection="row"
-                  alignItems="center"
-                  gap="x12"
-                  backgroundColor={checked ? 'primary10' : 'gray50'}
-                  p="y12"
-                  borderRadius="s12"
-                  borderWidth={1}
-                  borderColor={checked ? 'primary100' : 'gray100'}
-                  opacity={hasArrived ? 1 : 0.5}
-                >
-                  {/* Toque na área do item (ícone + texto) alterna o check.
-                      Só o input de quantidade fica fora do alvo de toque. */}
+            <>
+              {/* Pedidos falhos (transferência de malha): card check-only, sem quantidade. */}
+              {pedidosVolta.map((p) => {
+                const pedidoChecked = !!pedidoConferred[p.id];
+                return (
                   <TouchableOpacityBox
-                    flex={1}
+                    key={p.id}
                     flexDirection="row"
                     alignItems="center"
                     gap="x12"
+                    backgroundColor={pedidoChecked ? 'primary10' : 'gray50'}
+                    p="y12"
+                    borderRadius="s12"
+                    borderWidth={1}
+                    borderColor={pedidoChecked ? 'primary100' : 'gray100'}
+                    opacity={hasArrived ? 1 : 0.5}
                     disabled={!hasArrived}
-                    onPress={() => toggle(idx)}
+                    onPress={() => togglePedido(p.id)}
                   >
-                    <LocalIcon
-                      iconName={checked ? 'check' : 'box'}
+                    <Icon
+                      name={pedidoChecked ? 'check-circle' : 'inventory-2'}
                       size={measure.m20}
-                      color={checked ? 'primary100' : 'gray400'}
+                      color={pedidoChecked ? 'primary100' : 'gray400'}
                     />
                     <Box flex={1}>
                       <Text preset="text14" fontWeightPreset="semibold" color="colorTextPrimary">
-                        {item.material}
+                        {p.title || 'Pedido'}
                       </Text>
-                      <Text preset="text12" color="gray600">
-                        {item.origin === 'PICKUP' ? 'Devolução/coleta' : `Não entregue${reasonLabel(item.reason)}`}
-                        {item.serviceCode ? ` · #${item.serviceCode}` : ''}
+                      <Text preset="text12" color="colorTextError">
+                        Não recebido no CD
                       </Text>
                     </Box>
                   </TouchableOpacityBox>
+                );
+              })}
 
-                  {/* Quantidade recebida no CD (default = esperado, editável p/ baixo) */}
-                  <Box alignItems="flex-end" gap="y2">
-                    <Box
+              {items.map((item, idx) => {
+                const checked = !!conferred[idx];
+                const expected = Number(item.quantity ?? 0);
+                const recvValue = received[idx] ?? String(expected);
+                return (
+                  <Box
+                    key={`${item.serviceId}-${idx}`}
+                    flexDirection="row"
+                    alignItems="center"
+                    gap="x12"
+                    backgroundColor={checked ? 'primary10' : 'gray50'}
+                    p="y12"
+                    borderRadius="s12"
+                    borderWidth={1}
+                    borderColor={checked ? 'primary100' : 'gray100'}
+                    opacity={hasArrived ? 1 : 0.5}
+                  >
+                    {/* Toque na área do item (ícone + texto) alterna o check.
+                        Só o input de quantidade fica fora do alvo de toque. */}
+                    <TouchableOpacityBox
+                      flex={1}
                       flexDirection="row"
                       alignItems="center"
-                      gap="x4"
-                      borderWidth={1}
-                      borderColor="gray200"
-                      borderRadius="s8"
-                      paddingHorizontal="x8"
-                      paddingVertical="y4"
-                      backgroundColor="white"
+                      gap="x12"
+                      disabled={!hasArrived}
+                      onPress={() => toggle(idx)}
                     >
-                      <TextInput
-                        value={recvValue}
-                        onChangeText={(t) => setReceived((prev) => ({ ...prev, [idx]: t.replace(/[^\d.]/g, '') }))}
-                        keyboardType="numeric"
-                        editable={hasArrived}
-                        style={{ minWidth: 26, textAlign: 'right', padding: 0, color: '#111827' }}
+                      <LocalIcon
+                        iconName={checked ? 'check' : 'box'}
+                        size={measure.m20}
+                        color={checked ? 'primary100' : 'gray400'}
                       />
-                      <Text preset="text12" color="gray500">
-                        / {expected}{item.unit ? ` ${item.unit}` : ''}
-                      </Text>
+                      <Box flex={1}>
+                        <Text preset="text14" fontWeightPreset="semibold" color="colorTextPrimary">
+                          {item.material}
+                        </Text>
+                        <Text preset="text12" color="gray600">
+                          {item.origin === 'PICKUP' ? 'Devolução/coleta' : `Não entregue${reasonLabel(item.reason)}`}
+                          {item.serviceCode ? ` · #${item.serviceCode}` : ''}
+                        </Text>
+                      </Box>
+                    </TouchableOpacityBox>
+
+                    {/* Quantidade recebida no CD (default = esperado, editável p/ baixo) */}
+                    <Box alignItems="flex-end" gap="y2">
+                      <Box
+                        flexDirection="row"
+                        alignItems="center"
+                        gap="x4"
+                        borderWidth={1}
+                        borderColor="gray200"
+                        borderRadius="s8"
+                        paddingHorizontal="x8"
+                        paddingVertical="y4"
+                        backgroundColor="white"
+                      >
+                        <TextInput
+                          value={recvValue}
+                          onChangeText={(t) => setReceived((prev) => ({ ...prev, [idx]: t.replace(/[^\d.]/g, '') }))}
+                          keyboardType="numeric"
+                          editable={hasArrived}
+                          style={{ minWidth: 26, textAlign: 'right', padding: 0, color: '#111827' }}
+                        />
+                        <Text preset="text12" color="gray500">
+                          / {expected}{item.unit ? ` ${item.unit}` : ''}
+                        </Text>
+                      </Box>
+                      <Text preset="text12" color="gray500">recebido</Text>
                     </Box>
-                    <Text preset="text12" color="gray500">recebido</Text>
                   </Box>
-                </Box>
-              );
-            })
+                );
+              })}
+            </>
           )}
         </Box>
 
