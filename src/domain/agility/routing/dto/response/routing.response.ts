@@ -147,6 +147,8 @@ export interface RoutingResponse {
     originFacilityName?: string | null
     /** Cross-docking: nome do CD de destino do trecho. */
     destinationFacilityName?: string | null
+    /** Cross-docking: id do CD de destino do trecho (resolve coords via distribution-centers). */
+    destinationFacilityId?: string | null
 
     /** Creation timestamp */
     createdAt: Date | string
