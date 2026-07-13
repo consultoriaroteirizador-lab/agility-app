@@ -22,6 +22,8 @@ export type MultiPhotoPickerProps = {
   labelPreset?: keyof Theme['textVariants'];
   padding?: string;
   backgroundColor?: string;
+  /** Lado do quadrado de cada foto/botão em px. Default: (largura da tela - 64) / 3. */
+  photoSize?: number;
 };
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
@@ -37,6 +39,7 @@ export default function MultiPhotoPicker({
   labelPreset = 'textParagraph',
   padding = 'm12',
   backgroundColor = 'transparent',
+  photoSize = PHOTO_SIZE,
 }: MultiPhotoPickerProps) {
   const { colors, borderRadii } = useAppTheme();
 
@@ -108,8 +111,8 @@ export default function MultiPhotoPicker({
     return (
       <View
         style={{
-          width: PHOTO_SIZE,
-          height: PHOTO_SIZE,
+          width: photoSize,
+          height: photoSize,
           position: 'relative',
         }}
       >
@@ -216,8 +219,8 @@ export default function MultiPhotoPicker({
       <TouchableOpacity
         onPress={pickPhotos}
         style={{
-          width: PHOTO_SIZE,
-          height: PHOTO_SIZE,
+          width: photoSize,
+          height: photoSize,
           backgroundColor: colors.gray50,
           borderWidth: measure.m2,
           borderColor: colors.gray200,
@@ -238,8 +241,8 @@ export default function MultiPhotoPicker({
       <TouchableOpacity
         onPress={takePhoto}
         style={{
-          width: PHOTO_SIZE,
-          height: PHOTO_SIZE,
+          width: photoSize,
+          height: photoSize,
           backgroundColor: colors.gray50,
           borderWidth: measure.m2,
           borderColor: colors.gray200,

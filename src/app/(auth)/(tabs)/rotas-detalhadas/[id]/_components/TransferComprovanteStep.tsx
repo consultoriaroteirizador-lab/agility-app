@@ -115,6 +115,7 @@ export function TransferComprovanteStep({ routingId, onBack }: { routingId: stri
                 label="Foto da carga (opcional se houver assinatura)"
                 maxPhotos={5}
                 allowCamera
+                photoSize={88}
             />
 
             <Box>
