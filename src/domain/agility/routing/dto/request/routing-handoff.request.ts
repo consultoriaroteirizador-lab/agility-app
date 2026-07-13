@@ -5,10 +5,19 @@ export interface RoutingHandoffProof {
     notes?: string
 }
 
+export interface RoutingHandoffItem {
+    serviceId: string
+    outcome: 'RECEIVED' | 'NOT_RECEIVED'
+    reason?: string
+    notes?: string
+}
+
 export interface RoutingHandoffRequest {
     proof: RoutingHandoffProof
     /** Subconjunto do lote (futuro palete/pedido). Omitido = lote inteiro. */
     serviceIds?: string[]
+    /** Conferência por pedido (Fase 2). Omitido = lote inteiro recebido (backward-compat). */
+    items?: RoutingHandoffItem[]
 }
 
 export interface RoutingHandoffResult {
