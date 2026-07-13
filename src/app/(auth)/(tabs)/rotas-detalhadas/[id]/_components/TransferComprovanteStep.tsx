@@ -14,6 +14,8 @@ import { measure } from '@/theme';
 
 import { useRota } from '../_context/RotaContext';
 
+import { TransferOrderList } from './TransferOrderList';
+
 /**
  * Etapa 2 (comprovante) da tela de transferência: quem recebeu + documento,
  * foto/assinatura e o disparo do handoff (POST /routings/:id/handoff).
@@ -100,6 +102,8 @@ export function TransferComprovanteStep({ routingId, onBack }: { routingId: stri
                     Confirme o recebimento do lote ({paradas.length} pedido{paradas.length === 1 ? '' : 's'}) no CD de destino.
                 </Text>
             </Box>
+
+            <TransferOrderList paradas={paradas} />
 
             <DocumentCollectionForm data={doc} onChange={setDoc} />
 
