@@ -5,6 +5,7 @@ import { router } from 'expo-router';
 
 import { Box, Button, LocalIcon, Text } from '@/components';
 import { DocumentCollectionForm, type DocumentData } from '@/components/DocumentCollectionForm';
+import Modal from '@/components/Modal/Modal';
 import { MultiPhotoPicker } from '@/components/MultiPhotoPicker';
 import { SignatureCanvas } from '@/components/SignatureCanvas';
 import { useRoutingHandoff } from '@/domain/agility/routing/useCase/useRoutingHandoff';
@@ -30,6 +31,7 @@ export function TransferComprovanteStep({ routingId, onBack }: { routingId: stri
     const [doc, setDoc] = useState<DocumentData>({ recipientName: '', documentType: 'RG', documentNumber: '' });
     const [photos, setPhotos] = useState<ImagePicker.ImagePickerAsset[]>([]);
     const [signature, setSignature] = useState<string | null>(null);
+    const [showSignature, setShowSignature] = useState(false);
     const [submitting, setSubmitting] = useState(false);
     const [done, setDone] = useState(false);
 
@@ -119,12 +121,11 @@ export function TransferComprovanteStep({ routingId, onBack }: { routingId: stri
                 <Text preset="text12" color="gray600" mb="b4">
                     Assinatura (opcional se houver foto)
                 </Text>
-                <SignatureCanvas onSave={setSignature} onClear={() => setSignature(null)} height={measure.y200} penColor="black" backgroundColor="white" />
-                {signature ? (
-                    <Text preset="text12" color="primary100" mt="t4">
-                        Assinatura registrada.
-                    </Text>
-                ) : null}
+                <Button
+                    preset="outline"
+                    title={signature ? 'Assinatura registrada ✓' : 'Registrar assinatura'}
+                    onPress={() => setShowSignature(true)}
+                />
             </Box>
 
             <Box gap="y12" pb="y24">
@@ -136,6 +137,25 @@ export function TransferComprovanteStep({ routingId, onBack }: { routingId: stri
                 ) : null}
                 <Button title="Voltar" onPress={onBack} preset="outline" />
             </Box>
+
+            <Modal title="Assinatura" isVisible={showSignature} onClose={() => setShowSignature(false)}>
+                <Box paddingHorizontal="x10" paddingTop="t10" paddingBottom="y10">
+                    <Text preset="text16" fontWeightPreset="bold" color="colorTextPrimary" marginBottom="b10" textAlign="center">
+                        Assinatura do recebedor
+                    </Text>
+                    <SignatureCanvas
+                        onClear={() => setSignature(null)}
+                        onSave={async (signatureUri: string) => {
+                            setSignature(signatureUri);
+                            setShowSignature(false);
+                        }}
+                        height={measure.y280}
+                        penColor="black"
+                        backgroundColor="white"
+                        preset="textParagraph"
+                    />
+                </Box>
+            </Modal>
         </Box>
     );
 }
