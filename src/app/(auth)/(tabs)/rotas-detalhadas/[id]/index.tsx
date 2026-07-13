@@ -7,7 +7,7 @@
 import { useState, useCallback, useMemo } from 'react'
 import { FlatList, SectionList } from 'react-native'
 
-import { useLocalSearchParams } from 'expo-router'
+import { Redirect, useLocalSearchParams } from 'expo-router'
 
 import { ActivityIndicator, Box, Button, ScreenBase, Text, TouchableOpacityBox } from '@/components'
 import { ButtonBack } from '@/components/Button/ButtonBack'
@@ -354,6 +354,21 @@ function RotaDetalhadaContent() {
   if (error || !routing) return <ErrorState onBack={() => { }} />
 
   if (routing.legType === 'TRANSFER') {
+    // Pós-handoff: o RETURN foi materializado (returnServiceId) e o trecho segue
+    // em retorno. Ao reabrir o trecho (sair/voltar do app), ir pro fluxo de
+    // retorno em vez de repetir a entrega da transferência — a navegação do
+    // onSuccess é imperativa e não sobrevive a sair/voltar. Redirect declarativo
+    // resolve o estado a partir do dado (returnServiceId + em andamento).
+    if (routing.returnServiceId && routing.isInProgress) {
+      return (
+        <Redirect
+          href={{
+            pathname: '/rotas-detalhadas/[id]/parada/[pid]/retorno' as never,
+            params: { id: routing.id, pid: routing.returnServiceId } as never,
+          }}
+        />
+      )
+    }
     return <TransferLegExecution />
   }
 

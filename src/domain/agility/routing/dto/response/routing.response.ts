@@ -98,6 +98,11 @@ export interface RoutingResponse {
     /** Has return */
     hasReturn: boolean
 
+    /** Id do Service RETURN materializado no handoff (trecho de malha em retorno).
+     *  Presente ⇒ o handoff já ocorreu e o motorista deve seguir pro check-in de
+     *  retorno em vez de repetir a entrega da transferência. */
+    returnServiceId?: string | null
+
     /** Return point */
     returnPoint: ReturnPoint
 
