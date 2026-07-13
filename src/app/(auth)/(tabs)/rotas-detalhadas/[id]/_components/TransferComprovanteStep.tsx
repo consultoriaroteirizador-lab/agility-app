@@ -99,7 +99,13 @@ export function TransferComprovanteStep({ routingId, onBack, onDone }: { routing
         },
     });
 
-    const canSubmit = doc.recipientName.trim().length > 0 && (photos.length > 0 || !!signature);
+    // Igual ao SharedEtapaDados do last-mile: exige TODOS — nome + documento do
+    // recebedor + foto + assinatura.
+    const canSubmit =
+        doc.recipientName.trim().length > 0 &&
+        doc.documentNumber.trim().length > 0 &&
+        photos.length > 0 &&
+        !!signature;
 
     async function onConfirm() {
         if (!canSubmit || submitting) return;
@@ -177,7 +183,7 @@ export function TransferComprovanteStep({ routingId, onBack, onDone }: { routing
             <MultiPhotoPicker
                 photos={photos}
                 onPhotosChange={setPhotos}
-                label="Foto da carga (opcional se houver assinatura)"
+                label="Foto da carga"
                 maxPhotos={5}
                 allowCamera
                 photoSize={88}
@@ -185,7 +191,7 @@ export function TransferComprovanteStep({ routingId, onBack, onDone }: { routing
 
             <Box>
                 <Text preset="text12" color="gray600" mb="b4">
-                    Assinatura (opcional se houver foto)
+                    Assinatura
                 </Text>
                 <Button
                     preset="outline"
@@ -198,7 +204,7 @@ export function TransferComprovanteStep({ routingId, onBack, onDone }: { routing
                 <Button title="Registrar entrega da carga" onPress={onConfirm} disabled={!canSubmit || submitting} isLoading={submitting} />
                 {!canSubmit ? (
                     <Text preset="text12" color="gray500" textAlign="center">
-                        * Informe quem recebeu e anexe uma foto ou assinatura.
+                        * Informe nome e documento do recebedor, foto e assinatura.
                     </Text>
                 ) : null}
                 <Button title="Voltar" onPress={onBack} preset="outline" />
