@@ -21,6 +21,7 @@ import { useCompleteRouting, useGetRoutingMapData, useReturnManifest } from '@/d
 import type { ReturnChecklistItem } from '@/domain/agility/service/dto/request/service-completion-details.request';
 import { uploadMultipleServicePhotos } from '@/domain/agility/service/serviceUploadUtils';
 import { useCompleteServiceWithDetails, useFindOneService } from '@/domain/agility/service/useCase';
+import { useRouteDirections } from '@/domain/ors/useRouteDirections';
 import { KEY_ROUTINGS, KEY_SERVICES } from '@/domain/queryKeys';
 import { formatHHmm } from '@/functions';
 import { useToastService } from '@/services/Toast/useToast';
@@ -181,6 +182,15 @@ export default function RetornoScreen() {
 
     return { points: pts, coordinateSegments: segs };
   }, [returnPoint, lastStop, mapData?.geometry]);
+
+  // Traçado de estrada do retorno (última parada → CD) via ORS ao vivo. O
+  // `mapData.geometry` costuma ser o trajeto de ida (ex.: CD1→CD2 na malha), sem
+  // o trecho de volta — por isso a linha saía reta. Com ORS, segue as ruas;
+  // fallback = os `coordinateSegments` (linha reta) enquanto o ORS não responde.
+  const roadGeometry = useRouteDirections(
+    lastStop ? { latitude: lastStop.latitude, longitude: lastStop.longitude } : null,
+    returnPoint ? { latitude: returnPoint.latitude, longitude: returnPoint.longitude } : null,
+  );
 
   // Pedidos que voltam (transferência de malha): serviços FAILED do trecho que
   // NÃO têm material no manifesto. Regra dedupe: se o serviço já aparece como
@@ -346,12 +356,14 @@ export default function RetornoScreen() {
           </Box>
         </Box>
 
-        {/* Mapa do retorno (trecho última parada → CD) */}
-        {returnPoint && (
+        {/* Mapa do retorno (trecho última parada → CD). Some após o check-in
+            ("Cheguei no retorno") — já chegou, o trajeto não serve mais. */}
+        {returnPoint && !hasArrived && (
           <Box borderRadius="s12" overflow="hidden">
             <Map
               points={points}
-              coordinateSegments={coordinateSegments}
+              geometries={roadGeometry ? [roadGeometry] : undefined}
+              coordinateSegments={roadGeometry ? undefined : coordinateSegments}
               routeColor="#EF4444"
               routeWidth={4}
               addressText={address}
@@ -508,6 +520,7 @@ export default function RetornoScreen() {
             label="Comprovante (opcional)"
             maxPhotos={5}
             allowCamera
+            photoSize={88}
           />
         ) : null}
 
