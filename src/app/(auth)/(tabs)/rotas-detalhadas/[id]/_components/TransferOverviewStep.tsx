@@ -66,7 +66,7 @@ export function TransferOverviewStep() {
             {cdCard('Origem', origemNome, origemEndereco, ORIGIN_COLOR)}
             {cdCard('Destino', destinoNome, destinoEndereco, DEST_COLOR)}
 
-            {points.length > 0 ? (
+            {cd1Coords ? (
                 <Box borderRadius="s12" overflow="hidden">
                     <Map height={measure.y220} points={points} geometries={roadGeometry ? [roadGeometry] : undefined} coordinateSegments={coordinateSegments} routeColor={DEST_COLOR} routeWidth={4} showNavigationButton={false} />
                 </Box>
@@ -76,6 +76,9 @@ export function TransferOverviewStep() {
                 <Text preset="text14" fontWeightPreset="bold" color="gray600">
                     Lote da carga ({paradas.length} pedido{paradas.length === 1 ? '' : 's'})
                 </Text>
+                {paradas.length === 0 ? (
+                    <Text preset="text13" color="gray600">Nenhum pedido no lote deste trecho.</Text>
+                ) : null}
                 {paradas.map((parada) => (
                     <Box key={parada.serviceId} flexDirection="row" alignItems="center" gap="x12" backgroundColor="white" p="y12" borderRadius="s12" borderWidth={1} borderColor="gray200">
                         <Icon name="inventory-2" size={measure.m20} color="gray400" />
