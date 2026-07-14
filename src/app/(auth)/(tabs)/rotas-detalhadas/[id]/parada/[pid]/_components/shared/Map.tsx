@@ -11,10 +11,11 @@ import { colors, measure } from '@/theme';
 import { FREE_TILE_URLS } from '../../_utils/mapConfig';
 import { MapErrorBoundary } from '../MapErrorBoundary';
 
+import { CdMarker } from './CdMarker';
 import { decodePolyline, simplifyCoordinates } from './geo';
 import { StopMarker } from './StopMarker';
 
-type MapVariant = 'coleta' | 'service' | 'entrega';
+type MapVariant = 'coleta' | 'service' | 'entrega' | 'cd';
 
 export interface MapPoint {
     id: string;
@@ -92,6 +93,11 @@ const VARIANT_CONFIG = {
         markerColor: 'redError' as const,
         borderColor: 'primary100' as const,
         label: 'Entrega',
+    },
+    cd: {
+        markerColor: 'primary100' as const,
+        borderColor: 'white' as const,
+        label: '',
     },
 };
 
@@ -406,7 +412,9 @@ export function Map({
                                         title={point.title || `Ponto ${index + 1}`}
                                         anchor={{ x: 0.5, y: 1 }}
                                     >
-                                        <StopMarker color={pinColor} label={pinLabel} size={point.size} />
+                                        {point.variant === 'cd'
+                                            ? <CdMarker color={pinColor} label={point.label} size={point.size} />
+                                            : <StopMarker color={pinColor} label={pinLabel} size={point.size} />}
                                     </MapLibreGL.PointAnnotation>
                                 );
                             })}
