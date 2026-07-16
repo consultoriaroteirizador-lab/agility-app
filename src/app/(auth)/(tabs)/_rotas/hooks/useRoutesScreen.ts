@@ -26,9 +26,9 @@ function useDriverAvailability() {
     const isAvailable = resolveDisplayedAvailability(serverAvailable, pendingValue);
 
     const { updateDriver, isLoading: isUpdatingAvailability } = useUpdateDriver({
-        onSuccess: () => {
-            if (driverId) {
-                queryClient.invalidateQueries({ queryKey: [KEY_DRIVER, driverId] });
+        onSuccess: (data) => {
+            if (driverId && data?.result) {
+                queryClient.setQueryData([KEY_DRIVER, driverId], data);
             }
         },
         onError: (error) => {
@@ -141,9 +141,11 @@ export function useRoutesScreen() {
         },
     });
 
-    // O toggle controla APENAS a disponibilidade para leilão. O rastreamento é
-    // dirigido pela rota IN_PROGRESS no LocationTrackingProvider — marcar-se
-    // indisponível não para mais o tracking de uma rota em andamento.
+    // O toggle atualiza a disponibilidade para leilão. Isso também
+    // liga/desliga o rastreamento (via shouldTrack no LocationTrackingProvider,
+    // que combina disponibilidade + rota IN_PROGRESS) — marcar-se indisponível
+    // não para o tracking de uma rota em andamento, mas fora de rota o
+    // rastreamento agora acompanha o toggle.
     const handleToggleAvailability = useCallback(async () => {
         if (!driverId || isUpdatingAvailability) return;
 
