@@ -166,6 +166,12 @@ const getDefaultConfig = (authConfig: TrackingAuthConfig) => {
   // o que deixava requisições saindo com config antiga → 401.
   reset: true,
 
+  // Heartbeat: mantém o "visto por último" fresco quando o motorista está
+  // disponível e parado. Top-level (config flat do SDK). iOS exige
+  // preventSuspend:true pro onHeartbeat disparar; Android mínimo 60s.
+  heartbeatInterval: 60,
+  preventSuspend: true,
+
   // Pede permissão de localização "Sempre" (background). Sem isso o SO mata o
   // tracking ao sair do app, anulando o stopOnTerminate:false.
   locationAuthorizationRequest: 'Always' as const,
@@ -220,6 +226,18 @@ const getDefaultConfig = (authConfig: TrackingAuthConfig) => {
   },
   };
 };
+
+/**
+ * Força uma leitura de posição imediata (persiste + POSTa). Usado no report
+ * imediato ao ficar disponível, pra o motorista aparecer rápido no mapa.
+ */
+export async function requestCurrentPosition(): Promise<void> {
+  try {
+    await BackgroundGeolocation.getCurrentPosition({ samples: 1, persist: true });
+  } catch (err) {
+    console.warn('[BGGeolocation] requestCurrentPosition falhou:', err);
+  }
+}
 
 /**
  * Inicializa o serviço de Background Geolocation
@@ -454,6 +472,13 @@ function onHeartbeatHandler(event: HeartbeatEvent) {
       lat: event.location.coords.latitude.toFixed(6),
       lng: event.location.coords.longitude.toFixed(6),
     } : null,
+  });
+
+  // O heartbeat NÃO engaja o GPS sozinho (event.location é só o último conhecido).
+  // Forçamos uma posição fresca — que persiste + POSTa pro backend, mantendo o
+  // "ao vivo" mesmo parado.
+  BackgroundGeolocation.getCurrentPosition({ samples: 1, persist: true }).catch((err) => {
+    console.warn('[BGGeolocation] onHeartbeat getCurrentPosition falhou:', err);
   });
 }
 

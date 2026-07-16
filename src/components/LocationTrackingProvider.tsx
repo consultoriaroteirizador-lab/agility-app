@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
 
+import { useFindOneDriver } from '@/domain/agility/driver/useCase';
 import { RoutingStatus } from '@/domain/agility/routing/dto/types';
 import { useFindMyRoutings } from '@/domain/agility/routing/useCase';
 import { useTrackingWebSocket } from '@/domain/agility/tracking';
@@ -9,7 +10,8 @@ import { authAdapter } from '@/domain/Auth/authAdapter';
 import { useAuthCredentialsService } from '@/services';
 import { initializeGeofenceService, cleanupGeofenceService } from '@/services/geofence';
 import { useLocationTracking, updateBackgroundGeolocationAuth } from '@/services/location';
-import { initializeBackgroundGeolocation, cleanupBackgroundGeolocation, onAuthRefreshed } from '@/services/location/backgroundLocationService';
+import { initializeBackgroundGeolocation, cleanupBackgroundGeolocation, onAuthRefreshed, requestCurrentPosition } from '@/services/location/backgroundLocationService';
+import { shouldTrack } from '@/services/location/trackingGate';
 
 /**
  * Componente que gerencia o rastreamento de localização automaticamente.
@@ -43,13 +45,21 @@ export function LocationTrackingProvider({ children }: { children: React.ReactNo
   // dispare quando o SDK tiver finalizado a inicialização assíncrona.
   const [sdkReady, setSdkReady] = useState(false);
 
-  // Rastreamento é dirigido pela ROTA, não pela disponibilidade: liga enquanto
-  // houver rota IN_PROGRESS e desliga ao concluir. Disponibilidade (toggle da
-  // home) controla apenas leilão. A query compartilha cache com a tela de rotas.
+  // Rastreamento liga quando o motorista está em rota IN_PROGRESS OU marcado
+  // disponível (toggle da home) — ver shouldTrack. Disponível-ocioso também é
+  // rastreado (alimenta o "solto" no monitoramento). A query de disponibilidade
+  // (useFindOneDriver) compartilha cache com a tela de rotas.
   const { routings } = useFindMyRoutings();
   const hasInProgressRoute = routings.some(
     (r) => r.status === RoutingStatus.IN_PROGRESS,
   );
+
+  // Disponibilidade vem da MESMA fonte da verdade que a home (cache do React
+  // Query). Motorista disponível-ocioso também é rastreado (alimenta o "solto"
+  // no monitoramento).
+  const { driver } = useFindOneDriver(userAuth?.driverId ?? null);
+  const isAvailable = driver?.isAvailable ?? false;
+  const trackingEnabled = shouldTrack(hasInProgressRoute, isAvailable);
 
   // WebSocket de telemetria (canal /monitoring). NÃO é o canal que envia
   // localizações — o SDK faz isso por HTTP direto. Aqui só recebemos updates
@@ -112,25 +122,31 @@ export function LocationTrackingProvider({ children }: { children: React.ReactNo
     };
   }, [driverId]);
 
-  // [3] Start/stop do tracking dirigido pela ROTA ATIVA (IN_PROGRESS), não pela
-  // disponibilidade nem pela tela aberta. Liga quando há rota em andamento e
-  // desliga ao concluir. startTracking/stopTracking são idempotentes e checam o
-  // estado real do SDK, então re-renders não causam start→stop→start.
+  // [3] Start/stop do tracking dirigido por PRESENÇA: rota ativa (IN_PROGRESS)
+  // OU disponível (toggle da home) — ver trackingEnabled/shouldTrack.
+  // startTracking/stopTracking são idempotentes e checam o estado real do SDK,
+  // então re-renders não causam start→stop→start.
   useEffect(() => {
     if (!sdkReady || !driverId) return;
 
-    if (hasInProgressRoute) {
-      console.log('[LocationTrackingProvider] Rota IN_PROGRESS — iniciando tracking');
-      startTracking().catch(err => {
-        console.error('[LocationTrackingProvider] Erro ao iniciar tracking:', err);
-      });
+    if (trackingEnabled) {
+      console.log('[LocationTrackingProvider] Em rota ou disponível — iniciando tracking');
+      startTracking()
+        .then(() => {
+          // Report imediato: aparece rápido no mapa e não é varrido pelo cron
+          // por "nunca ter reportado".
+          void requestCurrentPosition();
+        })
+        .catch(err => {
+          console.error('[LocationTrackingProvider] Erro ao iniciar tracking:', err);
+        });
     } else {
-      console.log('[LocationTrackingProvider] Sem rota IN_PROGRESS — parando tracking');
+      console.log('[LocationTrackingProvider] Sem rota e indisponível — parando tracking');
       stopTracking().catch(err => {
         console.error('[LocationTrackingProvider] Erro ao parar tracking:', err);
       });
     }
-  }, [sdkReady, driverId, hasInProgressRoute, startTracking, stopTracking]);
+  }, [sdkReady, driverId, trackingEnabled, startTracking, stopTracking]);
 
   // [4] Refresh de token → setConfig leve nos headers HTTP do SDK. Sem
   // reinit, sem stop/start — o SDK continua emitindo localizações com o
