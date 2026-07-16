@@ -1,47 +1,54 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
+import { useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 
-import { useUpdateDriver } from '@/domain/agility/driver/useCase';
+import { useFindOneDriver, useUpdateDriver } from '@/domain/agility/driver/useCase';
 import { RoutingStatus } from '@/domain/agility/routing/dto/types';
 import { useFindMyRoutings, useStartRouting } from '@/domain/agility/routing/useCase';
+import { KEY_DRIVER } from '@/domain/queryKeys';
 import { useAuthCredentialsService } from '@/services';
+import { resolveDisplayedAvailability } from '@/services/location/trackingGate';
 
 import { useRoutesModals } from './useRoutesModals';
 
 function useDriverAvailability() {
     const { userAuth } = useAuthCredentialsService();
     const driverId = userAuth?.driverId || null;
-    const [isAvailable, setIsAvailable] = useState(false);
-    const hasInitializedRef = useRef(false);
+    const queryClient = useQueryClient();
+
+    // Fonte da verdade: o servidor. Persiste a disponibilidade entre aberturas.
+    const { driver } = useFindOneDriver(driverId);
+    const serverAvailable = driver?.isAvailable ?? false;
+
+    // Valor pedido enquanto o PATCH está em voo (otimismo). null = sem pendência.
+    const [pendingValue, setPendingValue] = useState<boolean | null>(null);
+    const isAvailable = resolveDisplayedAvailability(serverAvailable, pendingValue);
 
     const { updateDriver, isLoading: isUpdatingAvailability } = useUpdateDriver({
-        onSuccess: () => {
-            setIsAvailable((prev) => prev);
+        onSuccess: (data) => {
+            if (driverId && data?.result) {
+                queryClient.setQueryData([KEY_DRIVER, driverId], data);
+            }
         },
         onError: (error) => {
+            setPendingValue(null); // reverte pro valor do servidor
             console.error('[useDriverAvailability] Error updating availability:', error);
         },
     });
 
-    // Force offline ONCE when driverId becomes available
+    // Limpa o otimismo quando o servidor já reflete o valor pedido (sem flicker).
     useEffect(() => {
-        if (hasInitializedRef.current || !driverId) {
-            return;
+        if (pendingValue !== null && serverAvailable === pendingValue) {
+            setPendingValue(null);
         }
-
-        hasInitializedRef.current = true;
-        updateDriver({
-            id: driverId,
-            payload: { isAvailable: false },
-        });
-    }, [driverId, updateDriver]);
+    }, [serverAvailable, pendingValue]);
 
     const toggleAvailability = useCallback(
         async (newValue: boolean) => {
             if (!driverId || isUpdatingAvailability) return false;
 
-            setIsAvailable(newValue);
+            setPendingValue(newValue); // otimista
             updateDriver({
                 id: driverId,
                 payload: { isAvailable: newValue },
@@ -57,7 +64,6 @@ function useDriverAvailability() {
         isAvailable,
         isUpdatingAvailability,
         toggleAvailability,
-        setIsAvailable,
     };
 }
 
@@ -103,7 +109,6 @@ export function useRoutesScreen() {
         isAvailable,
         isUpdatingAvailability,
         toggleAvailability,
-        setIsAvailable,
     } = useDriverAvailability();
 
     const { routes, isLoading, isError, refreshing, onRefresh, refetch } = useRoutesList();
@@ -136,23 +141,18 @@ export function useRoutesScreen() {
         },
     });
 
-    // O toggle controla APENAS a disponibilidade para leilão. O rastreamento é
-    // dirigido pela rota IN_PROGRESS no LocationTrackingProvider — marcar-se
-    // indisponível não para mais o tracking de uma rota em andamento.
+    // O toggle atualiza a disponibilidade para leilão. Isso também
+    // liga/desliga o rastreamento (via shouldTrack no LocationTrackingProvider,
+    // que combina disponibilidade + rota IN_PROGRESS) — marcar-se indisponível
+    // não para o tracking de uma rota em andamento, mas fora de rota o
+    // rastreamento agora acompanha o toggle.
     const handleToggleAvailability = useCallback(async () => {
         if (!driverId || isUpdatingAvailability) return;
 
         const newAvailability = !isAvailable;
-        setIsAvailable(newAvailability);
 
         await toggleAvailability(newAvailability);
-    }, [
-        driverId,
-        isAvailable,
-        isUpdatingAvailability,
-        setIsAvailable,
-        toggleAvailability,
-    ]);
+    }, [driverId, isAvailable, isUpdatingAvailability, toggleAvailability]);
 
     const confirmStartRoute = useCallback(() => {
         if (!selectedRoute) return;
