@@ -45,9 +45,10 @@ export function LocationTrackingProvider({ children }: { children: React.ReactNo
   // dispare quando o SDK tiver finalizado a inicialização assíncrona.
   const [sdkReady, setSdkReady] = useState(false);
 
-  // Rastreamento é dirigido pela ROTA, não pela disponibilidade: liga enquanto
-  // houver rota IN_PROGRESS e desliga ao concluir. Disponibilidade (toggle da
-  // home) controla apenas leilão. A query compartilha cache com a tela de rotas.
+  // Rastreamento liga quando o motorista está em rota IN_PROGRESS OU marcado
+  // disponível (toggle da home) — ver shouldTrack. Disponível-ocioso também é
+  // rastreado (alimenta o "solto" no monitoramento). A query de disponibilidade
+  // (useFindOneDriver) compartilha cache com a tela de rotas.
   const { routings } = useFindMyRoutings();
   const hasInProgressRoute = routings.some(
     (r) => r.status === RoutingStatus.IN_PROGRESS,
@@ -121,10 +122,10 @@ export function LocationTrackingProvider({ children }: { children: React.ReactNo
     };
   }, [driverId]);
 
-  // [3] Start/stop do tracking dirigido pela ROTA ATIVA (IN_PROGRESS), não pela
-  // disponibilidade nem pela tela aberta. Liga quando há rota em andamento e
-  // desliga ao concluir. startTracking/stopTracking são idempotentes e checam o
-  // estado real do SDK, então re-renders não causam start→stop→start.
+  // [3] Start/stop do tracking dirigido por PRESENÇA: rota ativa (IN_PROGRESS)
+  // OU disponível (toggle da home) — ver trackingEnabled/shouldTrack.
+  // startTracking/stopTracking são idempotentes e checam o estado real do SDK,
+  // então re-renders não causam start→stop→start.
   useEffect(() => {
     if (!sdkReady || !driverId) return;
 
