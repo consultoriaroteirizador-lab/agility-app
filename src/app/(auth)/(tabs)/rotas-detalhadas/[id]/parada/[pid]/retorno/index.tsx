@@ -48,6 +48,20 @@ function isTerminalStatus(st?: string | null): boolean {
   return ['COMPLETED', 'FAILED', 'CANCELED', 'CANCELLED'].includes(String(st ?? '').toUpperCase());
 }
 
+/**
+ * Fases de custódia (cross-docking) em que o pedido JÁ foi entregue no CD de
+ * destino (handoff feito) — passou a ser responsabilidade do CD, não do
+ * motorista. Conta como "concluído p/ o trecho" no gate do retorno MESMO com
+ * status ainda PENDING (o pedido recebido segue no last-mile, então nunca vira
+ * COMPLETED na transferência). AT_ORIGIN/IN_TRANSIT são pré-handoff (ainda com o
+ * motorista) e EXCEPTION é desvio — nenhum conta como entregue, então o gate
+ * segue bloqueando se o handoff não terminou.
+ */
+const HANDED_OFF_PHASES = new Set(['AT_HUB', 'OUT_FOR_DELIVERY', 'DELIVERED']);
+function isHandedOff(phase?: string | null): boolean {
+  return HANDED_OFF_PHASES.has(String(phase ?? '').toUpperCase());
+}
+
 /** Rótulo do motivo do retorno (separado da quantidade). Vazio quando não há. */
 function reasonLabel(reason?: string | null): string {
   switch (String(reason ?? '').toUpperCase()) {
@@ -116,7 +130,11 @@ export default function RetornoScreen() {
     const others = (services ?? []).filter(
       (s) => String(s.serviceType ?? '').toUpperCase() !== 'RETURN',
     );
-    return others.every((s) => isTerminalStatus(s.status));
+    // Pedido "concluído p/ o trecho" = terminal (COMPLETED/FAILED/CANCELED — inclui
+    // os NÃO recebidos, que voltam) OU já entregue no CD (custódia AT_HUB+). Assim o
+    // retorno libera pós-handoff, sem confundir "recebido no CD" (PENDING/AT_HUB) com
+    // "ainda pendente com o motorista".
+    return others.every((s) => isTerminalStatus(s.status) || isHandedOff(s.custodyPhase));
   }, [services]);
   const canCheckIn = hasArrived || othersDone;
 
