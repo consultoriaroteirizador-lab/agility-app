@@ -152,6 +152,13 @@ export interface RoutingResponse {
     originFacilityName?: string | null
     /** Cross-docking: nome do CD de destino do trecho. */
     destinationFacilityName?: string | null
+
+    /** Cross-docking: nº de pedidos do lote sendo transportados neste trecho de
+     *  TRANSFERÊNCIA. Diferente de `totalServices` (que é 0 num transfer, pois o
+     *  trecho não tem paradas de entrega). O backend precisa incluir este contador
+     *  no payload leve de GET /routings para os trechos com legType === 'TRANSFER'.
+     *  Ausente/null em rota comum e enquanto o backend não o expuser. */
+    transferOrdersCount?: number | null
     /** Cross-docking: id do CD de destino do trecho (resolve coords via distribution-centers). */
     destinationFacilityId?: string | null
 

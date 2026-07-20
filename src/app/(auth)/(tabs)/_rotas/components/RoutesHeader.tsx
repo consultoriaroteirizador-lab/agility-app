@@ -15,24 +15,24 @@ function RoutesHeaderComponent({
 }: RoutesHeaderProps) {
     return (
         <>
-            <Box flexDirection="row" justifyContent="space-between" alignItems="flex-start" mb="y12">
-                <Box>
+            <Box flexDirection="row" justifyContent="space-between" alignItems="center" mb="y12">
+                <Box flex={1} pr="x12">
                     <Text preset="text20" fontWeightPreset='semibold' color="colorTextPrimary">
                         {title}
                     </Text>
-                    <Text preset="text16" color="gray400" mt="y4">
+                    <Text preset="text14" color="gray400" mt="y4">
                         {subtitle}
                     </Text>
                 </Box>
                 <Image
                     source={require('@/assets/images/agility/rotas/imgRotasHeader.png')}
-                    width={measure.x80}
-                    height={measure.y80}
+                    width={measure.x56}
+                    height={measure.y56}
                     resizeMode="contain"
                 />
             </Box>
 
-            <Box height={measure.y1} backgroundColor="gray200" width="100%" mb="y24" />
+            <Box height={measure.y1} backgroundColor="gray200" width="100%" mb="y16" />
         </>
     );
 }
