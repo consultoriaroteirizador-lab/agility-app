@@ -10,6 +10,7 @@ import { ButtonBack } from '@/components/Button/ButtonBack';
 import Modal from '@/components/Modal/Modal';
 import { formatAddress } from '@/domain/agility/address/dto/response/address.response';
 import { useFindOneAddress } from '@/domain/agility/address/useCase';
+import { useGetProfile } from '@/domain/agility/collaborator/useCase/useGetProfile';
 import { useCompleteRouting } from '@/domain/agility/routing/useCase';
 import { ServiceType } from '@/domain/agility/service/dto/types';
 import { useFindOneService, useFindServicesByRoutingId } from '@/domain/agility/service/useCase';
@@ -57,11 +58,19 @@ export default function StopDetailScreen() {
   // User location
   const { userLocation } = useUserLocation();
 
+  // Regras configuráveis da empresa (uma parada por vez / ordem obrigatória) —
+  // mesmas flags que o fluxo de entrega/coleta (ParadaContext) usa, pra o gating
+  // ser consistente também nesta tela genérica.
+  const { profile } = useGetProfile();
+  const companyFeatures = profile?.companyFeatures ?? null;
+
   // Calculate stop status
   const stopStatus = useStopStatus({
     service,
     allServices,
     currentServiceId: serviceId,
+    enforceSingleActiveStop: companyFeatures?.enforceSingleActiveStop === true,
+    enforceStopOrder: companyFeatures?.enforceStopOrder === true,
   });
 
   // Stop actions

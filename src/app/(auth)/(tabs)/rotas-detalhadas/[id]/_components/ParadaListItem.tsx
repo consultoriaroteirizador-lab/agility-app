@@ -194,6 +194,7 @@ export function ParadaListItem({
                 <Box
                     flexDirection="row"
                     alignItems="center"
+                    flexWrap="wrap"
                     gap="x8"
                     marginBottom="y4"
                 >

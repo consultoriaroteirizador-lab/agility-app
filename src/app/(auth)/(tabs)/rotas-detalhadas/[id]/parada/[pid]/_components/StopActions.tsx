@@ -15,6 +15,7 @@ export const StopActions = ({
     hasArrivedAtLocation,
     hasOtherServiceInProgress,
     canStartService,
+    startBlockReason,
     canCompleteRouting,
     isStarting = false,
     isStartingAttendance = false,
@@ -29,13 +30,15 @@ export const StopActions = ({
     const attending = isInAttendance || hasArrivedAtLocation;
     return (
         <Box gap="y12" mt="y16" justifyContent='center' alignItems='center'                                                                 >
-            {/* Não é a próxima e não está em execução → só "Indo pra lá" */}
+            {/* Não é a próxima e não está em execução → só "Indo pra lá".
+                Gate por canStartService: iniciar tb respeita ordem/uma-por-vez
+                (não só o "Estou aqui"), senão dá pra furar a regra pela partida. */}
             {!isNextStop && !isInProgress && !attending && (
                 <Button
                     title={isStarting ? "Iniciando..." : "Indo pra lá"}
                     preset="outline"
                     onPress={onGoToLocation}
-                    disabled={isStarting}
+                    disabled={isStarting || !canStartService}
                     width={measure.x330}
                 />
             )}
@@ -43,10 +46,10 @@ export const StopActions = ({
             {/* Próxima parada (PENDING/ASSIGNED), ainda não a caminho nem atendendo */}
             {isNextStop && !isInProgress && !attending && (
                 <>
-                    {hasOtherServiceInProgress && (
+                    {startBlockReason && (
                         <Box backgroundColor="alertColor" p="y12" borderRadius="s12" mb="y8">
                             <Text preset="text13" color="alertColor" textAlign="center">
-                                ⚠️ Já existe uma parada em andamento. Conclua a parada atual antes de iniciar outra.
+                                ⚠️ {startBlockReason}
                             </Text>
                         </Box>
                     )}
@@ -54,7 +57,7 @@ export const StopActions = ({
                         title={isStarting ? "Iniciando..." : "Indo pra lá"}
                         preset="outline"
                         onPress={onGoToLocation}
-                        disabled={hasOtherServiceInProgress || isStarting}
+                        disabled={isStarting || !canStartService}
                         width={measure.x330}
                     />
                     <Button
