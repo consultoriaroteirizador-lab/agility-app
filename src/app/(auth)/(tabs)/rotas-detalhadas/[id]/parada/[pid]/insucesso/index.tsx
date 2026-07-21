@@ -7,24 +7,18 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import { Box, Button, Text, TouchableOpacityBox, ActivityIndicator, ScreenBase, Input } from '@/components';
 import { ButtonBack } from '@/components/Button/ButtonBack';
-import { FailureReason } from '@/domain/agility/service/dto';
-import { useFailService, useFindOneService } from '@/domain/agility/service/useCase';
+import type { OrderOccurrenceReasonResponse } from '@/domain/agility/order-occurrence-reason/dto';
+import { useFindOccurrenceReasons } from '@/domain/agility/order-occurrence-reason/useCase';
+import type { ApplyOccurrenceRequest } from '@/domain/agility/service/dto';
+import { useFindOneService, useRegisterOccurrence } from '@/domain/agility/service/useCase';
 import { KEY_SERVICES } from '@/domain/queryKeys';
+import { loadOccurrenceReasonsMirror } from '@/services/storage/occurrenceReasonsStorage';
 import { useToastService } from '@/services/Toast/useToast';
 import { measure } from '@/theme';
 
 import { useInsucessoDraft } from '../_hooks/useInsucessoDraft';
 
-const FAILURE_REASONS = [
-  { value: FailureReason.RECIPIENT_ABSENT, label: 'Destinatário ausente' },
-  { value: FailureReason.WRONG_ADDRESS, label: 'Endereço incorreto' },
-  { value: FailureReason.ACCESS_DENIED, label: 'Acesso negado' },
-  { value: FailureReason.RECIPIENT_REFUSED, label: 'Destinatário recusou' },
-  { value: FailureReason.VEHICLE_ISSUE, label: 'Problema com veículo' },
-  { value: FailureReason.WEATHER_CONDITIONS, label: 'Condições climáticas' },
-  { value: FailureReason.TIME_EXCEEDED, label: 'Tempo excedido' },
-  { value: FailureReason.OTHER, label: 'Outro' },
-];
+import { occurrenceOutcomeMessage } from './occurrenceOutcome';
 
 export default function FalhaScreen() {
   const router = useRouter();
@@ -48,8 +42,25 @@ export default function FalhaScreen() {
   } = useInsucessoDraft(serviceId);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const { failService, isLoading: isFailingService } = useFailService({
-    onSuccess: async () => {
+  const { reasons, isError: isReasonsError } = useFindOccurrenceReasons();
+  const [mirror, setMirror] = useState<OrderOccurrenceReasonResponse[]>([]);
+  useEffect(() => {
+    if (reasons.length === 0 && isReasonsError) {
+      loadOccurrenceReasonsMirror().then(m => setMirror(m ?? []));
+    }
+  }, [reasons.length, isReasonsError]);
+  const options = reasons.length > 0 ? reasons : mirror;
+
+  const { registerOccurrence, isLoading: isRegisteringOccurrence } = useRegisterOccurrence({
+    onSuccess: async (resp) => {
+      const outcome = resp?.result?.occurrenceOutcome;
+      if (outcome) {
+        showToast({
+          message: occurrenceOutcomeMessage(outcome),
+          type: outcome === 'FAILED_LIMIT' ? 'error' : 'success',
+        });
+      }
+
       // Backend já limpa o draft em reportFailure; aqui limpamos o cache local
       // (best-effort; o cleanStaleParadaDrafts global também resolve no próximo open).
       await clearDraft();
@@ -138,23 +149,19 @@ export default function FalhaScreen() {
     // colhemos as URLs S3 que já estão prontas em memória.
     const photoUrls = getUploadedPhotoUrls();
 
-    const payload: {
-      reason: FailureReason;
-      notes?: string;
-      photoProof?: string[];
-    } = {
-      reason: selectedReason,
+    const payload: ApplyOccurrenceRequest = {
+      occurrenceReasonId: selectedReason,
     };
 
     if (notes.trim()) {
-      payload.notes = notes.trim();
+      payload.note = notes.trim();
     }
 
     if (photoUrls.length > 0) {
       payload.photoProof = photoUrls;
     }
 
-    failService({
+    registerOccurrence({
       id: serviceId,
       payload,
     });
@@ -184,40 +191,46 @@ export default function FalhaScreen() {
               <Text preset="text16" fontWeightPreset='semibold' color="colorTextPrimary" mb="y12">
                 Motivo do insucesso *
               </Text>
-              <Box gap="y8">
-                {FAILURE_REASONS.map((reason) => (
-                  <TouchableOpacityBox
-                    key={reason.value}
-                    onPress={() => setSelectedReason(reason.value)}
-                    flexDirection="row"
-                    alignItems="center"
-                    gap="x12"
-                    p="y16"
-                    borderWidth={measure.m2}
-                    borderColor={selectedReason === reason.value ? 'primary100' : 'gray200'}
-                    borderRadius="s12"
-                    backgroundColor={selectedReason === reason.value ? 'primary10' : 'white'}
-                  >
-                    <Box
-                      width={measure.x24}
-                      height={measure.y24}
-                      borderRadius="s12"
-                      borderWidth={measure.m2}
-                      borderColor={selectedReason === reason.value ? 'primary100' : 'gray400'}
-                      backgroundColor={selectedReason === reason.value ? 'primary100' : 'transparent'}
-                      justifyContent="center"
+              {options.length === 0 ? (
+                <Text preset="text14" color="gray400">
+                  Não foi possível carregar os motivos — conecte-se uma vez ou peça para configurar na plataforma.
+                </Text>
+              ) : (
+                <Box gap="y8">
+                  {options.map((reason) => (
+                    <TouchableOpacityBox
+                      key={reason.id}
+                      onPress={() => setSelectedReason(reason.id)}
+                      flexDirection="row"
                       alignItems="center"
+                      gap="x12"
+                      p="y16"
+                      borderWidth={measure.m2}
+                      borderColor={selectedReason === reason.id ? 'primary100' : 'gray200'}
+                      borderRadius="s12"
+                      backgroundColor={selectedReason === reason.id ? 'primary10' : 'white'}
                     >
-                      {selectedReason === reason.value && (
-                        <Box width={measure.x12} height={measure.y12} borderRadius="s6" backgroundColor="white" />
-                      )}
-                    </Box>
-                    <Text preset="text16" color="colorTextPrimary" fontWeight={selectedReason === reason.value ? '500' : '400'}>
-                      {reason.label}
-                    </Text>
-                  </TouchableOpacityBox>
-                ))}
-              </Box>
+                      <Box
+                        width={measure.x24}
+                        height={measure.y24}
+                        borderRadius="s12"
+                        borderWidth={measure.m2}
+                        borderColor={selectedReason === reason.id ? 'primary100' : 'gray400'}
+                        backgroundColor={selectedReason === reason.id ? 'primary100' : 'transparent'}
+                        justifyContent="center"
+                        alignItems="center"
+                      >
+                        {selectedReason === reason.id && (
+                          <Box width={measure.x12} height={measure.y12} borderRadius="s6" backgroundColor="white" />
+                        )}
+                      </Box>
+                      <Text preset="text16" color="colorTextPrimary" fontWeight={selectedReason === reason.id ? '500' : '400'}>
+                        {reason.name}
+                      </Text>
+                    </TouchableOpacityBox>
+                  ))}
+                </Box>
+              )}
             </Box>
 
             <Box>
@@ -331,9 +344,9 @@ export default function FalhaScreen() {
 
             <Box mt="y16">
               <Button
-                title={isFailingService || isSubmitting ? 'Registrando...' : 'Registrar insucesso'}
+                title={isRegisteringOccurrence || isSubmitting ? 'Registrando...' : 'Registrar insucesso'}
                 onPress={handleSubmit}
-                disabled={isFailingService || isSubmitting || !selectedReason}
+                disabled={isRegisteringOccurrence || isSubmitting || !selectedReason}
                 width={measure.x330}
               />
             </Box>

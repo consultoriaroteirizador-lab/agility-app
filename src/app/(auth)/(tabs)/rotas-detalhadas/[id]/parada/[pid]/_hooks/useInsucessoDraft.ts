@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 
 import * as ImagePicker from 'expo-image-picker'
 
-import { FailureReason } from '@/domain/agility/service/dto'
 import { uploadMultipleServicePhotos } from '@/domain/agility/service/serviceUploadUtils'
 import { useGetServiceDraft, useSaveServiceDraft } from '@/domain/agility/service/useCase'
 import {
@@ -27,7 +26,7 @@ export type InsucessoPhoto = ImagePicker.ImagePickerAsset & {
  * preservando o que outras telas (entrega/coleta/service) gravaram.
  */
 export function useInsucessoDraft(serviceId: string | undefined) {
-    const [selectedReason, setSelectedReasonState] = useState<FailureReason | null>(null)
+    const [selectedReason, setSelectedReasonState] = useState<string | null>(null)
     const [notes, setNotesState] = useState('')
     const [photos, setPhotosState] = useState<InsucessoPhoto[]>([])
 
@@ -207,7 +206,7 @@ export function useInsucessoDraft(serviceId: string | undefined) {
         )
     }, [])
 
-    const setSelectedReason = useCallback((reason: FailureReason | null) => {
+    const setSelectedReason = useCallback((reason: string | null) => {
         setSelectedReasonState(reason)
     }, [])
 
