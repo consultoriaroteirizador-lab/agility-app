@@ -147,7 +147,12 @@ export default function FalhaScreen() {
   };
 
   const handleSubmit = async () => {
-    if (!selectedReason) {
+    // Só submete um motivo confirmado no catálogo CARREGADO. Cobre o caso
+    // offline-nunca-cacheado + draft antigo (enum legado ou motivo desativado):
+    // sem catálogo carregado, `options` é vazio e o guard de reset (efeito acima)
+    // não roda — sem esta checagem, um `selectedReason` restaurado inválido
+    // passaria e mandaria um occurrenceReasonId lixo pro backend.
+    if (!selectedReason || !options.some((o) => o.id === selectedReason)) {
       showToast({ message: 'Por favor, selecione um motivo para o insucesso.', type: 'error' });
       return;
     }
@@ -359,7 +364,7 @@ export default function FalhaScreen() {
               <Button
                 title={isRegisteringOccurrence || isSubmitting ? 'Registrando...' : 'Registrar insucesso'}
                 onPress={handleSubmit}
-                disabled={isRegisteringOccurrence || isSubmitting || !selectedReason}
+                disabled={isRegisteringOccurrence || isSubmitting || !selectedReason || !options.some((o) => o.id === selectedReason)}
                 width={measure.x330}
               />
             </Box>
