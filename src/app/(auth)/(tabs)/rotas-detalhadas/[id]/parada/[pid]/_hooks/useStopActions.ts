@@ -3,11 +3,9 @@ import { useCallback, useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 
-import { FailureReason } from '@/domain/agility/service/dto';
 import { ServiceStatus } from '@/domain/agility/service/dto/types';
 import {
     useCompleteService,
-    useFailService,
     useStartService,
     useStartAttendance,
 } from '@/domain/agility/service/useCase';
@@ -34,7 +32,6 @@ interface UseStopActionsReturn {
     isStarting: boolean;
     isStartingAttendance: boolean;
     isCompleting: boolean;
-    isFailing: boolean;
 }
 
 /**
@@ -142,18 +139,6 @@ export const useStopActions = ({
         },
     });
 
-    const { failService, isLoading: isFailing } = useFailService({
-        onSuccess: async () => {
-            await invalidateQueries();
-            await queryClient.refetchQueries({ queryKey: [KEY_SERVICES, 'routing', routeId] });
-            setTimeout(() => router.back(), 500);
-        },
-        onError: (error) => {
-            console.error('Error marking service as failed:', error);
-            showToast({ message: 'Não foi possível marcar o serviço como insucesso. Tente novamente.', type: 'error' });
-        },
-    });
-
     const handleStartService = useCallback(() => {
         setPendingStart(true);
         startService(serviceId);
@@ -218,15 +203,14 @@ export const useStopActions = ({
         completeService({ id: serviceId });
     }, [completeService, serviceId]);
 
+    // Quick-fail agora roteia pro picker de motivos do catálogo (tela insucesso) em
+    // vez de disparar a mutation direto com FailureReason.OTHER hardcoded.
     const handleMarkAsFailed = useCallback(() => {
-        failService({
-            id: serviceId,
-            payload: {
-                reason: FailureReason.OTHER,
-                notes: `Failure registered for service ${serviceId}`,
-            },
+        router.push({
+            pathname: '/rotas-detalhadas/[id]/parada/[pid]/insucesso',
+            params: { id: routeId, pid: serviceId },
         });
-    }, [failService, serviceId]);
+    }, [router, routeId, serviceId]);
 
     return {
         handleStartService,
@@ -238,6 +222,5 @@ export const useStopActions = ({
         isStarting: isStarting || pendingStart,
         isStartingAttendance: isStartingAttendance || pendingAttendance,
         isCompleting,
-        isFailing,
     };
 };
