@@ -269,8 +269,10 @@ export default function StopDetailScreen() {
   const addressText = formatAddress(service?.address)
     ?? address?.formattedAddress
     ?? (service.addressId ? `Endereço ID: ${service.addressId}` : 'Endereço não disponível');
-  const startTime = formatHHmm(service.estimatedArrival);
-  const endTime = formatHHmm(service.estimatedCompletion);
+  // Fallback vazio (não '--:--') p/ não exibir horário quando não há ETA.
+  const startTime = formatHHmm(service.estimatedArrival, '');
+  const endTime = formatHHmm(service.estimatedCompletion, '');
+  const horarioLabel = startTime && endTime ? `${startTime} - ${endTime}` : (startTime || endTime || '');
   const serviceTypeLabel = getServiceTypeLabel();
 
   // Coordinates
@@ -422,7 +424,7 @@ export default function StopDetailScreen() {
         <Box flexDirection="row" justifyContent="center" gap="x12" mb="y12" px="x16">
           <Box backgroundColor="primary10" px="x12" py="y4" borderRadius="s20">
             <Text preset="text13" color="primary100">
-              {serviceTypeLabel} {startTime} - {endTime}
+              {serviceTypeLabel}{horarioLabel ? ` ${horarioLabel}` : ''}
             </Text>
           </Box>
         </Box>

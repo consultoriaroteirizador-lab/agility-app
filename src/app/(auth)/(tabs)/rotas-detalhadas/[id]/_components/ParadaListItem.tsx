@@ -136,6 +136,13 @@ export function ParadaListItem({
         ? `${formatHHmm(parada.promisedStartISO)}–${formatHHmm(parada.promisedEndISO)}`
         : null
 
+    // ⏰ ETA: só exibir quando há horário REAL. formatHHmm devolve '--:--' quando
+    // não há estimatedArrival/Completion — não queremos mostrar o relógio com o
+    // traço vazio (sem dado).
+    const HORA_PLACEHOLDER = '--:--'
+    const horaInicioValida = !!parada.horarioInicio && parada.horarioInicio !== HORA_PLACEHOLDER
+    const horaFimValida = !!parada.horarioFim && parada.horarioFim !== HORA_PLACEHOLDER
+
     const handlePress = () => {
         if (onPress) {
             onPress(parada)
@@ -341,17 +348,17 @@ export function ParadaListItem({
                     {parada.endereco}
                 </Text>
 
-                {(parada.horarioInicio || parada.horarioFim) && (
+                {(horaInicioValida || horaFimValida) && (
                     <Box flexDirection="row" alignItems="center" gap="x4" marginTop="y8">
                         <Text preset="text12" color={lateEta || lateWindow ? 'redError' : 'gray400'}>
-                            ⏰ {parada.horarioInicio}
+                            ⏰{horaInicioValida ? ` ${parada.horarioInicio}` : ''}
                         </Text>
-                        {parada.horarioInicio && parada.horarioFim && (
+                        {horaInicioValida && horaFimValida && (
                             <Text preset="text12" color="gray300">
                                 -
                             </Text>
                         )}
-                        {parada.horarioFim && (
+                        {horaFimValida && (
                             <Text preset="text12" color={lateEta || lateWindow ? 'redError' : 'gray400'}>
                                 {parada.horarioFim}
                             </Text>

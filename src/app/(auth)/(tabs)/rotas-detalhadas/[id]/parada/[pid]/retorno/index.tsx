@@ -306,7 +306,8 @@ export default function RetornoScreen() {
   // Endereço do retorno: do ponto de retorno (quando cadastrado); senão um
   // rótulo padrão. NUNCA mostra lat/long cru no cabeçalho.
   const address = returnPoint?.address || 'CD de origem';
-  const eta = formatHHmm(service?.estimatedArrival);
+  // Fallback vazio (não '--:--') p/ o guard `eta ?` esconder quando não há ETA.
+  const eta = formatHHmm(service?.estimatedArrival, '');
 
   if (isLoading) {
     return (
