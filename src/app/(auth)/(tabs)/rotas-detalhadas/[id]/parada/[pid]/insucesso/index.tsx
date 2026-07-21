@@ -42,7 +42,7 @@ export default function FalhaScreen() {
   } = useInsucessoDraft(serviceId);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const { reasons, isError: isReasonsError } = useFindOccurrenceReasons();
+  const { reasons, isLoading: isLoadingReasons, isError: isReasonsError } = useFindOccurrenceReasons();
   const [mirror, setMirror] = useState<OrderOccurrenceReasonResponse[]>([]);
   useEffect(() => {
     if (reasons.length === 0 && isReasonsError) {
@@ -50,6 +50,15 @@ export default function FalhaScreen() {
     }
   }, [reasons.length, isReasonsError]);
   const options = reasons.length > 0 ? reasons : mirror;
+
+  // Limpa motivo restaurado do rascunho que não existe mais no catálogo atual
+  // (enum antigo pré-deploy ou motivo desativado no servidor). Só roda depois
+  // que o catálogo carregou, senão apagaríamos uma seleção válida ainda não hidratada.
+  useEffect(() => {
+    if (options.length > 0 && selectedReason && !options.some(o => o.id === selectedReason)) {
+      setSelectedReason(null);
+    }
+  }, [options, selectedReason, setSelectedReason]);
 
   const { registerOccurrence, isLoading: isRegisteringOccurrence } = useRegisterOccurrence({
     onSuccess: async (resp) => {
@@ -191,7 +200,11 @@ export default function FalhaScreen() {
               <Text preset="text16" fontWeightPreset='semibold' color="colorTextPrimary" mb="y12">
                 Motivo do insucesso *
               </Text>
-              {options.length === 0 ? (
+              {isLoadingReasons && options.length === 0 ? (
+                <Box py="y16" alignItems="center">
+                  <ActivityIndicator />
+                </Box>
+              ) : options.length === 0 ? (
                 <Text preset="text14" color="gray400">
                   Não foi possível carregar os motivos — conecte-se uma vez ou peça para configurar na plataforma.
                 </Text>
