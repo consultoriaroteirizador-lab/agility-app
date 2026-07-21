@@ -14,6 +14,8 @@ import type {
     ServiceDraftData,
     SaveServiceDraftResponse,
     GetServiceDraftResponse,
+    ApplyOccurrenceRequest,
+    OccurrenceOutcome,
 } from './dto'
 import type {
     ServiceMaterialResponse,
@@ -98,6 +100,13 @@ async function fail(
     return serviceAPI.fail(id, payload)
 }
 
+async function applyOccurrence(
+    id: Id,
+    payload: ApplyOccurrenceRequest,
+): Promise<BaseResponse<ServiceResponse & { occurrenceOutcome: OccurrenceOutcome }>> {
+    return serviceAPI.applyOccurrence(id, payload)
+}
+
 async function changeStatus(
     id: Id,
     payload: ChangeServiceStatusRequest,
@@ -163,6 +172,7 @@ export const serviceService = {
     complete,
     completeWithDetails,
     fail,
+    applyOccurrence,
     changeStatus,
     remove,
     removeBatch,

@@ -16,6 +16,8 @@ import type {
     SaveServiceDraftRequest,
     SaveServiceDraftResponse,
     GetServiceDraftResponse,
+    ApplyOccurrenceRequest,
+    OccurrenceOutcome,
 } from './dto'
 import type {
     ServiceMaterialResponse,
@@ -134,6 +136,30 @@ async function fail(id: Id, payload: ServiceFailRequest): Promise<BaseResponse<S
     return data
 }
 
+async function applyOccurrence(
+    id: Id,
+    payload: ApplyOccurrenceRequest,
+): Promise<BaseResponse<ServiceResponse & { occurrenceOutcome: OccurrenceOutcome }>> {
+    // Remover campos undefined do payload
+    const cleanPayload = Object.entries(payload).reduce((acc, [key, value]) => {
+        if (value !== undefined && value !== null) {
+            acc[key] = value;
+        }
+        return acc;
+    }, {} as Record<string, any>);
+
+    const { data } = await apiAgility.post<BaseResponse<ServiceResponse & { occurrenceOutcome: OccurrenceOutcome }>>(
+        `/services/${id}/occurrence`,
+        cleanPayload,
+        {
+            headers: {
+                'Content-Type': 'application/json',
+            },
+        }
+    )
+    return data
+}
+
 async function changeStatus(
     id: Id,
     payload: ChangeServiceStatusRequest,
@@ -236,6 +262,7 @@ export const serviceAPI = {
     complete,
     completeWithDetails,
     fail,
+    applyOccurrence,
     changeStatus,
     remove,
     removeBatch,
