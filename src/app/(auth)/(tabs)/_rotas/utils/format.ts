@@ -1,6 +1,8 @@
 import { format, formatDistanceToNowStrict, isToday, isTomorrow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
+import { parseCalendarDay } from '@/functions/dateFunctions';
+
 type DateInput = Date | string | null | undefined;
 
 function toDate(value: DateInput): Date | null {
@@ -14,24 +16,28 @@ function capitalize(text: string): string {
 }
 
 /**
- * Data da rota em formato relativo + hora:
- *  - Hoje    → "Hoje, 14:30"
- *  - Amanhã  → "Amanhã, 08:00"
- *  - Outros  → "Sex, 22/07 · 09:00"
+ * Data da rota (dia-calendário) em formato relativo, SEM hora:
+ *  - Hoje    → "Hoje"
+ *  - Amanhã  → "Amanhã"
+ *  - Outros  → "Sex, 22/07"
+ *
+ * `route.date` é date-only (o backend grava meia-noite UTC); não há hora real a
+ * mostrar — a hora antiga ("· 09:00") era a meia-noite-UTC vista no fuso do
+ * device. Usa [parseCalendarDay] pra derivar o dia sem deslocar o fuso (senão o
+ * dia e a classificação Hoje/Amanhã voltavam 1 dia em UTC-3). Horas reais (início
+ * da rota) vêm de `startedAt` via [formatRelativeSince].
  */
 export function formatRouteDate(value: DateInput): string | null {
-    const date = toDate(value);
+    const date = parseCalendarDay(value);
     if (!date) return null;
 
-    const time = format(date, 'HH:mm');
-
-    if (isToday(date)) return `Hoje, ${time}`;
-    if (isTomorrow(date)) return `Amanhã, ${time}`;
+    if (isToday(date)) return 'Hoje';
+    if (isTomorrow(date)) return 'Amanhã';
 
     // No ptBR do date-fns, a forma curta de 3 letras é 'EEEEEE' ("qua", "sex");
     // 'EEE' devolve o nome cheio ("quarta").
     const weekday = capitalize(format(date, 'EEEEEE', { locale: ptBR }));
-    return `${weekday}, ${format(date, 'dd/MM')} · ${time}`;
+    return `${weekday}, ${format(date, 'dd/MM')}`;
 }
 
 /** Tempo decorrido desde um instante: "há 25 min". null quando a data é inválida. */
