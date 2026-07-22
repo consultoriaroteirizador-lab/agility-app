@@ -42,11 +42,11 @@ export default function FalhaScreen() {
   } = useInsucessoDraft(serviceId);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const { reasons, isLoading: isLoadingReasons, isError: isReasonsError } = useFindOccurrenceReasons();
+  const { reasons, isLoading: isLoadingReasons, isError: isReasonsError } = useFindOccurrenceReasons('LAST_MILE');
   const [mirror, setMirror] = useState<OrderOccurrenceReasonResponse[]>([]);
   useEffect(() => {
     if (reasons.length === 0 && isReasonsError) {
-      loadOccurrenceReasonsMirror().then(m => setMirror(m ?? []));
+      loadOccurrenceReasonsMirror('LAST_MILE').then(m => setMirror(m ?? []));
     }
   }, [reasons.length, isReasonsError]);
   const options = reasons.length > 0 ? reasons : mirror;

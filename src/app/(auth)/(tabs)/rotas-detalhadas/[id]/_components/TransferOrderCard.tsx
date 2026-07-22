@@ -10,7 +10,8 @@ import type { Parada } from '../_types/rota.types';
 /** Outcome de conferência de um pedido do lote (marcado pelo motorista na Tela 2). */
 export type TransferOrderOutcome = {
     outcome: 'RECEIVED' | 'NOT_RECEIVED';
-    reason?: string;
+    occurrenceReasonId?: string;
+    reasonName?: string;
     notes?: string;
 };
 
@@ -57,7 +58,7 @@ export function TransferOrderCard({
                         <Box flexDirection="row" alignItems="center" justifyContent="space-between" gap="x8">
                             <Box flex={1}>
                                 <Text preset="text12" fontWeightPreset="semibold" color="redError">
-                                    Não recebido{outcome?.reason ? ` — ${outcome.reason}` : ''}
+                                    Não recebido{outcome?.reasonName ? ` — ${outcome.reasonName}` : ''}
                                 </Text>
                             </Box>
                             <TouchableOpacityBox onPress={onMarkReceived}>

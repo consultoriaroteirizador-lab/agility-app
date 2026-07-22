@@ -41,10 +41,21 @@ export function useFindServicesByRoutingId(
         // ter os motivos disponíveis offline na hora da entrega. Best-effort: falha aqui
         // não pode quebrar o carregamento da rota — em caso de erro (ex. offline), o
         // fluxo de insucesso cai pro mirror já salvo (se houver).
-        void orderOccurrenceReasonService.findAllActive()
+        void orderOccurrenceReasonService.findAllActive('LAST_MILE')
             .then(res => {
                 const list = res.result ?? []
-                if (list.length) void saveOccurrenceReasonsMirror(list)
+                if (list.length) void saveOccurrenceReasonsMirror(list, 'LAST_MILE')
+            })
+            .catch(() => { /* offline: usa o mirror existente */ })
+
+        // Warm do catálogo de motivos TRANSFER (conferência do CD na malha).
+        // Não dá pra distinguir barato aqui se a rota tem trecho de transferência,
+        // então warma sempre — best-effort e barato (mesmo padrão acima); em rotas
+        // sem malha o mirror TRANSFER só fica sem uso.
+        void orderOccurrenceReasonService.findAllActive('TRANSFER')
+            .then(res => {
+                const list = res.result ?? []
+                if (list.length) void saveOccurrenceReasonsMirror(list, 'TRANSFER')
             })
             .catch(() => { /* offline: usa o mirror existente */ })
     }, [routingId, services])
