@@ -82,7 +82,6 @@ export default function StopDetailScreen() {
     isStarting,
     isStartingAttendance,
     isCompleting,
-    isFailing,
   } = useStopActions({
     serviceId,
     routeId,

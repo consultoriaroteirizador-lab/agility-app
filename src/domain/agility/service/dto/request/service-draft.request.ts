@@ -1,7 +1,5 @@
 import { PaymentMethodType } from '../types'
 
-import { FailureReason } from './service-fail.request'
-
 /**
  * Recipient block captured during the delivery flow.
  */
@@ -35,7 +33,7 @@ export interface ServiceDraftData {
     etapa?: number
     checklist?: ServiceDraftChecklist
     formAnswers?: Record<string, string | string[]>
-    failureReason?: FailureReason
+    failureReason?: string
     failureNotes?: string
     failurePhotos?: string[]
 

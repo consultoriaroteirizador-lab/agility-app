@@ -14,6 +14,7 @@ export type { ServiceScheduleRequest } from './request/service-schedule.request'
 export type { ServiceMaterialRequest } from './request/service-material.request'
 export type { ServiceFailRequest } from './request/service-fail.request'
 export { FailureReason } from './request/service-fail.request'
+export type { OccurrenceOutcome, ApplyOccurrenceRequest } from './request/apply-occurrence.request'
 export type {
     CreateServicesBatchRequest,
     BatchServiceItemRequest,

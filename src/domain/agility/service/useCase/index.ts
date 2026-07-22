@@ -12,6 +12,7 @@ export { useStartAttendance } from './useStartAttendance'
 export { useCompleteService } from './useCompleteService'
 export { useCompleteServiceWithDetails } from './useCompleteServiceWithDetails'
 export { useFailService } from './useFailService'
+export { useRegisterOccurrence } from './useRegisterOccurrence'
 export { useChangeServiceStatus } from './useChangeServiceStatus'
 export { useRemoveService } from './useRemoveService'
 // Materials
