@@ -28,7 +28,7 @@ describe('occurrenceReasonsStorage', () => {
 
         await saveOccurrenceReasonsMirror(REASONS)
 
-        expect(mockedStorage.setItem).toHaveBeenCalledWith('occurrence-reasons:cache', REASONS)
+        expect(mockedStorage.setItem).toHaveBeenCalledWith('occurrence-reasons:cache:all', REASONS)
     })
 
     it('round-trips save -> load returning the same list', async () => {
@@ -64,5 +64,46 @@ describe('occurrenceReasonsStorage', () => {
         const loaded = await loadOccurrenceReasonsMirror()
 
         expect(loaded).toBeNull()
+    })
+
+    it('saves the mirror under a context-scoped key', async () => {
+        mockedStorage.setItem.mockResolvedValueOnce(undefined)
+
+        await saveOccurrenceReasonsMirror(REASONS, 'TRANSFER')
+
+        expect(mockedStorage.setItem).toHaveBeenCalledWith('occurrence-reasons:cache:TRANSFER', REASONS)
+    })
+
+    it('round-trips save -> load for a given context', async () => {
+        const store = new Map<string, unknown>()
+        mockedStorage.setItem.mockImplementation(async (key: string, value: unknown) => {
+            store.set(key, value)
+        })
+        mockedStorage.getItem.mockImplementation(async (key: string) => (store.get(key) as OrderOccurrenceReasonResponse[] | undefined) ?? null)
+
+        await saveOccurrenceReasonsMirror(REASONS, 'TRANSFER')
+        const loaded = await loadOccurrenceReasonsMirror('TRANSFER')
+
+        expect(loaded).toEqual(REASONS)
+    })
+
+    it('different contexts do not collide with each other or with the default key', async () => {
+        const store = new Map<string, unknown>()
+        mockedStorage.setItem.mockImplementation(async (key: string, value: unknown) => {
+            store.set(key, value)
+        })
+        mockedStorage.getItem.mockImplementation(async (key: string) => (store.get(key) as OrderOccurrenceReasonResponse[] | undefined) ?? null)
+
+        const TRANSFER_REASONS = [REASONS[0]]
+        const LAST_MILE_REASONS = [REASONS[1]]
+
+        await saveOccurrenceReasonsMirror(REASONS) // no context -> ...:all
+        await saveOccurrenceReasonsMirror(TRANSFER_REASONS, 'TRANSFER')
+        await saveOccurrenceReasonsMirror(LAST_MILE_REASONS, 'LAST_MILE')
+
+        expect(await loadOccurrenceReasonsMirror()).toEqual(REASONS)
+        expect(await loadOccurrenceReasonsMirror('TRANSFER')).toEqual(TRANSFER_REASONS)
+        expect(await loadOccurrenceReasonsMirror('LAST_MILE')).toEqual(LAST_MILE_REASONS)
+        expect(store.size).toBe(3)
     })
 })

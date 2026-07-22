@@ -6,13 +6,13 @@ import { saveOccurrenceReasonsMirror } from '@/services/storage/occurrenceReason
 import type { OrderOccurrenceReasonResponse } from '../dto'
 import { orderOccurrenceReasonService } from '../orderOccurrenceReasonService'
 
-export function useFindOccurrenceReasons() {
+export function useFindOccurrenceReasons(context?: 'TRANSFER' | 'LAST_MILE' | 'SERVICE') {
   const { data, isLoading, isError } = useQuery({
-    queryKey: [KEY_OCCURRENCE_REASONS],
+    queryKey: [KEY_OCCURRENCE_REASONS, context ?? 'all'],
     queryFn: async () => {
-      const res = await orderOccurrenceReasonService.findAllActive()
+      const res = await orderOccurrenceReasonService.findAllActive(context)
       const list = res.result ?? []
-      if (list.length > 0) void saveOccurrenceReasonsMirror(list) // warm mirror on success
+      if (list.length > 0) void saveOccurrenceReasonsMirror(list, context) // warm mirror on success
       return list
     },
     staleTime: 1000 * 60 * 30, // catálogo é estável
