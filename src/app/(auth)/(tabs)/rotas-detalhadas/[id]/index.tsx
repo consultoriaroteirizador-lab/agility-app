@@ -186,6 +186,9 @@ interface ConcluidasListProps {
   setAba: (aba: RotaTabType) => void
   paradasSucesso: Parada[]
   insucessoRows: InsucessoRow[]
+  // paradas de insucesso AO VIVO (ainda na rota, ex. FAILED) — usadas p/ restaurar
+  // a navegação (tap → parada em leitura) só das linhas que têm parada ao vivo.
+  paradasInsucessoLive: Parada[]
   onPressParada: (parada: Parada) => void
 }
 
@@ -194,8 +197,13 @@ function ConcluidasList({
   setAba,
   paradasSucesso,
   insucessoRows,
+  paradasInsucessoLive,
   onPressParada,
 }: ConcluidasListProps) {
+  const liveInsucessoById = useMemo(
+    () => new Map(paradasInsucessoLive.map((p) => [p.serviceId, p])),
+    [paradasInsucessoLive],
+  )
   const sections = useMemo(
     () => [
       {
@@ -223,9 +231,16 @@ function ConcluidasList({
           />
         )
       }
-      return <InsucessoRowItem row={item} />
+      // Linha só-ledger (cancelado/devolvido) não tem parada ao vivo → sem navegação.
+      const live = liveInsucessoById.get(item.serviceId)
+      return (
+        <InsucessoRowItem
+          row={item}
+          onPress={live ? () => onPressParada(live) : undefined}
+        />
+      )
     },
-    [onPressParada],
+    [onPressParada, liveInsucessoById],
   )
 
   const renderSectionHeader = useCallback(
@@ -348,6 +363,7 @@ function RotaDetalhadaContent() {
     proximaParada,
     outrasParadas,
     paradasConcluidasSucesso,
+    paradasConcluidasInsucesso,
     insucessoRows,
     nenhumAndamento,
     isCompleting,
@@ -424,6 +440,7 @@ function RotaDetalhadaContent() {
           setAba={setAba}
           paradasSucesso={paradasConcluidasSucesso}
           insucessoRows={insucessoRows}
+          paradasInsucessoLive={paradasConcluidasInsucesso}
           onPressParada={navegarParaParada}
         />
       )}

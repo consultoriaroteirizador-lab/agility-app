@@ -1,14 +1,17 @@
 /**
- * InsucessoRowItem - Linha (read-only) do "Concluídas com insucesso" da rota.
+ * InsucessoRowItem - Linha do "Concluídas com insucesso" da rota.
  *
  * Renderiza uma linha unificada do ledger de não-entregues: pedidos que ficaram
  * na rota (insucesso) e pedidos que saíram dela (cancelados / devolvidos à fila).
  * Exibe o DESFECHO (outcome) + o MOTIVO (reasonName) — antes o motivo não era
- * mostrado nesta tela. É read-only: itens cancelados/devolvidos já não pertencem
- * à rota, então não há navegação para a parada.
+ * mostrado nesta tela.
+ *
+ * Navegação: linhas com `onPress` (as que ainda têm uma parada ao vivo na rota —
+ * ex. FAILED) abrem a parada em modo leitura, como antes. Itens só-ledger
+ * (cancelados/devolvidos) já não pertencem à rota → sem `onPress` (read-only).
  */
 
-import { Box, Text } from '@/components'
+import { Box, Text, TouchableOpacityBox } from '@/components'
 import { formatDatePtBr, formatHHmm } from '@/functions/dateFunctions'
 import { measure } from '@/theme'
 
@@ -17,6 +20,8 @@ import { outcomeLabel } from '../_utils'
 
 export interface InsucessoRowItemProps {
     row: InsucessoRow
+    /** Quando presente, a linha é tocável e abre a parada ao vivo (leitura). */
+    onPress?: () => void
 }
 
 function formatOccurredAt(occurredAt: string | null): string | null {
@@ -29,13 +34,18 @@ function formatOccurredAt(occurredAt: string | null): string | null {
     return `${dia} ${hora}`
 }
 
-export function InsucessoRowItem({ row }: InsucessoRowItemProps) {
+export function InsucessoRowItem({ row, onPress }: InsucessoRowItemProps) {
     const label = outcomeLabel(row.outcome)
     const quando = formatOccurredAt(row.occurredAt)
     const titulo = row.recipientName ?? row.code ?? 'Pedido'
 
+    // Box quando read-only, TouchableOpacityBox quando navegável. O cast alinha os
+    // tipos (Box não declara onPress; em runtime um onPress undefined é ignorado).
+    const Container = (onPress ? TouchableOpacityBox : Box) as typeof TouchableOpacityBox
+
     return (
-        <Box
+        <Container
+            onPress={onPress}
             backgroundColor="white"
             borderRadius="s12"
             paddingVertical="y16"
@@ -103,6 +113,6 @@ export function InsucessoRowItem({ row }: InsucessoRowItemProps) {
                     🕓 {quando}
                 </Text>
             )}
-        </Box>
+        </Container>
     )
 }
