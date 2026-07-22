@@ -15,8 +15,12 @@ describe('occurrenceOutcomeMessage', () => {
         expect(occurrenceOutcomeMessage('FAILED_LIMIT')).toBe('Limite de tentativas atingido — registrado como insucesso.')
     })
 
+    it('returns the failure message for FAILED', () => {
+        expect(occurrenceOutcomeMessage('FAILED')).toBe('Pedido registrado como insucesso.')
+    })
+
     it('covers every OccurrenceOutcome member exhaustively', () => {
-        const outcomes: OccurrenceOutcome[] = ['CANCELED', 'PENDING', 'FAILED_LIMIT']
+        const outcomes: OccurrenceOutcome[] = ['CANCELED', 'PENDING', 'FAILED_LIMIT', 'FAILED']
         outcomes.forEach(outcome => {
             expect(typeof occurrenceOutcomeMessage(outcome)).toBe('string')
         })

@@ -12,5 +12,7 @@ export function occurrenceOutcomeMessage(outcome: OccurrenceOutcome): string {
             return 'Será reenviado para nova tentativa.'
         case 'FAILED_LIMIT':
             return 'Limite de tentativas atingido — registrado como insucesso.'
+        case 'FAILED':
+            return 'Pedido registrado como insucesso.'
     }
 }
