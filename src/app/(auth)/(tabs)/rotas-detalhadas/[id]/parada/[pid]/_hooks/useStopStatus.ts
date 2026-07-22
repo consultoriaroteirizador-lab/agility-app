@@ -78,13 +78,19 @@ export const useStopStatus = ({
             .sort((a, b) => (a.sequenceOrder ?? Number.MAX_SAFE_INTEGER) - (b.sequenceOrder ?? Number.MAX_SAFE_INTEGER))[0];
         const isNextInOrder = !nextExpected || nextExpected.id === currentServiceId;
 
+        // "Uma por vez" IMPLICA "seguir ordem": sem isso, a combinação
+        // (uma-por-vez ON + ordem OFF) vira armadilha — o motorista inicia uma
+        // parada fora de ordem, trava as demais (uma por vez) e não tem como
+        // desfazer. Amarrar ordem ao single-active fecha essa brecha.
+        const orderEnforced = enforceStopOrder || enforceSingleActiveStop;
+
         // Regras configuráveis: monta o motivo do bloqueio (null = pode iniciar).
         let startBlockReason: string | null = null;
-        if (enforceSingleActiveStop && hasOtherServiceInProgress) {
-            startBlockReason = 'Conclua a parada em andamento antes de iniciar outra.';
-        } else if (enforceStopOrder && !isNextInOrder) {
+        if (orderEnforced && !isNextInOrder) {
             const pos = (nextExpected?.sequenceOrder ?? 0) + 1;
             startBlockReason = `Você deve seguir a ordem das paradas. Inicie a parada #${pos} primeiro.`;
+        } else if (enforceSingleActiveStop && hasOtherServiceInProgress) {
+            startBlockReason = 'Conclua a parada em andamento antes de iniciar outra.';
         }
 
         // Business rule: Cannot start if pending is false OR if a configurable rule blocks it.

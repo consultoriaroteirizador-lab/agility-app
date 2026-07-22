@@ -10,6 +10,7 @@ import { ButtonBack } from '@/components/Button/ButtonBack';
 import Modal from '@/components/Modal/Modal';
 import { formatAddress } from '@/domain/agility/address/dto/response/address.response';
 import { useFindOneAddress } from '@/domain/agility/address/useCase';
+import { useGetProfile } from '@/domain/agility/collaborator/useCase/useGetProfile';
 import { useCompleteRouting } from '@/domain/agility/routing/useCase';
 import { ServiceType } from '@/domain/agility/service/dto/types';
 import { useFindOneService, useFindServicesByRoutingId } from '@/domain/agility/service/useCase';
@@ -57,11 +58,19 @@ export default function StopDetailScreen() {
   // User location
   const { userLocation } = useUserLocation();
 
+  // Regras configuráveis da empresa (uma parada por vez / ordem obrigatória) —
+  // mesmas flags que o fluxo de entrega/coleta (ParadaContext) usa, pra o gating
+  // ser consistente também nesta tela genérica.
+  const { profile } = useGetProfile();
+  const companyFeatures = profile?.companyFeatures ?? null;
+
   // Calculate stop status
   const stopStatus = useStopStatus({
     service,
     allServices,
     currentServiceId: serviceId,
+    enforceSingleActiveStop: companyFeatures?.enforceSingleActiveStop === true,
+    enforceStopOrder: companyFeatures?.enforceStopOrder === true,
   });
 
   // Stop actions
@@ -260,8 +269,10 @@ export default function StopDetailScreen() {
   const addressText = formatAddress(service?.address)
     ?? address?.formattedAddress
     ?? (service.addressId ? `Endereço ID: ${service.addressId}` : 'Endereço não disponível');
-  const startTime = formatHHmm(service.estimatedArrival);
-  const endTime = formatHHmm(service.estimatedCompletion);
+  // Fallback vazio (não '--:--') p/ não exibir horário quando não há ETA.
+  const startTime = formatHHmm(service.estimatedArrival, '');
+  const endTime = formatHHmm(service.estimatedCompletion, '');
+  const horarioLabel = startTime && endTime ? `${startTime} - ${endTime}` : (startTime || endTime || '');
   const serviceTypeLabel = getServiceTypeLabel();
 
   // Coordinates
@@ -413,7 +424,7 @@ export default function StopDetailScreen() {
         <Box flexDirection="row" justifyContent="center" gap="x12" mb="y12" px="x16">
           <Box backgroundColor="primary10" px="x12" py="y4" borderRadius="s20">
             <Text preset="text13" color="primary100">
-              {serviceTypeLabel} {startTime} - {endTime}
+              {serviceTypeLabel}{horarioLabel ? ` ${horarioLabel}` : ''}
             </Text>
           </Box>
         </Box>

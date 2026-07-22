@@ -151,8 +151,18 @@ export function LocationTrackingProvider({ children }: { children: React.ReactNo
   // [4] Refresh de token → setConfig leve nos headers HTTP do SDK. Sem
   // reinit, sem stop/start — o SDK continua emitindo localizações com o
   // token novo a partir do próximo batch.
+  //
+  // GATE em `sdkReady` (STATE), não em `isInitialized` (ref). O init é assíncrono
+  // e um ref não re-dispara effect: se um refresh de token acontecesse durante o
+  // init (ex.: refresh no boot de sessão restaurada), o effect via
+  // isInitialized.current===false, fazia no-op e NUNCA mais rodava (a dep do
+  // token não mudava depois) — o SDK ficava preso ao token do init. Com token +
+  // refresh token defasados pela rotação do Keycloak, o auto-refresh nativo do
+  // SDK falhava ("Refresh token inválido") e as requisições tomavam 401. Gatilhar
+  // por sdkReady garante que, no instante em que o SDK fica pronto, o token ATUAL
+  // é empurrado — cobrindo qualquer refresh ocorrido durante o init.
   useEffect(() => {
-    if (!isInitialized.current) return;
+    if (!sdkReady) return;
     if (!authCredentials?.accessToken || !authCredentials?.tenantId) return;
     updateBackgroundGeolocationAuth({
       accessToken: authCredentials.accessToken,
@@ -164,7 +174,7 @@ export function LocationTrackingProvider({ children }: { children: React.ReactNo
     }).catch(err => {
       console.error('[LocationTrackingProvider] Erro ao atualizar auth do SDK:', err);
     });
-  }, [authCredentials?.accessToken, authCredentials?.tenantId, authCredentials?.refreshToken, authCredentials?.expiration]);
+  }, [sdkReady, authCredentials?.accessToken, authCredentials?.tenantId, authCredentials?.refreshToken, authCredentials?.expiration]);
 
   // [4.1] Write-back do refresh nativo do SDK. Quando o SDK renova o JWT em
   // background (onAuthorization), os tokens novos voltam pra cá e gravamos no
