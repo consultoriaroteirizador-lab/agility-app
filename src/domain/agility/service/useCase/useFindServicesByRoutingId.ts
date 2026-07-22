@@ -47,6 +47,17 @@ export function useFindServicesByRoutingId(
                 if (list.length) void saveOccurrenceReasonsMirror(list)
             })
             .catch(() => { /* offline: usa o mirror existente */ })
+
+        // Warm do catálogo de motivos TRANSFER (conferência do CD na malha).
+        // Não dá pra distinguir barato aqui se a rota tem trecho de transferência,
+        // então warma sempre — best-effort e barato (mesmo padrão acima); em rotas
+        // sem malha o mirror TRANSFER só fica sem uso.
+        void orderOccurrenceReasonService.findAllActive('TRANSFER')
+            .then(res => {
+                const list = res.result ?? []
+                if (list.length) void saveOccurrenceReasonsMirror(list, 'TRANSFER')
+            })
+            .catch(() => { /* offline: usa o mirror existente */ })
     }, [routingId, services])
 
     return {
