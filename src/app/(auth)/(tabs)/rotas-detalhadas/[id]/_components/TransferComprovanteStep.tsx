@@ -119,6 +119,20 @@ export function TransferComprovanteStep({ routingId, onBack, onDone }: { routing
 
     async function onConfirm() {
         if (!canSubmit || submitting) return;
+
+        // Guarda de submit: `outcomes` acumula durante uma conferência longa no
+        // CD; se o motivo foi escolhido a partir do espelho offline e o
+        // catálogo mudou depois (refetch ao reconectar), o id salvo pode não
+        // existir mais nas opções atuais. Bloqueia o POST de um
+        // occurrenceReasonId obsoleto antes de subir foto/assinatura.
+        const invalidReasons = Object.values(outcomes).some(
+            (o) => o.outcome === 'NOT_RECEIVED' && !options.some((r) => r.id === o.occurrenceReasonId),
+        );
+        if (invalidReasons) {
+            showToast({ message: 'Revise os motivos dos pedidos não recebidos — recarregue os motivos e selecione novamente.', type: 'error' });
+            return;
+        }
+
         setSubmitting(true);
 
         const [photoUrls, signatureUrl] = await Promise.all([
