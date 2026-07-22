@@ -66,7 +66,7 @@ export default function FalhaScreen() {
       if (outcome) {
         showToast({
           message: occurrenceOutcomeMessage(outcome),
-          type: outcome === 'FAILED_LIMIT' ? 'error' : 'success',
+          type: ['FAILED_LIMIT', 'FAILED'].includes(outcome) ? 'error' : 'success',
         });
       }
 
