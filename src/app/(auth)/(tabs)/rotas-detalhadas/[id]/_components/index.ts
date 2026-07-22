@@ -33,6 +33,9 @@ export type {
     EmptyParadasListProps,
 } from './ParadaListItem'
 
+export { InsucessoRowItem } from './InsucessoRowItem'
+export type { InsucessoRowItemProps } from './InsucessoRowItem'
+
 // ============================================
 // COMPONENTES DE AÇÕES
 // ============================================
