@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 import { Linking } from 'react-native';
 
-import { router } from 'expo-router';
+import { router, usePathname } from 'expo-router';
 
 import { Box, Button, LocalIcon, ScreenBase, Text, TouchableOpacityBox } from '@/components';
 import { ButtonBack } from '@/components/Button/ButtonBack';
@@ -16,6 +16,7 @@ import { MaterialsModal } from '../shared/MaterialsModal';
 export function ServiceEtapaConfirmacao() {
     const { service, effectiveAddress, setEtapa, setDelivered, isServiceStarted, rotaId } = useParada();
     const [showMaterialModal, setShowMaterialModal] = useState(false);
+    const pathname = usePathname();
 
     const customerName = service?.fantasyName || service?.responsible || 'Cliente';
 
@@ -110,7 +111,10 @@ export function ServiceEtapaConfirmacao() {
                                         borderWidth={1}
                                         borderColor="primary20"
                                         onPress={() => {
-                                            router.push('/(auth)/(tabs)/menu/suporte');
+                                            router.push({
+                                                pathname: '/(auth)/(tabs)/menu/suporte',
+                                                params: { returnTo: pathname },
+                                            });
                                         }}
                                     >
                                         <Icon name="chat" size={measure.m20} color="white" />

@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 import { Linking } from 'react-native';
 
-import { router } from 'expo-router';
+import { router, usePathname } from 'expo-router';
 
 import { Box, Button, LocalIcon, ScreenBase, Text, TouchableOpacityBox } from '@/components';
 import { ButtonBack } from '@/components/Button/ButtonBack';
@@ -18,6 +18,7 @@ import { Map } from '../shared/Map';
  */
 export function ColetaEtapaConfirmacao() {
     const { service, effectiveAddress, setEtapa, setDelivered, isServiceStarted, rotaId } = useParada();
+    const pathname = usePathname();
 
     const nomeCliente = service?.fantasyName || service?.responsible || 'Cliente';
 
@@ -118,7 +119,10 @@ export function ColetaEtapaConfirmacao() {
                                         borderWidth={1}
                                         borderColor="primary20"
                                         onPress={() => {
-                                            router.push('/(auth)/(tabs)/menu/suporte');
+                                            router.push({
+                                                pathname: '/(auth)/(tabs)/menu/suporte',
+                                                params: { returnTo: pathname },
+                                            });
                                         }}
                                     >
                                         <Icon name="chat" size={measure.m20} color="white" />

@@ -64,14 +64,16 @@ export function useInsucessoDraft(serviceId: string | undefined) {
                 if (chosen.failureReason) setSelectedReasonState(chosen.failureReason)
                 if (chosen.failureNotes !== undefined) setNotesState(chosen.failureNotes)
                 if (chosen.failurePhotos && chosen.failurePhotos.length > 0) {
-                    const restored: InsucessoPhoto[] = chosen.failurePhotos.map(url => ({
-                        uri: url,
+                    // `uri` = presigned (carrega no <Image>); `__s3Url` = chave (submissão).
+                    const signed = chosen.failurePhotosSigned
+                    const restored: InsucessoPhoto[] = chosen.failurePhotos.map((key, i) => ({
+                        uri: signed?.[i] ?? key,
                         width: 0,
                         height: 0,
                         type: 'image',
-                        __s3Url: url,
+                        __s3Url: key,
                         __uploadStatus: 'uploaded',
-                        __localUri: url,
+                        __localUri: signed?.[i] ?? key,
                     } as unknown as InsucessoPhoto))
                     setPhotosState(restored)
                 }
@@ -120,8 +122,11 @@ export function useInsucessoDraft(serviceId: string | undefined) {
                     prev.map(p => {
                         const localKey = p.__localUri ?? p.uri
                         if (localKey !== asset.uri) return p
+                        // NÃO trocar `uri` pela key do S3 (não é carregável pelo <Image>,
+                        // miniatura em branco). Mantém o `uri` LOCAL pro preview e guarda
+                        // a key em `__s3Url` — submissão e filtro de pendentes usam `__s3Url`.
                         return s3Url
-                            ? ({ ...p, uri: s3Url, __s3Url: s3Url, __uploadStatus: 'uploaded', __localUri: localKey } as InsucessoPhoto)
+                            ? ({ ...p, __s3Url: s3Url, __uploadStatus: 'uploaded', __localUri: localKey } as InsucessoPhoto)
                             : ({ ...p, __uploadStatus: 'failed', __localUri: localKey } as InsucessoPhoto)
                     }),
                 )

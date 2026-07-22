@@ -98,6 +98,11 @@ export interface RoutingResponse {
     /** Has return */
     hasReturn: boolean
 
+    /** Id do Service RETURN materializado no handoff (trecho de malha em retorno).
+     *  Presente ⇒ o handoff já ocorreu e o motorista deve seguir pro check-in de
+     *  retorno em vez de repetir a entrega da transferência. */
+    returnServiceId?: string | null
+
     /** Return point */
     returnPoint: ReturnPoint
 
@@ -136,6 +141,26 @@ export interface RoutingResponse {
 
     /** Has vehicle */
     hasVehicle: boolean
+
+    /** Cross-docking: papel do trecho na malha. null/undefined em rota comum. */
+    legType?: 'TRANSFER' | 'LAST_MILE' | null
+    /** Cross-docking: rota-mãe da malha. */
+    parentRoutingId?: string | null
+    /** Cross-docking: próximo trecho na cadeia (last-mile ou próximo CD). */
+    nextLegRoutingId?: string | null
+    /** Cross-docking: nome do CD de origem do trecho (faixa de hops). */
+    originFacilityName?: string | null
+    /** Cross-docking: nome do CD de destino do trecho. */
+    destinationFacilityName?: string | null
+
+    /** Cross-docking: nº de pedidos do lote sendo transportados neste trecho de
+     *  TRANSFERÊNCIA. Diferente de `totalServices` (que é 0 num transfer, pois o
+     *  trecho não tem paradas de entrega). O backend precisa incluir este contador
+     *  no payload leve de GET /routings para os trechos com legType === 'TRANSFER'.
+     *  Ausente/null em rota comum e enquanto o backend não o expuser. */
+    transferOrdersCount?: number | null
+    /** Cross-docking: id do CD de destino do trecho (resolve coords via distribution-centers). */
+    destinationFacilityId?: string | null
 
     /** Creation timestamp */
     createdAt: Date | string

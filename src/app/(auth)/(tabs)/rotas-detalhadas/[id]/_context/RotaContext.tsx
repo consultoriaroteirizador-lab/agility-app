@@ -29,6 +29,7 @@ import {
     useRouteDetails,
     useRouteActions,
     useParadaNavigation,
+    useRouteLiveSync,
 } from '../_hooks'
 import type {
     Parada,
@@ -259,6 +260,10 @@ export function RotaProvider({ children, routeId }: RotaProviderProps) {
         temMultiplasEmAndamento,
     } = useRouteDetails(routeId)
 
+    // Sincronização ao vivo: re-projeção de ETA por atraso / replan chegam via
+    // socket (/monitoring) e invalidam as queries — a tela reflete sem refresh.
+    useRouteLiveSync(routeId)
+
     // Hook de ações da rota (iniciar, concluir, navegar)
     const {
         startRoute: iniciarRotaBase,
@@ -293,11 +298,16 @@ export function RotaProvider({ children, routeId }: RotaProviderProps) {
     // é orientado a iniciar a rota (o CTA "Iniciar Rota" aparece via RouteActions).
     const navegarParaParada = useCallback(
         (parada: Parada) => {
-            // SÓ permite abrir a parada quando a rota está EM ANDAMENTO (IN_PROGRESS).
-            // Qualquer outro status não leva a fluxo nenhum:
-            //   - ASSIGNED/pré-start  → orienta a iniciar a rota (toast)
-            //   - finalizada (COMPLETED/CANCELLED) → não acontece nada
-            if (routing?.isInProgress !== true) {
+            // Permite abrir a parada quando a rota está EM ANDAMENTO (IN_PROGRESS)
+            // OU quando está FINALIZADA (COMPLETED/CANCELLED) — nesse caso o
+            // orquestrador da parada renderiza a tela read-only (EtapaConcluida).
+            //   - ASSIGNED/pré-start → orienta a iniciar a rota (toast)
+            //   - pendente/broadcasting → bloqueado sem feedback
+            const canNavigate =
+                routing?.isInProgress === true ||
+                routing?.isCompleted === true ||
+                routing?.isCancelled === true
+            if (!canNavigate) {
                 if (routing?.isAssigned === true) {
                     showToast({
                         message: 'Inicie a rota para acessar as paradas.',
@@ -308,7 +318,14 @@ export function RotaProvider({ children, routeId }: RotaProviderProps) {
             }
             navigateToStop(parada)
         },
-        [routing?.isInProgress, routing?.isAssigned, navigateToStop, showToast],
+        [
+            routing?.isInProgress,
+            routing?.isCompleted,
+            routing?.isCancelled,
+            routing?.isAssigned,
+            navigateToStop,
+            showToast,
+        ],
     )
 
     // Trava de iniciar rota: mesma regra da home — não pode iniciar uma segunda rota

@@ -9,12 +9,14 @@ interface MaterialsModalProps {
     isVisible: boolean;
     onClose: () => void;
     materials: ServiceMaterialResponse[];
+    /** Título do modal (default: "Materiais"). Use "Volumes" no contexto de carga. */
+    title?: string;
 }
 
-export function MaterialsModal({ isVisible, onClose, materials }: MaterialsModalProps) {
+export function MaterialsModal({ isVisible, onClose, materials, title = 'Materiais' }: MaterialsModalProps) {
     return (
         <Modal
-            title="Materiais"
+            title={title}
             isVisible={isVisible}
             onClose={onClose}
         >

@@ -17,6 +17,7 @@ export enum ServiceType {
     PICKUP = 'PICKUP',
     SERVICE = 'SERVICE',
     TRANSFER = 'TRANSFER', // Transferência (CD↔CD, loja↔loja) — cargo entre 2 pontos fixos
+    RETURN = 'RETURN', // Retorno: última parada no CD/origem (check-in + conferência das devoluções)
 }
 
 export enum PriorityLevel {

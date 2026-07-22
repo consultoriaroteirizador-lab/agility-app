@@ -207,7 +207,7 @@ export function SharedEtapaFinalizacao({ serviceType }: SharedEtapaFinalizacaoPr
                 backgroundColor={safeChecklist.documento ? 'primary10' : 'white'}
               >
                 <Box flexDirection="row" alignItems="center" gap="x4">
-                  <Text preset="text16" color="colorTextPrimary" fontWeightPreset={safeChecklist.documento ? 'bold' : 'regular'}>
+                  <Text ml='l6' preset="text16" color="colorTextPrimary" fontWeightPreset={safeChecklist.documento ? 'bold' : 'regular'}>
                     Documento preenchido
                   </Text>
                 </Box>
@@ -252,7 +252,7 @@ export function SharedEtapaFinalizacao({ serviceType }: SharedEtapaFinalizacaoPr
                 borderRadius="s12"
                 backgroundColor={safeChecklist.foto ? 'primary10' : 'white'}
               >
-                <Text preset="text16" color="colorTextPrimary" fontWeightPreset={safeChecklist.foto ? 'bold' : 'regular'}>
+                <Text ml='l6' preset="text16" color="colorTextPrimary" fontWeightPreset={safeChecklist.foto ? 'bold' : 'regular'}>
                   Foto tirada
                 </Text>
                 <Box flexDirection="row" gap="y12">
@@ -300,7 +300,7 @@ export function SharedEtapaFinalizacao({ serviceType }: SharedEtapaFinalizacaoPr
                 backgroundColor={safeChecklist.signature ? 'primary10' : 'white'}
               >
                 <Box flexDirection="row" alignItems="center" gap="x4">
-                  <Text preset="text16" color="colorTextPrimary" fontWeightPreset={safeChecklist.signature ? 'bold' : 'regular'}>
+                  <Text ml='l6' preset="text16" color="colorTextPrimary" fontWeightPreset={safeChecklist.signature ? 'bold' : 'regular'}>
                     Assinatura coletada
                   </Text>
                 </Box>

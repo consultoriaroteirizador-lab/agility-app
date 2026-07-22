@@ -24,6 +24,14 @@ export interface ServicePointResponse {
 
     /** Service status */
     status?: string | null
+
+    /**
+     * Fase de custódia (cross-docking): AT_ORIGIN | IN_TRANSIT | AT_HUB |
+     * OUT_FOR_DELIVERY | DELIVERED | EXCEPTION. Pós-handoff, um pedido entregue no
+     * CD fica AT_HUB+ com status ainda PENDING (segue no last-mile) — o gate do
+     * retorno usa isto pra liberar o "Cheguei no retorno".
+     */
+    custodyPhase?: string | null
 }
 
 /**

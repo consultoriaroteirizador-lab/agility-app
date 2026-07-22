@@ -9,12 +9,19 @@ import { clearStaleParadaDrafts } from '@/services/storage/paradaDraftStorage'
 
 import { serviceService } from '../serviceService'
 
-export function useFindServicesByRoutingId(routingId: string | undefined) {
+export function useFindServicesByRoutingId(
+    routingId: string | undefined,
+    options?: { refetchIntervalMs?: number },
+) {
     const { data, isLoading, isError, refetch, isRefetching } = useQuery({
         queryKey: [KEY_SERVICES, 'routing', routingId],
         queryFn: () => serviceService.findByRoutingId(routingId!),
         enabled: !!routingId,
         retry: false,
+        // Fallback de polling enquanto a rota está em execução — cobre eventual
+        // queda do socket /monitoring, garantindo que a re-projeção de ETA por
+        // atraso chegue à tela mesmo sem push.
+        refetchInterval: options?.refetchIntervalMs ?? false,
     })
 
     const services = data?.result ?? []

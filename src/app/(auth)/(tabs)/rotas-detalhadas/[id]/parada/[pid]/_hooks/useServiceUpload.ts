@@ -181,10 +181,15 @@ export function useServiceUpload() {
         }
     }, [photoAssets, serviceId, setUploadProgress, showToast, updatePhotoByLocalUri]);
 
-    // Upload de signature (idempotente). Aceita base64 OU URL — se já é URL, retorna como está.
+    // Upload de signature (idempotente). SÓ faz upload de base64 cru (`data:`).
+    // Qualquer outra coisa já é uma referência subida — URL http OU **key relativa**
+    // do S3 — e deve passar direto. Antes o guard era `isS3Url` (só http); como o
+    // /services/upload-photos retorna KEY relativa, a assinatura (já subida em
+    // background via saveAssinatura) caía no else e era re-enviada com a própria
+    // KEY no lugar do base64 → objeto corrompido no S3 → assinatura em branco.
     const uploadSignature = useCallback(async (signatureData: string): Promise<string | null> => {
         if (!signatureData) return null;
-        if (isS3Url(signatureData)) {
+        if (!isBase64Payload(signatureData)) {
             return signatureData
         }
 

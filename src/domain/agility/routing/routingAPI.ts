@@ -15,6 +15,8 @@ import type {
     BroadcastingQueryRequest,
     AcceptRoutingRequest,
     RoutingsAggregatedSummaryResponse,
+    RoutingHandoffRequest,
+    RoutingHandoffResult,
 } from './dto'
 
 
@@ -163,6 +165,35 @@ async function acceptRouting(id: Id, payload?: AcceptRoutingRequest): Promise<Ba
     return data
 }
 
+export interface ReturnManifestItem {
+    material: string
+    sku: string | null
+    unit: string | null
+    quantity: number
+    origin: 'PICKUP' | 'UNDELIVERED'
+    /** Motivo do retorno (separado da quantidade): FAILED | PARTIAL | MISSING | DAMAGED | REFUSED. */
+    reason?: string | null
+    /** Quantidade efetivamente entregue (o que não volta). */
+    delivered?: number | null
+    serviceId: string
+    serviceCode: string | null
+}
+
+export interface ReturnManifestResponse {
+    routingId: string
+    items: ReturnManifestItem[]
+}
+
+async function getReturnManifest(id: Id): Promise<BaseResponse<ReturnManifestResponse>> {
+    const { data } = await apiAgility.get<BaseResponse<ReturnManifestResponse>>(`/routings/${id}/return-manifest`)
+    return data
+}
+
+async function handoff(id: Id, payload: RoutingHandoffRequest): Promise<BaseResponse<RoutingHandoffResult>> {
+    const { data } = await apiAgility.post<BaseResponse<RoutingHandoffResult>>(`/routings/${id}/handoff`, payload)
+    return data
+}
+
 export const routingAPI = {
     create,
     findAll,
@@ -186,6 +217,8 @@ export const routingAPI = {
     getMapData,
     acceptRouting,
     getAggregatedSummary,
+    getReturnManifest,
+    handoff,
 }
 
 

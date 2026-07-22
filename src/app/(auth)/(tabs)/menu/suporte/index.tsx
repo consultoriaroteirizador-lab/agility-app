@@ -1,6 +1,6 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 
 import { ActivityIndicator, Box, Button, Input, ScreenBase, Text, TouchableOpacityBox } from '@/components';
 import { ButtonBack } from '@/components/Button/ButtonBack';
@@ -17,6 +17,9 @@ import { measure } from '@/theme';
 
 export default function SuporteScreen() {
   const router = useRouter();
+  // returnTo: rota de origem quando o suporte é aberto a partir de um pedido
+  // (outra aba). Sem isso, router.back() voltaria para a home da aba Menu.
+  const { returnTo } = useLocalSearchParams<{ returnTo?: string }>();
   const { userAuth } = useAuthCredentialsService();
   const { showToast } = useToastService();
   const [isCreatingChat, setIsCreatingChat] = useState(false);
@@ -123,8 +126,19 @@ export default function SuporteScreen() {
     refetch();
   }
 
+  const handleBack = useCallback(() => {
+    if (returnTo) {
+      // Volta para a tela de origem (o pedido), que está em outra aba.
+      // A limpeza da pilha do Menu é feita pelo popToTopOnBlur da aba (ver
+      // (tabs)/_layout.tsx), então a aba Menu reabre sempre na sua home.
+      router.navigate(returnTo as never);
+      return;
+    }
+    router.back();
+  }, [returnTo, router]);
+
   return (
-    <ScreenBase buttonLeft={<ButtonBack />} title={<Text preset="textTitleScreen">Suporte</Text>}>
+    <ScreenBase buttonLeft={<ButtonBack onPress={handleBack} />} title={<Text preset="textTitleScreen">Suporte</Text>}>
       <Box flex={1} backgroundColor="white" px="x16" pt="y12" pb="y24">
 
         {/* Texto - sempre visível */}
