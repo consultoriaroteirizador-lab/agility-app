@@ -8,7 +8,7 @@ export interface RoutingHandoffProof {
 export interface RoutingHandoffItem {
     serviceId: string
     outcome: 'RECEIVED' | 'NOT_RECEIVED'
-    reason?: string
+    occurrenceReasonId?: string
     notes?: string
 }
 

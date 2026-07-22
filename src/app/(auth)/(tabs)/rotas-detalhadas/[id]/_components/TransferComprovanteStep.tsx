@@ -1,15 +1,18 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 
-import { Box, Button, Input, Text, TouchableOpacityBox } from '@/components';
+import { ActivityIndicator, Box, Button, Input, Text, TouchableOpacityBox } from '@/components';
 import { DocumentCollectionForm, type DocumentData } from '@/components/DocumentCollectionForm';
 import Modal from '@/components/Modal/Modal';
 import { MultiPhotoPicker } from '@/components/MultiPhotoPicker';
 import { SignatureCanvas } from '@/components/SignatureCanvas';
+import type { OrderOccurrenceReasonResponse } from '@/domain/agility/order-occurrence-reason/dto';
+import { useFindOccurrenceReasons } from '@/domain/agility/order-occurrence-reason/useCase';
 import { useRoutingHandoff } from '@/domain/agility/routing/useCase/useRoutingHandoff';
 import { uploadBase64Signature, uploadMultipleServicePhotos } from '@/domain/agility/service/serviceUploadUtils';
+import { loadOccurrenceReasonsMirror } from '@/services/storage/occurrenceReasonsStorage';
 import { useToastService } from '@/services/Toast/useToast';
 import { measure } from '@/theme';
 
@@ -17,9 +20,6 @@ import { useRota } from '../_context/RotaContext';
 
 import type { TransferOrderOutcome } from './TransferOrderCard';
 import { TransferOrderList } from './TransferOrderList';
-
-/** Motivos de não-recebido (conferência por pedido, Fase 2). Sem migração: mapeia pra FailureReason.OTHER no back. */
-const NOT_RECEIVED_REASONS = ['DANIFICADO', 'FALTOU', 'RECUSADO', 'OUTRO'] as const;
 
 /**
  * Etapa 2 (comprovante) da tela de transferência: quem recebeu + documento,
@@ -44,9 +44,18 @@ export function TransferComprovanteStep({ routingId, onBack, onDone }: { routing
     const [reasonDraft, setReasonDraft] = useState<string>('');
     const [notesDraft, setNotesDraft] = useState<string>('');
 
+    const { reasons, isLoading: isLoadingReasons, isError: isReasonsError } = useFindOccurrenceReasons('TRANSFER');
+    const [mirror, setMirror] = useState<OrderOccurrenceReasonResponse[]>([]);
+    useEffect(() => {
+        if (reasons.length === 0 && isReasonsError) {
+            loadOccurrenceReasonsMirror('TRANSFER').then((m) => setMirror(m ?? []));
+        }
+    }, [reasons.length, isReasonsError]);
+    const options = reasons.length > 0 ? reasons : mirror;
+
     function openReasonModal(serviceId: string) {
         const existing = outcomes[serviceId];
-        setReasonDraft(existing?.reason ?? '');
+        setReasonDraft(existing?.occurrenceReasonId ?? '');
         setNotesDraft(existing?.notes ?? '');
         setReasonModalServiceId(serviceId);
     }
@@ -56,12 +65,13 @@ export function TransferComprovanteStep({ routingId, onBack, onDone }: { routing
     }
 
     function confirmReason() {
-        if (!reasonModalServiceId || !reasonDraft) return;
+        if (!reasonModalServiceId || !reasonDraft || !options.some((o) => o.id === reasonDraft)) return;
         setOutcomes((prev) => ({
             ...prev,
             [reasonModalServiceId]: {
                 outcome: 'NOT_RECEIVED',
-                reason: reasonDraft,
+                occurrenceReasonId: reasonDraft,
+                reasonName: options.find((o) => o.id === reasonDraft)?.name,
                 notes: notesDraft.trim() || undefined,
             },
         }));
@@ -142,7 +152,7 @@ export function TransferComprovanteStep({ routingId, onBack, onDone }: { routing
                     ? {
                         serviceId: p.serviceId,
                         outcome: 'NOT_RECEIVED' as const,
-                        reason: outcomes[p.serviceId].reason,
+                        occurrenceReasonId: outcomes[p.serviceId].occurrenceReasonId,
                         notes: outcomes[p.serviceId].notes,
                     }
                     : { serviceId: p.serviceId, outcome: 'RECEIVED' as const },
@@ -234,24 +244,34 @@ export function TransferComprovanteStep({ routingId, onBack, onDone }: { routing
                     <Text preset="text14" fontWeightPreset="semibold" color="colorTextPrimary">
                         Motivo
                     </Text>
-                    <Box gap="y8">
-                        {NOT_RECEIVED_REASONS.map((reason) => (
-                            <TouchableOpacityBox
-                                key={reason}
-                                onPress={() => setReasonDraft(reason)}
-                                flexDirection="row"
-                                alignItems="center"
-                                gap="x12"
-                                p="y12"
-                                borderWidth={measure.m2}
-                                borderColor={reasonDraft === reason ? 'primary100' : 'gray200'}
-                                borderRadius="s12"
-                                backgroundColor={reasonDraft === reason ? 'primary10' : 'white'}
-                            >
-                                <Text preset="text14" color="colorTextPrimary">{reason}</Text>
-                            </TouchableOpacityBox>
-                        ))}
-                    </Box>
+                    {isLoadingReasons && options.length === 0 ? (
+                        <Box py="y16" alignItems="center">
+                            <ActivityIndicator />
+                        </Box>
+                    ) : options.length === 0 ? (
+                        <Text preset="text14" color="gray400">
+                            Não foi possível carregar os motivos — conecte-se uma vez ou peça para configurar na plataforma.
+                        </Text>
+                    ) : (
+                        <Box gap="y8">
+                            {options.map((reason) => (
+                                <TouchableOpacityBox
+                                    key={reason.id}
+                                    onPress={() => setReasonDraft(reason.id)}
+                                    flexDirection="row"
+                                    alignItems="center"
+                                    gap="x12"
+                                    p="y12"
+                                    borderWidth={measure.m2}
+                                    borderColor={reasonDraft === reason.id ? 'primary100' : 'gray200'}
+                                    borderRadius="s12"
+                                    backgroundColor={reasonDraft === reason.id ? 'primary10' : 'white'}
+                                >
+                                    <Text preset="text14" color="colorTextPrimary">{reason.name}</Text>
+                                </TouchableOpacityBox>
+                            ))}
+                        </Box>
+                    )}
                     <Input
                         title="Observação (opcional)"
                         value={notesDraft}
@@ -263,7 +283,7 @@ export function TransferComprovanteStep({ routingId, onBack, onDone }: { routing
                         width="auto"
                     />
                     <Box gap="y10">
-                        <Button title="Confirmar" onPress={confirmReason} disabled={!reasonDraft} />
+                        <Button title="Confirmar" onPress={confirmReason} disabled={!reasonDraft || !options.some((o) => o.id === reasonDraft)} />
                         <Button title="Cancelar" onPress={closeReasonModal} preset="outline" />
                     </Box>
                 </Box>
