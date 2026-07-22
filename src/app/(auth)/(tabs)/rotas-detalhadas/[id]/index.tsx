@@ -19,11 +19,13 @@ import {
   ParadaListItem,
   EmptyParadasList,
   RouteActions,
+  InsucessoRowItem,
 } from './_components'
 import { MapaParadasModal } from './_components/MapaParadasModal'
 import { TransferLegExecution } from './_components/TransferLegExecution'
 import { RotaProvider, useRota } from './_context/RotaContext'
 import type { RotaTabType, Parada } from './_types/rota.types'
+import type { InsucessoRow } from './_utils'
 
 // ============================================
 // COMPONENTE DE TABS
@@ -170,11 +172,23 @@ function AndamentoList({
 // LISTA DE CONCLUÍDAS (SectionList)
 // ============================================
 
+// Item de uma seção de "Concluídas": parada ao vivo (sucesso) OU linha de
+// insucesso unificada (ledger de não-entregues). Ambas expõem `serviceId`.
+type ConcluidaItem = Parada | InsucessoRow
+
+// Discriminador: só a Parada tem `numero`; a InsucessoRow tem `outcome`.
+function isParada(item: ConcluidaItem): item is Parada {
+  return 'numero' in item
+}
+
 interface ConcluidasListProps {
   aba: RotaTabType
   setAba: (aba: RotaTabType) => void
   paradasSucesso: Parada[]
-  paradasInsucesso: Parada[]
+  insucessoRows: InsucessoRow[]
+  // paradas de insucesso AO VIVO (ainda na rota, ex. FAILED) — usadas p/ restaurar
+  // a navegação (tap → parada em leitura) só das linhas que têm parada ao vivo.
+  paradasInsucessoLive: Parada[]
   onPressParada: (parada: Parada) => void
 }
 
@@ -182,34 +196,51 @@ function ConcluidasList({
   aba,
   setAba,
   paradasSucesso,
-  paradasInsucesso,
+  insucessoRows,
+  paradasInsucessoLive,
   onPressParada,
 }: ConcluidasListProps) {
+  const liveInsucessoById = useMemo(
+    () => new Map(paradasInsucessoLive.map((p) => [p.serviceId, p])),
+    [paradasInsucessoLive],
+  )
   const sections = useMemo(
     () => [
       {
         title: 'Concluídas com sucesso',
-        data: paradasSucesso,
+        data: paradasSucesso as ConcluidaItem[],
         empty: 'Nenhuma parada concluída com sucesso.',
       },
       {
         title: 'Concluídas com insucesso',
-        data: paradasInsucesso,
+        data: insucessoRows as ConcluidaItem[],
         empty: 'Nenhuma parada marcada como insucesso.',
       },
     ],
-    [paradasSucesso, paradasInsucesso],
+    [paradasSucesso, insucessoRows],
   )
 
   const renderItem = useCallback(
-    ({ item }: { item: Parada }) => (
-      <ParadaListItem
-        parada={item}
-        onPress={onPressParada}
-        showNavigationButton={false}
-      />
-    ),
-    [onPressParada],
+    ({ item }: { item: ConcluidaItem }) => {
+      if (isParada(item)) {
+        return (
+          <ParadaListItem
+            parada={item}
+            onPress={onPressParada}
+            showNavigationButton={false}
+          />
+        )
+      }
+      // Linha só-ledger (cancelado/devolvido) não tem parada ao vivo → sem navegação.
+      const live = liveInsucessoById.get(item.serviceId)
+      return (
+        <InsucessoRowItem
+          row={item}
+          onPress={live ? () => onPressParada(live) : undefined}
+        />
+      )
+    },
+    [onPressParada, liveInsucessoById],
   )
 
   const renderSectionHeader = useCallback(
@@ -228,7 +259,7 @@ function ConcluidasList({
     [],
   )
 
-  const keyExtractor = useCallback((item: Parada) => item.serviceId, [])
+  const keyExtractor = useCallback((item: ConcluidaItem) => item.serviceId, [])
 
   return (
     <SectionList
@@ -333,6 +364,7 @@ function RotaDetalhadaContent() {
     outrasParadas,
     paradasConcluidasSucesso,
     paradasConcluidasInsucesso,
+    insucessoRows,
     nenhumAndamento,
     isCompleting,
     popupConcluirRota,
@@ -407,7 +439,8 @@ function RotaDetalhadaContent() {
           aba={aba}
           setAba={setAba}
           paradasSucesso={paradasConcluidasSucesso}
-          paradasInsucesso={paradasConcluidasInsucesso}
+          insucessoRows={insucessoRows}
+          paradasInsucessoLive={paradasConcluidasInsucesso}
           onPressParada={navegarParaParada}
         />
       )}

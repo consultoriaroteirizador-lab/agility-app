@@ -68,3 +68,13 @@ export {
     isNenhumAndamento,
     isRotaConcluida,
 } from './routeCalculations'
+
+// ============================================
+// NÃO-ENTREGUES (LEDGER)
+// ============================================
+
+export {
+    type InsucessoRow,
+    buildInsucessoList,
+    outcomeLabel,
+} from './routeNonDelivered'

@@ -25,11 +25,16 @@ export type { RoutingResponse } from './response/routing.response'
 export type { RoutingCountResponse } from './response/routing-count.response'
 export type { ReturnPoint } from './response/routing.response'
 export type { RoutingSummaryResponse } from './response/routing-summary.response'
-export type { 
+export type {
     RoutingMapDataResponse,
     ServicePointResponse,
     RouteSegmentResponse,
     OriginPointResponse,
 } from './response/routing-map-data.response'
+export type {
+    RouteNonDeliveredItemResponse,
+    RouteNonDeliveredOutcome,
+    RouteNonDeliveredKind,
+} from './response/route-non-delivered.response'
 
 
