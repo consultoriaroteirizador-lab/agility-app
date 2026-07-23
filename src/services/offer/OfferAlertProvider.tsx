@@ -1,5 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
-import { Modal } from 'react-native';
+import { Modal, Platform, Vibration } from 'react-native';
 
 import { router } from 'expo-router';
 
@@ -97,6 +97,14 @@ export function OfferAlertProvider({ children }: { children: React.ReactNode }) 
 
   const current = activeOffer(offers);
   const secondsLeft = current ? Math.max(0, Math.ceil((expiresAtOf(current) - now) / 1000)) : 0;
+
+  // Vibra ao surgir uma nova oferta ativa (som customizado fica para follow-up;
+  // o som do sistema já toca via a push em background).
+  useEffect(() => {
+    if (current?.id) {
+      Vibration.vibrate(Platform.OS === 'ios' ? [0, 400, 200, 400] : 600);
+    }
+  }, [current?.id]);
 
   const onRecusar = useCallback(() => {
     setOffers((list) => (current ? dropOffer(list, current.id) : list));
