@@ -198,7 +198,10 @@ function OfertaCard({ oferta, onPress, onAceitar, isAccepting }: OfertaCardProps
           <Text preset="text13" color="gray400" mt="y2">
             {oferta.distancia} · {oferta.tempo}
           </Text>
-          <Text preset="text18" color="primary100" fontWeight="700" mt="y4">
+          <Text preset="text13" color="gray400" mt="y4">
+            Frete
+          </Text>
+          <Text preset="text18" color="primary100" fontWeight="700">
             {oferta.preco}
           </Text>
         </Box>

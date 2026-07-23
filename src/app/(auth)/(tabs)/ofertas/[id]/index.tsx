@@ -125,7 +125,7 @@ export default function OfertaDetalhadaScreen() {
             {resumo.totalParadas} paradas
           </TagResumo>
           <TagResumo icon={<Icon name="attach-money" />}>
-            {resumo.preco}
+            Frete: {resumo.preco}
           </TagResumo>
           <TagResumo icon={<Icon name="straighten" />}>
             {resumo.distancia}
