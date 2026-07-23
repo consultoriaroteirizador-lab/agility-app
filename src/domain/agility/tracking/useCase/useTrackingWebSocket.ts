@@ -10,6 +10,7 @@ import { useEffect, useRef, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
 
 import { urls } from '@/config/urls';
+import type { OfferPayload } from '@/domain/agility/offer/offerStore';
 import { useAuthCredentialsService } from '@/services/authCredentials/useAuthCredentialsService';
 
 import type { DriverLocationUpdate } from '../types';
@@ -21,6 +22,8 @@ export interface TrackingWebSocketOptions {
   onRoutingUpdated?: (data: { id?: string } & Record<string, unknown>) => void;
   /** Serviço/parada atualizado (status, ETA re-projetada, etc.). */
   onServiceUpdated?: (data: { id?: string; routingId?: string } & Record<string, unknown>) => void;
+  /** Nova oferta disponível para o motorista (uberização). */
+  onOfferAvailable?: (offer: OfferPayload) => void;
   onConnect?: () => void;
   onDisconnect?: () => void;
   onError?: (error: Error) => void;
@@ -160,6 +163,12 @@ export function useTrackingWebSocket(options: TrackingWebSocketOptions = {}) {
     socket.on('service_updated', (data: { id?: string; routingId?: string }) => {
       console.log('[TrackingWebSocket] Service update:', data?.id);
       optionsRef.current.onServiceUpdated?.(data);
+    });
+
+    // Nova oferta disponível (uberização).
+    socket.on('offer.available', (offer: OfferPayload) => {
+      console.log('[TrackingWebSocket] Offer available:', offer?.id);
+      optionsRef.current.onOfferAvailable?.(offer);
     });
 
     // Escutar erros
