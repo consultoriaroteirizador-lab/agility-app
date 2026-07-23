@@ -14,7 +14,7 @@ import {
   pruneExpired,
 } from '@/domain/agility/offer/offerStore';
 import type { OfferPayload, PendingOffer } from '@/domain/agility/offer/offerStore';
-import { useAcceptRouting } from '@/domain/agility/routing/useCase';
+import { useAcceptRouting, useFindBroadcastingRoutings } from '@/domain/agility/routing/useCase';
 import { useAppSafeArea } from '@/hooks';
 import { useAuthCredentialsService } from '@/services/authCredentials/useAuthCredentialsService';
 import { useToastService } from '@/services/Toast/useToast';
@@ -82,18 +82,52 @@ export function OfferAlertProvider({ children }: { children: React.ReactNode }) 
   // Gating: só empilha oferta se o motorista estiver disponível.
   const pushOffer = useCallback((offer: OfferPayload) => {
     if (!isAvailable) return;
-    setOffers((list) => addOffer(list, offer, Date.now()));
+    // Defensivo: normaliza o id caso o backend mande `routingId` em vez de `id`.
+    const normalized: OfferPayload = { ...offer, id: offer.id ?? (offer as { routingId?: string }).routingId };
+    if (!normalized.id) return;
+    setOffers((list) => addOffer(list, normalized, Date.now()));
   }, [isAvailable]);
 
-  // Tick de 1s: expira ofertas vencidas e atualiza o contador regressivo.
+  // Fallback de polling: enquanto o motorista estiver disponível, busca ofertas
+  // em broadcasting periodicamente (o hook faz refetchInterval). Complementa o
+  // WebSocket (dedup por id em `addOffer` cobre a sobreposição WS+poll).
+  const { routings: broadcastRoutings } = useFindBroadcastingRoutings(
+    {
+      driverLatitude: userLocation?.coords.latitude,
+      driverLongitude: userLocation?.coords.longitude,
+    },
+    { pollWhileAvailable: isAvailable },
+  );
+
   useEffect(() => {
+    (broadcastRoutings ?? []).forEach((r) => pushOffer({
+      id: r.id,
+      code: r.code ?? undefined,
+      offerTime: r.offerTime ?? undefined,
+      totalServices: r.totalServices ?? undefined,
+      totalDistanceKm: r.totalDistanceKm ?? undefined,
+      totalDurationMinutes: r.totalDurationMinutes ?? undefined,
+      totalValue: r.totalValue ?? undefined,
+    }));
+  }, [broadcastRoutings, pushOffer]);
+
+  // Tick de 1s: expira ofertas vencidas e atualiza o contador regressivo.
+  // Só roda enquanto houver ofertas na fila, para não churnar em idle.
+  useEffect(() => {
+    if (offers.length === 0) return;
     const timer = setInterval(() => {
       const t = Date.now();
       setNow(t);
       setOffers((list) => pruneExpired(list, t));
     }, 1000);
     return () => clearInterval(timer);
-  }, []);
+  }, [offers.length]);
+
+  // Se o motorista deixar de estar disponível, descarta a fila inteira: uma
+  // oferta pendente não deve continuar visível/aceitável fora de disponibilidade.
+  useEffect(() => {
+    if (!isAvailable) setOffers([]);
+  }, [isAvailable]);
 
   const current = activeOffer(offers);
   const secondsLeft = current ? Math.max(0, Math.ceil((expiresAtOf(current) - now) / 1000)) : 0;
@@ -140,7 +174,7 @@ export function OfferAlertProvider({ children }: { children: React.ReactNode }) 
       <Modal
         animationType="slide"
         transparent
-        visible={!!current}
+        visible={!!current && isAvailable}
         onRequestClose={onRecusar}
       >
         <Box flex={1} justifyContent="flex-end" backgroundColor="blackOpaque">

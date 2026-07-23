@@ -1,4 +1,4 @@
-import { addOffer, dropOffer, pruneExpired, activeOffer } from './offerStore';
+import { addOffer, dropOffer, pruneExpired, activeOffer, expiresAtOf } from './offerStore';
 
 const o = (id: string, offerTime = '00:10') => ({ id, offerTime });
 
@@ -21,8 +21,28 @@ it('dropOffer remove por id', () => {
 });
 
 it('pruneExpired remove ofertas cujo timer passou', () => {
-    // offerTime '00:00' + receivedAt 0 → expira em receivedAt + 0*60s... usar offerTime em segundos via helper
+    // offerTime '00:00' cai no fallback de 60s (ver testes de expiresAtOf abaixo).
     let l = addOffer([], { id: 'r1', offerTime: '00:00' }, 0);
-    l = pruneExpired(l, 61_000); // 61s depois
+    l = pruneExpired(l, 61_000); // 61s depois: já passou do fallback de 60s
     expect(l.length).toBe(0);
+});
+
+it('expiresAtOf usa fallback de 60s quando offerTime é "00:00" (duração zero)', () => {
+    const o = { id: 'r1', offerTime: '00:00', receivedAt: 0 };
+    expect(expiresAtOf(o)).toBe(60_000);
+});
+
+it('expiresAtOf usa fallback de 60s quando offerTime está ausente', () => {
+    const o = { id: 'r1', receivedAt: 0 };
+    expect(expiresAtOf(o)).toBe(60_000);
+});
+
+it('expiresAtOf usa fallback de 60s quando offerTime está em branco', () => {
+    const o = { id: 'r1', offerTime: '   ', receivedAt: 0 };
+    expect(expiresAtOf(o)).toBe(60_000);
+});
+
+it('expiresAtOf respeita offerTime válido não-zero (não aplica fallback)', () => {
+    const o = { id: 'r1', offerTime: '00:10', receivedAt: 0 };
+    expect(expiresAtOf(o)).toBe(10_000);
 });

@@ -253,7 +253,6 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
       const routingId = data.routingId ?? data.metadata?.routingId;
       const isOfferPush =
         data.type === "ROUTE_OFFER" ||
-        (!data.route && !data.screen && !!routingId) ||
         (typeof data.linkUrl === "string" && data.linkUrl.includes("ofertas"));
 
       if (isOfferPush) {
