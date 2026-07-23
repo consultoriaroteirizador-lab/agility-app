@@ -54,6 +54,15 @@ export interface ServiceCompletionDetailsRequest {
      * conferidos no CD (devoluções/coletas + não entregues).
      */
     returnChecklist?: ReturnChecklistItem[]
+
+    /** Código de confirmação da entrega informado pelo cliente ao motorista. */
+    deliveryCode?: string
+
+    /** Código do motivo (catálogo) — usado quando o código é dispensado/bypass. */
+    reasonCode?: string
+
+    /** Texto livre do motivo — usado junto com reasonCode quando aplicável. */
+    reasonText?: string
 }
 
 export interface ReturnChecklistItem {

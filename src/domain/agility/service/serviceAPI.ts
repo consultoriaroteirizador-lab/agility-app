@@ -92,11 +92,28 @@ async function start(id: Id): Promise<BaseResponse<ServiceResponse>> {
     return data
 }
 
+export interface StartAttendanceOptions {
+    /** Localização capturada pelo app no momento do "Estou aqui" (best-effort). */
+    location?: { latitude?: number; longitude?: number; accuracy?: number }
+    /** Código de retirada informado pelo cliente ao motorista (quando exigido). */
+    pickupCode?: string
+    /** Código do motivo (catálogo) — usado quando o código é dispensado/bypass. */
+    reasonCode?: string
+    /** Texto livre do motivo — usado junto com reasonCode quando aplicável. */
+    reasonText?: string
+}
+
 async function startAttendance(
     id: Id,
-    location?: { latitude?: number; longitude?: number; accuracy?: number },
+    opts?: StartAttendanceOptions,
 ): Promise<BaseResponse<ServiceResponse>> {
-    const { data } = await apiAgility.patch<BaseResponse<ServiceResponse>>(`/services/${id}/start-attendance`, location ?? {})
+    const body = {
+        ...(opts?.location ?? {}),
+        ...(opts?.pickupCode ? { pickupCode: opts.pickupCode } : {}),
+        ...(opts?.reasonCode ? { reasonCode: opts.reasonCode } : {}),
+        ...(opts?.reasonText ? { reasonText: opts.reasonText } : {}),
+    }
+    const { data } = await apiAgility.patch<BaseResponse<ServiceResponse>>(`/services/${id}/start-attendance`, body)
     return data
 }
 

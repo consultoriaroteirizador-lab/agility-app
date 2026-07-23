@@ -183,6 +183,24 @@ interface ParadaContextValue {
   paymentMethod: PaymentMethodType | null;
   setPaymentMethod: (value: PaymentMethodType | null) => void;
 
+  // Código de confirmação de entrega (T3) — informado pelo cliente ao motorista.
+  deliveryCode: string;
+  setDeliveryCode: (value: string) => void;
+  bypassReasonCode: string | null;
+  setBypassReasonCode: (value: string | null) => void;
+  bypassReasonText: string;
+  setBypassReasonText: (value: string) => void;
+
+  // Código de confirmação de retirada (T4) — informado pelo cliente ao motorista.
+  // Estado separado do de entrega (deliveryCode/bypassReasonCode acima) para não
+  // clobberar um checkpoint com o outro (ex.: TRANSFER passa pelos dois).
+  pickupCode: string;
+  setPickupCode: (value: string) => void;
+  pickupBypassReasonCode: string | null;
+  setPickupBypassReasonCode: (value: string | null) => void;
+  pickupBypassReasonText: string;
+  setPickupBypassReasonText: (value: string) => void;
+
   // Formulário dinâmico
   formGroups: FormGroupResponse[];
   formAnswersMap: Record<string, string | string[]>;
@@ -319,6 +337,16 @@ export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderPr
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paymentAmount, setPaymentAmount] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethodType | null>(null);
+
+  // Estado do código de confirmação de entrega (short-lived — não persistido no draft).
+  const [deliveryCode, setDeliveryCode] = useState('');
+  const [bypassReasonCode, setBypassReasonCode] = useState<string | null>(null);
+  const [bypassReasonText, setBypassReasonText] = useState('');
+
+  // Estado do código de confirmação de retirada (short-lived — não persistido no draft).
+  const [pickupCode, setPickupCode] = useState('');
+  const [pickupBypassReasonCode, setPickupBypassReasonCode] = useState<string | null>(null);
+  const [pickupBypassReasonText, setPickupBypassReasonText] = useState('');
 
   // Estado do formulário dinâmico
   const [formState, setFormState] = useState<FormState>({
@@ -1018,6 +1046,12 @@ export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderPr
     setPaymentAmount('');
     setPaymentMethod(null);
     setShowPaymentModal(false);
+    setDeliveryCode('');
+    setBypassReasonCode(null);
+    setBypassReasonText('');
+    setPickupCode('');
+    setPickupBypassReasonCode(null);
+    setPickupBypassReasonText('');
     setFormState({
       formGroups: [],
       formAnswersMap: {},
@@ -1036,6 +1070,12 @@ export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderPr
     setShowPaymentModal(false);
     setPaymentAmount('');
     setPaymentMethod(null);
+    setDeliveryCode('');
+    setBypassReasonCode(null);
+    setBypassReasonText('');
+    setPickupCode('');
+    setPickupBypassReasonCode(null);
+    setPickupBypassReasonText('');
   }, [serviceId]);
 
   const value: ParadaContextValue = {
@@ -1138,6 +1178,22 @@ export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderPr
     setPaymentAmount,
     paymentMethod,
     setPaymentMethod,
+
+    // Código de confirmação de entrega
+    deliveryCode,
+    setDeliveryCode,
+    bypassReasonCode,
+    setBypassReasonCode,
+    bypassReasonText,
+    setBypassReasonText,
+
+    // Código de confirmação de retirada
+    pickupCode,
+    setPickupCode,
+    pickupBypassReasonCode,
+    setPickupBypassReasonCode,
+    pickupBypassReasonText,
+    setPickupBypassReasonText,
 
     // Formulário dinâmico
     formGroups: formState.formGroups,

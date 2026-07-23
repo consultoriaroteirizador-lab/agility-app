@@ -8,6 +8,12 @@ export interface StartAttendanceVariables {
     id: Id
     /** Localização capturada pelo app no momento do "Estou aqui" (best-effort). */
     location?: { latitude?: number; longitude?: number; accuracy?: number }
+    /** Código de retirada informado pelo cliente ao motorista (quando exigido). */
+    pickupCode?: string
+    /** Código do motivo (catálogo) — usado quando o código é dispensado/bypass. */
+    reasonCode?: string
+    /** Texto livre do motivo — usado junto com reasonCode quando aplicável. */
+    reasonText?: string
 }
 
 /**
@@ -18,7 +24,8 @@ export interface StartAttendanceVariables {
  */
 export function useStartAttendance(options?: MutationOptions<BaseResponse<ServiceResponse>>) {
     const mutation = useMutationService<ServiceResponse, StartAttendanceVariables>({
-        action: ({ id, location }: StartAttendanceVariables) => serviceService.startAttendance(id, location),
+        action: ({ id, location, pickupCode, reasonCode, reasonText }: StartAttendanceVariables) =>
+            serviceService.startAttendance(id, { location, pickupCode, reasonCode, reasonText }),
         onSuccess: options?.onSuccess,
         onError: options?.onError,
     })
@@ -26,6 +33,9 @@ export function useStartAttendance(options?: MutationOptions<BaseResponse<Servic
     return {
         isLoading: mutation.isLoading,
         startAttendance: (variables: StartAttendanceVariables) => mutation.mutate(variables),
+        // Variante async (aguardável) — usada quando o chamador precisa saber se a
+        // mutation teve sucesso antes de avançar o wizard (ex.: gate de código de retirada).
+        startAttendanceAsync: (variables: StartAttendanceVariables) => mutation.mutateAsync(variables),
         isSuccess: mutation.isSuccess,
         isError: mutation.isError,
     }
