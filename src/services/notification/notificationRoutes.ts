@@ -54,6 +54,11 @@ export const notificationRoutes: Record<string, (params?: any) => void> = {
     invoicePrivateLabel: () => router.navigate('/(auth)/PrivateLabel/Invoice' as Href),
     validationPinPrivateLabel: () => router.navigate('/(auth)/PrivateLabel/ValidationPInPrivateLabelScreen' as Href),
 
+    // Ofertas (oferta de rota em tempo real)
+    ofertas: (params?: any) => params?.id
+        ? router.navigate({ pathname: '/(auth)/(tabs)/ofertas/[id]' as any, params })
+        : router.navigate('/(auth)/(tabs)/ofertas' as any),
+
     // Menu
     menu: () => router.navigate('/(auth)/(tabs)/menu' as Href),
     chat: (params?: any) => router.navigate({ pathname: '/(auth)/(tabs)/menu/chat' as any, params }),
