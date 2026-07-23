@@ -23,10 +23,23 @@ interface UseStopActionsParams {
     onSuccess?: () => void;
 }
 
+/** Argumentos opcionais do gate de código de retirada (T4). */
+export interface StartAttendanceArgs {
+    pickupCode?: string;
+    reasonCode?: string;
+    reasonText?: string;
+}
+
 interface UseStopActionsReturn {
     handleStartService: () => void;
     handleGoToLocation: () => void;
-    handleStartAttendance: () => void;
+    /**
+     * Inicia o atendimento. Retorna `true` em sucesso (ou quando o serviço já
+     * estava em atendimento — tratado como sucesso efetivo) e `false` quando a
+     * mutation falhou de verdade (ex.: código de retirada inválido) — o chamador
+     * NÃO deve avançar o wizard nesse caso.
+     */
+    handleStartAttendance: (args?: StartAttendanceArgs) => Promise<boolean>;
     handleCompleteService: () => void;
     handleMarkAsFailed: () => void;
     isStarting: boolean;
@@ -105,7 +118,7 @@ export const useStopActions = ({
         },
     })
 
-    const { startAttendance, isLoading: isStartingAttendance } = useStartAttendance({
+    const { startAttendanceAsync, isLoading: isStartingAttendance } = useStartAttendance({
         onSuccess: async () => {
             await invalidateQueries();
             onSuccess?.();
@@ -175,7 +188,7 @@ export const useStopActions = ({
         invalidateQueries,
     ]);
 
-    const handleStartAttendance = useCallback(async () => {
+    const handleStartAttendance = useCallback(async (args?: StartAttendanceArgs): Promise<boolean> => {
         // Bloqueia só estados terminais; backend aceita PENDING/ASSIGNED/IN_PROGRESS → IN_ATTENDANCE.
         if (
             serviceStatus === ServiceStatus.COMPLETED ||
@@ -183,21 +196,38 @@ export const useStopActions = ({
             serviceStatus === ServiceStatus.FAILED
         ) {
             showToast({ message: `Não é possível iniciar o atendimento. Status atual: ${serviceStatus}`, type: 'error' });
-            return;
+            return false;
         }
         // Já em atendimento → apenas garante refetch
         if (serviceStatus === ServiceStatus.IN_ATTENDANCE) {
             invalidateQueries();
             onSuccess?.();
-            return;
+            return true;
         }
         // Marca pendência ANTES de capturar GPS — o botão já entra em loading no clique,
         // mesmo durante a captura de localização (até alguns segundos).
         setPendingAttendance(true);
         // Captura a referência de GPS de onde o motorista iniciou o atendimento (best-effort).
         const location = await getCurrentCoords();
-        startAttendance({ id: serviceId, location });
-    }, [serviceStatus, startAttendance, serviceId, invalidateQueries, onSuccess, showToast]);
+        try {
+            await startAttendanceAsync({ id: serviceId, location, ...args });
+            return true;
+        } catch (error: any) {
+            // Mesmo critério do onError acima: "já em atendimento" é sucesso efetivo,
+            // não uma falha real de código/validação — não deve bloquear o wizard.
+            const errorMessage = error?.error?.message || error?.message || '';
+            if (
+                errorMessage.includes('em atendimento') ||
+                errorMessage.includes('IN_ATTENDANCE') ||
+                error?.error?.code === 'INTERNAL_ERROR'
+            ) {
+                return true;
+            }
+            // Falha real (ex.: código de retirada inválido) — onError acima já mostrou o
+            // toast. O chamador NÃO deve avançar o wizard.
+            return false;
+        }
+    }, [serviceStatus, startAttendanceAsync, serviceId, invalidateQueries, onSuccess, showToast]);
 
     const handleCompleteService = useCallback(() => {
         completeService({ id: serviceId });

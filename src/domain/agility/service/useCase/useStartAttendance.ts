@@ -33,6 +33,9 @@ export function useStartAttendance(options?: MutationOptions<BaseResponse<Servic
     return {
         isLoading: mutation.isLoading,
         startAttendance: (variables: StartAttendanceVariables) => mutation.mutate(variables),
+        // Variante async (aguardável) — usada quando o chamador precisa saber se a
+        // mutation teve sucesso antes de avançar o wizard (ex.: gate de código de retirada).
+        startAttendanceAsync: (variables: StartAttendanceVariables) => mutation.mutateAsync(variables),
         isSuccess: mutation.isSuccess,
         isError: mutation.isError,
     }

@@ -6,6 +6,7 @@ import { Box, Button, ScreenBase, Text } from '@/components';
 import { ButtonBack } from '@/components/Button/ButtonBack';
 import { TouchableOpacityBox } from '@/components/RestyleComponent/RestyleComponent';
 import { formatAddressFull, formatAddressStreetNumber } from '@/domain/agility/address/dto';
+import { resolveCodeRequirement } from '@/domain/agility/service/codeGate';
 import { formatHHmm } from '@/functions';
 import { useToastService } from '@/services/Toast/useToast';
 import { measure } from '@/theme';
@@ -13,6 +14,7 @@ import { measure } from '@/theme';
 import { useParada } from '../../_context/ParadaContext';
 import { useStopActions } from '../../_hooks/useStopActions';
 import { MaterialsModal } from '../shared/MaterialsModal';
+import { PickupCodeCard } from '../shared/PickupCodeCard';
 import { StopRouteMap } from '../shared/StopRouteMap';
 
 /**
@@ -20,9 +22,14 @@ import { StopRouteMap } from '../shared/StopRouteMap';
  * Layout baseado no módulo de entrega
  */
 export function ColetaEtapaInicial() {
-    const { service, effectiveAddress, setEtapa, rotaId, startBlockReason } = useParada();
+    const { service, effectiveAddress, setEtapa, rotaId, startBlockReason, pickupCode, pickupBypassReasonCode, pickupBypassReasonText } = useParada();
     const { showToast } = useToastService();
     const [showVolumesModal, setShowVolumesModal] = useState(false);
+
+    // Código de confirmação de retirada (T4) — exigido/bypass conforme configuração da empresa.
+    const pickupGate = resolveCodeRequirement(service, 'PICKUP');
+    const pickupBypassValid =
+        !!pickupBypassReasonCode && (pickupBypassReasonCode !== 'OUTRO' || pickupBypassReasonText.trim().length > 0);
     const { handleStartService, handleStartAttendance, isStarting, isStartingAttendance } = useStopActions({
         serviceId: service?.id || '',
         routeId: service?.routingId || '',
@@ -53,14 +60,42 @@ export function ColetaEtapaInicial() {
         handleStartService();
     }, [isStartBlocked, startBlockReason, showToast, handleStartService]);
 
-    const handleArrived = useCallback(() => {
+    const handleArrived = useCallback(async () => {
         if (isStartBlocked) {
             showToast({ message: startBlockReason!, type: 'error' });
             return;
         }
+
+        if (pickupGate.required) {
+            const pickupCodeFilled = pickupCode.trim().length === 4;
+            const pending = !pickupCodeFilled && !(pickupGate.allowBypass && pickupBypassValid);
+            if (pending) {
+                showToast({ message: 'Informe o código de retirada ou o motivo.', type: 'error' });
+                return;
+            }
+            const args = pickupCodeFilled
+                ? { pickupCode: pickupCode.trim() }
+                : { reasonCode: pickupBypassReasonCode!, reasonText: pickupBypassReasonText.trim() || undefined };
+            const ok = await handleStartAttendance(args);
+            if (ok) setEtapa(2);
+            return;
+        }
+
         handleStartAttendance();
         setEtapa(2);
-    }, [isStartBlocked, startBlockReason, showToast, handleStartAttendance, setEtapa]);
+    }, [
+        isStartBlocked,
+        startBlockReason,
+        showToast,
+        pickupGate.required,
+        pickupGate.allowBypass,
+        pickupCode,
+        pickupBypassValid,
+        pickupBypassReasonCode,
+        pickupBypassReasonText,
+        handleStartAttendance,
+        setEtapa,
+    ]);
 
     return (
         <ScreenBase
@@ -149,6 +184,8 @@ export function ColetaEtapaInicial() {
                                 </Box>
                             )}
                         </Box>
+
+                        {pickupGate.required && <PickupCodeCard allowBypass={pickupGate.allowBypass} />}
 
                         {/* Botões de ação */}
                         <Box gap="y12" paddingBottom="y24">

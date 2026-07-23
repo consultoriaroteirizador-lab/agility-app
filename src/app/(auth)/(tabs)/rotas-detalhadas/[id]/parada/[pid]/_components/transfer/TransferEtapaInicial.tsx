@@ -6,6 +6,7 @@ import { Box, Button, ScreenBase, Text } from '@/components';
 import { ButtonBack } from '@/components/Button/ButtonBack';
 import { TouchableOpacityBox } from '@/components/RestyleComponent/RestyleComponent';
 import { formatAddressFull, formatAddressStreetNumber } from '@/domain/agility/address/dto';
+import { resolveCodeRequirement } from '@/domain/agility/service/codeGate';
 import { useToastService } from '@/services/Toast/useToast';
 import { measure } from '@/theme';
 
@@ -13,6 +14,7 @@ import { useParada } from '../../_context/ParadaContext';
 import { useStopActions } from '../../_hooks/useStopActions';
 import { Map } from '../shared/Map';
 import { MaterialsModal } from '../shared/MaterialsModal';
+import { PickupCodeCard } from '../shared/PickupCodeCard';
 
 import { TransferStepHeader } from './TransferStepHeader';
 
@@ -22,12 +24,27 @@ import { TransferStepHeader } from './TransferStepHeader';
  * entrega, a "chegada" é só um passo de UI (o serviço já está em atendimento).
  */
 export function TransferEtapaInicial() {
-    const { service, effectiveAddress, setEtapa, transferLeg, isServiceStarted, startBlockReason } = useParada();
+    const {
+        service,
+        effectiveAddress,
+        setEtapa,
+        transferLeg,
+        isServiceStarted,
+        startBlockReason,
+        pickupCode,
+        pickupBypassReasonCode,
+        pickupBypassReasonText,
+    } = useParada();
     const { showToast } = useToastService();
     const isPickup = transferLeg === 'pickup';
     // Gating só na perna de coleta (origem), onde a parada é efetivamente iniciada.
     const isStartBlocked = isPickup && startBlockReason !== null;
     const [showVolumesModal, setShowVolumesModal] = useState(false);
+
+    // Código de confirmação de retirada (T4) — só aplica na perna de coleta (origem).
+    const pickupGate = resolveCodeRequirement(service, 'PICKUP');
+    const pickupBypassValid =
+        !!pickupBypassReasonCode && (pickupBypassReasonCode !== 'OUTRO' || pickupBypassReasonText.trim().length > 0);
 
     const { handleStartService, handleStartAttendance, isStarting, isStartingAttendance } = useStopActions({
         serviceId: service?.id || '',
@@ -51,18 +68,51 @@ export function TransferEtapaInicial() {
         handleStartService();
     }, [isStartBlocked, startBlockReason, showToast, handleStartService]);
 
-    const handleChegou = useCallback(() => {
+    const handleChegou = useCallback(async () => {
         if (isStartBlocked) {
             showToast({ message: startBlockReason!, type: 'error' });
             return;
         }
+
         // Na coleta (origem), marca atendimento no backend (uma única vez por TRANSFER).
         // Na entrega (destino), o serviço já está IN_ATTENDANCE — só avança o passo.
         if (isPickup && !isServiceStarted) {
-            handleStartAttendance();
+            if (pickupGate.required) {
+                const pickupCodeFilled = pickupCode.trim().length === 4;
+                const pending = !pickupCodeFilled && !(pickupGate.allowBypass && pickupBypassValid);
+                if (pending) {
+                    showToast({ message: 'Informe o código de retirada ou o motivo.', type: 'error' });
+                    return;
+                }
+                const args = pickupCodeFilled
+                    ? { pickupCode: pickupCode.trim() }
+                    : { reasonCode: pickupBypassReasonCode!, reasonText: pickupBypassReasonText.trim() || undefined };
+                const ok = await handleStartAttendance(args);
+                if (!ok) return;
+                setEtapa(2);
+                return;
+            }
+            await handleStartAttendance();
+            setEtapa(2);
+            return;
         }
+
         setEtapa(2);
-    }, [isStartBlocked, startBlockReason, showToast, isPickup, isServiceStarted, handleStartAttendance, setEtapa]);
+    }, [
+        isStartBlocked,
+        startBlockReason,
+        showToast,
+        isPickup,
+        isServiceStarted,
+        pickupGate.required,
+        pickupGate.allowBypass,
+        pickupCode,
+        pickupBypassValid,
+        pickupBypassReasonCode,
+        pickupBypassReasonText,
+        handleStartAttendance,
+        setEtapa,
+    ]);
 
     return (
         <ScreenBase
@@ -121,6 +171,10 @@ export function TransferEtapaInicial() {
                                 </Box>
                             )}
                         </Box>
+
+                        {isPickup && pickupGate.required && !isServiceStarted && (
+                            <PickupCodeCard allowBypass={pickupGate.allowBypass} />
+                        )}
 
                         <Box gap="y12" paddingBottom="y24" alignItems="center">
                             {isPickup && (
