@@ -92,7 +92,9 @@ export function TransferEtapaInicial() {
                 setEtapa(2);
                 return;
             }
-            await handleStartAttendance();
+            // Sem código exigido: mantém o comportamento otimista de sempre (igual ao
+            // Coleta e ao pré-feature) — fire-and-forget, não bloqueia por falha aqui.
+            void handleStartAttendance();
             setEtapa(2);
             return;
         }

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
@@ -76,6 +76,11 @@ export const useStopActions = ({
     // o novo status (via prop serviceStatus que atualiza no refetch) ou erro.
     const [pendingStart, setPendingStart] = useState(false);
     const [pendingAttendance, setPendingAttendance] = useState(false);
+    // Guard síncrono contra duplo-tap: o `pendingAttendance` em state é assíncrono
+    // (entre o clique e o re-render que desabilita o botão, um 2º toque passaria),
+    // e agora o payload carrega código/motivo, então um start-attendance duplicado é
+    // mais consequente. O ref bloqueia imediatamente. (Mesmo padrão do finalizingRef.)
+    const startingAttendanceRef = useRef(false);
 
     useEffect(() => {
         // Confirmou "a caminho" (ou já avançou) → limpa pendência do start.
@@ -191,42 +196,51 @@ export const useStopActions = ({
     ]);
 
     const handleStartAttendance = useCallback(async (args?: StartAttendanceArgs): Promise<boolean> => {
-        // Bloqueia só estados terminais; backend aceita PENDING/ASSIGNED/IN_PROGRESS → IN_ATTENDANCE.
-        if (
-            serviceStatus === ServiceStatus.COMPLETED ||
-            serviceStatus === ServiceStatus.CANCELED ||
-            serviceStatus === ServiceStatus.FAILED
-        ) {
-            showToast({ message: `Não é possível iniciar o atendimento. Status atual: ${serviceStatus}`, type: 'error' });
+        // Duplo-tap: se já há um start-attendance em voo, ignora o 2º toque.
+        if (startingAttendanceRef.current) {
             return false;
         }
-        // Já em atendimento → apenas garante refetch
-        if (serviceStatus === ServiceStatus.IN_ATTENDANCE) {
-            invalidateQueries();
-            onSuccess?.();
-            return true;
-        }
-        // Marca pendência ANTES de capturar GPS — o botão já entra em loading no clique,
-        // mesmo durante a captura de localização (até alguns segundos).
-        setPendingAttendance(true);
-        // Captura a referência de GPS de onde o motorista iniciou o atendimento (best-effort).
-        const location = await getCurrentCoords();
+        startingAttendanceRef.current = true;
         try {
-            await startAttendanceAsync({ id: serviceId, location, ...args });
-            return true;
-        } catch (error: any) {
-            // Só "já em atendimento" é sucesso efetivo (idempotência). NÃO tratamos
-            // INTERNAL_ERROR/500 como sucesso aqui: num gate de código, um erro genérico
-            // do servidor durante a validação não pode fazer o wizard avançar sem que o
-            // código tenha sido aceito. Qualquer outra falha (código inválido, 500, rede)
-            // → retorna false e o chamador mantém o motorista na etapa atual.
-            const errorMessage = error?.error?.message || error?.message || '';
-            if (errorMessage.includes('em atendimento') || errorMessage.includes('IN_ATTENDANCE')) {
+            // Bloqueia só estados terminais; backend aceita PENDING/ASSIGNED/IN_PROGRESS → IN_ATTENDANCE.
+            if (
+                serviceStatus === ServiceStatus.COMPLETED ||
+                serviceStatus === ServiceStatus.CANCELED ||
+                serviceStatus === ServiceStatus.FAILED
+            ) {
+                showToast({ message: `Não é possível iniciar o atendimento. Status atual: ${serviceStatus}`, type: 'error' });
+                return false;
+            }
+            // Já em atendimento → apenas garante refetch
+            if (serviceStatus === ServiceStatus.IN_ATTENDANCE) {
+                invalidateQueries();
+                onSuccess?.();
                 return true;
             }
-            // Falha real (ex.: código de retirada inválido) — o onError já mostrou o toast
-            // com a mensagem do backend. O chamador NÃO deve avançar o wizard.
-            return false;
+            // Marca pendência ANTES de capturar GPS — o botão já entra em loading no clique,
+            // mesmo durante a captura de localização (até alguns segundos).
+            setPendingAttendance(true);
+            // Captura a referência de GPS de onde o motorista iniciou o atendimento (best-effort).
+            const location = await getCurrentCoords();
+            try {
+                await startAttendanceAsync({ id: serviceId, location, ...args });
+                return true;
+            } catch (error: any) {
+                // Só "já em atendimento" é sucesso efetivo (idempotência). NÃO tratamos
+                // INTERNAL_ERROR/500 como sucesso aqui: num gate de código, um erro genérico
+                // do servidor durante a validação não pode fazer o wizard avançar sem que o
+                // código tenha sido aceito. Qualquer outra falha (código inválido, 500, rede)
+                // → retorna false e o chamador mantém o motorista na etapa atual.
+                const errorMessage = error?.error?.message || error?.message || '';
+                if (errorMessage.includes('em atendimento') || errorMessage.includes('IN_ATTENDANCE')) {
+                    return true;
+                }
+                // Falha real (ex.: código de retirada inválido) — o onError já mostrou o toast
+                // com a mensagem do backend. O chamador NÃO deve avançar o wizard.
+                return false;
+            }
+        } finally {
+            startingAttendanceRef.current = false;
         }
     }, [serviceStatus, startAttendanceAsync, serviceId, invalidateQueries, onSuccess, showToast]);
 
