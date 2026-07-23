@@ -22,7 +22,7 @@ import type {
     MaterialCheckRequest,
     MaterialCheckResponse,
 } from './dto/response/service-material.response'
-import { serviceAPI, type ServiceItem } from './serviceAPI'
+import { serviceAPI, type ServiceItem, type StartAttendanceOptions } from './serviceAPI'
 
 /**
  * Cria um service
@@ -77,9 +77,9 @@ async function start(id: Id): Promise<BaseResponse<ServiceResponse>> {
 
 async function startAttendance(
     id: Id,
-    location?: { latitude?: number; longitude?: number; accuracy?: number },
+    opts?: StartAttendanceOptions,
 ): Promise<BaseResponse<ServiceResponse>> {
-    return serviceAPI.startAttendance(id, location)
+    return serviceAPI.startAttendance(id, opts)
 }
 
 async function complete(id: Id, completionNotes?: string): Promise<BaseResponse<ServiceResponse>> {
