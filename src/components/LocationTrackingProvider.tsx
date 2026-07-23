@@ -12,6 +12,7 @@ import { initializeGeofenceService, cleanupGeofenceService } from '@/services/ge
 import { useLocationTracking, updateBackgroundGeolocationAuth } from '@/services/location';
 import { initializeBackgroundGeolocation, cleanupBackgroundGeolocation, onAuthRefreshed, requestCurrentPosition } from '@/services/location/backgroundLocationService';
 import { shouldTrack } from '@/services/location/trackingGate';
+import { useOfferAlert } from '@/services/offer/OfferAlertProvider';
 
 /**
  * Componente que gerencia o rastreamento de localização automaticamente.
@@ -61,6 +62,10 @@ export function LocationTrackingProvider({ children }: { children: React.ReactNo
   const isAvailable = driver?.isAvailable ?? false;
   const trackingEnabled = shouldTrack(hasInProgressRoute, isAvailable);
 
+  // Popup global de oferta (uberização) — o WS entrega o payload, o
+  // OfferAlertProvider (montado acima, em (auth)/_layout.tsx) decide exibir.
+  const { pushOffer } = useOfferAlert();
+
   // WebSocket de telemetria (canal /monitoring). NÃO é o canal que envia
   // localizações — o SDK faz isso por HTTP direto. Aqui só recebemos updates
   // pro backend ver o motorista em tempo real.
@@ -68,6 +73,7 @@ export function LocationTrackingProvider({ children }: { children: React.ReactNo
     onDriverLocationUpdate: (data: DriverLocationUpdate) => {
       console.log('[LocationTrackingProvider] Localização confirmada via WebSocket:', data.driverId);
     },
+    onOfferAvailable: pushOffer,
     onConnect: () => {
       console.log('[LocationTrackingProvider] WebSocket conectado ao /monitoring');
     },
