@@ -137,7 +137,9 @@ export const useStopActions = ({
             }
             console.error('Error starting attendance:', error)
             setPendingAttendance(false)
-            showToast({ message: 'Não foi possível iniciar o atendimento. Tente novamente.', type: 'error' })
+            // Preferir a mensagem do backend (ex.: "Código de retirada inválido") para o
+            // motorista distinguir código errado de falha de rede, em vez do genérico.
+            showToast({ message: errorMessage || 'Não foi possível iniciar o atendimento. Tente novamente.', type: 'error' })
         },
     })
 
@@ -213,18 +215,17 @@ export const useStopActions = ({
             await startAttendanceAsync({ id: serviceId, location, ...args });
             return true;
         } catch (error: any) {
-            // Mesmo critério do onError acima: "já em atendimento" é sucesso efetivo,
-            // não uma falha real de código/validação — não deve bloquear o wizard.
+            // Só "já em atendimento" é sucesso efetivo (idempotência). NÃO tratamos
+            // INTERNAL_ERROR/500 como sucesso aqui: num gate de código, um erro genérico
+            // do servidor durante a validação não pode fazer o wizard avançar sem que o
+            // código tenha sido aceito. Qualquer outra falha (código inválido, 500, rede)
+            // → retorna false e o chamador mantém o motorista na etapa atual.
             const errorMessage = error?.error?.message || error?.message || '';
-            if (
-                errorMessage.includes('em atendimento') ||
-                errorMessage.includes('IN_ATTENDANCE') ||
-                error?.error?.code === 'INTERNAL_ERROR'
-            ) {
+            if (errorMessage.includes('em atendimento') || errorMessage.includes('IN_ATTENDANCE')) {
                 return true;
             }
-            // Falha real (ex.: código de retirada inválido) — onError acima já mostrou o
-            // toast. O chamador NÃO deve avançar o wizard.
+            // Falha real (ex.: código de retirada inválido) — o onError já mostrou o toast
+            // com a mensagem do backend. O chamador NÃO deve avançar o wizard.
             return false;
         }
     }, [serviceStatus, startAttendanceAsync, serviceId, invalidateQueries, onSuccess, showToast]);
