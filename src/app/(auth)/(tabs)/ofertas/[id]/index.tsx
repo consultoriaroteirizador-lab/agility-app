@@ -57,6 +57,12 @@ export default function OfertaDetalhadaScreen() {
       showToast({ message: 'Rota aceita com sucesso', type: 'success' });
       router.push('/(auth)/(tabs)');
     },
+    onError: (error: any) => {
+      // Backend retorna { error: { message } } (ex.: rejeição de capacidade
+      // do veículo) — priorizar essa mensagem sobre um texto genérico.
+      const errorMessage = error?.error?.message || error?.message || 'Erro ao aceitar rota';
+      showToast({ message: errorMessage, type: 'error' });
+    },
   });
 
   const paradas = useMemo(() => {

@@ -229,8 +229,10 @@ export default function OfertasScreen() {
       showToast({ message: 'Rota aceita com sucesso', type: 'success' });
       router.push('/(auth)/(tabs)');
     },
-    onError: (error: Error) => {
-      const errorMessage = error?.message || 'Erro ao aceitar rota';
+    onError: (error: any) => {
+      // Backend retorna { error: { message } } (ex.: rejeição de capacidade
+      // do veículo) — priorizar essa mensagem sobre um texto genérico.
+      const errorMessage = error?.error?.message || error?.message || 'Erro ao aceitar rota';
       showToast({ message: errorMessage, type: 'error' });
     },
   });
