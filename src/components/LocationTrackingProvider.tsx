@@ -1,17 +1,21 @@
 import { useEffect, useRef, useState } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
 
+import { useQueryClient } from '@tanstack/react-query';
+
 import { useFindOneDriver } from '@/domain/agility/driver/useCase';
 import { RoutingStatus } from '@/domain/agility/routing/dto/types';
 import { useFindMyRoutings } from '@/domain/agility/routing/useCase';
 import { useTrackingWebSocket } from '@/domain/agility/tracking';
 import type { DriverLocationUpdate } from '@/domain/agility/tracking';
 import { authAdapter } from '@/domain/Auth/authAdapter';
+import { KEY_ROUTINGS } from '@/domain/queryKeys';
 import { useAuthCredentialsService } from '@/services';
 import { initializeGeofenceService, cleanupGeofenceService } from '@/services/geofence';
 import { useLocationTracking, updateBackgroundGeolocationAuth } from '@/services/location';
 import { initializeBackgroundGeolocation, cleanupBackgroundGeolocation, onAuthRefreshed, requestCurrentPosition } from '@/services/location/backgroundLocationService';
 import { shouldTrack } from '@/services/location/trackingGate';
+import { useToastService } from '@/services/Toast/useToast';
 
 /**
  * Componente que gerencia o rastreamento de localização automaticamente.
@@ -61,12 +65,25 @@ export function LocationTrackingProvider({ children }: { children: React.ReactNo
   const isAvailable = driver?.isAvailable ?? false;
   const trackingEnabled = shouldTrack(hasInProgressRoute, isAvailable);
 
+  // Alerta global de nova oferta: como este provider é o DONO do socket global
+  // /monitoring (o primeiro consumidor de useTrackingWebSocket), é aqui que o
+  // evento `offer.available` dispara de forma confiável — não na tela de ofertas
+  // (que só reusa o socket e não tem seus callbacks anexados).
+  const queryClient = useQueryClient();
+  const { showToast } = useToastService();
+
   // WebSocket de telemetria (canal /monitoring). NÃO é o canal que envia
   // localizações — o SDK faz isso por HTTP direto. Aqui só recebemos updates
   // pro backend ver o motorista em tempo real.
   const { connect: connectWebSocket, disconnect: disconnectWebSocket } = useTrackingWebSocket({
     onDriverLocationUpdate: (data: DriverLocationUpdate) => {
       console.log('[LocationTrackingProvider] Localização confirmada via WebSocket:', data.driverId);
+    },
+    onOfferAvailable: (offer) => {
+      console.log('[LocationTrackingProvider] Nova oferta recebida:', offer?.code ?? offer?.id);
+      // Atualiza a lista de ofertas onde quer que o motorista esteja no app.
+      void queryClient.invalidateQueries({ queryKey: [KEY_ROUTINGS, 'broadcasting'] });
+      showToast({ message: 'Nova oferta de rota disponível!', type: 'success' });
     },
     onConnect: () => {
       console.log('[LocationTrackingProvider] WebSocket conectado ao /monitoring');

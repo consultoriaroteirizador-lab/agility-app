@@ -15,7 +15,8 @@ import { useUserLocation } from '../rotas-detalhadas/[id]/parada/[pid]/_hooks/us
 
 interface OfertaAdaptada {
   id: string;
-  tempoExpirarSegundos: number;
+  /** Segundos até expirar. `null` = sem prazo definido (oferta NÃO expira no app). */
+  tempoExpirarSegundos: number | null;
   servicosCount: number;
   distancia: string;
   tempo: string;
@@ -24,21 +25,27 @@ interface OfertaAdaptada {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function calcularTempoExpirar(offerTime: string | null): number {
-  if (!offerTime) return 0;
-  try {
-    if (offerTime.includes(':')) {
-      const [hora, minuto] = offerTime.split(':').map(Number);
-      const agora = new Date();
-      const expiracao = new Date();
-      expiracao.setHours(hora, minuto, 0, 0);
-      if (expiracao < agora) expiracao.setDate(expiracao.getDate() + 1);
-      return Math.max(0, Math.floor((expiracao.getTime() - agora.getTime()) / 1000));
-    }
-    return Math.max(0, Math.floor((new Date(offerTime).getTime() - Date.now()) / 1000));
-  } catch {
-    return 0;
-  }
+/**
+ * Segundos até a oferta expirar, ou `null` quando não há um prazo confiável.
+ *
+ * O único formato confiável é um TIMESTAMP ABSOLUTO de expiração (ISO) — aí sim
+ * dá pra contar regressivamente. Enquanto o backend não enviar isso:
+ *  - `offerTime` ausente/null  → `null` (sem prazo; NÃO marca "Expirada").
+ *  - `offerTime` em `HH:mm`     → `null` (ambíguo — duração? hora do dia? — não dá
+ *     pra virar contagem confiável; tratar como "sem prazo" em vez de expirar na hora).
+ *  - ISO válido no futuro       → segundos restantes.
+ *  - ISO válido no passado      → 0 (genuinamente expirada).
+ *
+ * ANTES este helper retornava 0 para null/HH:mm, fazendo TODA oferta nascer
+ * "Expirada" + Aceitar desabilitado (o front do operador não envia offerTime).
+ */
+function calcularTempoExpirar(offerTime: string | null): number | null {
+  if (!offerTime) return null;
+  // HH:mm não é um instante confiável de expiração — ignora (sem prazo).
+  if (/^\d{1,2}:\d{2}$/.test(offerTime.trim())) return null;
+  const ts = new Date(offerTime).getTime();
+  if (Number.isNaN(ts)) return null;
+  return Math.max(0, Math.floor((ts - Date.now()) / 1000));
 }
 
 function formatarDistancia(km: number | null | undefined): string {
@@ -77,15 +84,19 @@ interface OfertaCardProps {
 }
 
 function OfertaCard({ oferta, onPress, onAceitar, isAccepting }: OfertaCardProps) {
-  const [segundos, setSegundos] = useState(oferta.tempoExpirarSegundos);
+  const [segundos, setSegundos] = useState<number | null>(oferta.tempoExpirarSegundos);
 
   useEffect(() => {
-    if (segundos <= 0) return;
-    const interval = setInterval(() => setSegundos((s) => s - 1), 1000);
+    // Sem prazo (null) → não roda contagem regressiva.
+    if (segundos === null || segundos <= 0) return;
+    const interval = setInterval(() => setSegundos((s) => (s === null ? null : s - 1)), 1000);
     return () => clearInterval(interval);
   }, [segundos]);
 
-  const expirado = segundos <= 0;
+  // Só é "expirado" quando há um prazo real que chegou a zero. Sem prazo (null)
+  // NUNCA bloqueia o Aceitar.
+  const expirado = segundos !== null && segundos <= 0;
+  const temPrazo = segundos !== null;
 
   return (
     <TouchableOpacityBox
@@ -97,24 +108,28 @@ function OfertaCard({ oferta, onPress, onAceitar, isAccepting }: OfertaCardProps
       overflow="hidden"
       onPress={onPress}
     >
-      {/* Timer */}
-      <Box px="x16" pt="y16" pb="y12">
-        <Box
-          alignSelf="flex-start"
-          borderWidth={measure.m1}
-          borderColor="primary100"
-          borderRadius="s20"
-          px="x12"
-          py="y4"
-        >
-          <Text preset="text13" color={expirado ? 'redError' : 'primary100'}>
-            Oferta sumirá: {formatarTimer(segundos)}
-          </Text>
-        </Box>
-      </Box>
+      {/* Timer — só aparece quando há um prazo real de expiração */}
+      {temPrazo && (
+        <>
+          <Box px="x16" pt="y16" pb="y12">
+            <Box
+              alignSelf="flex-start"
+              borderWidth={measure.m1}
+              borderColor="primary100"
+              borderRadius="s20"
+              px="x12"
+              py="y4"
+            >
+              <Text preset="text13" color={expirado ? 'redError' : 'primary100'}>
+                Oferta sumirá: {formatarTimer(segundos as number)}
+              </Text>
+            </Box>
+          </Box>
 
-      {/* Divisor */}
-      <Box height={measure.m1} backgroundColor="gray100" />
+          {/* Divisor */}
+          <Box height={measure.m1} backgroundColor="gray100" />
+        </>
+      )}
 
       {/* Timeline */}
       <Box px="x16" py="y16" gap="y4">
@@ -250,6 +265,10 @@ export default function OfertasScreen() {
   const onRefresh = () => {
     refetch();
   };
+  // Tempo real: o alerta + invalidação da lista de ofertas ficam no
+  // LocationTrackingProvider (dono global do socket /monitoring). Quando uma
+  // oferta chega, ele invalida a query de broadcasting e esta tela, se montada,
+  // re-busca sozinha via React Query.
 
 
   // TODO: substituir por store real

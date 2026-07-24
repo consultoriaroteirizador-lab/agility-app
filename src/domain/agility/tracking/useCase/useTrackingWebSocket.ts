@@ -21,6 +21,9 @@ export interface TrackingWebSocketOptions {
   onRoutingUpdated?: (data: { id?: string } & Record<string, unknown>) => void;
   /** Serviço/parada atualizado (status, ETA re-projetada, etc.). */
   onServiceUpdated?: (data: { id?: string; routingId?: string } & Record<string, unknown>) => void;
+  /** Nova oferta de rota disponível pra este motorista (uberização/leilão).
+   *  Emitido pelo backend em `offer.available` na sala `user:${keycloakUserId}`. */
+  onOfferAvailable?: (data: { id?: string; code?: string } & Record<string, unknown>) => void;
   onConnect?: () => void;
   onDisconnect?: () => void;
   onError?: (error: Error) => void;
@@ -160,6 +163,14 @@ export function useTrackingWebSocket(options: TrackingWebSocketOptions = {}) {
     socket.on('service_updated', (data: { id?: string; routingId?: string }) => {
       console.log('[TrackingWebSocket] Service update:', data?.id);
       optionsRef.current.onServiceUpdated?.(data);
+    });
+
+    // Nova oferta de rota disponível (uberização): backend emite na sala do
+    // usuário. A tela de ofertas usa isso para atualizar a lista ao vivo +
+    // alertar o motorista, sem precisar recarregar.
+    socket.on('offer.available', (data: { id?: string; code?: string }) => {
+      console.log('[TrackingWebSocket] Offer available:', data?.code ?? data?.id);
+      optionsRef.current.onOfferAvailable?.(data);
     });
 
     // Escutar erros
