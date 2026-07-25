@@ -2,7 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
 
 import { useQueryClient } from '@tanstack/react-query';
+import { useRouter } from 'expo-router';
 
+import { OfferAlertModal, type IncomingOffer } from '@/components/OfferAlertModal/OfferAlertModal';
 import { useFindOneDriver } from '@/domain/agility/driver/useCase';
 import { RoutingStatus } from '@/domain/agility/routing/dto/types';
 import { useFindMyRoutings } from '@/domain/agility/routing/useCase';
@@ -15,7 +17,6 @@ import { initializeGeofenceService, cleanupGeofenceService } from '@/services/ge
 import { useLocationTracking, updateBackgroundGeolocationAuth } from '@/services/location';
 import { initializeBackgroundGeolocation, cleanupBackgroundGeolocation, onAuthRefreshed, requestCurrentPosition } from '@/services/location/backgroundLocationService';
 import { shouldTrack } from '@/services/location/trackingGate';
-import { useToastService } from '@/services/Toast/useToast';
 
 /**
  * Componente que gerencia o rastreamento de localização automaticamente.
@@ -70,7 +71,9 @@ export function LocationTrackingProvider({ children }: { children: React.ReactNo
   // evento `offer.available` dispara de forma confiável — não na tela de ofertas
   // (que só reusa o socket e não tem seus callbacks anexados).
   const queryClient = useQueryClient();
-  const { showToast } = useToastService();
+  const router = useRouter();
+  // Oferta recém-chegada pelo socket — dispara o bottom-sheet de alerta.
+  const [incomingOffer, setIncomingOffer] = useState<IncomingOffer | null>(null);
 
   // WebSocket de telemetria (canal /monitoring). NÃO é o canal que envia
   // localizações — o SDK faz isso por HTTP direto. Aqui só recebemos updates
@@ -83,7 +86,8 @@ export function LocationTrackingProvider({ children }: { children: React.ReactNo
       console.log('[LocationTrackingProvider] Nova oferta recebida:', offer?.code ?? offer?.id);
       // Atualiza a lista de ofertas onde quer que o motorista esteja no app.
       void queryClient.invalidateQueries({ queryKey: [KEY_ROUTINGS, 'broadcasting'] });
-      showToast({ message: 'Nova oferta de rota disponível!', type: 'success' });
+      // Alerta in-app destacado (estilo app de motorista).
+      setIncomingOffer(offer as IncomingOffer);
     },
     onConnect: () => {
       console.log('[LocationTrackingProvider] WebSocket conectado ao /monitoring');
@@ -253,7 +257,20 @@ export function LocationTrackingProvider({ children }: { children: React.ReactNo
     return () => subscription.remove();
   }, [driverId, connectWebSocket]);
 
-  return <>{children}</>;
+  return (
+    <>
+      {children}
+      <OfferAlertModal
+        offer={incomingOffer}
+        onView={() => {
+          const id = incomingOffer?.id;
+          setIncomingOffer(null);
+          if (id) router.push(`/(auth)/(tabs)/ofertas/${id}`);
+        }}
+        onDismiss={() => setIncomingOffer(null)}
+      />
+    </>
+  );
 }
 
 /**

@@ -10,6 +10,7 @@ import { formatAddress } from '@/domain/agility/address/dto';
 import { useFindOneRouting, useAcceptRouting } from '@/domain/agility/routing/useCase';
 import { ServiceType } from '@/domain/agility/service/dto/types';
 import { useFindServicesByRoutingId } from '@/domain/agility/service/useCase';
+import { useAppSafeArea } from '@/hooks';
 import { useToastService } from '@/services/Toast/useToast';
 import { measure } from '@/theme';
 
@@ -51,6 +52,7 @@ export default function OfertaDetalhadaScreen() {
   const { routing, isLoading: isLoadingRouting } = useFindOneRouting(routingId);
   const { services, isLoading: isLoadingServices } = useFindServicesByRoutingId(routingId);
   const { showToast } = useToastService();
+  const safeArea = useAppSafeArea();
   const [mostrarPopup, setMostrarPopup] = useState(false);
   const [mostrarMapa, setMostrarMapa] = useState(false);
 
@@ -132,7 +134,9 @@ export default function OfertaDetalhadaScreen() {
       buttonLeft={<ButtonBack />}
       title={<Text preset="textTitleScreen">Rota</Text>}
     >
-      <Box flex={1} pt="y12" pb="y24" scrollable>
+      {/* pb generoso: os botões Recusar/Aceitar precisam livrar a tab bar + o
+          safe-area inferior (antes ficavam colados no rodapé). */}
+      <Box flex={1} pt="y12" scrollable style={{ paddingBottom: safeArea.bottom + 96 }}>
 
         {/* Tags de Resumo */}
         <Box flexDirection="row" flexWrap="wrap" gap="x12" mb="y24">
@@ -161,6 +165,35 @@ export default function OfertaDetalhadaScreen() {
 
         {/* Timeline de Paradas */}
         <Box gap="y16" mb="y24">
+          {/* Origem — de onde o motorista sai */}
+          <Box flexDirection="row" alignItems="flex-start" gap="x12">
+            <Box alignItems="center" width={measure.x24}>
+              <Box
+                width={measure.x24}
+                height={measure.y24}
+                borderRadius="s12"
+                borderWidth={measure.m2}
+                borderColor="primary100"
+                backgroundColor="white"
+                justifyContent="center"
+                alignItems="center"
+              >
+                <Icon name="home" size={12} color="primary100" />
+              </Box>
+              {(paradas.length > 0 || retorno) && (
+                <Box width={measure.x2} flex={1} backgroundColor="gray200" mt="y4" />
+              )}
+            </Box>
+            <Box flex={1} backgroundColor="white" borderRadius="s12" p="y16" borderWidth={measure.m1} borderColor="gray200">
+              <Text preset="text14" fontWeightPreset='semibold' color="colorTextPrimary" mb="y4">
+                Origem
+              </Text>
+              <Text preset="text13" color="gray400">
+                {routing.originAddress || 'Ponto de partida'}
+              </Text>
+            </Box>
+          </Box>
+
           {paradas.map((parada, index) => (
             <Box key={index} flexDirection="row" alignItems="flex-start" gap="x12">
               <Box alignItems="center" width={measure.x24}>
