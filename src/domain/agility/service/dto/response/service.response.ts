@@ -267,6 +267,16 @@ export interface ServiceResponse {
 
     /** Respostas preenchidas dos form groups */
     formGroupAnswers: FormGroupAnswerResponse[] | null
+
+    /**
+     * Configuração de código de confirmação de retirada/entrega (por empresa).
+     * Indica se o backend exige código na retirada/entrega e se permite bypass.
+     */
+    confirmationCode?: {
+        requirePickupCode: boolean
+        requireDeliveryCode: boolean
+        allowCodeBypass: boolean
+    } | null
 }
 
 

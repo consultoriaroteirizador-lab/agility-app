@@ -1,22 +1,18 @@
 import { useEffect, useRef, useState } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
 
-import { useQueryClient } from '@tanstack/react-query';
-import { useRouter } from 'expo-router';
-
-import { OfferAlertModal, type IncomingOffer } from '@/components/OfferAlertModal/OfferAlertModal';
 import { useFindOneDriver } from '@/domain/agility/driver/useCase';
 import { RoutingStatus } from '@/domain/agility/routing/dto/types';
 import { useFindMyRoutings } from '@/domain/agility/routing/useCase';
 import { useTrackingWebSocket } from '@/domain/agility/tracking';
 import type { DriverLocationUpdate } from '@/domain/agility/tracking';
 import { authAdapter } from '@/domain/Auth/authAdapter';
-import { KEY_ROUTINGS } from '@/domain/queryKeys';
 import { useAuthCredentialsService } from '@/services';
 import { initializeGeofenceService, cleanupGeofenceService } from '@/services/geofence';
 import { useLocationTracking, updateBackgroundGeolocationAuth } from '@/services/location';
 import { initializeBackgroundGeolocation, cleanupBackgroundGeolocation, onAuthRefreshed, requestCurrentPosition } from '@/services/location/backgroundLocationService';
 import { shouldTrack } from '@/services/location/trackingGate';
+import { useOfferAlert } from '@/services/offer/OfferAlertProvider';
 
 /**
  * Componente que gerencia o rastreamento de localização automaticamente.
@@ -66,14 +62,13 @@ export function LocationTrackingProvider({ children }: { children: React.ReactNo
   const isAvailable = driver?.isAvailable ?? false;
   const trackingEnabled = shouldTrack(hasInProgressRoute, isAvailable);
 
-  // Alerta global de nova oferta: como este provider é o DONO do socket global
-  // /monitoring (o primeiro consumidor de useTrackingWebSocket), é aqui que o
-  // evento `offer.available` dispara de forma confiável — não na tela de ofertas
-  // (que só reusa o socket e não tem seus callbacks anexados).
-  const queryClient = useQueryClient();
-  const router = useRouter();
-  // Oferta recém-chegada pelo socket — dispara o bottom-sheet de alerta.
-  const [incomingOffer, setIncomingOffer] = useState<IncomingOffer | null>(null);
+  // Popup global de oferta (uberização). Este provider é o DONO do socket
+  // global /monitoring (primeiro consumidor de useTrackingWebSocket), então é
+  // aqui que `offer.available` chega de forma confiável — não na tela de
+  // ofertas, que só reusa o socket e não tem seus callbacks anexados. O WS
+  // entrega o payload; o OfferAlertProvider (montado acima, em
+  // (auth)/_layout.tsx) decide exibir.
+  const { pushOffer } = useOfferAlert();
 
   // WebSocket de telemetria (canal /monitoring). NÃO é o canal que envia
   // localizações — o SDK faz isso por HTTP direto. Aqui só recebemos updates
@@ -82,13 +77,7 @@ export function LocationTrackingProvider({ children }: { children: React.ReactNo
     onDriverLocationUpdate: (data: DriverLocationUpdate) => {
       console.log('[LocationTrackingProvider] Localização confirmada via WebSocket:', data.driverId);
     },
-    onOfferAvailable: (offer) => {
-      console.log('[LocationTrackingProvider] Nova oferta recebida:', offer?.code ?? offer?.id);
-      // Atualiza a lista de ofertas onde quer que o motorista esteja no app.
-      void queryClient.invalidateQueries({ queryKey: [KEY_ROUTINGS, 'broadcasting'] });
-      // Alerta in-app destacado (estilo app de motorista).
-      setIncomingOffer(offer as IncomingOffer);
-    },
+    onOfferAvailable: pushOffer,
     onConnect: () => {
       console.log('[LocationTrackingProvider] WebSocket conectado ao /monitoring');
     },
@@ -257,20 +246,7 @@ export function LocationTrackingProvider({ children }: { children: React.ReactNo
     return () => subscription.remove();
   }, [driverId, connectWebSocket]);
 
-  return (
-    <>
-      {children}
-      <OfferAlertModal
-        offer={incomingOffer}
-        onView={() => {
-          const id = incomingOffer?.id;
-          setIncomingOffer(null);
-          if (id) router.push(`/(auth)/(tabs)/ofertas/${id}`);
-        }}
-        onDismiss={() => setIncomingOffer(null)}
-      />
-    </>
-  );
+  return <>{children}</>;
 }
 
 /**

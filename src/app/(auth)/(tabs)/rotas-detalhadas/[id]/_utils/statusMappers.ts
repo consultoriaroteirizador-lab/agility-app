@@ -7,6 +7,7 @@
  * @module rotas-detalhadas/utils/statusMappers
  */
 
+import { formatAddress } from '@/domain/agility/address/dto'
 import type { ServiceResponse } from '@/domain/agility/service/dto'
 import { ServiceType } from '@/domain/agility/service/dto/types'
 import { formatHHmm } from '@/functions'
@@ -169,12 +170,21 @@ export function mapServiceToParada(service: ServiceResponse, index: number, retu
 
     const isRetorno = service.serviceType === ServiceType.RETURN
 
+    // TRANSFER ponto-a-ponto (A→B): mostrar coleta (origem) e entrega (destino)
+    // em vez de um endereço só. Nulo para os demais tipos de serviço.
+    const isTransferAB = service.serviceType === ServiceType.TRANSFER
+        && (!!service.pickupAddress || !!service.deliveryAddress)
+    const enderecoColeta = isTransferAB ? formatAddress(service.pickupAddress) : null
+    const enderecoEntrega = isTransferAB ? formatAddress(service.deliveryAddress) : null
+
     // O endereço do RETORNO vem da routing (returnPoint/returnAddress), não de
     // service.address — a parada RETURN normalmente não tem Address cadastrado.
     const endereco = isRetorno
         ? (returnAddress ?? 'Retorno ao CD/origem')
-        : (service.address?.formattedAddress
-            ?? (service.addressId ? `Endereço ID: ${service.addressId}` : 'Endereço não disponível'))
+        : isTransferAB
+            ? `Coleta: ${enderecoColeta} · Entrega: ${enderecoEntrega}`
+            : (service.address?.formattedAddress
+                ?? (service.addressId ? `Endereço ID: ${service.addressId}` : 'Endereço não disponível'))
 
     const horarioInicio = formatHHmm(service.estimatedArrival)
     const horarioFim = formatHHmm(service.estimatedCompletion)
@@ -197,6 +207,8 @@ export function mapServiceToParada(service: ServiceResponse, index: number, retu
         serviceId: service.id,
         nome: isRetorno ? 'Retorno' : (service.fantasyName ?? service.responsible ?? 'Cliente'),
         endereco,
+        enderecoColeta,
+        enderecoEntrega,
         horarioInicio,
         horarioFim,
         estimatedArrivalISO: toISO(service.estimatedArrival),

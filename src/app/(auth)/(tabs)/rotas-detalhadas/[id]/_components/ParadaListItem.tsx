@@ -339,14 +339,35 @@ export function ParadaListItem({
                     </Text>
                 </Box>
 
-                <Text
-                    preset="text13"
-                    color="gray400"
-                    numberOfLines={1}
-                    ellipsizeMode="tail"
-                >
-                    {parada.endereco}
-                </Text>
+                {parada.enderecoColeta || parada.enderecoEntrega ? (
+                    <Box gap="y2">
+                        <Text
+                            preset="text13"
+                            color="gray400"
+                            numberOfLines={1}
+                            ellipsizeMode="tail"
+                        >
+                            Coleta: {parada.enderecoColeta}
+                        </Text>
+                        <Text
+                            preset="text13"
+                            color="gray400"
+                            numberOfLines={1}
+                            ellipsizeMode="tail"
+                        >
+                            Entrega: {parada.enderecoEntrega}
+                        </Text>
+                    </Box>
+                ) : (
+                    <Text
+                        preset="text13"
+                        color="gray400"
+                        numberOfLines={1}
+                        ellipsizeMode="tail"
+                    >
+                        {parada.endereco}
+                    </Text>
+                )}
 
                 {(horaInicioValida || horaFimValida) && (
                     <Box flexDirection="row" alignItems="center" gap="x4" marginTop="y8">

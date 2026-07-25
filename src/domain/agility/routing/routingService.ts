@@ -15,6 +15,7 @@ import type {
     AcceptRoutingRequest,
     RoutingHandoffRequest,
     RoutingHandoffResult,
+    RouteNonDeliveredItemResponse,
 } from './dto'
 import { routingAPI, type ReturnManifestResponse } from './routingAPI'
 
@@ -116,6 +117,10 @@ async function handoff(id: Id, payload: RoutingHandoffRequest): Promise<BaseResp
     return routingAPI.handoff(id, payload)
 }
 
+async function findNonDelivered(id: Id): Promise<RouteNonDeliveredItemResponse[]> {
+    return routingAPI.findNonDelivered(id)
+}
+
 export const routingService = {
     create,
     findAll,
@@ -140,6 +145,7 @@ export const routingService = {
     acceptRouting,
     getReturnManifest,
     handoff,
+    findNonDelivered,
 }
 
 

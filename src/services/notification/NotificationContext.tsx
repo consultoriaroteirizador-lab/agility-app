@@ -41,6 +41,10 @@ interface NotificationData {
   requiresAuth?: boolean;
   action?: string;
   userId?: string;
+  type?: string;
+  routingId?: string;
+  linkUrl?: string;
+  metadata?: { routingId?: string; [key: string]: any };
   [key: string]: any;
 }
 
@@ -244,6 +248,17 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
   // Função para lidar com navegação baseada nos dados da notificação
   const handleNotificationNavigation = useCallback(
     async (data: NotificationData) => {
+      // Push de oferta (ROUTE_OFFER) não traz `route`/`screen` do backend hoje.
+      // Mapeia explicitamente para a aba Ofertas, usando o routingId como `id`.
+      const routingId = data.routingId ?? data.metadata?.routingId;
+      const isOfferPush =
+        data.type === "ROUTE_OFFER" ||
+        (typeof data.linkUrl === "string" && data.linkUrl.includes("ofertas"));
+
+      if (isOfferPush) {
+        data = { ...data, route: "ofertas", params: { ...data.params, id: routingId } };
+      }
+
       // Prioriza 'route' sobre 'screen'
       const targetRoute = data.route || data.screen;
 

@@ -41,6 +41,9 @@ export function useServiceCompletion() {
         paymentAmount,
         paymentMethod,
         pickupEvidence,
+        deliveryCode,
+        bypassReasonCode,
+        bypassReasonText,
     } = useParada();
     const { showToast } = useToastService();
 
@@ -213,6 +216,17 @@ export function useServiceCompletion() {
                 payload.accuracy = finishCoords.accuracy;
             }
 
+            // Código de confirmação de entrega (T3): envia o código informado OU,
+            // quando o código foi dispensado (bypass), o motivo escolhido.
+            if (deliveryCode?.trim()) {
+                payload.deliveryCode = deliveryCode.trim();
+            } else if (bypassReasonCode?.trim()) {
+                payload.reasonCode = bypassReasonCode.trim();
+                if (bypassReasonText?.trim()) {
+                    payload.reasonText = bypassReasonText.trim();
+                }
+            }
+
             // TRANSFER: anexa a evidência da COLETA na origem (perna 1), capturada antes.
             if (pickupEvidence) {
                 payload.pickupCompletion = {
@@ -296,6 +310,9 @@ export function useServiceCompletion() {
         paymentAmount,
         paymentMethod,
         pickupEvidence,
+        deliveryCode,
+        bypassReasonCode,
+        bypassReasonText,
     ]);
 
     // Verificar se pode finalizar - validação robusta

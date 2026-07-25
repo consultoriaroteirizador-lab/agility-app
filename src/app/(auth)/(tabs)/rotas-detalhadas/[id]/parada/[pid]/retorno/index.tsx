@@ -549,7 +549,7 @@ export default function RetornoScreen() {
             <>
               <Button
                 title={isStartingAttendance ? 'Confirmando...' : 'Cheguei no retorno'}
-                onPress={handleStartAttendance}
+                onPress={() => { void handleStartAttendance(); }}
                 disabled={isStartingAttendance || !canCheckIn}
               />
               {!canCheckIn ? (

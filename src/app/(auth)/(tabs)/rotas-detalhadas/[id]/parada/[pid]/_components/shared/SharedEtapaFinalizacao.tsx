@@ -1,10 +1,11 @@
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { TextInput, Alert } from 'react-native';
 
 import { Box, Button, ScreenBase, Text, TouchableOpacityBox } from '@/components';
 import { ButtonBack } from '@/components/Button/ButtonBack';
 import Modal from '@/components/Modal/Modal';
 import { SignatureCanvas } from '@/components/SignatureCanvas';
+import { resolveCodeRequirement } from '@/domain/agility/service/codeGate';
 import { PaymentMethodType } from '@/domain/agility/service/dto/types';
 import { useAuthCredentialsService } from '@/services';
 import { measure } from '@/theme';
@@ -29,6 +30,12 @@ const PAYMENT_METHODS = [
   { type: PaymentMethodType.PIX, label: 'PIX' },
   { type: PaymentMethodType.CARD_DEBIT, label: 'Débito' },
   { type: PaymentMethodType.CARD_CREDIT, label: 'Crédito' },
+] as const;
+
+const BYPASS_REASONS = [
+  { value: 'CLIENTE_SEM_CODIGO', label: 'Cliente não tem o código' },
+  { value: 'CLIENTE_AUSENTE', label: 'Cliente ausente' },
+  { value: 'OUTRO', label: 'Outro motivo' },
 ] as const;
 
 /**
@@ -76,6 +83,12 @@ export function SharedEtapaFinalizacao({ serviceType }: SharedEtapaFinalizacaoPr
     setPaymentAmount,
     paymentMethod,
     setPaymentMethod,
+    deliveryCode,
+    setDeliveryCode,
+    bypassReasonCode,
+    setBypassReasonCode,
+    bypassReasonText,
+    setBypassReasonText,
   } = useParada();
 
   console.log('[SharedEtapaFinalizacao] useParada()', {
@@ -143,6 +156,20 @@ export function SharedEtapaFinalizacao({ serviceType }: SharedEtapaFinalizacaoPr
   // Pagamento pendente quando o serviço exige cobrança e ainda não foi preenchido.
   const paymentPending = !!service?.requiresPayment && (!paymentAmount || !paymentMethod);
 
+  // Código de confirmação de entrega (T3) — exigido/bypass conforme configuração da empresa.
+  const { required: deliveryCodeRequired, allowBypass: deliveryCodeAllowBypass } = resolveCodeRequirement(
+    service,
+    'DELIVERY'
+  );
+  const [showBypassReasons, setShowBypassReasons] = useState(false);
+
+  const deliveryCodeFilled = deliveryCode.trim().length === 4;
+  const bypassReasonValid =
+    !!bypassReasonCode && (bypassReasonCode !== 'OUTRO' || bypassReasonText.trim().length > 0);
+  // Pendente quando o código é obrigatório e nem o código nem um bypass válido foram informados.
+  const deliveryCodePending =
+    deliveryCodeRequired && !deliveryCodeFilled && !(deliveryCodeAllowBypass && bypassReasonValid);
+
   // Inferência: se o user tem collaboratorId no JWT, é colaborador (funcionário CLT).
   // Cash recebido por colaborador vira dívida na wallet (backend cria DriverAdvance automaticamente).
   const { userAuth } = useAuthCredentialsService();
@@ -191,6 +218,111 @@ export function SharedEtapaFinalizacao({ serviceType }: SharedEtapaFinalizacaoPr
                     {paymentAmount && paymentMethod ? 'Editar pagamento' : 'Registrar pagamento'}
                   </Text>
                 </TouchableOpacityBox>
+              </Box>
+            )}
+
+            {deliveryCodeRequired && (
+              <Box
+                marginBottom="y12"
+                padding="y12"
+                borderRadius="s12"
+                borderWidth={measure.m1}
+                borderColor="primary100"
+                backgroundColor="primary10"
+              >
+                <Text preset="text14" fontWeightPreset="bold" color="primary100">
+                  Código de confirmação de entrega
+                </Text>
+                <Text preset="text12" color="colorTextPrimary" marginTop="t4" marginBottom="b8">
+                  Peça ao cliente o código de confirmação para finalizar esta entrega.
+                </Text>
+
+                <Box
+                  borderWidth={measure.m1}
+                  borderColor="borderColor"
+                  borderRadius="s8"
+                  paddingHorizontal="x12"
+                  paddingVertical="y8"
+                >
+                  <TextInput
+                    value={deliveryCode}
+                    onChangeText={(text) => setDeliveryCode(text.replace(/\D/g, '').slice(0, 4))}
+                    keyboardType="numeric"
+                    maxLength={4}
+                    placeholder="Código de entrega"
+                    placeholderTextColor="#999"
+                    style={{ fontSize: 16, color: '#333' }}
+                  />
+                </Box>
+
+                {deliveryCodeAllowBypass && (
+                  <Box marginTop="t8">
+                    <TouchableOpacityBox onPress={() => setShowBypassReasons((prev) => !prev)}>
+                      <Text preset="text12" color="primary100" fontWeightPreset="bold">
+                        Não tenho o código
+                      </Text>
+                    </TouchableOpacityBox>
+
+                    {showBypassReasons && (
+                      <Box marginTop="t8" gap="y8">
+                        {BYPASS_REASONS.map((reason) => (
+                          <TouchableOpacityBox
+                            key={reason.value}
+                            onPress={() => setBypassReasonCode(reason.value)}
+                            flexDirection="row"
+                            alignItems="center"
+                            gap="x12"
+                            p="y12"
+                            borderWidth={measure.m2}
+                            borderColor={bypassReasonCode === reason.value ? 'primary100' : 'gray200'}
+                            borderRadius="s12"
+                            backgroundColor={bypassReasonCode === reason.value ? 'primary10' : 'white'}
+                          >
+                            <Box
+                              width={measure.x20}
+                              height={measure.y20}
+                              borderRadius="s10"
+                              borderWidth={measure.m2}
+                              borderColor={bypassReasonCode === reason.value ? 'primary100' : 'gray400'}
+                              backgroundColor={bypassReasonCode === reason.value ? 'primary100' : 'transparent'}
+                              justifyContent="center"
+                              alignItems="center"
+                            >
+                              {bypassReasonCode === reason.value && (
+                                <Box width={measure.x10} height={measure.y10} borderRadius="s5" backgroundColor="white" />
+                              )}
+                            </Box>
+                            <Text
+                              preset="text14"
+                              color={bypassReasonCode === reason.value ? 'primary100' : 'colorTextPrimary'}
+                              fontWeightPreset={bypassReasonCode === reason.value ? 'bold' : 'regular'}
+                            >
+                              {reason.label}
+                            </Text>
+                          </TouchableOpacityBox>
+                        ))}
+
+                        {bypassReasonCode === 'OUTRO' && (
+                          <Box
+                            borderWidth={measure.m1}
+                            borderColor="borderColor"
+                            borderRadius="s8"
+                            paddingHorizontal="x12"
+                            paddingVertical="y8"
+                          >
+                            <TextInput
+                              value={bypassReasonText}
+                              onChangeText={setBypassReasonText}
+                              placeholder="Descreva o motivo"
+                              placeholderTextColor="#999"
+                              style={{ fontSize: 16, color: '#333' }}
+                            />
+                          </Box>
+                        )}
+                      </Box>
+                    )}
+                  </Box>
+                )}
               </Box>
             )}
 
@@ -342,7 +474,7 @@ export function SharedEtapaFinalizacao({ serviceType }: SharedEtapaFinalizacaoPr
               <Button
                 title={isCompleting ? 'Finalizando...' : 'Finalizar'}
                 onPress={handleFinalizarWrapper}
-                disabled={isCompleting || !canFinalize || paymentPending}
+                disabled={isCompleting || !canFinalize || paymentPending || deliveryCodePending}
                 width={measure.x330}
               />
               {!canFinalize && (
@@ -353,6 +485,11 @@ export function SharedEtapaFinalizacao({ serviceType }: SharedEtapaFinalizacaoPr
               {canFinalize && paymentPending && (
                 <Text preset="text12" color="primary100" textAlign="center" marginTop="y8">
                   * Registre o pagamento antes de finalizar
+                </Text>
+              )}
+              {canFinalize && !paymentPending && deliveryCodePending && (
+                <Text preset="text12" color="primary100" textAlign="center" marginTop="y8">
+                  * Informe o código de entrega{deliveryCodeAllowBypass ? ' ou o motivo' : ''} antes de finalizar
                 </Text>
               )}
             </Box>

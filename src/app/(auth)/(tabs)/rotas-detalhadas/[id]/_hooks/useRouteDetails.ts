@@ -9,11 +9,12 @@
 
 import { useMemo } from 'react'
 
-import { useFindOneRouting } from '@/domain/agility/routing/useCase'
+import { useFindOneRouting, useRouteNonDelivered } from '@/domain/agility/routing/useCase'
 import { useFindServicesByRoutingId } from '@/domain/agility/service/useCase'
 
 import type { Parada, Rota, RotaStatus } from '../_types/rota.types'
 import {
+    buildInsucessoList,
     calculateProgressFromParadas,
     countParadasByStatus,
     findOutrasParadas,
@@ -25,6 +26,7 @@ import {
     hasMultipleParadasEmAndamento,
     isNenhumAndamento,
     mapServicesToParadas,
+    type InsucessoRow,
 } from '../_utils'
 
 // ============================================
@@ -82,8 +84,16 @@ export interface UseRouteDetailsResult {
     /** Paradas concluídas com sucesso */
     paradasConcluidasSucesso: Parada[]
 
-    /** Paradas concluídas com insucesso */
+    /** Paradas concluídas com insucesso (só as que ficaram na rota) */
     paradasConcluidasInsucesso: Parada[]
+
+    /**
+     * Lista unificada do "Concluídas com insucesso": paradas de insucesso ao vivo
+     * + ledger de não-entregues (cancelados / devolvidos à fila que saíram da
+     * rota). Fonte da verdade do desfecho/motivo é o ledger. Cai para só-ao-vivo
+     * quando o endpoint do ledger falha.
+     */
+    insucessoRows: InsucessoRow[]
 
     /** Todas as paradas concluídas */
     paradasConcluidas: Parada[]
@@ -230,6 +240,19 @@ export function useRouteDetails(rotaId: string | null | undefined): UseRouteDeta
         return findParadasConcluidasInsucesso(paradas)
     }, [paradas])
 
+    // Ledger de não-entregues (cancelados / devolvidos à fila). Só faz sentido
+    // buscar quando há rota. Em erro, `items` = [] e a lista cai para só-ao-vivo.
+    const { items: nonDeliveredItems } = useRouteNonDelivered(rotaId ?? undefined, {
+        enabled: !!rotaId,
+    })
+
+    /**
+     * Lista unificada de insucesso (ao vivo + ledger), deduplicada por serviceId.
+     */
+    const insucessoRows = useMemo(() => {
+        return buildInsucessoList(paradasConcluidasInsucesso, nonDeliveredItems)
+    }, [paradasConcluidasInsucesso, nonDeliveredItems])
+
     /**
      * Todas as paradas concluídas
      */
@@ -304,6 +327,7 @@ export function useRouteDetails(rotaId: string | null | undefined): UseRouteDeta
         outrasParadas,
         paradasConcluidasSucesso,
         paradasConcluidasInsucesso,
+        insucessoRows,
         paradasConcluidas,
         nenhumAndamento,
         temMultiplasEmAndamento,

@@ -17,6 +17,7 @@ import type {
     RoutingsAggregatedSummaryResponse,
     RoutingHandoffRequest,
     RoutingHandoffResult,
+    RouteNonDeliveredItemResponse,
 } from './dto'
 
 
@@ -194,6 +195,15 @@ async function handoff(id: Id, payload: RoutingHandoffRequest): Promise<BaseResp
     return data
 }
 
+/**
+ * Ledger de não-entregues (cancelados / devolvidos à fila / insucesso) da rota.
+ * RESPOSTA É UM ARRAY CRU (sem envelope BaseResponse) — retornamos direto.
+ */
+async function findNonDelivered(id: Id): Promise<RouteNonDeliveredItemResponse[]> {
+    const { data } = await apiAgility.get<RouteNonDeliveredItemResponse[]>(`/routings/${id}/non-delivered`)
+    return Array.isArray(data) ? data : []
+}
+
 export const routingAPI = {
     create,
     findAll,
@@ -219,6 +229,7 @@ export const routingAPI = {
     getAggregatedSummary,
     getReturnManifest,
     handoff,
+    findNonDelivered,
 }
 
 

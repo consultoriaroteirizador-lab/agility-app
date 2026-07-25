@@ -213,7 +213,10 @@ function OfertaCard({ oferta, onPress, onAceitar, isAccepting }: OfertaCardProps
           <Text preset="text13" color="gray400" mt="y2">
             {oferta.distancia} · {oferta.tempo}
           </Text>
-          <Text preset="text18" color="primary100" fontWeight="700" mt="y4">
+          <Text preset="text13" color="gray400" mt="y4">
+            Frete
+          </Text>
+          <Text preset="text18" color="primary100" fontWeight="700">
             {oferta.preco}
           </Text>
         </Box>
@@ -241,8 +244,10 @@ export default function OfertasScreen() {
       showToast({ message: 'Rota aceita com sucesso', type: 'success' });
       router.push('/(auth)/(tabs)');
     },
-    onError: (error: Error) => {
-      const errorMessage = error?.message || 'Erro ao aceitar rota';
+    onError: (error: any) => {
+      // Backend retorna { error: { message } } (ex.: rejeição de capacidade
+      // do veículo) — priorizar essa mensagem sobre um texto genérico.
+      const errorMessage = error?.error?.message || error?.message || 'Erro ao aceitar rota';
       showToast({ message: errorMessage, type: 'error' });
     },
   });

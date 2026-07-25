@@ -9,13 +9,17 @@ import { routingService } from '../routingService'
 
 interface UseAcceptRoutingOptions {
     onSuccess?: (data: BaseResponse<RoutingResponse>) => void
-    onError?: (error: Error) => void
+    onError?: (error: BaseResponse<any>) => void
 }
 
 export function useAcceptRouting(options?: UseAcceptRoutingOptions) {
     const queryClient = useQueryClient()
 
-    const mutation = useMutation({
+    const mutation = useMutation<
+        BaseResponse<RoutingResponse>,
+        BaseResponse<any>,
+        { routingId: Id; payload?: AcceptRoutingRequest }
+    >({
         mutationFn: ({ routingId, payload }: { routingId: Id; payload?: AcceptRoutingRequest }) =>
             routingService.acceptRouting(routingId, payload),
         onSuccess: (data: BaseResponse<RoutingResponse>) => {
@@ -27,7 +31,7 @@ export function useAcceptRouting(options?: UseAcceptRoutingOptions) {
             }
             options?.onSuccess?.(data)
         },
-        onError: (error: Error) => {
+        onError: (error: BaseResponse<any>) => {
             options?.onError?.(error)
         },
     })

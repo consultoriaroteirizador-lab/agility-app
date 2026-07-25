@@ -15,7 +15,12 @@ export function useFindOccurrenceReasons(context?: 'TRANSFER' | 'LAST_MILE' | 'S
       if (list.length > 0) void saveOccurrenceReasonsMirror(list, context) // warm mirror on success
       return list
     },
-    staleTime: 1000 * 60 * 30, // catálogo é estável
+    // Bug 1b: a lista de motivos NÃO pode ser cacheada — config/motivos mudam por
+    // empresa e o motorista precisa sempre da versão atual do servidor. staleTime 0 +
+    // refetchOnMount 'always' garante refetch a cada abertura do fluxo. O mirror offline
+    // (saveOccurrenceReasonsMirror) segue como fallback só quando a query falha.
+    staleTime: 0,
+    refetchOnMount: 'always',
     retry: false,
   })
 

@@ -61,6 +61,12 @@ export default function OfertaDetalhadaScreen() {
       showToast({ message: 'Rota aceita com sucesso', type: 'success' });
       router.push('/(auth)/(tabs)');
     },
+    onError: (error: any) => {
+      // Backend retorna { error: { message } } (ex.: rejeição de capacidade
+      // do veículo) — priorizar essa mensagem sobre um texto genérico.
+      const errorMessage = error?.error?.message || error?.message || 'Erro ao aceitar rota';
+      showToast({ message: errorMessage, type: 'error' });
+    },
   });
 
   // O RETURN (retorno à origem) NÃO é uma parada de pedido — é o trecho de volta.
@@ -72,14 +78,22 @@ export default function OfertaDetalhadaScreen() {
     return [...services]
       .filter((service) => service.serviceType !== ServiceType.RETURN)
       .sort((a, b) => (a.sequenceOrder ?? 999) - (b.sequenceOrder ?? 999))
-      .map((service) => ({
-        tipo: service.serviceType
-          ? (SERVICE_TYPE_LABEL[service.serviceType as ServiceType] ?? service.serviceType)
-          : 'Serviço',
-        endereco: service.address
-          ? formatAddress(service.address)
-          : 'Endereço não disponível',
-      }));
+      .map((service) => {
+        const isTransfer = service.serviceType === ServiceType.TRANSFER
+          && (!!service.pickupAddress || !!service.deliveryAddress);
+
+        return {
+          tipo: service.serviceType
+            ? (SERVICE_TYPE_LABEL[service.serviceType as ServiceType] ?? service.serviceType)
+            : 'Serviço',
+          endereco: service.address
+            ? formatAddress(service.address)
+            : 'Endereço não disponível',
+          isTransfer,
+          enderecoColeta: isTransfer ? formatAddress(service.pickupAddress) : null,
+          enderecoEntrega: isTransfer ? formatAddress(service.deliveryAddress) : null,
+        };
+      });
   }, [services]);
 
   // Mostra o retorno à origem quando a rota volta (returnToOrigin/hasReturn),
@@ -144,7 +158,7 @@ export default function OfertaDetalhadaScreen() {
             {resumo.totalParadas} paradas
           </TagResumo>
           <TagResumo icon={<Icon name="attach-money" />}>
-            {resumo.preco}
+            Frete: {resumo.preco}
           </TagResumo>
           <TagResumo icon={<Icon name="straighten" />}>
             {resumo.distancia}
@@ -206,9 +220,26 @@ export default function OfertaDetalhadaScreen() {
                 <Text preset="text14" fontWeightPreset='semibold' color="colorTextPrimary" mb="y4">
                   {parada.tipo}
                 </Text>
-                <Text preset="text13" color="gray400">
-                  {parada.endereco}
-                </Text>
+                {parada.isTransfer ? (
+                  <Box gap="y8">
+                    <Box>
+                      <Text preset="text12" color="gray600">Coleta</Text>
+                      <Text preset="text13" color="gray400">
+                        {parada.enderecoColeta}
+                      </Text>
+                    </Box>
+                    <Box>
+                      <Text preset="text12" color="gray600">Entrega</Text>
+                      <Text preset="text13" color="gray400">
+                        {parada.enderecoEntrega}
+                      </Text>
+                    </Box>
+                  </Box>
+                ) : (
+                  <Text preset="text13" color="gray400">
+                    {parada.endereco}
+                  </Text>
+                )}
               </Box>
             </Box>
           ))}

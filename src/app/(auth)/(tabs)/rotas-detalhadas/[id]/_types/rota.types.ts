@@ -84,6 +84,13 @@ export interface Parada {
     /** Endereço formatado da parada */
     endereco: string
 
+    /**
+     * Origem (coleta) e destino (entrega) formatados para TRANSFER
+     * ponto-a-ponto. Nulos para os demais tipos de serviço.
+     */
+    enderecoColeta?: string | null
+    enderecoEntrega?: string | null
+
     /** Horário de início previsto (formato HH:MM) */
     horarioInicio: string
 

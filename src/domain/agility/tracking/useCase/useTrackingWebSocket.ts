@@ -10,6 +10,7 @@ import { useEffect, useRef, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
 
 import { urls } from '@/config/urls';
+import type { OfferPayload } from '@/domain/agility/offer/offerStore';
 import { useAuthCredentialsService } from '@/services/authCredentials/useAuthCredentialsService';
 
 import type { DriverLocationUpdate } from '../types';
@@ -21,9 +22,9 @@ export interface TrackingWebSocketOptions {
   onRoutingUpdated?: (data: { id?: string } & Record<string, unknown>) => void;
   /** Serviço/parada atualizado (status, ETA re-projetada, etc.). */
   onServiceUpdated?: (data: { id?: string; routingId?: string } & Record<string, unknown>) => void;
-  /** Nova oferta de rota disponível pra este motorista (uberização/leilão).
+  /** Nova oferta disponível para o motorista (uberização).
    *  Emitido pelo backend em `offer.available` na sala `user:${keycloakUserId}`. */
-  onOfferAvailable?: (data: { id?: string; code?: string } & Record<string, unknown>) => void;
+  onOfferAvailable?: (offer: OfferPayload) => void;
   onConnect?: () => void;
   onDisconnect?: () => void;
   onError?: (error: Error) => void;
@@ -165,12 +166,10 @@ export function useTrackingWebSocket(options: TrackingWebSocketOptions = {}) {
       optionsRef.current.onServiceUpdated?.(data);
     });
 
-    // Nova oferta de rota disponível (uberização): backend emite na sala do
-    // usuário. A tela de ofertas usa isso para atualizar a lista ao vivo +
-    // alertar o motorista, sem precisar recarregar.
-    socket.on('offer.available', (data: { id?: string; code?: string }) => {
-      console.log('[TrackingWebSocket] Offer available:', data?.code ?? data?.id);
-      optionsRef.current.onOfferAvailable?.(data);
+    // Nova oferta disponível (uberização): backend emite na sala do usuário.
+    socket.on('offer.available', (offer: OfferPayload) => {
+      console.log('[TrackingWebSocket] Offer available:', offer?.id);
+      optionsRef.current.onOfferAvailable?.(offer);
     });
 
     // Escutar erros

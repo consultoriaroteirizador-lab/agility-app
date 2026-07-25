@@ -21,5 +21,6 @@ export { useGetRoutingMapData } from './useGetRoutingMapData'
 export { useAcceptRouting } from './useAcceptRouting'
 export { useReturnManifest } from './useReturnManifest'
 export { useRoutingHandoff } from './useRoutingHandoff'
+export { useRouteNonDelivered } from './useRouteNonDelivered'
 
 
