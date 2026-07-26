@@ -197,11 +197,18 @@ async function handoff(id: Id, payload: RoutingHandoffRequest): Promise<BaseResp
 
 /**
  * Ledger de não-entregues (cancelados / devolvidos à fila / insucesso) da rota.
- * RESPOSTA É UM ARRAY CRU (sem envelope BaseResponse) — retornamos direto.
+ *
+ * A resposta VEM ENVELOPADA em BaseResponse — o ResponseInterceptor global do
+ * backend envolve tudo em `{ success, result, error }`, inclusive o array deste
+ * endpoint. Ler `data` como array (como fazia antes) dava sempre `[]`, e o
+ * fallback silencioso escondia o erro: a lista de "Concluídas com insucesso"
+ * nascia vazia mesmo com o ledger cheio.
  */
 async function findNonDelivered(id: Id): Promise<RouteNonDeliveredItemResponse[]> {
-    const { data } = await apiAgility.get<RouteNonDeliveredItemResponse[]>(`/routings/${id}/non-delivered`)
-    return Array.isArray(data) ? data : []
+    const { data } = await apiAgility.get<BaseResponse<RouteNonDeliveredItemResponse[]>>(
+        `/routings/${id}/non-delivered`,
+    )
+    return Array.isArray(data?.result) ? data.result : []
 }
 
 export const routingAPI = {
