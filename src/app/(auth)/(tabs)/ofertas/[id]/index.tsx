@@ -10,9 +10,11 @@ import { formatAddress } from '@/domain/agility/address/dto';
 import { useFindOneRouting, useAcceptRouting } from '@/domain/agility/routing/useCase';
 import { ServiceType } from '@/domain/agility/service/dto/types';
 import { useFindServicesByRoutingId } from '@/domain/agility/service/useCase';
+import { useAppSafeArea } from '@/hooks';
 import { useToastService } from '@/services/Toast/useToast';
 import { measure } from '@/theme';
 
+import { MapaParadasModal } from '../../rotas-detalhadas/[id]/_components/MapaParadasModal';
 import { useUserLocation } from '../../rotas-detalhadas/[id]/parada/[pid]/_hooks/useUserLocation';
 
 const SERVICE_TYPE_LABEL: Record<ServiceType, string> = {
@@ -50,7 +52,9 @@ export default function OfertaDetalhadaScreen() {
   const { routing, isLoading: isLoadingRouting } = useFindOneRouting(routingId);
   const { services, isLoading: isLoadingServices } = useFindServicesByRoutingId(routingId);
   const { showToast } = useToastService();
+  const safeArea = useAppSafeArea();
   const [mostrarPopup, setMostrarPopup] = useState(false);
+  const [mostrarMapa, setMostrarMapa] = useState(false);
 
   const { acceptRouting, isLoading: isAccepting } = useAcceptRouting({
     onSuccess: () => {
@@ -65,10 +69,14 @@ export default function OfertaDetalhadaScreen() {
     },
   });
 
+  // O RETURN (retorno à origem) NÃO é uma parada de pedido — é o trecho de volta.
+  // Não pode contar como parada nem aparecer como "Endereço não disponível".
+  // Ele é renderizado à parte (linha "Retorno à origem"), fora desta lista.
   const paradas = useMemo(() => {
     if (!services || services.length === 0) return [];
 
     return [...services]
+      .filter((service) => service.serviceType !== ServiceType.RETURN)
       .sort((a, b) => (a.sequenceOrder ?? 999) - (b.sequenceOrder ?? 999))
       .map((service) => {
         const isTransfer = service.serviceType === ServiceType.TRANSFER
@@ -87,6 +95,15 @@ export default function OfertaDetalhadaScreen() {
         };
       });
   }, [services]);
+
+  // Mostra o retorno à origem quando a rota volta (returnToOrigin/hasReturn),
+  // como um marcador — não como uma parada.
+  const retorno = useMemo(() => {
+    if (!routing?.returnToOrigin && !routing?.hasReturn) return null;
+    return {
+      endereco: routing?.returnAddress || routing?.originAddress || 'Retorno ao ponto de origem',
+    };
+  }, [routing]);
 
   const resumo = useMemo(() => ({
     totalParadas: paradas.length,
@@ -131,7 +148,9 @@ export default function OfertaDetalhadaScreen() {
       buttonLeft={<ButtonBack />}
       title={<Text preset="textTitleScreen">Rota</Text>}
     >
-      <Box flex={1} pt="y12" pb="y24" scrollable>
+      {/* pb generoso: os botões Recusar/Aceitar precisam livrar a tab bar + o
+          safe-area inferior (antes ficavam colados no rodapé). */}
+      <Box flex={1} pt="y12" scrollable style={{ paddingBottom: safeArea.bottom + 96 }}>
 
         {/* Tags de Resumo */}
         <Box flexDirection="row" flexWrap="wrap" gap="x12" mb="y24">
@@ -149,13 +168,51 @@ export default function OfertaDetalhadaScreen() {
           </TagResumo>
         </Box>
 
+        {/* Ver rota no mapa */}
+        <Button
+          title="Ver rota no mapa"
+          preset="outline"
+          iconName="map"
+          onPress={() => setMostrarMapa(true)}
+          mb="y24"
+        />
+
         {/* Timeline de Paradas */}
         <Box gap="y16" mb="y24">
+          {/* Origem — de onde o motorista sai */}
+          <Box flexDirection="row" alignItems="flex-start" gap="x12">
+            <Box alignItems="center" width={measure.x24}>
+              <Box
+                width={measure.x24}
+                height={measure.y24}
+                borderRadius="s12"
+                borderWidth={measure.m2}
+                borderColor="primary100"
+                backgroundColor="white"
+                justifyContent="center"
+                alignItems="center"
+              >
+                <Icon name="home" size={12} color="primary100" />
+              </Box>
+              {(paradas.length > 0 || retorno) && (
+                <Box width={measure.x2} flex={1} backgroundColor="gray200" mt="y4" />
+              )}
+            </Box>
+            <Box flex={1} backgroundColor="white" borderRadius="s12" p="y16" borderWidth={measure.m1} borderColor="gray200">
+              <Text preset="text14" fontWeightPreset='semibold' color="colorTextPrimary" mb="y4">
+                Origem
+              </Text>
+              <Text preset="text13" color="gray400">
+                {routing.originAddress || 'Ponto de partida'}
+              </Text>
+            </Box>
+          </Box>
+
           {paradas.map((parada, index) => (
             <Box key={index} flexDirection="row" alignItems="flex-start" gap="x12">
               <Box alignItems="center" width={measure.x24}>
                 <Box width={measure.x16} height={measure.y16} borderRadius="s8" backgroundColor="primary100" />
-                {index < paradas.length - 1 && (
+                {(index < paradas.length - 1 || retorno) && (
                   <Box width={measure.x2} flex={1} backgroundColor="gray200" mt="y4" />
                 )}
               </Box>
@@ -186,6 +243,30 @@ export default function OfertaDetalhadaScreen() {
               </Box>
             </Box>
           ))}
+
+          {/* Retorno à origem — marcador, NÃO é uma parada de pedido */}
+          {retorno && (
+            <Box flexDirection="row" alignItems="flex-start" gap="x12">
+              <Box alignItems="center" width={measure.x24}>
+                <Box
+                  width={measure.x16}
+                  height={measure.y16}
+                  borderRadius="s8"
+                  borderWidth={measure.m2}
+                  borderColor="primary100"
+                  backgroundColor="white"
+                />
+              </Box>
+              <Box flex={1} backgroundColor="gray50" borderRadius="s12" p="y16" borderWidth={measure.m1} borderColor="gray200">
+                <Text preset="text14" fontWeightPreset='semibold' color="gray600" mb="y4">
+                  Retorno à origem
+                </Text>
+                <Text preset="text13" color="gray400">
+                  {retorno.endereco}
+                </Text>
+              </Box>
+            </Box>
+          )}
         </Box>
 
         {/* Botões */}
@@ -206,6 +287,12 @@ export default function OfertaDetalhadaScreen() {
           onPress={handleAcceptRouting}
           isVisible={mostrarPopup}
           onClose={() => setMostrarPopup(false)}
+        />
+
+        <MapaParadasModal
+          visible={mostrarMapa}
+          onClose={() => setMostrarMapa(false)}
+          routeId={routingId}
         />
       </Box>
     </ScreenBase>

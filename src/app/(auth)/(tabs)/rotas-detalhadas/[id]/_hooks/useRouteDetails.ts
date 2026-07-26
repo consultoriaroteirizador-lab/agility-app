@@ -15,7 +15,8 @@ import { useFindServicesByRoutingId } from '@/domain/agility/service/useCase'
 import type { Parada, Rota, RotaStatus } from '../_types/rota.types'
 import {
     buildInsucessoList,
-    calculateProgressFromParadas,
+    calculateProgress,
+    countLedgerOnly,
     countParadasByStatus,
     findOutrasParadas,
     findParadasConcluidas,
@@ -26,6 +27,7 @@ import {
     hasMultipleParadasEmAndamento,
     isNenhumAndamento,
     mapServicesToParadas,
+    withLedgerNonDelivered,
     type InsucessoRow,
 } from '../_utils'
 
@@ -194,20 +196,6 @@ export function useRouteDetails(rotaId: string | null | undefined): UseRouteDeta
         return getRotaStatus(paradas)
     }, [paradas])
 
-    /**
-     * Porcentagem de progresso da rota
-     */
-    const progress = useMemo(() => {
-        return calculateProgressFromParadas(paradas)
-    }, [paradas])
-
-    /**
-     * Contagem de paradas por status
-     */
-    const contagem = useMemo(() => {
-        return countParadasByStatus(paradas)
-    }, [paradas])
-
     // ========================================
     // PARADAS DERIVADAS
     // ========================================
@@ -252,6 +240,33 @@ export function useRouteDetails(rotaId: string | null | undefined): UseRouteDeta
     const insucessoRows = useMemo(() => {
         return buildInsucessoList(paradasConcluidasInsucesso, nonDeliveredItems)
     }, [paradasConcluidasInsucesso, nonDeliveredItems])
+
+    /**
+     * Pedidos que saíram da rota (cancelado / devolvido à fila) — contados a
+     * partir do ledger porque já não existem em `paradas`.
+     */
+    const ledgerOnlyCount = useMemo(() => {
+        return countLedgerOnly(
+            paradasConcluidasInsucesso.map((p) => p.serviceId),
+            nonDeliveredItems,
+        )
+    }, [paradasConcluidasInsucesso, nonDeliveredItems])
+
+    /**
+     * Contagem de paradas por status, somando os não-entregues que saíram da
+     * rota — senão a tela mostra "0 de 1 concluídas" com N cards de insucesso.
+     */
+    const contagem = useMemo(() => {
+        return withLedgerNonDelivered(countParadasByStatus(paradas), ledgerOnlyCount)
+    }, [paradas, ledgerOnlyCount])
+
+    /**
+     * Porcentagem de progresso da rota — deriva da contagem já mesclada com o
+     * ledger, para não divergir do "X de Y concluídas" exibido ao lado.
+     */
+    const progress = useMemo(() => {
+        return calculateProgress(contagem.concluidas, contagem.total)
+    }, [contagem])
 
     /**
      * Todas as paradas concluídas

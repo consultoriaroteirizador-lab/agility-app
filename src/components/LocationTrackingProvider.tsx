@@ -62,8 +62,12 @@ export function LocationTrackingProvider({ children }: { children: React.ReactNo
   const isAvailable = driver?.isAvailable ?? false;
   const trackingEnabled = shouldTrack(hasInProgressRoute, isAvailable);
 
-  // Popup global de oferta (uberização) — o WS entrega o payload, o
-  // OfferAlertProvider (montado acima, em (auth)/_layout.tsx) decide exibir.
+  // Popup global de oferta (uberização). Este provider é o DONO do socket
+  // global /monitoring (primeiro consumidor de useTrackingWebSocket), então é
+  // aqui que `offer.available` chega de forma confiável — não na tela de
+  // ofertas, que só reusa o socket e não tem seus callbacks anexados. O WS
+  // entrega o payload; o OfferAlertProvider (montado acima, em
+  // (auth)/_layout.tsx) decide exibir.
   const { pushOffer } = useOfferAlert();
 
   // WebSocket de telemetria (canal /monitoring). NÃO é o canal que envia

@@ -22,7 +22,8 @@ export interface TrackingWebSocketOptions {
   onRoutingUpdated?: (data: { id?: string } & Record<string, unknown>) => void;
   /** Serviço/parada atualizado (status, ETA re-projetada, etc.). */
   onServiceUpdated?: (data: { id?: string; routingId?: string } & Record<string, unknown>) => void;
-  /** Nova oferta disponível para o motorista (uberização). */
+  /** Nova oferta disponível para o motorista (uberização).
+   *  Emitido pelo backend em `offer.available` na sala `user:${keycloakUserId}`. */
   onOfferAvailable?: (offer: OfferPayload) => void;
   onConnect?: () => void;
   onDisconnect?: () => void;
@@ -165,7 +166,7 @@ export function useTrackingWebSocket(options: TrackingWebSocketOptions = {}) {
       optionsRef.current.onServiceUpdated?.(data);
     });
 
-    // Nova oferta disponível (uberização).
+    // Nova oferta disponível (uberização): backend emite na sala do usuário.
     socket.on('offer.available', (offer: OfferPayload) => {
       console.log('[TrackingWebSocket] Offer available:', offer?.id);
       optionsRef.current.onOfferAvailable?.(offer);

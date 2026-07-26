@@ -1,7 +1,8 @@
 import type { RouteNonDeliveredItemResponse } from '@/domain/agility/routing/dto'
 
 import type { Parada } from '../../_types/rota.types'
-import { buildInsucessoList, outcomeLabel } from '../routeNonDelivered'
+import { calculateProgress, countParadasByStatus, withLedgerNonDelivered } from '../routeCalculations'
+import { buildInsucessoList, countLedgerOnly, outcomeLabel } from '../routeNonDelivered'
 
 // Fábrica mínima de Parada de insucesso ao vivo (só os campos que o merge usa).
 function makeParada(over: Partial<Parada> & { serviceId: string }): Parada {
@@ -141,5 +142,85 @@ describe('buildInsucessoList', () => {
         expect(ids).toHaveLength(3)
         expect(new Set(ids).size).toBe(3)
         expect(ids).toEqual(expect.arrayContaining(['s-fail', 's-legacy', 's-cancel']))
+    })
+})
+
+describe('countLedgerOnly', () => {
+    it('conta só quem saiu da rota (não tem parada viva)', () => {
+        const ledger = [
+            makeLedger({ serviceId: 's-fail' }),
+            makeLedger({ serviceId: 's-cancel-1', outcome: 'CANCELED' }),
+            makeLedger({ serviceId: 's-cancel-2', outcome: 'CANCELED' }),
+        ]
+
+        expect(countLedgerOnly(['s-fail'], ledger)).toBe(2)
+    })
+
+    it('deduplica múltiplas ocorrências do mesmo pedido', () => {
+        const ledger = [
+            makeLedger({ serviceId: 's-1', outcome: 'FAILED' }),
+            makeLedger({ serviceId: 's-1', outcome: 'CANCELED' }),
+        ]
+
+        expect(countLedgerOnly([], ledger)).toBe(1)
+    })
+
+    it('é zero quando o ledger está vazio ou tudo já tem parada viva', () => {
+        expect(countLedgerOnly([], [])).toBe(0)
+        expect(countLedgerOnly(['s-1'], [makeLedger({ serviceId: 's-1' })])).toBe(0)
+    })
+
+    it('ignora ids nulos/vazios vindos do chamador', () => {
+        const ledger = [makeLedger({ serviceId: 's-1', outcome: 'CANCELED' })]
+
+        expect(countLedgerOnly([null, undefined, ''], ledger)).toBe(1)
+    })
+})
+
+describe('withLedgerNonDelivered', () => {
+    it('soma os não-entregues ao total e às concluídas, sem mexer em pendentes', () => {
+        const base = countParadasByStatus([
+            makeParada({ serviceId: 's-pend', status: 'pendente' }),
+        ])
+        expect(base).toMatchObject({ total: 1, pendentes: 1, concluidas: 0 })
+
+        const merged = withLedgerNonDelivered(base, 3)
+
+        expect(merged).toMatchObject({
+            total: 4,
+            pendentes: 1,
+            concluidas: 3,
+            concluidasInsucesso: 3,
+            concluidasSucesso: 0,
+        })
+    })
+
+    it('devolve a contagem intacta quando não há nada só-no-ledger', () => {
+        const base = countParadasByStatus([makeParada({ serviceId: 's-1', status: 'pendente' })])
+
+        expect(withLedgerNonDelivered(base, 0)).toEqual(base)
+        expect(withLedgerNonDelivered(base, -1)).toEqual(base)
+    })
+
+    it('caso real da rota 7867e90b: 1 pendente + 3 cancelados = 75%, não 0%', () => {
+        const paradas = [makeParada({ serviceId: 's-viva', status: 'pendente' })]
+        const ledger = [
+            makeLedger({ serviceId: 's-c1', outcome: 'CANCELED', reasonName: 'Recusado' }),
+            makeLedger({ serviceId: 's-c2', outcome: 'CANCELED', reasonName: 'Recusado' }),
+            makeLedger({ serviceId: 's-c3', outcome: 'CANCELED', reasonName: 'Recusado' }),
+        ]
+
+        const contagem = withLedgerNonDelivered(
+            countParadasByStatus(paradas),
+            countLedgerOnly([], ledger),
+        )
+
+        expect(contagem.concluidas).toBe(3)
+        expect(contagem.total).toBe(4)
+        expect(contagem.pendentes).toBe(1)
+        expect(calculateProgress(contagem.concluidas, contagem.total)).toBe(75)
+
+        // E o contador não pode divergir da lista exibida logo abaixo.
+        expect(buildInsucessoList([], ledger)).toHaveLength(contagem.concluidasInsucesso)
     })
 })
