@@ -12,7 +12,7 @@ import * as ImagePicker from 'expo-image-picker';
 
 import type { AddressResponse } from '@/domain/agility/address/dto';
 import { useFindOneAddress } from '@/domain/agility/address/useCase';
-import { useGetProfile } from '@/domain/agility/collaborator/useCase/useGetProfile';
+import { useGetMe } from '@/domain/agility/driver/useCase';
 import type { FormGroupResponse } from '@/domain/agility/form-group/dto/form-group.response';
 import { formGroupService } from '@/domain/agility/form-group/formGroupService';
 import { FormEntityType } from '@/domain/agility/form-group-answer/dto/create-form-group-answer.request';
@@ -38,6 +38,7 @@ import {
 import { parseBRLToCents } from '@/utils/parseCurrency';
 
 import { useStopStatus } from '../_hooks/useStopStatus';
+import { resolveCompanyRules } from '../_utils/companyRules';
 
 // Tipos
 export type RecipientType = 'cliente' | 'porteiro' | 'vizinho' | 'familiar' | 'outro';
@@ -261,16 +262,21 @@ export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderPr
 
   // ── Gating de início de parada (regras configuráveis por empresa) ─────────
   // Backend é a fonte de verdade; aqui apenas desabilitamos os botões e
-  // mostramos um toast antecipando a rejeição (UX). Lê os flags do profile.
-  const { profile } = useGetProfile();
-  const companyFeatures = profile?.companyFeatures ?? null;
+  // mostramos um toast antecipando a rejeição (UX). Lê os flags de `me`.
+  // `useGetMe` (GET /drivers/me) resolve o motorista logado seja ele funcionário
+  // ou terceirizado — o antigo useGetProfile (/collaborators/profile) 404ava para
+  // terceirizado e apagava a regra operacional para ele.
+  const { me } = useGetMe();
+  // Opt-out: mesma semântica do backend. Perfil ainda não carregado (rede ruim,
+  // primeiro render) NÃO pode desligar a regra — na dúvida, ela vale.
+  const rules = resolveCompanyRules(me?.companyFeatures);
   const { services: routeServices } = useFindServicesByRoutingId(service?.routingId || rotaId || '');
   const stopGate = useStopStatus({
     service: service ?? null,
     allServices: routeServices,
     currentServiceId: serviceId,
-    enforceSingleActiveStop: companyFeatures?.enforceSingleActiveStop === true,
-    enforceStopOrder: companyFeatures?.enforceStopOrder === true,
+    enforceSingleActiveStop: rules.enforceSingleActiveStop,
+    enforceStopOrder: rules.enforceStopOrder,
   });
   const canStartService = stopGate.canStartService;
   const startBlockReason = stopGate.startBlockReason;

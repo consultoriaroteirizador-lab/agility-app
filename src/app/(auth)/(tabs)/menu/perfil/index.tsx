@@ -14,9 +14,12 @@ import {
 import { ButtonBack } from '@/components/Button/ButtonBack';
 import type { UpdateCollaboratorRequest } from '@/domain/agility/collaborator/dto';
 import { useGetProfile, useUpdateProfile } from '@/domain/agility/collaborator/useCase';
+import { useGetMe } from '@/domain/agility/driver/useCase';
 import { KEY_COLLABORATORS } from '@/domain/queryKeys';
 import { useAuthCredentialsService } from '@/services';
 import { useToastService } from '@/services/Toast/useToast';
+
+import { resolveCanEditProfile } from './_utils/resolveCanEditProfile';
 
 interface FormData {
   fullname: string;
@@ -31,6 +34,22 @@ export default function PerfilScreen() {
   const queryClient = useQueryClient();
   const { userAuth, saveUserAuth } = useAuthCredentialsService();
   const { profile, isLoading: isLoadingProfile } = useGetProfile();
+  // `/collaborators/profile` (useGetProfile) é exclusiva de colaborador — para o
+  // motorista terceirizado (linkType PROVIDER) ela 404a. `useGetMe` (GET /drivers/me)
+  // resolve os dois casos e é a fonte usada para decidir se a edição pode aparecer.
+  // `isLoading` de ambos os hooks reflete só a carga INICIAL — não inclui refetch
+  // de background — para não trocar o formulário já preenchido por um spinner de
+  // tela cheia quando a tela reabre e o staleTime já expirou.
+  const { me, isLoading: isLoadingMe } = useGetMe();
+  const isLoadingProfileData = isLoadingProfile || isLoadingMe;
+  // PATCH /collaborators/profile tem @Roles('COLLABORATOR') — motorista terceirizado
+  // tomaria 403 ao salvar. Em vez de deixar o usuário tentar e falhar, escondemos a
+  // edição. Enquanto nem `profile` nem `me` carregaram ainda não sabemos o vínculo,
+  // então também não oferecemos edição (mesma postura "na dúvida, não" das regras
+  // operacionais). Evidência positiva de QUALQUER uma das duas fontes já basta —
+  // ver `resolveCanEditProfile` para o porquê (evita perder edição legítima quando
+  // `/drivers/me` falha mas `/collaborators/profile` já confirmou o vínculo).
+  const canEditProfile = resolveCanEditProfile(profile, me);
 
   const { showToast } = useToastService();
 
@@ -61,6 +80,8 @@ export default function PerfilScreen() {
   // Populate form with profile data from API (complete data)
   useEffect(() => {
     if (profile) {
+      // Colaborador: CollaboratorResponse tem os campos completos (inclusive os
+      // editáveis: nickname/phone).
       setFormData({
         fullname: profile.fullName || userAuth?.fullname || '',
         nickname: profile.nickname || '',
@@ -68,7 +89,18 @@ export default function PerfilScreen() {
         email: profile.email || userAuth?.email || '',
         document: profile.taxNumber || '',
       });
-    } else if (!isLoadingProfile && userAuth) {
+    } else if (me) {
+      // Terceirizado: não existe CollaboratorResponse (a rota é exclusiva de
+      // colaborador). `/drivers/me` só devolve nome e e-mail — os demais campos
+      // ficam vazios porque não há edição para preencher de qualquer forma.
+      setFormData({
+        fullname: `${me.firstName ?? ''} ${me.lastName ?? ''}`.trim() || userAuth?.fullname || '',
+        nickname: userAuth?.nickname || '',
+        phone: userAuth?.phone || '',
+        email: me.email || userAuth?.email || '',
+        document: userAuth?.taxNumber || '',
+      });
+    } else if (!isLoadingProfileData && userAuth) {
       // Fallback: use JWT data if profile fetch fails
       setFormData({
         fullname: userAuth.fullname || '',
@@ -78,7 +110,7 @@ export default function PerfilScreen() {
         document: userAuth.taxNumber || '',
       });
     }
-  }, [profile, isLoadingProfile, userAuth]);
+  }, [profile, me, isLoadingProfileData, userAuth]);
 
   const handleInputChange = (field: keyof FormData, value: string) => {
     setFormData(prev => ({
@@ -157,7 +189,7 @@ export default function PerfilScreen() {
     handleInputChange('document', formatted);
   };
 
-  if (isLoadingProfile) {
+  if (isLoadingProfileData) {
     return (
       <ScreenBase buttonLeft={<ButtonBack />} title={<Text preset="textTitleScreen" fontWeight="bold" color="colorTextPrimary">
         Editar Perfil
@@ -189,13 +221,22 @@ export default function PerfilScreen() {
 
           {/* Campos do Formulário */}
           <Box gap="y16">
+            {/* Motorista terceirizado: PATCH /collaborators/profile é exclusiva de
+                colaborador (@Roles('COLLABORATOR')) e daria 403 nele. Em vez de deixar
+                tentar e falhar, avisamos e escondemos a edição. */}
+            {!canEditProfile && (
+              <Text preset="text14" color="secondaryTextColor">
+                Edição de perfil disponível apenas para colaboradores.
+              </Text>
+            )}
+
             {/* Nome Completo */}
             <Input
               title="Nome Completo"
               placeholder="Digite seu nome completo"
               value={formData.fullname}
               onChangeText={(text) => handleInputChange('fullname', text)}
-              editable={!isUpdating}
+              editable={canEditProfile && !isUpdating}
             />
 
             {/* Apelido */}
@@ -204,7 +245,7 @@ export default function PerfilScreen() {
               placeholder="Como gostaria de ser chamado"
               value={formData.nickname}
               onChangeText={(text) => handleInputChange('nickname', text)}
-              editable={!isUpdating}
+              editable={canEditProfile && !isUpdating}
             />
 
             {/* Telefone */}
@@ -214,7 +255,7 @@ export default function PerfilScreen() {
               value={formData.phone}
               onChangeText={handlePhoneChange}
               keyboardType="phone-pad"
-              editable={!isUpdating}
+              editable={canEditProfile && !isUpdating}
               maxLength={15}
             />
 
@@ -241,7 +282,8 @@ export default function PerfilScreen() {
 
             />
 
-            {/* Botões de Ação */}
+            {/* Botões de Ação — terceirizado não tem rota de salvar, então nem o botão aparece */}
+            {canEditProfile && (
             <Box flexDirection="row" gap="x16" marginTop="y24">
               <Button
                 title={isUpdating ? 'Salvando...' : 'Salvar'}
@@ -259,6 +301,7 @@ export default function PerfilScreen() {
               /> */}
 
             </Box>
+            )}
           </Box>
         </Box>
 

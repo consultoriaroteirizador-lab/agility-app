@@ -21,6 +21,7 @@ import { ServiceStatus } from '@/domain/agility/service/dto/types'
 import { colors } from '@/theme'
 
 import { outcomeLabel } from '../../../../_utils/routeNonDelivered'
+
 import { splitRouteAtLastStop, type LatLng } from './geo'
 import { MapPoint } from './Map'
 

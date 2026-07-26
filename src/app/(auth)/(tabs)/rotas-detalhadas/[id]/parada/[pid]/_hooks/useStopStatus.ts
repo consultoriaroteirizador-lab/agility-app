@@ -51,8 +51,14 @@ export const useStopStatus = ({
     service,
     allServices,
     currentServiceId,
-    enforceSingleActiveStop = false,
-    enforceStopOrder = false,
+    // Opt-out — mesma semântica do backend e de `resolveCompanyRules` (Task 5):
+    // ligadas por padrão, só desligam com `false` explícito. Os 2 call sites
+    // atuais (index.tsx e ParadaContext) sempre passam esses valores, mas o
+    // default aqui é a última linha de defesa contra um caller futuro que
+    // esqueça de passar — sem isso, "esqueceu" vira "regra desligada" de novo,
+    // um nível abaixo do que a Task 5 corrigiu.
+    enforceSingleActiveStop = true,
+    enforceStopOrder = true,
 }: UseStopStatusParams): StopStatus => {
     return useMemo(() => {
         // Default values

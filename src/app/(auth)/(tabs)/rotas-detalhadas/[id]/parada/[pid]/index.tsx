@@ -10,7 +10,7 @@ import { ButtonBack } from '@/components/Button/ButtonBack';
 import Modal from '@/components/Modal/Modal';
 import { formatAddress } from '@/domain/agility/address/dto/response/address.response';
 import { useFindOneAddress } from '@/domain/agility/address/useCase';
-import { useGetProfile } from '@/domain/agility/collaborator/useCase/useGetProfile';
+import { useGetMe } from '@/domain/agility/driver/useCase';
 import { useCompleteRouting } from '@/domain/agility/routing/useCase';
 import { ServiceType } from '@/domain/agility/service/dto/types';
 import { useFindOneService, useFindServicesByRoutingId } from '@/domain/agility/service/useCase';
@@ -22,6 +22,7 @@ import { EquipmentList, StopActions, StopTabs } from './_components';
 import { Map } from './_components/shared/Map';
 import { useStopActions, useStopStatus, useUserLocation } from './_hooks';
 import { TabType } from './_types/stop.types';
+import { resolveCompanyRules } from './_utils/companyRules';
 import { isValidCoordinate } from './_utils/mapUtils';
 
 /**
@@ -61,16 +62,21 @@ export default function StopDetailScreen() {
   // Regras configuráveis da empresa (uma parada por vez / ordem obrigatória) —
   // mesmas flags que o fluxo de entrega/coleta (ParadaContext) usa, pra o gating
   // ser consistente também nesta tela genérica.
-  const { profile } = useGetProfile();
-  const companyFeatures = profile?.companyFeatures ?? null;
+  // `useGetMe` (GET /drivers/me) resolve o motorista logado seja ele funcionário
+  // ou terceirizado — o antigo useGetProfile (/collaborators/profile) 404ava para
+  // terceirizado e apagava a regra operacional para ele.
+  const { me } = useGetMe();
+  // Opt-out: mesma semântica do backend. Perfil ainda não carregado (rede ruim,
+  // primeiro render) NÃO pode desligar a regra — na dúvida, ela vale.
+  const rules = resolveCompanyRules(me?.companyFeatures);
 
   // Calculate stop status
   const stopStatus = useStopStatus({
     service,
     allServices,
     currentServiceId: serviceId,
-    enforceSingleActiveStop: companyFeatures?.enforceSingleActiveStop === true,
-    enforceStopOrder: companyFeatures?.enforceStopOrder === true,
+    enforceSingleActiveStop: rules.enforceSingleActiveStop,
+    enforceStopOrder: rules.enforceStopOrder,
   });
 
   // Stop actions

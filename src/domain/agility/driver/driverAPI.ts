@@ -7,6 +7,7 @@ import type {
     UpdateDriverRequest,
     ListDriversRequest,
     DriverResponse,
+    DriverMeResponse,
     AssignDriverTeamRequest,
 } from './dto'
 
@@ -48,6 +49,13 @@ async function findByLicenseNumber(licenseNumber: string): Promise<BaseResponse<
     return data
 }
 
+// Resolve o motorista logado independente do vínculo (Collaborator ou Provider).
+// Substitui GET /collaborators/profile, que 404ava para o terceirizado.
+async function getMe(): Promise<BaseResponse<DriverMeResponse>> {
+    const { data } = await apiService.get<BaseResponse<DriverMeResponse>>('/drivers/me')
+    return data
+}
+
 async function update(
     id: Id,
     payload: UpdateDriverRequest,
@@ -80,6 +88,7 @@ export const driverAPI = {
     findOne,
     findByCollaboratorId,
     findByLicenseNumber,
+    getMe,
     update,
     assignToTeam,
     removeFromTeam,
