@@ -50,7 +50,8 @@ export {
     
     // Funções de contagem
     countParadasByStatus,
-    
+    withLedgerNonDelivered,
+
     // Funções de filtragem
     filterParadasByStatus,
     filterParadasByStatuses,
@@ -76,5 +77,6 @@ export {
 export {
     type InsucessoRow,
     buildInsucessoList,
+    countLedgerOnly,
     outcomeLabel,
 } from './routeNonDelivered'

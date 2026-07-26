@@ -73,6 +73,32 @@ export function outcomeLabel(outcome: RouteNonDeliveredOutcome | null | undefine
  * Ordem: paradas ao vivo primeiro (mantém a ordem da rota), depois os itens que
  * só existem no ledger.
  */
+/**
+ * Quantos pedidos existem SÓ no ledger — os que saíram da rota (cancelados /
+ * devolvidos à fila zeram o `routingId`) e por isso não estão mais em `paradas`.
+ *
+ * É o número que falta nos contadores da rota: `countParadasByStatus` só enxerga
+ * as paradas vivas, então sem isto a tela mostra "0 de 1 concluídas" enquanto
+ * lista 3 cards de insucesso logo abaixo.
+ *
+ * Deduplicado por `serviceId` — o ledger pode ter mais de uma ocorrência para o
+ * mesmo pedido, e quem ainda tem parada viva já é contado por lá.
+ */
+export function countLedgerOnly(
+    liveInsucessoParadas: Parada[],
+    ledgerItems: RouteNonDeliveredItemResponse[],
+): number {
+    const liveIds = new Set(
+        liveInsucessoParadas.map((p) => p?.serviceId).filter((id): id is string => !!id),
+    )
+    const ledgerOnly = new Set<string>()
+    for (const item of ledgerItems) {
+        if (!item?.serviceId || liveIds.has(item.serviceId)) continue
+        ledgerOnly.add(item.serviceId)
+    }
+    return ledgerOnly.size
+}
+
 export function buildInsucessoList(
     liveInsucessoParadas: Parada[],
     ledgerItems: RouteNonDeliveredItemResponse[],

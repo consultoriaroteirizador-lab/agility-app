@@ -176,6 +176,33 @@ export function countParadasByStatus(paradas: Parada[]): ParadaCountResult {
     return result
 }
 
+/**
+ * Soma à contagem os pedidos que saíram da rota (cancelados / devolvidos à fila)
+ * e por isso não estão mais em `paradas` — eles vêm do ledger de não-entregues.
+ *
+ * Sem isto, a rota mostra "0 de 1 concluídas / 0%" enquanto exibe N cards em
+ * "Concluídas com insucesso": o denominador ignora tudo que saiu da rota. O
+ * motorista tratou o pedido, então ele conta como concluído (com insucesso) e
+ * entra no total. `pendentes` e `emAndamento` não mudam — ninguém volta a ser
+ * trabalho a fazer.
+ *
+ * `ledgerOnly` deve vir de `countLedgerOnly` (já deduplicado e sem os pedidos
+ * que ainda têm parada viva, para não contar duas vezes).
+ */
+export function withLedgerNonDelivered(
+    base: ParadaCountResult,
+    ledgerOnly: number,
+): ParadaCountResult {
+    if (!ledgerOnly || ledgerOnly <= 0) return base
+
+    return {
+        ...base,
+        total: base.total + ledgerOnly,
+        concluidasInsucesso: base.concluidasInsucesso + ledgerOnly,
+        concluidas: base.concluidas + ledgerOnly,
+    }
+}
+
 // ============================================
 // FUNÇÕES DE FILTRAGEM
 // ============================================
