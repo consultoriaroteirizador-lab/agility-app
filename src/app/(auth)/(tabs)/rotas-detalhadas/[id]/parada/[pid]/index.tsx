@@ -10,7 +10,7 @@ import { ButtonBack } from '@/components/Button/ButtonBack';
 import Modal from '@/components/Modal/Modal';
 import { formatAddress } from '@/domain/agility/address/dto/response/address.response';
 import { useFindOneAddress } from '@/domain/agility/address/useCase';
-import { useGetProfile } from '@/domain/agility/collaborator/useCase/useGetProfile';
+import { useGetMe } from '@/domain/agility/driver/useCase';
 import { useCompleteRouting } from '@/domain/agility/routing/useCase';
 import { ServiceType } from '@/domain/agility/service/dto/types';
 import { useFindOneService, useFindServicesByRoutingId } from '@/domain/agility/service/useCase';
@@ -62,10 +62,13 @@ export default function StopDetailScreen() {
   // Regras configuráveis da empresa (uma parada por vez / ordem obrigatória) —
   // mesmas flags que o fluxo de entrega/coleta (ParadaContext) usa, pra o gating
   // ser consistente também nesta tela genérica.
-  const { profile } = useGetProfile();
+  // `useGetMe` (GET /drivers/me) resolve o motorista logado seja ele funcionário
+  // ou terceirizado — o antigo useGetProfile (/collaborators/profile) 404ava para
+  // terceirizado e apagava a regra operacional para ele.
+  const { me } = useGetMe();
   // Opt-out: mesma semântica do backend. Perfil ainda não carregado (rede ruim,
   // primeiro render) NÃO pode desligar a regra — na dúvida, ela vale.
-  const rules = resolveCompanyRules(profile?.companyFeatures);
+  const rules = resolveCompanyRules(me?.companyFeatures);
 
   // Calculate stop status
   const stopStatus = useStopStatus({

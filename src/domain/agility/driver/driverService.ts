@@ -7,6 +7,7 @@ import type {
     UpdateDriverRequest,
     ListDriversRequest,
     DriverResponse,
+    DriverMeResponse,
     AssignDriverTeamRequest,
 } from './dto'
 
@@ -30,6 +31,10 @@ async function findByCollaboratorId(collaboratorId: Id): Promise<BaseResponse<Dr
 
 async function findByLicenseNumber(licenseNumber: string): Promise<BaseResponse<DriverResponse>> {
     return driverAPI.findByLicenseNumber(licenseNumber)
+}
+
+async function getMe(): Promise<BaseResponse<DriverMeResponse>> {
+    return driverAPI.getMe()
 }
 
 async function update(
@@ -61,6 +66,7 @@ export const driverService = {
     findOne,
     findByCollaboratorId,
     findByLicenseNumber,
+    getMe,
     update,
     assignToTeam,
     removeFromTeam,

@@ -6,4 +6,5 @@ export type { AssignDriverTeamRequest } from './request/assign-driver-team.reque
 
 // Response DTOs
 export type { DriverResponse } from './response/driver.response'
+export type { DriverMeResponse } from './response/driver-me.response'
 
