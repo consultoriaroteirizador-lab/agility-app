@@ -26,7 +26,12 @@ export function useGetMe() {
 
     return {
         me: data?.result ?? null,
-        isLoading: isLoading || isRefetching,
+        // `isLoading` reflete só a carga INICIAL (sem dado em cache ainda). Um
+        // refetch em background (ex.: reabrir a tela depois do staleTime expirar)
+        // não deve virar spinner de tela cheia por cima do dado já exibido — por
+        // isso `isRefetching` é exposto à parte, e não dobrado aqui dentro.
+        isLoading,
+        isRefetching,
         isError,
         refetch,
     }

@@ -19,6 +19,8 @@ import { KEY_COLLABORATORS } from '@/domain/queryKeys';
 import { useAuthCredentialsService } from '@/services';
 import { useToastService } from '@/services/Toast/useToast';
 
+import { resolveCanEditProfile } from './_utils/resolveCanEditProfile';
+
 interface FormData {
   fullname: string;
   nickname: string;
@@ -35,13 +37,19 @@ export default function PerfilScreen() {
   // `/collaborators/profile` (useGetProfile) é exclusiva de colaborador — para o
   // motorista terceirizado (linkType PROVIDER) ela 404a. `useGetMe` (GET /drivers/me)
   // resolve os dois casos e é a fonte usada para decidir se a edição pode aparecer.
+  // `isLoading` de ambos os hooks reflete só a carga INICIAL — não inclui refetch
+  // de background — para não trocar o formulário já preenchido por um spinner de
+  // tela cheia quando a tela reabre e o staleTime já expirou.
   const { me, isLoading: isLoadingMe } = useGetMe();
   const isLoadingProfileData = isLoadingProfile || isLoadingMe;
   // PATCH /collaborators/profile tem @Roles('COLLABORATOR') — motorista terceirizado
   // tomaria 403 ao salvar. Em vez de deixar o usuário tentar e falhar, escondemos a
-  // edição. Enquanto `me` não carregou ainda não sabemos o vínculo, então também não
-  // oferecemos edição (mesma postura "na dúvida, não" das regras operacionais).
-  const canEditProfile = me?.linkType === 'COLLABORATOR';
+  // edição. Enquanto nem `profile` nem `me` carregaram ainda não sabemos o vínculo,
+  // então também não oferecemos edição (mesma postura "na dúvida, não" das regras
+  // operacionais). Evidência positiva de QUALQUER uma das duas fontes já basta —
+  // ver `resolveCanEditProfile` para o porquê (evita perder edição legítima quando
+  // `/drivers/me` falha mas `/collaborators/profile` já confirmou o vínculo).
+  const canEditProfile = resolveCanEditProfile(profile, me);
 
   const { showToast } = useToastService();
 
