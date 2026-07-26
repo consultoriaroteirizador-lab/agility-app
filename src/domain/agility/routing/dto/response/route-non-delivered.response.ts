@@ -6,7 +6,8 @@
  * do ledger para que eles continuem aparecendo no "Concluídas com insucesso" da
  * rota — cada um com o desfecho (outcome) e o motivo (reasonName) congelados.
  *
- * Contrato: `GET /routings/:routingId/non-delivered` → ARRAY CRU (sem envelope).
+ * Contrato: `GET /routings/:routingId/non-delivered` → array DENTRO do envelope
+ * `BaseResponse` (`{ success, result, error }`), como todo o resto da API.
  *
  * @module domain/agility/routing/dto/response/route-non-delivered
  */
@@ -30,6 +31,16 @@ export interface RouteNonDeliveredItemResponse {
     recipientName: string | null
     /** Endereço já formatado em linha única. */
     address: string | null
+    /**
+     * Coordenadas do MESMO endereço de `address`, para plotar o não-entregue no
+     * mapa da rota — ele não vem em `/map-data` (o cancelamento zera o routingId).
+     *
+     * Opcionais no tipo porque backends anteriores ao PR #414 não mandam os
+     * campos; `null` quando o serviço sumiu ou o endereço não tem geocodificação.
+     * Sem coordenada o app apenas não desenha o pino.
+     */
+    latitude?: number | null
+    longitude?: number | null
     kind: RouteNonDeliveredKind
     outcome: RouteNonDeliveredOutcome
     /** Nome congelado do catálogo/motivo no momento da ocorrência. */

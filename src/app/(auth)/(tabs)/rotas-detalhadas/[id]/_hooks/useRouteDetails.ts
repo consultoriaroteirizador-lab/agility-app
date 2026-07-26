@@ -246,7 +246,10 @@ export function useRouteDetails(rotaId: string | null | undefined): UseRouteDeta
      * partir do ledger porque já não existem em `paradas`.
      */
     const ledgerOnlyCount = useMemo(() => {
-        return countLedgerOnly(paradasConcluidasInsucesso, nonDeliveredItems)
+        return countLedgerOnly(
+            paradasConcluidasInsucesso.map((p) => p.serviceId),
+            nonDeliveredItems,
+        )
     }, [paradasConcluidasInsucesso, nonDeliveredItems])
 
     /**

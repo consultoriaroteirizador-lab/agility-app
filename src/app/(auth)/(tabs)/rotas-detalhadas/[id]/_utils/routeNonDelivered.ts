@@ -83,14 +83,15 @@ export function outcomeLabel(outcome: RouteNonDeliveredOutcome | null | undefine
  *
  * Deduplicado por `serviceId` — o ledger pode ter mais de uma ocorrência para o
  * mesmo pedido, e quem ainda tem parada viva já é contado por lá.
+ *
+ * Recebe os ids (não as paradas) porque os chamadores têm formas diferentes: a
+ * tela da rota tem `Parada[]`, o histórico tem os serviços crus.
  */
 export function countLedgerOnly(
-    liveInsucessoParadas: Parada[],
+    liveServiceIds: (string | null | undefined)[],
     ledgerItems: RouteNonDeliveredItemResponse[],
 ): number {
-    const liveIds = new Set(
-        liveInsucessoParadas.map((p) => p?.serviceId).filter((id): id is string => !!id),
-    )
+    const liveIds = new Set(liveServiceIds.filter((id): id is string => !!id))
     const ledgerOnly = new Set<string>()
     for (const item of ledgerItems) {
         if (!item?.serviceId || liveIds.has(item.serviceId)) continue

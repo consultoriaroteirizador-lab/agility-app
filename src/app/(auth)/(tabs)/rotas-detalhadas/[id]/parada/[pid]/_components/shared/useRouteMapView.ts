@@ -16,10 +16,11 @@
 
 import { useMemo } from 'react'
 
-import { useGetRoutingMapData } from '@/domain/agility/routing/useCase'
+import { useGetRoutingMapData, useRouteNonDelivered } from '@/domain/agility/routing/useCase'
 import { ServiceStatus } from '@/domain/agility/service/dto/types'
 import { colors } from '@/theme'
 
+import { outcomeLabel } from '../../../../_utils/routeNonDelivered'
 import { splitRouteAtLastStop, type LatLng } from './geo'
 import { MapPoint } from './Map'
 
@@ -60,6 +61,8 @@ export interface RouteMapView {
 
 export function useRouteMapView(routeId: string): RouteMapView {
     const { mapData, services, origin, isLoading } = useGetRoutingMapData(routeId)
+    // Ledger dos que saíram da rota — em erro vem [] e o mapa fica como era antes.
+    const { items: nonDeliveredItems } = useRouteNonDelivered(routeId, { enabled: !!routeId })
 
     // Paradas ordenadas e com coordenadas válidas
     const sortedServices = useMemo(
@@ -76,7 +79,38 @@ export function useRouteMapView(routeId: string): RouteMapView {
     const hasReturn =
         !returnToOrigin && returnPoint?.latitude != null && returnPoint?.longitude != null
 
-    // Pinos: origem ("O"/"O-F"), paradas numeradas (cor por status), retorno ("F")
+    /**
+     * Pinos dos pedidos que saíram da rota (ledger de não-entregues). Dedup
+     * contra as paradas ao vivo — um FAILED mantém o routingId e já está em
+     * `sortedServices`, então não pode ganhar um segundo pino. Sem coordenada
+     * (serviço removido ou endereço sem geocodificação) simplesmente não desenha.
+     */
+    const ledgerPoints = useMemo<MapPoint[]>(() => {
+        const liveIds = new Set(sortedServices.map(s => s.id))
+        const seen = new Set<string>()
+        const points: MapPoint[] = []
+
+        for (const item of nonDeliveredItems) {
+            if (!item?.serviceId || liveIds.has(item.serviceId) || seen.has(item.serviceId)) continue
+            if (item.latitude == null || item.longitude == null) continue
+            seen.add(item.serviceId)
+
+            const nome = item.recipientName ?? item.serviceCode ?? 'Pedido'
+            points.push({
+                id: `non-delivered-${item.serviceId}`,
+                latitude: item.latitude,
+                longitude: item.longitude,
+                title: `${nome} — ${outcomeLabel(item.outcome)}`,
+                label: '✕',
+                color: ROUTE_MAP_COLORS.fail,
+            })
+        }
+
+        return points
+    }, [nonDeliveredItems, sortedServices])
+
+    // Pinos: origem ("O"/"O-F"), paradas numeradas (cor por status), não-entregues
+    // que saíram da rota (✕ vermelho) e retorno ("F")
     const mapPoints = useMemo<MapPoint[]>(() => {
         const points: MapPoint[] = []
 
@@ -102,6 +136,12 @@ export function useRouteMapView(routeId: string): RouteMapView {
             })
         })
 
+        // Não-entregues que SAÍRAM da rota (cancelado / devolvido à fila zeram o
+        // routingId): não vêm em `/map-data`, então sem isto a rota aparecia com
+        // menos paradas do que realmente teve. Vão sem número — perderam o
+        // sequenceOrder e não fazem parte do traçado — mas com a cor de insucesso.
+        points.push(...ledgerPoints)
+
         if (hasReturn) {
             points.push({
                 id: 'return',
@@ -114,7 +154,7 @@ export function useRouteMapView(routeId: string): RouteMapView {
         }
 
         return points
-    }, [hasOrigin, origin, returnToOrigin, sortedServices, hasReturn, returnPoint])
+    }, [hasOrigin, origin, returnToOrigin, sortedServices, ledgerPoints, hasReturn, returnPoint])
 
     // Traçado: ida sólida + retorno tracejado, recortados do traçado global.
     const { outboundSegments, dashedSegments } = useMemo(() => {

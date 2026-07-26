@@ -6,13 +6,14 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ActivityIndicator, Box, Button, ScreenBase, Text, TouchableOpacityBox } from '@/components';
 import { ButtonBack } from '@/components/Button/ButtonBack';
 import { RoutingStatus } from '@/domain/agility/routing/dto/types';
-import { useFindOneRouting } from '@/domain/agility/routing/useCase';
+import { useFindOneRouting, useRouteNonDelivered } from '@/domain/agility/routing/useCase';
 import { ServiceStatus, ServiceType } from '@/domain/agility/service/dto/types';
 import { useFindServicesByRoutingId } from '@/domain/agility/service/useCase';
 import { colors, measure } from '@/theme';
 import { formatDate, formatDateOnly } from '@/utils/formatDate';
 
 import { MapaParadasModal } from '../../../rotas-detalhadas/[id]/_components/MapaParadasModal';
+import { countLedgerOnly } from '../../../rotas-detalhadas/[id]/_utils/routeNonDelivered';
 import { Map } from '../../../rotas-detalhadas/[id]/parada/[pid]/_components/shared/Map';
 import { RouteMapLegend } from '../../../rotas-detalhadas/[id]/parada/[pid]/_components/shared/RouteMapLegend';
 import { useRouteMapView } from '../../../rotas-detalhadas/[id]/parada/[pid]/_components/shared/useRouteMapView';
@@ -74,6 +75,8 @@ export default function HistoricoDetalhesScreen() {
 
   const { routing, isLoading: isLoadingRouting } = useFindOneRouting(routeId || '');
   const { services, isLoading: isLoadingServices } = useFindServicesByRoutingId(routeId || '');
+  // Pedidos que saíram da rota (cancelado / devolvido à fila) — só existem no ledger.
+  const { items: nonDeliveredItems } = useRouteNonDelivered(routeId || '', { enabled: !!routeId });
 
   // Mapa de todas as paradas (pinos por status + ida sólida / retorno tracejado).
   // Mesma fonte do modal de tela cheia — ver useRouteMapView.
@@ -116,10 +119,27 @@ export default function HistoricoDetalhesScreen() {
 
   // Contar servicos por status
   const servicosRealizados = sortedServices.filter(s => s.status === ServiceStatus.COMPLETED).length;
-  const servicosNaoRealizados = sortedServices.filter(s => s.status === ServiceStatus.CANCELED).length;
+  // Não-entregues: os cancelados/devolvidos NÃO estão mais em `services` (a
+  // ocorrência zera o routingId), então contar CANCELED aqui dava sempre 0.
+  // O ledger é a fonte — mesma correção já aplicada na tela da rota ao vivo.
+  const naoRealizadosAoVivo = sortedServices.filter(
+    s => s.status === ServiceStatus.CANCELED || s.status === ServiceStatus.FAILED
+  );
+  const servicosNaoRealizados =
+    naoRealizadosAoVivo.length +
+    countLedgerOnly(naoRealizadosAoVivo.map(s => s.id), nonDeliveredItems);
   const servicosPendentes = sortedServices.filter(
-    s => s.status !== ServiceStatus.COMPLETED && s.status !== ServiceStatus.CANCELED
+    s =>
+      s.status !== ServiceStatus.COMPLETED &&
+      s.status !== ServiceStatus.CANCELED &&
+      s.status !== ServiceStatus.FAILED
   ).length;
+  // Total de paradas: as que ficaram na rota + as que saíram por ocorrência.
+  // `routing.totalServices` é gravado na criação e nunca recalculado, então
+  // sozinho ele diverge do que o mapa e a lista mostram.
+  const totalParadas =
+    sortedServices.length +
+    countLedgerOnly(sortedServices.map(s => s.id), nonDeliveredItems);
 
   if (isLoading) {
     return (
@@ -231,7 +251,7 @@ export default function HistoricoDetalhesScreen() {
               borderColor="primary20"
             >
               <Text preset="text14" color="gray600">
-                {routing.totalServices || sortedServices.length} paradas
+                {totalParadas} paradas
               </Text>
             </Box>
 

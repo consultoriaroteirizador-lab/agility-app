@@ -147,14 +147,13 @@ describe('buildInsucessoList', () => {
 
 describe('countLedgerOnly', () => {
     it('conta só quem saiu da rota (não tem parada viva)', () => {
-        const live = [makeParada({ serviceId: 's-fail' })]
         const ledger = [
             makeLedger({ serviceId: 's-fail' }),
             makeLedger({ serviceId: 's-cancel-1', outcome: 'CANCELED' }),
             makeLedger({ serviceId: 's-cancel-2', outcome: 'CANCELED' }),
         ]
 
-        expect(countLedgerOnly(live, ledger)).toBe(2)
+        expect(countLedgerOnly(['s-fail'], ledger)).toBe(2)
     })
 
     it('deduplica múltiplas ocorrências do mesmo pedido', () => {
@@ -168,9 +167,13 @@ describe('countLedgerOnly', () => {
 
     it('é zero quando o ledger está vazio ou tudo já tem parada viva', () => {
         expect(countLedgerOnly([], [])).toBe(0)
-        expect(
-            countLedgerOnly([makeParada({ serviceId: 's-1' })], [makeLedger({ serviceId: 's-1' })]),
-        ).toBe(0)
+        expect(countLedgerOnly(['s-1'], [makeLedger({ serviceId: 's-1' })])).toBe(0)
+    })
+
+    it('ignora ids nulos/vazios vindos do chamador', () => {
+        const ledger = [makeLedger({ serviceId: 's-1', outcome: 'CANCELED' })]
+
+        expect(countLedgerOnly([null, undefined, ''], ledger)).toBe(1)
     })
 })
 
