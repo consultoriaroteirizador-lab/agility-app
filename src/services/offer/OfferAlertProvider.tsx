@@ -80,9 +80,10 @@ export function OfferAlertProvider({ children }: { children: React.ReactNode }) 
   const { acceptRoutingAsync, isLoading } = useAcceptRouting();
 
   const [offers, setOffers] = useState<PendingOffer[]>([]);
-  // Memória das ofertas que o motorista mandou "Ver detalhes". Vive FORA da
-  // fila de propósito: a fila é volátil (ver o efeito de disponibilidade),
-  // a memória não.
+  // Memória das ofertas que o motorista já dispensou neste aparelho — por
+  // "Ver detalhes" ou por "Recusar". Um conceito só: dispensar é parar de
+  // alertar. Vive FORA da fila de propósito: a fila é volátil (ver o efeito
+  // de disponibilidade), a memória não.
   const [silenced, setSilenced] = useState<SilencedOffers>({});
   const [now, setNow] = useState(() => Date.now());
 
@@ -164,8 +165,19 @@ export function OfferAlertProvider({ children }: { children: React.ReactNode }) 
     }
   }, [current?.id]);
 
+  // Recusar é LOCAL POR DECISÃO DO PRODUTO, não por falta de endpoint: vale só
+  // neste aparelho, a rota segue em broadcasting para os outros motoristas e
+  // continua visível na aba Ofertas deste (que é alimentada pela query de
+  // broadcasting, não por esta fila). O backend tem um `RespondOfferDto` órfão,
+  // com campo de motivo, desenhado e nunca ligado — NÃO o ligue aqui achando
+  // que é um esquecimento; recusar não notifica o backend de propósito.
+  //
+  // Reusa a mesma memória do "Ver detalhes": dispensar é dispensar. Sem ela, o
+  // poll de 25s reempilhava a oferta e o alerta voltava — o sistema insistindo
+  // no que o motorista acabou de recusar.
   const onRecusar = useCallback(() => {
-    setOffers((list) => (current ? dropOffer(list, current.id) : list));
+    if (!current) return;
+    setSilenced((memory) => rememberSilenced(memory, current, Date.now()));
   }, [current]);
 
   // "Ver detalhes": fecha o alerta SEM recusar. A oferta é silenciada (segue na

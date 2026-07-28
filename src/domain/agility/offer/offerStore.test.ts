@@ -198,6 +198,45 @@ it('forgetSilenced devolve a mesma memória quando nada muda', () => {
     expect(forgetSilenced(memoria, [], 10_000)).toBe(memoria);
 });
 
+// ─── Recusa: local, e o poll não pode reinsistir ─────────────────────────────
+
+it('recusa → poll reempilha → não alerta de novo', () => {
+    // O motorista recusa: a oferta NÃO sai da fila (segue visível/aceitável),
+    // só entra na memória de dispensadas.
+    let fila = addOffer([], { id: 'r1', offerTime: '01:00' }, 0);
+    const memoria = rememberSilenced({}, fila[0], 0);
+    expect(activeOffer(applySilenced(fila, memoria))).toBeUndefined();
+
+    // 25s depois o poll devolve a mesma rota (segue em broadcasting para todos).
+    fila = addOffer(fila, { id: 'r1', offerTime: '01:00' }, 25_000);
+    expect(fila.length).toBe(1); // dedup por id
+    expect(activeOffer(applySilenced(fila, memoria))).toBeUndefined();
+});
+
+it('recusar uma oferta não silencia as outras nem tira a recusada da fila', () => {
+    let fila = addOffer([], o('r1'), 0);
+    fila = addOffer(fila, o('r2'), 0);
+    const memoria = rememberSilenced({}, fila[0], 0);
+    const efetiva = applySilenced(fila, memoria);
+    expect(efetiva.length).toBe(2); // a recusada continua na fila
+    expect(activeOffer(efetiva)?.id).toBe('r2');
+});
+
+it('a recusa herda a renovação de prazo: a memória não vence antes da oferta', () => {
+    // Recusa em t=0 uma oferta de 60s; como ela NÃO sai da fila, o prazo da
+    // memória é renovado a partir dela a cada tique e não há janela onde a
+    // oferta exista sem a memória.
+    const fila = [{ id: 'r1', offerTime: '01:00', receivedAt: 0 }];
+    let memoria = rememberSilenced({}, fila[0], 0);
+    memoria = forgetSilenced(memoria, fila, 59_000);
+    expect(activeOffer(applySilenced(fila, memoria))).toBeUndefined();
+
+    // Só quando a oferta some da fila por expiração é que a memória a esquece.
+    const filaVazia = pruneExpired(fila, 61_000);
+    expect(filaVazia.length).toBe(0);
+    expect(forgetSilenced(memoria, filaVazia, 61_000)).toEqual({});
+});
+
 it('a memória de uma oferta não silencia as outras', () => {
     let fila = addOffer([], o('r1'), 0);
     fila = addOffer(fila, o('r2'), 0);

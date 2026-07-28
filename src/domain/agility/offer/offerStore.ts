@@ -37,11 +37,16 @@ export function silenceOffer(list: PendingOffer[], id: string, now: number): Pen
 }
 
 // ─── Memória de ofertas dispensadas ──────────────────────────────────────────
+// Dispensar tem duas portas — "Ver detalhes" (decido depois) e "Recusar"
+// (decidi que não) — e uma consequência só: não alertar mais este id neste
+// aparelho. Por isso um conceito só, e não dois.
+//
 // A fila é estado volátil: ela é esvaziada inteira quando o motorista fica
-// indisponível. O conjunto de ids que ele já dispensou NÃO pode morrer junto,
-// senão a mesma oferta reentra pelo próximo poll sem o silêncio e o alerta
-// reabre por cima da tela de detalhe que ele está lendo. Esta memória é a
-// fonte da verdade do silêncio; o flag na fila é derivado dela.
+// indisponível, e é repovoada de fora pelo poll/WS. O conjunto de ids que ele
+// já dispensou NÃO pode morrer junto, senão a mesma oferta reentra sem o
+// silêncio e o alerta reabre — por cima da tela de detalhe que ele está lendo,
+// ou insistindo no que ele acabou de recusar. Esta memória é a fonte da
+// verdade do silêncio; o flag na fila é derivado dela.
 //   at    = quando foi silenciada (vira o `silencedAt` ao reaplicar)
 //   until = até quando vale lembrar dela mesmo fora da fila
 export type SilencedOffers = Record<string, { at: number; until: number }>;
