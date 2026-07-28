@@ -4,7 +4,7 @@ import { Modal, Platform, Vibration } from 'react-native';
 import { router } from 'expo-router';
 
 import { useUserLocation } from '@/app/(auth)/(tabs)/rotas-detalhadas/[id]/parada/[pid]/_hooks/useUserLocation';
-import { Box, Button, Text } from '@/components';
+import { Box, Button, Text, TextButton } from '@/components';
 import { useFindOneDriver } from '@/domain/agility/driver/useCase';
 import {
   activeOffer,
@@ -12,6 +12,7 @@ import {
   dropOffer,
   expiresAtOf,
   pruneExpired,
+  silenceOffer,
 } from '@/domain/agility/offer/offerStore';
 import type { OfferPayload, PendingOffer } from '@/domain/agility/offer/offerStore';
 import { useAcceptRouting, useFindBroadcastingRoutings } from '@/domain/agility/routing/useCase';
@@ -144,6 +145,18 @@ export function OfferAlertProvider({ children }: { children: React.ReactNode }) 
     setOffers((list) => (current ? dropOffer(list, current.id) : list));
   }, [current]);
 
+  // "Ver detalhes": fecha o alerta SEM recusar. A oferta é silenciada (segue na
+  // fila, válida e aceitável) e o motorista decide na tela de detalhe, que já
+  // tem mapa, paradas, Aceitar e Recusar. Sem o silêncio, o polling de
+  // `useFindBroadcastingRoutings` reempilharia a oferta e o popup voltaria por
+  // cima da própria tela que ele foi ver.
+  const onVerDetalhes = useCallback(() => {
+    if (!current) return;
+    const offerId = current.id;
+    setOffers((list) => silenceOffer(list, offerId, Date.now()));
+    router.push(`/(auth)/(tabs)/ofertas/${offerId}`);
+  }, [current]);
+
   const onAceitar = useCallback(async () => {
     if (!current) return;
     const offerId = current.id;
@@ -225,6 +238,17 @@ export function OfferAlertProvider({ children }: { children: React.ReactNode }) 
                     iconName="check-circle"
                     onPress={onAceitar}
                     disabled={isLoading || secondsLeft <= 0}
+                  />
+                </Box>
+
+                {/* Terceira ação, secundária: não compete com Aceitar/Recusar. */}
+                <Box alignItems="center" mt="y16">
+                  <TextButton
+                    preset="primary"
+                    title="Ver detalhes"
+                    onPress={onVerDetalhes}
+                    disabled={isLoading}
+                    hitSlop={{ top: 8, bottom: 8, left: 16, right: 16 }}
                   />
                 </Box>
               </>
