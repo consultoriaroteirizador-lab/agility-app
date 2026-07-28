@@ -1,12 +1,16 @@
 import {
     addOffer,
+    applySilenced,
     dropOffer,
+    forgetSilenced,
     pruneExpired,
+    rememberSilenced,
     activeOffer,
     expiresAtOf,
     isSilenced,
     silenceOffer,
 } from './offerStore';
+import type { SilencedOffers } from './offerStore';
 
 const o = (id: string, offerTime = '00:10') => ({ id, offerTime });
 
@@ -118,4 +122,85 @@ it('oferta silenciada continua podendo ser aceita/recusada por id', () => {
     l = silenceOffer(l, 'r1', 1);
     l = dropOffer(l, 'r1');
     expect(l.length).toBe(0);
+});
+
+it('pruneExpired preserva a referência quando nada expirou', () => {
+    const l = addOffer([], o('r1'), 0);
+    expect(pruneExpired(l, 1_000)).toBe(l);
+});
+
+// ─── Memória de dispensadas: sobrevive ao esvaziamento da fila ───────────────
+
+it('o silêncio sobrevive ao ciclo silencia → indisponível → disponível → repovoa', () => {
+    // t=0: oferta de 60s chega e o motorista manda "Ver detalhes".
+    let fila = addOffer([], { id: 'r1', offerTime: '01:00' }, 0);
+    let memoria = rememberSilenced({}, fila[0], 0);
+    expect(activeOffer(applySilenced(fila, memoria))).toBeUndefined();
+
+    // t=10s: fica indisponível — a fila inteira é descartada, a memória não.
+    fila = [];
+    memoria = forgetSilenced(memoria, fila, 10_000);
+    expect(Object.keys(memoria)).toEqual(['r1']);
+
+    // t=15s: volta a ficar disponível e o poll reempilha A MESMA oferta.
+    fila = addOffer(fila, { id: 'r1', offerTime: '01:00' }, 15_000);
+    expect(fila.length).toBe(1);
+
+    // O alerta NÃO reabre por cima da tela de detalhe que ele está lendo.
+    expect(activeOffer(applySilenced(fila, memoria))).toBeUndefined();
+});
+
+it('o prazo da memória é renovado pela oferta que reentrou (não vence antes dela)', () => {
+    let memoria = rememberSilenced({}, { id: 'r1', offerTime: '01:00', receivedAt: 0 }, 0);
+    expect(memoria.r1.until).toBe(60_000);
+
+    // Reentrou em t=50s com um receivedAt novo: expira só em 110s.
+    const fila = [{ id: 'r1', offerTime: '01:00', receivedAt: 50_000 }];
+    memoria = forgetSilenced(memoria, fila, 50_000);
+    expect(memoria.r1.until).toBe(110_000);
+
+    // Em t=60s (prazo antigo) a memória continua valendo e o alerta não volta.
+    memoria = forgetSilenced(memoria, fila, 60_000);
+    expect(activeOffer(applySilenced(fila, memoria))).toBeUndefined();
+});
+
+it('a memória é esquecida quando a oferta expira de vez fora da fila', () => {
+    let memoria = rememberSilenced({}, { id: 'r1', offerTime: '01:00', receivedAt: 0 }, 0);
+    memoria = forgetSilenced(memoria, [], 59_000); // ainda dentro do prazo
+    expect(Object.keys(memoria)).toEqual(['r1']);
+    memoria = forgetSilenced(memoria, [], 61_000); // prazo passou
+    expect(memoria).toEqual({});
+});
+
+it('rememberSilenced preserva o instante do primeiro silêncio', () => {
+    const oferta = { id: 'r1', offerTime: '01:00', receivedAt: 0 };
+    let memoria = rememberSilenced({}, oferta, 5);
+    memoria = rememberSilenced(memoria, oferta, 99);
+    expect(memoria.r1.at).toBe(5);
+});
+
+it('applySilenced usa o instante do silêncio, não o do render', () => {
+    const fila = addOffer([], o('r1'), 0);
+    const memoria = rememberSilenced({}, fila[0], 7);
+    expect(applySilenced(fila, memoria)[0].silencedAt).toBe(7);
+});
+
+it('applySilenced devolve a mesma lista quando não há nada a silenciar', () => {
+    const fila = addOffer([], o('r1'), 0);
+    expect(applySilenced(fila, {})).toBe(fila);
+    // memória de uma oferta que nem está na fila também não mexe na lista
+    const memoria: SilencedOffers = { r404: { at: 0, until: 60_000 } };
+    expect(applySilenced(fila, memoria)).toBe(fila);
+});
+
+it('forgetSilenced devolve a mesma memória quando nada muda', () => {
+    const memoria = rememberSilenced({}, { id: 'r1', offerTime: '01:00', receivedAt: 0 }, 0);
+    expect(forgetSilenced(memoria, [], 10_000)).toBe(memoria);
+});
+
+it('a memória de uma oferta não silencia as outras', () => {
+    let fila = addOffer([], o('r1'), 0);
+    fila = addOffer(fila, o('r2'), 0);
+    const memoria = rememberSilenced({}, fila[0], 0);
+    expect(activeOffer(applySilenced(fila, memoria))?.id).toBe('r2');
 });

@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { Modal, Platform, Vibration } from 'react-native';
 
 import { router } from 'expo-router';
@@ -9,12 +9,14 @@ import { useFindOneDriver } from '@/domain/agility/driver/useCase';
 import {
   activeOffer,
   addOffer,
+  applySilenced,
   dropOffer,
   expiresAtOf,
+  forgetSilenced,
   pruneExpired,
-  silenceOffer,
+  rememberSilenced,
 } from '@/domain/agility/offer/offerStore';
-import type { OfferPayload, PendingOffer } from '@/domain/agility/offer/offerStore';
+import type { OfferPayload, PendingOffer, SilencedOffers } from '@/domain/agility/offer/offerStore';
 import { useAcceptRouting, useFindBroadcastingRoutings } from '@/domain/agility/routing/useCase';
 import { useAppSafeArea } from '@/hooks';
 import { useAuthCredentialsService } from '@/services/authCredentials/useAuthCredentialsService';
@@ -78,6 +80,10 @@ export function OfferAlertProvider({ children }: { children: React.ReactNode }) 
   const { acceptRoutingAsync, isLoading } = useAcceptRouting();
 
   const [offers, setOffers] = useState<PendingOffer[]>([]);
+  // Memória das ofertas que o motorista mandou "Ver detalhes". Vive FORA da
+  // fila de propósito: a fila é volátil (ver o efeito de disponibilidade),
+  // a memória não.
+  const [silenced, setSilenced] = useState<SilencedOffers>({});
   const [now, setNow] = useState(() => Date.now());
 
   // Gating: só empilha oferta se o motorista estiver disponível.
@@ -113,24 +119,41 @@ export function OfferAlertProvider({ children }: { children: React.ReactNode }) 
   }, [broadcastRoutings, pushOffer]);
 
   // Tick de 1s: expira ofertas vencidas e atualiza o contador regressivo.
-  // Só roda enquanto houver ofertas na fila, para não churnar em idle.
+  // Só roda enquanto houver o que envelhecer — fila OU memória —, para não
+  // churnar em idle. A memória entra no gate porque ela precisa envelhecer
+  // justamente quando a fila está vazia (motorista indisponível).
+  const silencedCount = Object.keys(silenced).length;
   useEffect(() => {
-    if (offers.length === 0) return;
+    if (offers.length === 0 && silencedCount === 0) return;
     const timer = setInterval(() => {
       const t = Date.now();
       setNow(t);
       setOffers((list) => pruneExpired(list, t));
     }, 1000);
     return () => clearInterval(timer);
-  }, [offers.length]);
+  }, [offers.length, silencedCount]);
+
+  // Esquece as ofertas dispensadas cujo prazo passou (e renova o prazo das que
+  // seguem na fila), para a memória não crescer sem limite. Não referencia
+  // `silenced`: o updater lê a memória fresca e `forgetSilenced` devolve a
+  // mesma referência quando nada muda, então o React corta o re-render e isto
+  // não vira laço.
+  useEffect(() => {
+    setSilenced((memory) => forgetSilenced(memory, offers, now));
+  }, [offers, now]);
 
   // Se o motorista deixar de estar disponível, descarta a fila inteira: uma
   // oferta pendente não deve continuar visível/aceitável fora de disponibilidade.
+  // A memória do que ele já dispensou sobrevive de propósito — senão a mesma
+  // oferta reentraria pelo próximo poll sem o silêncio, e o alerta reabriria
+  // por cima da tela de detalhe que ele foi justamente ver.
   useEffect(() => {
     if (!isAvailable) setOffers([]);
   }, [isAvailable]);
 
-  const current = activeOffer(offers);
+  // Fila efetiva: a memória reaplica o silêncio às ofertas que reentraram.
+  const fila = useMemo(() => applySilenced(offers, silenced), [offers, silenced]);
+  const current = activeOffer(fila);
   const secondsLeft = current ? Math.max(0, Math.ceil((expiresAtOf(current) - now) / 1000)) : 0;
 
   // Vibra ao surgir uma nova oferta ativa (som customizado fica para follow-up;
@@ -149,11 +172,12 @@ export function OfferAlertProvider({ children }: { children: React.ReactNode }) 
   // fila, válida e aceitável) e o motorista decide na tela de detalhe, que já
   // tem mapa, paradas, Aceitar e Recusar. Sem o silêncio, o polling de
   // `useFindBroadcastingRoutings` reempilharia a oferta e o popup voltaria por
-  // cima da própria tela que ele foi ver.
+  // cima da própria tela que ele foi ver. Registrar na memória — e não marcar a
+  // fila — é o que faz o silêncio sobreviver ao esvaziamento por disponibilidade.
   const onVerDetalhes = useCallback(() => {
     if (!current) return;
     const offerId = current.id;
-    setOffers((list) => silenceOffer(list, offerId, Date.now()));
+    setSilenced((memory) => rememberSilenced(memory, current, Date.now()));
     router.push(`/(auth)/(tabs)/ofertas/${offerId}`);
   }, [current]);
 
@@ -244,7 +268,7 @@ export function OfferAlertProvider({ children }: { children: React.ReactNode }) 
                 {/* Terceira ação, secundária: não compete com Aceitar/Recusar. */}
                 <Box alignItems="center" mt="y16">
                   <TextButton
-                    preset="primary"
+                    preset="textPrimaryUnderline"
                     title="Ver detalhes"
                     onPress={onVerDetalhes}
                     disabled={isLoading}
