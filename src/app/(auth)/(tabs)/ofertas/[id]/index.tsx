@@ -148,9 +148,22 @@ export default function OfertaDetalhadaScreen() {
       buttonLeft={<ButtonBack />}
       title={<Text preset="textTitleScreen">Rota</Text>}
     >
-      {/* pb generoso: os botões Recusar/Aceitar precisam livrar a tab bar + o
-          safe-area inferior (antes ficavam colados no rodapé). */}
-      <Box flex={1} pt="y12" scrollable style={{ paddingBottom: safeArea.bottom + 96 }}>
+      {/*
+        O espaço para livrar a tab bar tem de ir em `contentContainerStyle`, NÃO em
+        `style`. Com `scrollable`, o Box vira ScrollView: padding no `style` encolhe
+        a janela visível, enquanto o conteúdo rolável continua terminando onde
+        terminava — então Recusar/Aceitar seguiam cortados ao rolar até o fim. É o
+        `contentContainerStyle` que estende o conteúdo e deixa os botões subirem
+        acima da barra.
+
+        O valor já era folgado (tab bar ~64pt + safe-area); o defeito era a prop.
+      */}
+      <Box
+        flex={1}
+        pt="y12"
+        scrollable
+        contentContainerStyle={{ paddingBottom: safeArea.bottom + 96 }}
+      >
 
         {/* Tags de Resumo */}
         <Box flexDirection="row" flexWrap="wrap" gap="x12" mb="y24">

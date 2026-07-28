@@ -15,10 +15,20 @@ export interface BoxBackGroundProps extends BoxProps<Theme>, ViewProps {
   scrollable?: boolean;
   borderRadii?: number;
   refreshControl?: ScrollViewProps['refreshControl'];
+  /**
+   * Estilo do CONTEÚDO rolável — só tem efeito com `scrollable`.
+   *
+   * Não confundir com `style`: em ScrollView, padding no `style` encolhe a janela
+   * visível e o conteúdo continua terminando onde terminava; é o
+   * `contentContainerStyle` que ESTENDE o conteúdo. Para o último elemento subir
+   * acima da tab bar (botões de ação no fim da tela, por exemplo), o espaço
+   * precisa vir por aqui.
+   */
+  contentContainerStyle?: ScrollViewProps['contentContainerStyle'];
 }
 
 export const Box = forwardRef<View, BoxBackGroundProps>(function Box(
-  { backgroundImage, children, scrollable = false, borderRadii = 0, ...rest },
+  { backgroundImage, children, scrollable = false, borderRadii = 0, contentContainerStyle, refreshControl, ...rest },
   ref
 ) {
   const { isInsideScrollView } = useScrollViewContext();
@@ -28,6 +38,10 @@ export const Box = forwardRef<View, BoxBackGroundProps>(function Box(
   const RNBox = shouldUseScrollView ? ScrollableBox : BaseBox;
 
   // Props de otimização para o ScrollableBox
+  // `contentContainerStyle` e `refreshControl` só existem em ScrollView. Quando o
+  // Box cai no BaseBox (View) — por não ser scrollable, ou por já estar dentro de
+  // outro ScrollView — repassá-los levaria prop desconhecida para a View, que a
+  // ignora em silêncio: o padding some sem erro nenhum e o motivo fica invisível.
   const scrollableProps = shouldUseScrollView
     ? {
       nestedScrollEnabled: true,
@@ -35,6 +49,8 @@ export const Box = forwardRef<View, BoxBackGroundProps>(function Box(
       removeClippedSubviews: Platform.OS === 'android',
       showsVerticalScrollIndicator: false,
       showsHorizontalScrollIndicator: false,
+      contentContainerStyle,
+      refreshControl,
     }
     : {};
 
