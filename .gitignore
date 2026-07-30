@@ -39,3 +39,9 @@ plans/
 
 # Debug screenshots
 ajudantes-*.png
+
+# graphify knowledge graph output (derived artifact, ~9MB)
+graphify-out/
+
+# Cursor local config
+.cursor/
