@@ -325,8 +325,11 @@ export function findOutrasParadas(paradas: Parada[], proximaParada: Parada | nul
         return []
     }
 
+    // Compara por serviceId, não por referência de objeto: com o agrupamento a
+    // lista de paradas é reconstruída entre os useMemo, e `p !== proximaParada`
+    // deixaria a próxima parada aparecer duas vezes na lista, sem erro nenhum na tela.
     return paradas.filter(p =>
-        p !== proximaParada &&
+        p.serviceId !== proximaParada?.serviceId &&
         (p.status === 'pendente' || p.status === 'em-andamento' || p.status === 'em-atendimento')
     )
 }
