@@ -19,6 +19,8 @@ import type {
     ServiceTypeLabelMap,
 } from '../_types/rota.types'
 
+import { stopKeyOf } from './stopGrouping'
+
 // ============================================
 // CONSTANTES DE MAPEAMENTO
 // ============================================
@@ -117,6 +119,37 @@ export function getParadaStatus(service: ServiceResponse): ParadaStatus {
 }
 
 /**
+ * Status da PARADA a partir dos N pedidos (§3.2 da spec).
+ *
+ * Precedência: em atendimento > em andamento > pendente > terminal. Uma parada
+ * só fecha quando TODOS os pedidos fecham; e grupo misto (alguns entregues,
+ * algum insucesso) fecha como INSUCESSO — é o recorte que não esconde o
+ * problema do operador (§3.3).
+ */
+export function getParadaStatusGrupo(grupo: ServiceResponse[]): ParadaStatus {
+    if (grupo.length === 0) return 'pendente'
+
+    const status = grupo.map(getParadaStatus)
+
+    if (status.includes('em-atendimento')) return 'em-atendimento'
+    if (status.includes('em-andamento')) return 'em-andamento'
+    if (status.includes('pendente')) return 'pendente'
+    if (status.includes('concluida-insucesso')) return 'concluida-insucesso'
+    return 'concluida-sucesso'
+}
+
+/** Janela mais restritiva do grupo: o início mais tarde e o fim mais cedo (§3.4). */
+function janelaMaisRestritiva(grupo: ServiceResponse[]): { inicio: string | null; fim: string | null } {
+    const inicios = grupo.map((s) => toISO(s.promisedStartDate)).filter((v): v is string => !!v)
+    const fins = grupo.map((s) => toISO(s.promisedEndDate)).filter((v): v is string => !!v)
+
+    return {
+        inicio: inicios.length ? inicios.reduce((a, b) => (a > b ? a : b)) : null,
+        fim: fins.length ? fins.reduce((a, b) => (a < b ? a : b)) : null,
+    }
+}
+
+/**
  * Determina o status da rota baseado nas paradas
  * 
  * @param paradas - Lista de paradas da rota
@@ -151,34 +184,27 @@ export function getRotaStatus(paradas: Parada[]): RotaStatus {
 }
 
 /**
- * Mapeia ServiceResponse para Parada
- * 
- * IMPORTANTE: Usa APENAS os dados do backend sem transformações desnecessárias.
- * Os campos booleanos (isPending, isInProgress, isCompleted, isCanceled) são a fonte da verdade.
- * 
- * @param service - Objeto de serviço do backend
- * @param index - Índice do serviço na lista ordenada (usado para número da parada)
- * @returns Objeto Parada formatado para exibição
- * 
- * @example
- * const parada = mapServiceToParada(service, 0)
- * // { numero: 1, serviceId: 'abc', nome: 'Cliente', ... }
+ * Mapeia UM GRUPO de pedidos (a parada) para `Parada`.
+ *
+ * O representante (`grupo[0]`, o primeiro do itinerário) fornece endereço, nome,
+ * tipo e ETA de chegada. O que é agregado vem do grupo inteiro: status (§3.2),
+ * janela (§3.4), conclusão real e pendência.
  */
-export function mapServiceToParada(service: ServiceResponse, index: number, returnAddress?: string | null): Parada {
-    // Usar posição na lista ordenada para numero (evita duplicados quando backend repete sequenceOrder)
+export function mapGrupoToParada(
+    grupo: ServiceResponse[],
+    index: number,
+    returnAddress?: string | null,
+): Parada {
+    const service = grupo[0]
     const numero = index + 1
 
     const isRetorno = service.serviceType === ServiceType.RETURN
 
-    // TRANSFER ponto-a-ponto (A→B): mostrar coleta (origem) e entrega (destino)
-    // em vez de um endereço só. Nulo para os demais tipos de serviço.
     const isTransferAB = service.serviceType === ServiceType.TRANSFER
         && (!!service.pickupAddress || !!service.deliveryAddress)
     const enderecoColeta = isTransferAB ? formatAddress(service.pickupAddress) : null
     const enderecoEntrega = isTransferAB ? formatAddress(service.deliveryAddress) : null
 
-    // O endereço do RETORNO vem da routing (returnPoint/returnAddress), não de
-    // service.address — a parada RETURN normalmente não tem Address cadastrado.
     const endereco = isRetorno
         ? (returnAddress ?? 'Retorno ao CD/origem')
         : isTransferAB
@@ -186,25 +212,37 @@ export function mapServiceToParada(service: ServiceResponse, index: number, retu
             : (service.address?.formattedAddress
                 ?? (service.addressId ? `Endereço ID: ${service.addressId}` : 'Endereço não disponível'))
 
+    // Chegada = a do primeiro pedido; conclusão = a do último. A parada dura da
+    // primeira nota à última.
+    const ultimo = grupo[grupo.length - 1]
     const horarioInicio = formatHHmm(service.estimatedArrival)
-    const horarioFim = formatHHmm(service.estimatedCompletion)
+    const horarioFim = formatHHmm(ultimo.estimatedCompletion)
 
-    // Mapear tipo de serviço
     const tipo = getServiceTypeLabel(service.serviceType)
+    const status = getParadaStatusGrupo(grupo)
+    const janela = janelaMaisRestritiva(grupo)
 
-    // Determinar status da parada
-    const status = getParadaStatus(service)
+    const hasReturn = grupo.some((s) => !!(
+        s.hasReturn ||
+        (s.materials?.some((m) => m.direction === 'PICKUP') ?? false)
+    ))
 
-    // Coleta de retorno no mesmo stop: flag explícita do backend ou inferida de
-    // materiais direction=PICKUP.
-    const hasReturn = !!(
-        service.hasReturn ||
-        (service.materials?.some((m) => m.direction === 'PICKUP') ?? false)
-    )
+    // Conclusão da PARADA = a do último pedido a fechar.
+    const conclusoes = grupo
+        .map((s) => toISO(s.completedAt ?? s.endDate))
+        .filter((v): v is string => !!v)
+    const completedAtISO = conclusoes.length ? conclusoes.reduce((a, b) => (a > b ? a : b)) : null
+
+    // Qualquer pendência de item no grupo marca a parada como "com pendência".
+    const deliveryOutcome = grupo.some((s) => s.deliveryOutcome === 'WITH_ISSUES')
+        ? 'WITH_ISSUES'
+        : (grupo.some((s) => s.deliveryOutcome === 'FULL') ? 'FULL' : null)
 
     return {
         numero,
         serviceId: service.id,
+        pedidos: grupo,
+        chaveParada: stopKeyOf(service),
         nome: isRetorno ? 'Retorno' : (service.fantasyName ?? service.responsible ?? 'Cliente'),
         endereco,
         enderecoColeta,
@@ -213,10 +251,9 @@ export function mapServiceToParada(service: ServiceResponse, index: number, retu
         horarioFim,
         estimatedArrivalISO: toISO(service.estimatedArrival),
         plannedArrivalISO: toISO(service.plannedArrival),
-        promisedStartISO: toISO(service.promisedStartDate),
-        promisedEndISO: toISO(service.promisedEndDate),
-        // Conclusão real — usada para "entregue em atraso" (completedAt × promisedEnd).
-        completedAtISO: toISO(service.completedAt ?? service.endDate),
+        promisedStartISO: janela.inicio,
+        promisedEndISO: janela.fim,
+        completedAtISO,
         isLateToEta: service.isLateToEta ?? undefined,
         isLateToWindow: service.isLateToWindow ?? undefined,
         delayMinutes: service.delayMinutes ?? null,
@@ -224,8 +261,17 @@ export function mapServiceToParada(service: ServiceResponse, index: number, retu
         hasReturn,
         isRetorno,
         status,
-        deliveryOutcome: service.deliveryOutcome ?? null,
+        deliveryOutcome,
     }
+}
+
+/** Compatibilidade: um pedido é uma parada de um pedido só. */
+export function mapServiceToParada(
+    service: ServiceResponse,
+    index: number,
+    returnAddress?: string | null,
+): Parada {
+    return mapGrupoToParada([service], index, returnAddress)
 }
 
 /** Normaliza Date|string|null → ISO string|null para comparação client-side. */

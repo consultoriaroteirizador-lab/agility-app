@@ -15,7 +15,8 @@ import type {
     RotaTabType,
 } from '../_types/rota.types'
 
-import { mapServiceToParada } from './statusMappers'
+import { mapGrupoToParada } from './statusMappers'
+import { contarChavesRepetidas, groupContiguousStops } from './stopGrouping'
 
 // ============================================
 // TIPOS
@@ -70,18 +71,25 @@ export function getParadasOrdenadas(services: ServiceResponse[]): ServiceRespons
 // ============================================
 
 /**
- * Converte lista de serviços em lista de paradas ordenadas
- * 
- * @param services - Lista de serviços do backend
- * @returns Lista de paradas ordenadas e formatadas
- * 
- * @example
- * const paradas = mapServicesToParadas(services)
- * // [{ numero: 1, serviceId: 'abc', nome: 'Cliente', ... }, ...]
+ * Converte a lista de PEDIDOS na lista de PARADAS ordenadas.
+ *
+ * Agrupa vizinhos CONTÍGUOS com a mesma chave de parada — nunca por afinidade,
+ * que reordenaria o itinerário. A numeração passa a ser por parada: "12 de 26",
+ * não "12 de 56".
  */
 export function mapServicesToParadas(services: ServiceResponse[], returnAddress?: string | null): Parada[] {
     const sortedServices = getParadasOrdenadas(services)
-    return sortedServices.map((service, index) => mapServiceToParada(service, index, returnAddress))
+    const grupos = groupContiguousStops(sortedServices)
+    // A mesma porta partida em mais de um grupo é comportamento CORRETO em rota
+    // legada — mas precisa ficar visível ao motorista para não parecer defeito.
+    const chavesRepetidas = contarChavesRepetidas(grupos)
+
+    return grupos.map((grupo, index) => {
+        const parada = mapGrupoToParada(grupo, index, returnAddress)
+        return chavesRepetidas.has(parada.chaveParada)
+            ? { ...parada, enderecoRepetido: true }
+            : parada
+    })
 }
 
 // ============================================

@@ -20,11 +20,13 @@ export {
     // Funções de mapeamento
     getServiceTypeLabel,
     getParadaStatus,
+    getParadaStatusGrupo,
     getParadaStatusLabel,
     getParadaStatusColor,
     getRotaStatus,
+    mapGrupoToParada,
     mapServiceToParada,
-    
+
     // Funções de verificação
     isParadaAtiva,
     isParadaConcluida,
