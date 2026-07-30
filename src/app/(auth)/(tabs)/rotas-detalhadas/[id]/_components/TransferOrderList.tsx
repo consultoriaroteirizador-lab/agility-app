@@ -17,25 +17,43 @@ export function TransferOrderList({
     outcomes,
     onMarkNotReceived,
     onMarkReceived,
+    titulo,
+    onOpen,
+    openLabel,
+    tituloDeCard,
+    subtituloDeCard,
+    badgeDeCard,
 }: {
     paradas: Parada[];
     outcomes?: Record<string, TransferOrderOutcome>;
     onMarkNotReceived?: (serviceId: string) => void;
     onMarkReceived?: (serviceId: string) => void;
+    /** Cabeçalho da lista. Default: "Lote da carga (N pedidos)". */
+    titulo?: string;
+    onOpen?: (serviceId: string) => void;
+    openLabel?: string;
+    tituloDeCard?: (parada: Parada, index: number) => string;
+    subtituloDeCard?: (parada: Parada, index: number) => string | undefined;
+    badgeDeCard?: (parada: Parada, index: number) => string | undefined;
 }) {
     return (
         <Box gap="y8">
             <Text preset="text14" fontWeightPreset="bold" color="gray600">
-                Lote da carga ({paradas.length} pedido{paradas.length === 1 ? '' : 's'})
+                {titulo ?? `Lote da carga (${paradas.length} pedido${paradas.length === 1 ? '' : 's'})`}
             </Text>
             {paradas.length === 0 ? (
                 <Text preset="text13" color="gray600">Nenhum pedido no lote deste trecho.</Text>
             ) : null}
-            {paradas.map((parada) => (
+            {paradas.map((parada, index) => (
                 <TransferOrderCard
                     key={parada.serviceId}
                     parada={parada}
                     outcome={outcomes?.[parada.serviceId]}
+                    titulo={tituloDeCard?.(parada, index)}
+                    subtitulo={subtituloDeCard?.(parada, index)}
+                    badge={badgeDeCard?.(parada, index)}
+                    onOpen={onOpen ? () => onOpen(parada.serviceId) : undefined}
+                    openLabel={openLabel}
                     onMarkNotReceived={onMarkNotReceived ? () => onMarkNotReceived(parada.serviceId) : undefined}
                     onMarkReceived={onMarkReceived ? () => onMarkReceived(parada.serviceId) : undefined}
                 />

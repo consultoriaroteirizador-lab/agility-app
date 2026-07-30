@@ -31,11 +31,25 @@ export function TransferOrderCard({
     outcome,
     onMarkNotReceived,
     onMarkReceived,
+    titulo,
+    subtitulo,
+    badge,
+    onOpen,
+    openLabel = 'Abrir',
 }: {
     parada: Parada;
     outcome?: TransferOrderOutcome;
     onMarkNotReceived?: () => void;
     onMarkReceived?: () => void;
+    /** Sobrescreve o título (na parada agrupada é o nº da nota / código do pedido). */
+    titulo?: string;
+    /** Sobrescreve o subtítulo (na parada agrupada é a janela contratada da nota). */
+    subtitulo?: string;
+    /** Etiqueta curta de status da nota (ex.: "Entregue", "Insucesso"). */
+    badge?: string;
+    /** CTA que abre o fluxo daquele pedido. Sem ela o card permanece como era. */
+    onOpen?: () => void;
+    openLabel?: string;
 }) {
     const [expanded, setExpanded] = useState(false);
     const { materials, isLoading, isError } = useGetMaterials(expanded ? parada.serviceId : undefined);
@@ -46,9 +60,14 @@ export function TransferOrderCard({
             <TouchableOpacityBox flexDirection="row" alignItems="center" gap="x12" p="y12" onPress={() => setExpanded((v) => !v)}>
                 <Icon name="inventory-2" size={measure.m20} color="gray400" />
                 <Box flex={1}>
-                    <Text preset="text14" fontWeightPreset="semibold" color="colorTextPrimary">{parada.nome}</Text>
-                    <Text preset="text12" color="gray600">{parada.endereco}</Text>
+                    <Text preset="text14" fontWeightPreset="semibold" color="colorTextPrimary">{titulo ?? parada.nome}</Text>
+                    <Text preset="text12" color="gray600">{subtitulo ?? parada.endereco}</Text>
                 </Box>
+                {badge ? (
+                    <Box backgroundColor="gray100" px="x8" py="y2" borderRadius="s4">
+                        <Text preset="text12" color="gray600">{badge}</Text>
+                    </Box>
+                ) : null}
                 <Icon name={expanded ? 'expand-less' : 'expand-more'} size={measure.m20} color="gray400" />
             </TouchableOpacityBox>
 
@@ -70,6 +89,14 @@ export function TransferOrderCard({
                             <Text preset="text12" color="gray600" style={{ textDecorationLine: 'underline' }}>Não recebido</Text>
                         </TouchableOpacityBox>
                     )}
+                </Box>
+            ) : null}
+
+            {onOpen ? (
+                <Box borderTopWidth={1} borderColor="gray100" px="x12" py="y8">
+                    <TouchableOpacityBox onPress={onOpen} alignSelf="flex-start">
+                        <Text preset="text13" fontWeightPreset="semibold" color="primary100">{openLabel}</Text>
+                    </TouchableOpacityBox>
                 </Box>
             ) : null}
 

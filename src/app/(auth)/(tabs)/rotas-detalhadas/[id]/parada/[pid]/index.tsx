@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Linking } from 'react-native';
 
 import { useQueryClient } from '@tanstack/react-query';
@@ -17,6 +17,9 @@ import { useFindOneService, useFindServicesByRoutingId } from '@/domain/agility/
 import { KEY_ROUTINGS } from '@/domain/queryKeys';
 import { formatHHmm } from '@/functions';
 import { measure } from '@/theme';
+
+import { TransferOrderList } from '../../_components/TransferOrderList';
+import { findGrupoDoServico, groupContiguousStops, mapGrupoToParada, getParadaStatusLabel } from '../../_utils';
 
 import { EquipmentList, StopActions, StopTabs } from './_components';
 import { Map } from './_components/shared/Map';
@@ -37,11 +40,28 @@ export default function StopDetailScreen() {
 
   // Fetch service data
   const { service, isLoading, isError, refetch } = useFindOneService(serviceId || '');
-  const { services: allServices } = useFindServicesByRoutingId(routeId || '');
+  const { services: allServices, isLoading: isLoadingServices } = useFindServicesByRoutingId(routeId || '');
 
   // Get address from service list as fallback
   const serviceFromList = allServices.find((s) => s.id === serviceId);
   const addressFromList = serviceFromList?.address ?? null;
+
+  // Pedidos DESTA parada (mesma porta, contíguos). Mesma função que monta a lista
+  // da rota e que o gate de "uma por vez" usa — as três precisam concordar.
+  const pedidosDaParada = useMemo(() => {
+    const ordenados = [...allServices].sort(
+      (a, b) => (a.sequenceOrder ?? 999) - (b.sequenceOrder ?? 999),
+    );
+    return findGrupoDoServico(groupContiguousStops(ordenados), serviceId) ?? [];
+  }, [allServices, serviceId]);
+
+  const isParadaAgrupada = pedidosDaParada.length > 1;
+
+  // Cada nota é uma "parada de 1 pedido" para o card — inclusive o status dela.
+  const notas = useMemo(
+    () => pedidosDaParada.map((p, i) => mapGrupoToParada([p], i, null)),
+    [pedidosDaParada],
+  );
 
   // Embedded address from service (when backend sends it)
   const embeddedAddress = service?.address ?? addressFromList ?? null;
@@ -128,6 +148,10 @@ export default function StopDetailScreen() {
   // Auto-redirect for DELIVERY and PICKUP service types
   useEffect(() => {
     if (isLoading || isError || !service) return;
+    // Parada agrupada: esta tela é o ÍNDICE das notas. Só redireciona quando a
+    // parada tem 1 pedido (comportamento idêntico ao de hoje). O guard de
+    // isLoadingServices evita redirecionar antes de saber quantas notas são.
+    if (isLoadingServices || isParadaAgrupada) return;
 
     console.log('[StopDetailScreen] Service type:', service.serviceType);
     console.log('[StopDetailScreen] ServiceType enum:', ServiceType);
@@ -179,7 +203,7 @@ export default function StopDetailScreen() {
       });
       return;
     }
-  }, [service, isLoading, isError, router, routeId, serviceId]);
+  }, [service, isLoading, isError, router, routeId, serviceId, isLoadingServices, isParadaAgrupada]);
 
   // "Estou aqui" → inicia o ATENDIMENTO: PATCH /services/:id/start-attendance → IN_ATTENDANCE.
   // Aceito de qualquer estado pré-terminal (PENDING/ASSIGNED/IN_PROGRESS) — o motorista pode
@@ -413,6 +437,63 @@ export default function StopDetailScreen() {
       <EquipmentList materials={service?.materials || []} />
     </Box>
   );
+
+  if (isParadaAgrupada) {
+    // Rota do fluxo de entrega/coleta/serviço de cada nota — MESMO mapa do
+    // useEffect de auto-redirect acima. O grupo é sempre homogêneo em tipo
+    // (o tipo entra na chave de agrupamento), então basta olhar o tipo do
+    // serviço corrente uma vez.
+    const rotaDaNota = service.serviceType === ServiceType.PICKUP
+      ? '/rotas-detalhadas/[id]/parada/[pid]/coleta'
+      : service.serviceType === ServiceType.SERVICE
+        ? '/rotas-detalhadas/[id]/parada/[pid]/service'
+        : '/rotas-detalhadas/[id]/parada/[pid]/entrega';
+
+    return (
+      <ScreenBase
+        scrollable
+        buttonLeft={<ButtonBack />}
+        title={
+          <Text preset="text16" fontWeightPreset="semibold" color="colorTextPrimary" textAlign="center" numberOfLines={2}>
+            {addressText}
+          </Text>
+        }
+      >
+        <Box flex={1} backgroundColor="white" pt="y8" px="x16" gap="y16">
+          <Box>
+            <Text preset="text15" fontWeightPreset="semibold" color="colorTextPrimary">{customerName}</Text>
+            <Text preset="text13" color="gray600">
+              {notas.length} notas nesta parada — confirme uma de cada vez.
+            </Text>
+          </Box>
+
+          <TransferOrderList
+            paradas={notas}
+            titulo={`Notas desta parada (${notas.length})`}
+            openLabel="Abrir"
+            tituloDeCard={(nota, i) => {
+              const pedido = pedidosDaParada[i];
+              return pedido?.identificationCode
+                ? `Nota ${i + 1} · #${pedido.identificationCode}`
+                : `Nota ${i + 1}`;
+            }}
+            subtituloDeCard={(nota) =>
+              nota.promisedStartISO || nota.promisedEndISO
+                ? `Janela ${formatHHmm(nota.promisedStartISO)}–${formatHHmm(nota.promisedEndISO)}`
+                : undefined
+            }
+            badgeDeCard={(nota) => getParadaStatusLabel(nota.status)}
+            onOpen={(pid) => {
+              router.push({
+                pathname: rotaDaNota,
+                params: { id: routeId, pid },
+              });
+            }}
+          />
+        </Box>
+      </ScreenBase>
+    );
+  }
 
   return (
     <ScreenBase
