@@ -80,3 +80,16 @@ export {
     countLedgerOnly,
     outcomeLabel,
 } from './routeNonDelivered'
+
+// ============================================
+// AGRUPAMENTO DE PARADAS (Camada 2)
+// ============================================
+
+export {
+    type StopKeyInput,
+    contarChavesRepetidas,
+    findGrupoDoServico,
+    groupContiguousBy,
+    groupContiguousStops,
+    stopKeyOf,
+} from './stopGrouping'
