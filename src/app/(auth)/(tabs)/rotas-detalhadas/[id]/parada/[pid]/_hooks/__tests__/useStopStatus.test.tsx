@@ -177,6 +177,60 @@ describe('useStopStatus — irmãos da mesma parada', () => {
         expect(result.startBlockReason).toContain('ordem');
     });
 
+    /**
+     * O número do bloqueio ("Inicie a parada #N primeiro") é a ÚNICA orientação
+     * que o motorista recebe no momento em que é travado. Ele vinha de
+     * `sequenceOrder + 1`, que é posição de PEDIDO; os números na tela são de
+     * PARADA (`mapGrupoToParada` → `numero = index + 1`). Numa rota agrupada os
+     * dois divergem: com os dados do cliente a mensagem mandaria "inicie a parada
+     * #34" numa lista que termina em 26.
+     */
+    it('o número citado no bloqueio é o da PARADA, não o sequenceOrder do pedido', () => {
+        // Itinerário: porta A com 5 notas (seq 1..5, já concluídas), porta B com 2
+        // notas (seq 6,7) e porta C (seq 8). A lista mostra 3 paradas.
+        const portaA = [1, 2, 3, 4, 5].map((seq) =>
+            makeService({ id: `a${seq}`, status: ServiceStatus.COMPLETED, sequenceOrder: seq, isCompleted: true, ...MESMA_PORTA }),
+        );
+        const portaB = [6, 7].map((seq) =>
+            makeService({ id: `b${seq}`, status: ServiceStatus.PENDING, sequenceOrder: seq, isPending: true, ...OUTRA_PORTA }),
+        );
+        const portaC = makeService({
+            id: 'c8', status: ServiceStatus.PENDING, sequenceOrder: 8, isPending: true,
+            addressId: 'addr-3', customerId: 'cli-3', serviceType: 'DELIVERY',
+        });
+        const allServices = [...portaA, ...portaB, portaC];
+
+        const result = runHook({
+            service: portaC,
+            allServices,
+            currentServiceId: 'c8',
+            enforceSingleActiveStop: true,
+            enforceStopOrder: true,
+        });
+
+        expect(result.canStartService).toBe(false);
+        // A próxima esperada é a porta B, que é a 2ª PARADA da rota.
+        expect(result.startBlockReason).toContain('#2');
+        // Antes citava o sequenceOrder + 1 do pedido (seq 6 → "#7"), um número que
+        // não existe numa lista de 3 paradas.
+        expect(result.startBlockReason).not.toContain('#7');
+    });
+
+    it('rota de 1 pedido por parada continua citando o mesmo número de antes', () => {
+        const a = makeService({ id: 'a', status: ServiceStatus.PENDING, sequenceOrder: 0, isPending: true, ...MESMA_PORTA });
+        const b = makeService({ id: 'b', status: ServiceStatus.PENDING, sequenceOrder: 1, isPending: true, ...OUTRA_PORTA });
+
+        const result = runHook({
+            service: b,
+            allServices: [a, b],
+            currentServiceId: 'b',
+            enforceSingleActiveStop: true,
+            enforceStopOrder: true,
+        });
+
+        expect(result.startBlockReason).toContain('#1');
+    });
+
     it('rota legada: mesma porta NÃO contígua são duas paradas — e uma bloqueia a outra', () => {
         // Itinerário: porta A (seq 1) → porta B (seq 2) → porta A de novo (seq 3).
         // O otimizador separou; o app respeita. 'a1' em atendimento bloqueia 'a2'.
