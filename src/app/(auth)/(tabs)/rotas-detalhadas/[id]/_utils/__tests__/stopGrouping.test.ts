@@ -117,6 +117,19 @@ describe('contarChavesRepetidas', () => {
     })
 })
 
+/**
+ * Chave de parada dos PONTOS DO MAPA (`/map-data`).
+ *
+ * Prefere a MESMA identidade da lista (`addressId` + cliente), que o backend de
+ * fato manda em `buildServicePoints` — verificado em
+ * `agility-services/src/routing/service/routing.service.ts:4512-4547`: o payload
+ * traz `addressId`, `fantasyName` e `responsible`. O `addressId` sai do acessor
+ * cru (`string | undefined`), então a CHAVE PODE VIR AUSENTE do JSON — daí o
+ * fallback por coordenada+título continuar existindo.
+ *
+ * O que NÃO vem é `customerId`; por isso o cliente é aproximado por
+ * `fantasyName ?? responsible`, os mesmos fallbacks que `stopKeyOf` já usa.
+ */
 describe('mapPointStopKeyOf', () => {
     const ponto = (over: Partial<MapPointKeyInput> & { id: string }): MapPointKeyInput => ({
         latitude: -7.2345678,
@@ -126,22 +139,101 @@ describe('mapPointStopKeyOf', () => {
         ...over,
     })
 
-    it('mesma coordenada e mesmo título → mesma chave', () => {
-        expect(mapPointStopKeyOf(ponto({ id: 'a' }))).toBe(mapPointStopKeyOf(ponto({ id: 'b' })))
+    /** Ponto como o backend manda de verdade: com addressId e nome do cliente. */
+    const pontoReal = (over: Partial<MapPointKeyInput> & { id: string }): MapPointKeyInput =>
+        ponto({ addressId: 'addr-1', fantasyName: 'SAO LUIZ CRATO', ...over })
+
+    describe('identidade da porta (addressId + cliente)', () => {
+        it('mesmo addressId e mesmo cliente → mesma chave, mesmo com TÍTULOS DIFERENTES', () => {
+            // `title` é texto livre POR PEDIDO (vem de coluna de planilha,
+            // placeholder "Ex: Entrega de pacote"). Cinco notas na mesma porta
+            // chegam com cinco títulos diferentes no dado real — a chave não pode
+            // depender dele quando existe identidade de verdade.
+            expect(mapPointStopKeyOf(pontoReal({ id: 'a', title: 'NF 1001' })))
+                .toBe(mapPointStopKeyOf(pontoReal({ id: 'b', title: 'Entrega de pacote' })))
+        })
+
+        it('5 notas na mesma porta com títulos diferentes → 1 pino (§8)', () => {
+            const pontos = [0, 1, 2, 3, 4].map((i) => pontoReal({ id: `p${i}`, title: `NF ${1000 + i}` }))
+            expect(groupContiguousBy(pontos, mapPointStopKeyOf)).toHaveLength(1)
+        })
+
+        it('mesmo endereço, clientes diferentes → 2 pinos (dois recebedores, dois canhotos)', () => {
+            expect(mapPointStopKeyOf(pontoReal({ id: 'a', fantasyName: 'CLIENTE A' })))
+                .not.toBe(mapPointStopKeyOf(pontoReal({ id: 'b', fantasyName: 'CLIENTE B' })))
+        })
+
+        it('addressId diferente → chaves diferentes, ainda que a coordenada coincida', () => {
+            expect(mapPointStopKeyOf(pontoReal({ id: 'a', addressId: 'addr-1' })))
+                .not.toBe(mapPointStopKeyOf(pontoReal({ id: 'b', addressId: 'addr-2' })))
+        })
+
+        it('cai para `responsible` quando não há `fantasyName`, normalizando caixa e espaços', () => {
+            expect(mapPointStopKeyOf(pontoReal({ id: 'a', fantasyName: null, responsible: ' Maria Silva ' })))
+                .toBe(mapPointStopKeyOf(pontoReal({ id: 'b', fantasyName: null, responsible: 'maria silva' })))
+        })
     })
 
-    it('coordenadas distintas → chaves distintas', () => {
-        expect(mapPointStopKeyOf(ponto({ id: 'a' })))
-            .not.toBe(mapPointStopKeyOf(ponto({ id: 'b', latitude: -7.3 })))
+    describe('fallback por coordenada + título (quando o addressId não vem)', () => {
+        it('mesma coordenada e mesmo título → mesma chave', () => {
+            expect(mapPointStopKeyOf(ponto({ id: 'a' }))).toBe(mapPointStopKeyOf(ponto({ id: 'b' })))
+        })
+
+        it('coordenadas distintas → chaves distintas', () => {
+            expect(mapPointStopKeyOf(ponto({ id: 'a' })))
+                .not.toBe(mapPointStopKeyOf(ponto({ id: 'b', latitude: -7.3 })))
+        })
+
+        it('sem título não agrupa (não dá para afirmar que é o mesmo recebedor)', () => {
+            expect(mapPointStopKeyOf(ponto({ id: 'a', title: null })))
+                .not.toBe(mapPointStopKeyOf(ponto({ id: 'b', title: null })))
+        })
+
+        it('sem addressId E sem título → `solo:`, nunca agrupa', () => {
+            const chave = mapPointStopKeyOf(ponto({ id: 'a', title: null, addressId: null }))
+            expect(chave).toBe('solo:a')
+            expect(chave).not.toBe(mapPointStopKeyOf(ponto({ id: 'b', title: null, addressId: null })))
+        })
+
+        it('com addressId mas SEM cliente, usa o fallback antigo em vez de desistir', () => {
+            // Não é regressão do que existia: sem nome de cliente a coordenada +
+            // título continuam sendo a melhor aproximação disponível.
+            expect(mapPointStopKeyOf(ponto({ id: 'a', addressId: 'addr-1', fantasyName: null })))
+                .toBe(mapPointStopKeyOf(ponto({ id: 'b', addressId: 'addr-1', fantasyName: null })))
+        })
+
+        it('chaves de formas diferentes não colidem (uma com addressId, outra sem)', () => {
+            expect(mapPointStopKeyOf(pontoReal({ id: 'a' })))
+                .not.toBe(mapPointStopKeyOf(ponto({ id: 'b' })))
+        })
     })
 
-    it('sem título não agrupa (não dá para afirmar que é o mesmo recebedor)', () => {
-        expect(mapPointStopKeyOf(ponto({ id: 'a', title: null })))
-            .not.toBe(mapPointStopKeyOf(ponto({ id: 'b', title: null })))
+    describe('tipos que nunca agrupam', () => {
+        it('RETORNO nunca agrupa, nem com addressId e cliente idênticos', () => {
+            expect(mapPointStopKeyOf(pontoReal({ id: 'r1', serviceType: ServiceType.RETURN })))
+                .not.toBe(mapPointStopKeyOf(pontoReal({ id: 'r2', serviceType: ServiceType.RETURN })))
+        })
+
+        it('TRANSFERÊNCIA nunca agrupa (A→B, dois endereços e wizard próprio)', () => {
+            expect(mapPointStopKeyOf(pontoReal({ id: 't1', serviceType: ServiceType.TRANSFER })))
+                .not.toBe(mapPointStopKeyOf(pontoReal({ id: 't2', serviceType: ServiceType.TRANSFER })))
+        })
+
+        it('entrega e coleta na mesma porta são pinos distintos (fluxos distintos)', () => {
+            expect(mapPointStopKeyOf(pontoReal({ id: 'a', serviceType: ServiceType.DELIVERY })))
+                .not.toBe(mapPointStopKeyOf(pontoReal({ id: 'b', serviceType: ServiceType.PICKUP })))
+        })
     })
 
-    it('5 pontos contíguos na mesma porta → 1 pino', () => {
-        const pontos = [0, 1, 2, 3, 4].map((i) => ponto({ id: `p${i}` }))
+    it('a chave do mapa concorda com a da lista para a mesma porta', () => {
+        // Fonte única de propósito: se o mapa e a lista discordarem sobre o que é
+        // "uma parada", o motorista lê 5 pinos para 1 card (ou o contrário).
+        const pontos = [0, 1, 2].map((i) => pontoReal({ id: `n${i}`, title: `NF ${i}` }))
+        const servicos = [0, 1, 2].map((i) =>
+            svc({ id: `n${i}`, addressId: 'addr-1', customerId: null, fantasyName: 'SAO LUIZ CRATO' }),
+        )
+
         expect(groupContiguousBy(pontos, mapPointStopKeyOf)).toHaveLength(1)
+        expect(groupContiguousStops(servicos)).toHaveLength(1)
     })
 })

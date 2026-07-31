@@ -128,8 +128,17 @@ export function useRouteMapView(routeId: string): RouteMapView {
         }
 
         // Um pino por PARADA, não por pedido: cinco notas na mesma porta viravam
-        // cinco pinos empilhados com números diferentes. A numeração aqui passa a
-        // bater com a da lista de paradas.
+        // cinco pinos empilhados com números diferentes. `mapPointStopKeyOf` usa a
+        // MESMA identidade da lista (endereço + cliente), então o agrupamento
+        // concorda com o dos cards.
+        //
+        // A NUMERAÇÃO, porém, não é garantida idêntica à da lista, e não afirmamos
+        // que seja: o mapa numera as paradas DESENHÁVEIS, e a lista numera todas.
+        // Um serviço sem coordenada é filtrado em `sortedServices` (:70-76) e some
+        // do mapa, deslocando em -1 todos os números seguintes; as duas telas também
+        // bebem de endpoints diferentes (`/map-data` × `/services`), que podem
+        // divergir no conjunto de serviços. Fechar isso exige decidir o que
+        // desenhar para uma parada sem coordenada — trabalho de outra camada.
         groupContiguousBy(sortedServices, mapPointStopKeyOf).forEach((grupo, index) => {
             const representante = grupo[0]
             const sufixo = grupo.length > 1 ? ` (${grupo.length} notas)` : ''

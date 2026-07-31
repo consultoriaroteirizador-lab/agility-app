@@ -124,23 +124,47 @@ export function contarChavesRepetidas(groups: StopKeyInput[][]): Set<string> {
     return repetidas
 }
 
-/** Ponto do mapa (`/map-data`) — payload leve, sem `addressId`/`customerId`. */
+/**
+ * Ponto do mapa (`/map-data`). O payload é leve, mas NÃO é anônimo: além da
+ * coordenada e do título, o backend manda `addressId`, `fantasyName` e
+ * `responsible` (`agility-services`, `buildServicePoints` em
+ * `src/routing/service/routing.service.ts:4512-4547`). O que ele NÃO manda é
+ * `customerId`.
+ *
+ * `addressId` sai do acessor cru da entidade (`string | undefined`, sem `?? null`),
+ * então a chave pode simplesmente NÃO EXISTIR no JSON — por isso todos os campos
+ * de identidade são opcionais aqui.
+ */
 export interface MapPointKeyInput {
     id: string
     latitude: number
     longitude: number
     title?: string | null
     serviceType?: string | null
+    /** Endereço do pedido. Pode vir ausente do payload (ver acima). */
+    addressId?: string | null
+    fantasyName?: string | null
+    responsible?: string | null
 }
 
 /**
  * Chave de parada para os PONTOS DO MAPA.
  *
- * `/map-data` devolve um payload leve que não traz `addressId` nem `customerId`,
- * então aqui a porta é aproximada por coordenada arredondada (5 casas ≈ 1 m) +
- * título. É deliberadamente mais conservadora que `stopKeyOf`: sem título, não
- * agrupa. Errar para o lado de desenhar dois pinos é melhor que fundir duas
- * portas distintas no mapa.
+ * Prefere a MESMA identidade que `stopKeyOf` usa na lista — endereço + cliente —
+ * porque é a única que descreve uma porta. O caminho antigo (coordenada
+ * arredondada + título) fica como FALLBACK: `title` é texto livre POR PEDIDO
+ * (vem de coluna de planilha, com placeholder "Ex: Entrega de pacote"), então
+ * cinco notas na mesma porta chegam com cinco títulos diferentes no dado real e
+ * o mapa desenharia cinco pinos — exatamente o que este épico existe para
+ * remover.
+ *
+ * Cliente é aproximado por `fantasyName ?? responsible` porque `customerId` não
+ * vem no payload do mapa. Sem cliente, o fallback por coordenada+título ainda é
+ * melhor que desistir, e não corre o risco de fundir dois recebedores nomeados.
+ *
+ * Segue deliberadamente conservadora: RETURN/TRANSFER e "sem identidade nenhuma"
+ * devolvem `solo:<id>`, que é único por definição. Desenhar dois pinos onde há
+ * uma porta é um erro menor que fundir duas portas distintas.
  */
 export function mapPointStopKeyOf(point: MapPointKeyInput): string {
     if (
@@ -148,6 +172,11 @@ export function mapPointStopKeyOf(point: MapPointKeyInput): string {
         point.serviceType === ServiceType.TRANSFER
     ) {
         return `solo:${point.id}`
+    }
+
+    const cliente = point.fantasyName ?? point.responsible
+    if (point.addressId && cliente) {
+        return `addr:${point.addressId}|cli:${normalizar(cliente)}|tipo:${point.serviceType ?? ''}`
     }
 
     const titulo = point.title ? normalizar(point.title) : ''
