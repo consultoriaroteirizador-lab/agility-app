@@ -124,6 +124,20 @@ export function resolveParadaAtendida(pedidos: ServiceResponse[]): boolean {
  * disparado pelo índice), porque a porta não tem como perguntar, por outra
  * tela, o que só a própria nota sabe perguntar.
  *
+ * ESTE RECUO É PERMANENTE, não dívida técnica — decisão do dono do produto em
+ * 31/07/2026: o código de retirada e a conferência de equipamento são por NOTA,
+ * vinculados ao `service`. E a chegada é onde esses controles são cobrados: no
+ * backend, `startAttendance` é a MESMA transação que valida o código de retirada
+ * (`Código de retirada inválido`, em `service.service.ts`); no app, a
+ * conferência de equipamento gateia `!isServiceStarted`, ou seja, roda antes do
+ * atendimento. Como o controle é por nota e a chegada o cobra, a chegada também
+ * é por nota nesses tipos — não há "chegar na porta" sem já estar respondendo
+ * pela nota.
+ *
+ * Só muda se o produto passar a tratar código/conferência como coisa da PORTA
+ * (um código para o balcão, uma conferência para a carga inteira). Aí o backend
+ * precisaria de um ponto de chegada por parada, e esta função sai de cena.
+ *
  * NÃO reusa `resolveCodeRequirement`/`PICKUP_CHECKPOINT_TYPES`
  * (`@/domain/agility/service/codeGate`) — ver nota no report do Task 2: aquela
  * função responde "esta empresa exige código NESTE serviço", que depende de
