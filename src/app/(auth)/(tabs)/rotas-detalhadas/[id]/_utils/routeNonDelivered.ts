@@ -14,6 +14,8 @@ import type {
 
 import type { Parada } from '../_types/rota.types'
 
+import { resolveNotasBadge } from './paradaDisplay'
+
 // ============================================
 // VIEW-MODEL
 // ============================================
@@ -22,6 +24,7 @@ import type { Parada } from '../_types/rota.types'
  * Linha renderizável do "Concluídas com insucesso" (unificado).
  */
 export interface InsucessoRow {
+    /** Id do pedido; numa parada agrupada, o do REPRESENTANTE (`pedidos[0]`). */
     serviceId: string
     /** Código do pedido (do snapshot do ledger; parada ao vivo não carrega código). */
     code: string | null
@@ -31,6 +34,10 @@ export interface InsucessoRow {
     outcome: RouteNonDeliveredOutcome | null
     reasonName: string | null
     occurredAt: string | null
+    /** Notas da parada (1 quando a linha é de um pedido avulso do ledger). */
+    totalNotas: number
+    /** Notas efetivamente entregues — o "3" de "3 de 5 entregues" (§3.3). */
+    notasEntregues: number
 }
 
 // ============================================
@@ -59,21 +66,6 @@ export function outcomeLabel(outcome: RouteNonDeliveredOutcome | null | undefine
 // ============================================
 
 /**
- * Unifica as paradas de insucesso ao vivo com o ledger de não-entregues,
- * deduplicando por `serviceId`.
- *
- * Regras:
- * - Dedup por `serviceId`. Quando a linha existe nos dois lados, o LEDGER vence
- *   para desfecho/motivo/occurredAt; a parada ao vivo vence para
- *   recipientName/address (dados atuais). `code` vem do snapshot do ledger.
- * - Uma parada ao vivo cujo `serviceId` NÃO está no ledger continua na lista
- *   (borda/legado), com outcome null → rótulo 'Insucesso' e sem motivo.
- * - Um item só no ledger (pedido que saiu da rota) usa o snapshot congelado.
- *
- * Ordem: paradas ao vivo primeiro (mantém a ordem da rota), depois os itens que
- * só existem no ledger.
- */
-/**
  * Quantos pedidos existem SÓ no ledger — os que saíram da rota (cancelados /
  * devolvidos à fila zeram o `routingId`) e por isso não estão mais em `paradas`.
  *
@@ -100,15 +92,45 @@ export function countLedgerOnly(
     return ledgerOnly.size
 }
 
+/**
+ * Unifica as paradas de insucesso ao vivo com o ledger de não-entregues.
+ *
+ * A unidade da lista é a PARADA (a porta), não a nota: uma porta com 5 notas em
+ * que 1 foi recusada rende UMA linha, "4 de 5 entregues" (§3.3). Sem isto ela
+ * renderia duas — a da porta (chaveada no representante, que muitas vezes foi
+ * ENTREGUE) e mais uma vinda do ledger para a nota recusada — e o contador ao
+ * lado discordaria da lista.
+ *
+ * Regras:
+ * - Chave da linha ao vivo = `parada.serviceId` (o representante). Todo pedido
+ *   do grupo aponta para essa chave, então um item do ledger de QUALQUER nota da
+ *   porta cai na linha da porta em vez de abrir linha nova.
+ * - O LEDGER vence para desfecho/motivo/occurredAt (é a fonte da verdade); a
+ *   parada ao vivo vence para recipientName/address (dados atuais). Com mais de
+ *   uma nota recusada na mesma porta, vale a última ocorrência do ledger — a
+ *   linha resume a porta, e o detalhe nota-a-nota vive na tela da parada.
+ * - `code` só é adotado quando a linha é de UMA nota: numa porta agrupada, o
+ *   código de uma nota isolada identificaria mal a parada inteira.
+ * - Uma parada ao vivo sem registro no ledger continua na lista (borda/legado),
+ *   com outcome null → rótulo 'Insucesso' e sem motivo.
+ * - Um item só no ledger (pedido que saiu da rota, com o `routingId` zerado) vira
+ *   linha própria com o snapshot congelado.
+ *
+ * Ordem: paradas ao vivo primeiro (mantém a ordem da rota), depois os itens que
+ * só existem no ledger.
+ */
 export function buildInsucessoList(
     liveInsucessoParadas: Parada[],
     ledgerItems: RouteNonDeliveredItemResponse[],
 ): InsucessoRow[] {
     const byId = new Map<string, InsucessoRow>()
+    /** Id de qualquer nota → id do representante da parada dela. */
+    const representantePorPedido = new Map<string, string>()
 
     // 1) Paradas ao vivo (ficaram na rota). Preserva a ordem da rota.
     for (const parada of liveInsucessoParadas) {
         if (!parada?.serviceId) continue
+        const badge = resolveNotasBadge(parada)
         byId.set(parada.serviceId, {
             serviceId: parada.serviceId,
             code: null,
@@ -117,22 +139,32 @@ export function buildInsucessoList(
             outcome: null,
             reasonName: null,
             occurredAt: null,
+            totalNotas: badge.totalNotas,
+            notasEntregues: badge.notasEntregues,
         })
+        representantePorPedido.set(parada.serviceId, parada.serviceId)
+        for (const pedido of parada.pedidos ?? []) {
+            if (pedido?.id) representantePorPedido.set(pedido.id, parada.serviceId)
+        }
     }
 
     // 2) Ledger = fonte da verdade do desfecho/motivo. Vence no merge para esses
     //    campos; reaproveita recipientName/address da parada ao vivo quando houver.
     for (const item of ledgerItems) {
         if (!item?.serviceId) continue
-        const live = byId.get(item.serviceId)
-        byId.set(item.serviceId, {
-            serviceId: item.serviceId,
-            code: item.serviceCode ?? live?.code ?? null,
+        const chave = representantePorPedido.get(item.serviceId) ?? item.serviceId
+        const live = byId.get(chave)
+        const ehParadaAgrupada = (live?.totalNotas ?? 1) > 1
+        byId.set(chave, {
+            serviceId: chave,
+            code: ehParadaAgrupada ? live?.code ?? null : item.serviceCode ?? live?.code ?? null,
             recipientName: live?.recipientName ?? item.recipientName ?? null,
             address: live?.address ?? item.address ?? null,
             outcome: item.outcome,
             reasonName: item.reasonName ?? null,
             occurredAt: item.occurredAt ?? null,
+            totalNotas: live?.totalNotas ?? 1,
+            notasEntregues: live?.notasEntregues ?? 0,
         })
     }
 

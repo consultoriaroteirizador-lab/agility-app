@@ -94,6 +94,28 @@ export function resolvePedidosDaParada(services: ServiceResponse[], serviceId: s
     return findGrupoDoServico(grupos, serviceId) ?? []
 }
 
+/**
+ * Ids de TODOS os pedidos que ainda estão na rota — um por nota, não um por
+ * parada.
+ *
+ * É a identidade que o dedup do ledger de não-entregues (`countLedgerOnly`)
+ * precisa. Com o agrupamento, `parada.serviceId` é apenas o REPRESENTANTE
+ * (`pedidos[0]`): passar só ele deixaria as notas 2..N invisíveis ao dedup, e
+ * uma nota recusada numa porta de cinco seria contada como "saiu da rota"
+ * estando ali na tela — inflando total e notas de uma vez.
+ *
+ * Cobre TODAS as paradas, não só as de insucesso: uma nota pode fechar em
+ * insucesso enquanto as irmãs seguem pendentes, e nesse momento a parada ainda
+ * não é de insucesso. É também o que a tela de histórico faz (passa todos os
+ * ids dos serviços) — sem isto a mesma rota reporta números diferentes nas duas
+ * telas.
+ *
+ * Sem `pedidos` (dado não carregado), cai para o próprio `serviceId`.
+ */
+export function collectLiveServiceIds(paradas: Parada[]): string[] {
+    return paradas.flatMap((p) => (p.pedidos?.length ? p.pedidos.map((s) => s.id) : [p.serviceId]))
+}
+
 // ============================================
 // FUNÇÕES DE MAPEAMENTO
 // ============================================

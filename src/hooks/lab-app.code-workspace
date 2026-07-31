@@ -18,12 +18,6 @@
     {
       "path": "../../../../infra-config",
     },
-    {
-      "path": "../../../../../Cursos/pythondev",
-    },
-    {
-      "path": "../../../../../Documents/Conlife/GitLab/conlife-notification-manager",
-    },
   ],
   "settings": {},
 }

@@ -36,6 +36,22 @@ export interface NotasBadge {
 }
 
 /**
+ * Texto do selo de notas. UM dono para a frase: o card da lista e a linha do
+ * "Concluídas com insucesso" precisam dizer a mesma coisa sobre a mesma porta.
+ *
+ * `null` quando a parada tem uma nota só — aí não há selo, e a tela fica
+ * idêntica ao que era antes do agrupamento.
+ */
+export function formatNotasLabel(
+    totalNotas: number,
+    notasEntregues: number,
+    isGrupoMisto: boolean,
+): string | null {
+    if (totalNotas <= 1) return null
+    return isGrupoMisto ? `${notasEntregues} de ${totalNotas} entregues` : `${totalNotas} notas`
+}
+
+/**
  * Selo de notas do card da parada.
  *
  * `N notas` no caso comum; `3 de 5 entregues` quando a parada fecha em insucesso
@@ -58,10 +74,7 @@ export function resolveNotasBadge(parada: NotasBadgeInput): NotasBadge {
         totalNotas,
         notasEntregues,
         isGrupoMisto,
-        label:
-            totalNotas > 1
-                ? (isGrupoMisto ? `${notasEntregues} de ${totalNotas} entregues` : `${totalNotas} notas`)
-                : null,
+        label: formatNotasLabel(totalNotas, notasEntregues, isGrupoMisto),
     }
 }
 

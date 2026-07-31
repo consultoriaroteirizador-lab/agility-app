@@ -54,6 +54,7 @@ export {
     calculateProgressFromParadas,
     
     // Funções de contagem
+    collectLiveServiceIds,
     countParadasByStatus,
     withLedgerNonDelivered,
 
@@ -108,6 +109,7 @@ export {
 export {
     type NotasBadge,
     type NotasBadgeInput,
+    formatNotasLabel,
     resolveNotasBadge,
     resolveProgressoTexto,
 } from './paradaDisplay'

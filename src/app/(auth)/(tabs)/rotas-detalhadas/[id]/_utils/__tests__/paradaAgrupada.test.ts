@@ -1,8 +1,10 @@
+import type { RouteNonDeliveredItemResponse } from '@/domain/agility/routing/dto'
 import type { ServiceResponse } from '@/domain/agility/service/dto'
 import { ServiceType } from '@/domain/agility/service/dto/types'
 
 import type { Parada } from '../../_types/rota.types'
-import { countParadasByStatus, findOutrasParadas, getParadasOrdenadas, hasMultipleParadasEmAndamento, mapServicesToParadas, resolvePedidosDaParada, withLedgerNonDelivered } from '../routeCalculations'
+import { collectLiveServiceIds, countParadasByStatus, findOutrasParadas, findParadasConcluidasInsucesso, getParadasOrdenadas, hasMultipleParadasEmAndamento, mapServicesToParadas, resolvePedidosDaParada, withLedgerNonDelivered } from '../routeCalculations'
+import { buildInsucessoList, countLedgerOnly } from '../routeNonDelivered'
 import { pathForServiceType } from '../statusMappers'
 import { findGrupoDoServico, groupContiguousStops } from '../stopGrouping'
 
@@ -293,5 +295,160 @@ describe('contagem de paradas e de notas', () => {
             pedido({ id: 'f0', sequenceOrder: 0, isFailed: true, isPending: false, status: 'FAILED' }),
         ])
         expect(countParadasByStatus(paradas).notasConcluidas).toBe(1)
+    })
+})
+
+// ============================================================================
+// LEDGER DE NÃO-ENTREGUES × PARADA AGRUPADA
+// ============================================================================
+
+/**
+ * O dedup do ledger conta "pedidos que saíram da rota" = os que NÃO têm mais
+ * parada viva. Antes do agrupamento cada pedido era a sua própria `Parada`, então
+ * o `serviceId` da parada bastava como identidade. Com o agrupamento
+ * `parada.serviceId` é só o REPRESENTANTE (`pedidos[0]`) — as notas 2..N ficavam
+ * invisíveis ao dedup e eram contadas como "saíram da rota" mesmo estando ali,
+ * na mesma porta, na tela.
+ *
+ * Um pedido com insucesso mantém o `routingId` E aparece no ledger (é o caso que
+ * `routeNonDelivered.test.ts` já cobre para o dedup), então isto NÃO é borda: é
+ * o caminho comum de "motorista recusa uma nota de uma porta com várias".
+ */
+function ledgerItem(
+    over: Partial<RouteNonDeliveredItemResponse> & { serviceId: string },
+): RouteNonDeliveredItemResponse {
+    return {
+        serviceCode: 'COD-000',
+        recipientName: 'Cliente Ledger',
+        address: 'Rua Ledger, 200',
+        kind: 'ORDER_FAILURE',
+        outcome: 'FAILED',
+        reasonName: 'Recusado pelo cliente',
+        currentStatus: null,
+        occurredAt: '2026-07-30T12:00:00.000Z',
+        ...over,
+    }
+}
+
+/** Porta de 5 notas; a nota `n2` fecha em insucesso, as outras conforme `resto`. */
+function portaDe5ComN2EmInsucesso(resto: PedidoOverrides) {
+    return [0, 1, 2, 3, 4].map((i) =>
+        pedido({
+            id: `n${i}`,
+            sequenceOrder: i,
+            ...(i === 2
+                ? { isFailed: true, isPending: false, status: 'FAILED' }
+                : resto),
+        }),
+    )
+}
+
+describe('dedup do ledger com parada agrupada', () => {
+    it('grupo de 5 com 1 nota em insucesso (ainda pendente) → 1 parada e 5 notas, não 2 e 6', () => {
+        const services = portaDe5ComN2EmInsucesso({ isPending: true })
+        const paradas = mapServicesToParadas(services)
+        const ledger = [ledgerItem({ serviceId: 'n2' })]
+
+        expect(paradas).toHaveLength(1)
+        expect(paradas[0].status).toBe('pendente')
+
+        const contagem = withLedgerNonDelivered(
+            countParadasByStatus(paradas),
+            countLedgerOnly(collectLiveServiceIds(paradas), ledger),
+        )
+
+        expect(contagem.total).toBe(1)
+        expect(contagem.notasTotal).toBe(5)
+        expect(contagem.concluidas).toBe(0)
+        expect(contagem.notasConcluidas).toBe(1)
+
+        // Prova do defeito que isto corrige: a derivação antiga passava só o
+        // `serviceId` das paradas de INSUCESSO. Aqui a parada é pendente (a porta
+        // não fechou), então a lista ia vazia, a nota `n2` parecia ter saído da
+        // rota e a tela lia "1 de 2 paradas · 2 de 6 notas" numa rota de 1 parada
+        // e 5 notas.
+        const derivacaoAntiga = findParadasConcluidasInsucesso(paradas).map((p) => p.serviceId)
+        const contagemAntiga = withLedgerNonDelivered(
+            countParadasByStatus(paradas),
+            countLedgerOnly(derivacaoAntiga, ledger),
+        )
+        expect(contagemAntiga.total).toBe(2)
+        expect(contagemAntiga.notasTotal).toBe(6)
+    })
+
+    it('paridade com o histórico: a mesma rota conta igual nas duas telas', () => {
+        // `menu/historico/[routeId]` passa TODOS os ids de serviço ao dedup; a tela
+        // da rota ao vivo passa as paradas. Enquanto as duas derivações não
+        // concordarem, a mesma rota reporta números diferentes em cada tela.
+        const services = portaDe5ComN2EmInsucesso({ isPending: true })
+        const paradas = mapServicesToParadas(services)
+        const ledger = [ledgerItem({ serviceId: 'n2' }), ledgerItem({ serviceId: 'saiu-da-rota', outcome: 'CANCELED' })]
+
+        expect(countLedgerOnly(collectLiveServiceIds(paradas), ledger)).toBe(
+            countLedgerOnly(services.map((s) => s.id), ledger),
+        )
+        expect(countLedgerOnly(collectLiveServiceIds(paradas), ledger)).toBe(1)
+    })
+
+    it('parada sem `pedidos` (dado não carregado) ainda expõe o representante ao dedup', () => {
+        const p = parada({ serviceId: 'so-representante', pedidos: [] })
+        expect(collectLiveServiceIds([p])).toEqual(['so-representante'])
+    })
+})
+
+describe('lista de insucesso com parada agrupada (§3.3)', () => {
+    it('grupo misto (4 entregues + 1 insucesso) → UMA linha da porta, com "4 de 5", sem linha fantasma da nota', () => {
+        const services = portaDe5ComN2EmInsucesso({ isCompleted: true, isPending: false, status: 'COMPLETED' })
+        const paradas = mapServicesToParadas(services)
+        const ledger = [ledgerItem({ serviceId: 'n2', reasonName: 'Endereço não encontrado' })]
+
+        expect(paradas[0].status).toBe('concluida-insucesso')
+
+        const rows = buildInsucessoList(findParadasConcluidasInsucesso(paradas), ledger)
+
+        // Antes: 2 linhas — a da porta (chaveada no representante `n0`, que na
+        // verdade foi ENTREGUE) e a da nota `n2` vinda do ledger.
+        expect(rows).toHaveLength(1)
+        expect(rows[0].serviceId).toBe('n0')
+        // O desfecho/motivo continuam vindo do ledger, que é a fonte da verdade.
+        expect(rows[0].outcome).toBe('FAILED')
+        expect(rows[0].reasonName).toBe('Endereço não encontrado')
+        // E a linha carrega o recorte do §3.3: "4 de 5 entregues".
+        expect(rows[0].totalNotas).toBe(5)
+        expect(rows[0].notasEntregues).toBe(4)
+    })
+
+    it('contador e lista não divergem: uma linha por parada de insucesso + uma por pedido que saiu da rota', () => {
+        const services = portaDe5ComN2EmInsucesso({ isCompleted: true, isPending: false, status: 'COMPLETED' })
+        const paradas = mapServicesToParadas(services)
+        const ledger = [
+            ledgerItem({ serviceId: 'n2' }),
+            ledgerItem({ serviceId: 'fora-1', outcome: 'CANCELED' }),
+            ledgerItem({ serviceId: 'fora-2', outcome: 'RETURNED_TO_POOL' }),
+        ]
+
+        const contagem = withLedgerNonDelivered(
+            countParadasByStatus(paradas),
+            countLedgerOnly(collectLiveServiceIds(paradas), ledger),
+        )
+        const rows = buildInsucessoList(findParadasConcluidasInsucesso(paradas), ledger)
+
+        expect(rows).toHaveLength(contagem.concluidasInsucesso)
+        expect(contagem.total).toBe(3)
+        expect(contagem.notasTotal).toBe(7)
+    })
+
+    it('parada de insucesso de UMA nota continua idêntica ao comportamento anterior', () => {
+        const paradas = mapServicesToParadas([
+            pedido({ id: 'unico', sequenceOrder: 0, isFailed: true, isPending: false, status: 'FAILED' }),
+        ])
+        const rows = buildInsucessoList(
+            findParadasConcluidasInsucesso(paradas),
+            [ledgerItem({ serviceId: 'unico', serviceCode: 'COD-9' })],
+        )
+
+        expect(rows).toHaveLength(1)
+        expect(rows[0]).toMatchObject({ serviceId: 'unico', code: 'COD-9', outcome: 'FAILED' })
+        expect(rows[0].totalNotas).toBe(1)
     })
 })
