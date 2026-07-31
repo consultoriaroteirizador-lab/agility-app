@@ -1,5 +1,5 @@
 /**
- * Agrupamento de PEDIDOS em PARADAS (Camada 2 do épico "parada ≠ pedido").
+ * Agrupamento de PEDIDOS em PARADAS (Camada 2/3 do épico "parada ≠ pedido").
  *
  * `Service` acumula dois papéis no modelo: é o PEDIDO e é a PARADA. Com os dados
  * reais do cliente, o motorista veria 56 paradas onde são 26 — a mesma porta 5
@@ -12,58 +12,108 @@
  * Camada 1 (backend, agility-services PR #427) garante que os pedidos de uma
  * mesma parada saem com `sequenceOrder` contíguo.
  *
+ * A CHAVE (Camada 3, 2026-07-31) espelha a canônica do backend —
+ * `agility-services/src/optimization/constants/stop-grouping.ts#stopKeyOf` — e
+ * NÃO tem opinião própria sobre o que é uma parada. Qualquer degrau extra aqui
+ * (a Camada 2 tinha `fantasyName`/`responsible` na cascata de cliente, e um app
+ * anônimo virava `solo:<id>`) é regressão: o app via 3 paradas onde o backend
+ * via 1, porque cada lado agrupava por um critério diferente na mesma rota.
+ *
  * @module rotas-detalhadas/utils/stopGrouping
  */
 
 import { ServiceType } from '@/domain/agility/service/dto/types'
 
-/** Campos mínimos para identificar a parada de um pedido. `ServiceResponse` os satisfaz. */
+/**
+ * Campos mínimos para identificar a parada de um pedido. `ServiceResponse` os
+ * satisfaz. `fantasyName`/`responsible` continuam aqui só para quem os usa na
+ * EXIBIÇÃO (nome do card) — não entram na chave, ver `customerKeyOf` abaixo.
+ */
 export interface StopKeyInput {
     id: string
     addressId?: string | null
     customerId?: string | null
+    /** CNPJ/CPF do recebedor. ÚLTIMO degrau da cascata de cliente — ver `customerKeyOf`. */
+    taxNumber?: string | null
     fantasyName?: string | null
     responsible?: string | null
     serviceType?: string | null
 }
 
-function normalizar(valor: string): string {
-    return valor.trim().toLowerCase()
+/** Sentido da parada — mesmo enum de 3 valores do backend (`StopSense`). */
+type StopSense = 'P' | 'D' | 'T'
+
+function senseOf(serviceType?: string | null): StopSense {
+    if (serviceType === ServiceType.PICKUP) return 'P'
+    if (serviceType === ServiceType.TRANSFER) return 'T'
+    return 'D'
 }
 
 /**
- * Chave da parada de um pedido. Pedidos com a MESMA chave e CONTÍGUOS formam
- * uma parada só.
+ * Parte de endereço da chave. TRANSFER e RETURN nunca agrupam — no backend isso
+ * vem de `stopIdentityOfServiceEntity` forçando `addressId: undefined`; aqui é o
+ * mesmo efeito, aplicado na hora de montar a chave (o app não separa um
+ * "projetor de identidade" do "montador de chave" porque só tem UM chamador,
+ * diferente do backend que tem dois pipelines).
  *
- * `solo:<id>` é a chave de quem nunca agrupa — é única por definição, então dois
- * "solo" jamais colidem:
- *  - RETURN: parada final no CD, uma só por rota;
- *  - TRANSFER: ponto-a-ponto (A→B), tem dois endereços e wizard próprio;
- *  - sem `addressId`: não dá para afirmar que é a mesma porta;
- *  - sem identificação de cliente: dois recebedores no mesmo endereço são duas
- *    paradas (decisão da Camada 1 — dois canhotos), e sem nome não dá para saber.
+ * Sem endereço (ausente, ou forçado pelo tipo) → chave PRÓPRIA por `fallbackId`,
+ * único por definição: nunca agrupa com ninguém.
+ */
+function addressPartOf(
+    addressId: string | null | undefined,
+    serviceType: string | null | undefined,
+    fallbackId: string,
+): string {
+    const nuncaAgrupa = serviceType === ServiceType.TRANSFER || serviceType === ServiceType.RETURN
+    const resolvedAddressId = nuncaAgrupa ? undefined : addressId
+    return resolvedAddressId ?? `sem-endereco:${fallbackId}`
+}
+
+/**
+ * Identidade do cliente: `customerId` → `taxNumber` → `sem-cliente`.
  *
- * O tipo entra na chave: entrega e coleta na mesma porta têm fluxos distintos, e
- * mantê-las separadas preserva o `tipo` escalar da `Parada` e o redirect de N==1.
+ * FONTE: `agility-services/src/optimization/constants/stop-grouping.ts#customerKeyOf`.
+ * A cascata PARA em `taxNumber` de propósito — não é lacuna do app, é decisão
+ * espelhada do backend. Lá, um terceiro degrau (`identificationCode`) já existiu
+ * e foi REMOVIDO: aquele campo é o código de RASTREIO do pedido (único por
+ * serviço, exibido ao destinatário como "Seu pedido …"), não identifica o
+ * cliente — sendo único por pedido, aquele ramo nunca agrupava, derrotando o
+ * propósito de existir. Um degrau a mais só do lado do app (como
+ * `fantasyName`/`responsible`, que a Camada 2 tinha) reabre exatamente essa
+ * divergência por outra porta: no teste ao vivo que motivou esta correção, o
+ * backend via 1 parada de 4 notas e o app via 3, porque o app cascateava por
+ * nome/responsável e o backend não. NÃO adicione um terceiro degrau aqui.
+ *
+ * `sem-cliente` (nada identifica o recebedor) agrupa só por ENDEREÇO — é o
+ * comportamento seguro, porque fisicamente continua sendo uma porta só.
+ */
+function customerKeyOf(customerId?: string | null, taxNumber?: string | null): string {
+    for (const candidato of [customerId, taxNumber]) {
+        const v = typeof candidato === 'string' ? candidato.trim() : ''
+        if (v !== '') return v
+    }
+    return 'sem-cliente'
+}
+
+/**
+ * Chave da parada de um pedido: `(endereço, cliente, sentido)`. Pedidos com a
+ * MESMA chave e CONTÍGUOS formam uma parada só.
+ *
+ * Espelha `stopKeyOf` do backend — mesma fórmula, forma de entrada adaptada (um
+ * único objeto com `id` embutido, em vez de `(identity, fallbackId)` separados,
+ * porque o app tem um só chamador e não precisa separar "identidade projetada"
+ * de "id de fallback").
+ *
+ * Dois CNPJs no mesmo endereço são DUAS paradas — dois recebedores, dois
+ * canhotos. Sem NENHUMA identidade de cliente, agrupa por endereço (ver
+ * `customerKeyOf`). O tipo entra como SENTIDO, não `serviceType` cru: DELIVERY e
+ * SERVICE têm o mesmo sentido (D) e agrupam juntos; PICKUP e TRANSFER têm
+ * sentido próprio e nunca se misturam com entrega no mesmo endereço.
  */
 export function stopKeyOf(service: StopKeyInput): string {
-    if (
-        service.serviceType === ServiceType.RETURN ||
-        service.serviceType === ServiceType.TRANSFER
-    ) {
-        return `solo:${service.id}`
-    }
-
-    if (!service.addressId) {
-        return `solo:${service.id}`
-    }
-
-    const cliente = service.customerId ?? service.fantasyName ?? service.responsible
-    if (!cliente) {
-        return `solo:${service.id}`
-    }
-
-    return `addr:${service.addressId}|cli:${normalizar(cliente)}|tipo:${service.serviceType ?? ''}`
+    const addressPart = addressPartOf(service.addressId, service.serviceType, service.id)
+    const customerPart = customerKeyOf(service.customerId, service.taxNumber)
+    return `${addressPart}|${customerPart}|${senseOf(service.serviceType)}`
 }
 
 /** Agrupa itens ADJACENTES que compartilham a chave. Não reordena nada. */
@@ -104,6 +154,9 @@ export function findGrupoDoServico<T extends StopKeyInput>(
  * Chaves que aparecem em MAIS DE UM grupo — a mesma porta que o itinerário
  * separou (rota legada ou reordenada à mão). Serve para avisar o motorista na
  * tela, para que não pareça defeito.
+ *
+ * Chaves sem endereço (prefixo `sem-endereco:`) são únicas por construção —
+ * nunca contam como repetidas.
  */
 export function contarChavesRepetidas(groups: StopKeyInput[][]): Set<string> {
     const vistas = new Set<string>()
@@ -113,7 +166,7 @@ export function contarChavesRepetidas(groups: StopKeyInput[][]): Set<string> {
         const primeiro = grupo[0]
         if (!primeiro) continue
         const chave = stopKeyOf(primeiro)
-        if (chave.startsWith('solo:')) continue
+        if (chave.startsWith('sem-endereco:')) continue
         if (vistas.has(chave)) {
             repetidas.add(chave)
         } else {
@@ -125,15 +178,15 @@ export function contarChavesRepetidas(groups: StopKeyInput[][]): Set<string> {
 }
 
 /**
- * Ponto do mapa (`/map-data`). O payload é leve, mas NÃO é anônimo: além da
- * coordenada e do título, o backend manda `addressId`, `fantasyName` e
- * `responsible` (`agility-services`, `buildServicePoints` em
- * `src/routing/service/routing.service.ts:4512-4547`). O que ele NÃO manda é
- * `customerId`.
+ * Ponto do mapa (`/map-data`). O payload é leve: além da coordenada e do
+ * título, o backend manda `addressId` (`agility-services`, `buildServicePoints`
+ * em `src/routing/service/routing.service.ts`). O que ele NÃO manda é
+ * `customerId`/`taxNumber`.
  *
  * `addressId` sai do acessor cru da entidade (`string | undefined`, sem `?? null`),
- * então a chave pode simplesmente NÃO EXISTIR no JSON — por isso todos os campos
- * de identidade são opcionais aqui.
+ * então a chave pode simplesmente NÃO EXISTIR no JSON — por isso é opcional
+ * aqui. `title`/`fantasyName`/`responsible` continuam no tipo só para EXIBIÇÃO
+ * (label do pino) — não entram mais na chave, ver `mapPointStopKeyOf`.
  */
 export interface MapPointKeyInput {
     id: string
@@ -148,41 +201,23 @@ export interface MapPointKeyInput {
 }
 
 /**
- * Chave de parada para os PONTOS DO MAPA.
+ * Chave de parada para os PONTOS DO MAPA: `addressId` + sentido — SEM cliente e
+ * SEM o fallback por coordenada+título que a Camada 2 tinha.
  *
- * Prefere a MESMA identidade que `stopKeyOf` usa na lista — endereço + cliente —
- * porque é a única que descreve uma porta. O caminho antigo (coordenada
- * arredondada + título) fica como FALLBACK: `title` é texto livre POR PEDIDO
- * (vem de coluna de planilha, com placeholder "Ex: Entrega de pacote"), então
- * cinco notas na mesma porta chegam com cinco títulos diferentes no dado real e
- * o mapa desenharia cinco pinos — exatamente o que este épico existe para
- * remover.
+ * Simplificação da Camada 3: como o cliente anônimo agora agrupa por endereço
+ * (a mesma regra 1 de `stopKeyOf`), e `/map-data` nunca traz `customerId`/
+ * `taxNumber` (`ServicePointResponse`), o degrau de cliente aproximado
+ * (`fantasyName ?? responsible`) e o fallback por `title` deixaram de fazer
+ * falta — e o `title` era exatamente a fragilidade apontada no review final da
+ * Camada 2: texto livre POR PEDIDO (coluna de planilha, placeholder "Ex: Entrega
+ * de pacote"), então cinco notas na mesma porta chegavam com cinco títulos
+ * diferentes no dado real.
  *
- * Cliente é aproximado por `fantasyName ?? responsible` porque `customerId` não
- * vem no payload do mapa. Sem cliente, o fallback por coordenada+título ainda é
- * melhor que desistir, e não corre o risco de fundir dois recebedores nomeados.
- *
- * Segue deliberadamente conservadora: RETURN/TRANSFER e "sem identidade nenhuma"
- * devolvem `solo:<id>`, que é único por definição. Desenhar dois pinos onde há
- * uma porta é um erro menor que fundir duas portas distintas.
+ * Sem endereço (ausente, ou forçado por RETURN/TRANSFER) cai em chave própria
+ * por id — nunca agrupa. Desenhar dois pinos onde há uma porta é um erro menor
+ * que fundir duas portas distintas.
  */
 export function mapPointStopKeyOf(point: MapPointKeyInput): string {
-    if (
-        point.serviceType === ServiceType.RETURN ||
-        point.serviceType === ServiceType.TRANSFER
-    ) {
-        return `solo:${point.id}`
-    }
-
-    const cliente = point.fantasyName ?? point.responsible
-    if (point.addressId && cliente) {
-        return `addr:${point.addressId}|cli:${normalizar(cliente)}|tipo:${point.serviceType ?? ''}`
-    }
-
-    const titulo = point.title ? normalizar(point.title) : ''
-    if (!titulo) {
-        return `solo:${point.id}`
-    }
-
-    return `geo:${point.latitude.toFixed(5)},${point.longitude.toFixed(5)}|t:${titulo}|tipo:${point.serviceType ?? ''}`
+    const addressPart = addressPartOf(point.addressId, point.serviceType, point.id)
+    return `${addressPart}|${senseOf(point.serviceType)}`
 }
