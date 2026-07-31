@@ -118,4 +118,5 @@ export {
     resolveParadaAtendidaElegivel,
     resolveProgressoTexto,
     resolveTemEtapaPropriaAntesDoAtendimento,
+    temOutraNotaPorTrabalhar,
 } from './paradaDisplay'

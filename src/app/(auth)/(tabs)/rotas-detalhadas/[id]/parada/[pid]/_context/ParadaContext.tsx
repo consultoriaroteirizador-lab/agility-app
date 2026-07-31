@@ -18,7 +18,7 @@ import type { FormGroupResponse } from '@/domain/agility/form-group/dto/form-gro
 import { formGroupService } from '@/domain/agility/form-group/formGroupService';
 import { FormEntityType } from '@/domain/agility/form-group-answer/dto/create-form-group-answer.request';
 import { useCreateFormGroupAnswer } from '@/domain/agility/form-group-answer/useCase/useCreateFormGroupAnswer';
-import type { ServiceDraftData } from '@/domain/agility/service/dto';
+import type { ServiceDraftData, ServiceResponse } from '@/domain/agility/service/dto';
 import type { ServiceMaterialResponse, MaterialStatus } from '@/domain/agility/service/dto/response/service-material.response';
 import { PaymentMethodType, ServiceStatus, ServiceType } from '@/domain/agility/service/dto/types';
 import { serviceService } from '@/domain/agility/service/serviceService';
@@ -92,6 +92,12 @@ interface ParadaContextValue {
   // IDs
   rotaId: string;
   serviceId: string;
+
+  // Pedidos da MESMA PARADA que o serviço corrente (Camada 2/3) — mesma lista
+  // que alimenta `isParadaAtendida`, abaixo. Exposta para quem precisa saber
+  // se a PORTA ainda tem outra nota por trabalhar (Task 5, `useDestinoAposNota`)
+  // sem re-derivar `resolvePedidosDaParada` por conta própria.
+  pedidosDaParada: ServiceResponse[];
 
   // Estado da etapa atual
   etapa: number;
@@ -1158,6 +1164,9 @@ export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderPr
     // IDs
     rotaId,
     serviceId,
+
+    // Pedidos da parada (Camada 2/3)
+    pedidosDaParada,
 
     // Estado da etapa
     etapa,

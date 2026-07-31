@@ -1,27 +1,28 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ScrollView, Image as RNImage, Platform } from 'react-native';
 
 import { useQueryClient } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 
 import { Box, Button, Text, TouchableOpacityBox, ActivityIndicator, ScreenBase, Input } from '@/components';
 import { ButtonBack } from '@/components/Button/ButtonBack';
 import type { OrderOccurrenceReasonResponse } from '@/domain/agility/order-occurrence-reason/dto';
 import { useFindOccurrenceReasons } from '@/domain/agility/order-occurrence-reason/useCase';
 import type { ApplyOccurrenceRequest } from '@/domain/agility/service/dto';
-import { useFindOneService, useRegisterOccurrence } from '@/domain/agility/service/useCase';
+import { useFindOneService, useFindServicesByRoutingId, useRegisterOccurrence } from '@/domain/agility/service/useCase';
 import { KEY_SERVICES } from '@/domain/queryKeys';
 import { loadOccurrenceReasonsMirror } from '@/services/storage/occurrenceReasonsStorage';
 import { useToastService } from '@/services/Toast/useToast';
 import { measure } from '@/theme';
 
+import { resolvePedidosDaParada } from '../../../_utils';
+import { useDestinoAposNota } from '../_hooks/useDestinoAposNota';
 import { useInsucessoDraft } from '../_hooks/useInsucessoDraft';
 
 import { occurrenceOutcomeMessage } from './occurrenceOutcome';
 
 export default function FalhaScreen() {
-  const router = useRouter();
   const queryClient = useQueryClient();
   const { id, pid } = useLocalSearchParams<{ id: string; pid: string }>();
   const rotaId = id as string;
@@ -29,6 +30,21 @@ export default function FalhaScreen() {
   const { showToast } = useToastService();
 
   const { service, isLoading: isLoadingService } = useFindOneService(serviceId || '');
+
+  // Pedidos da MESMA PARADA que este serviço (Camada 2/3) — esta tela não tem
+  // `ParadaProvider` (ver comentário em `useInsucessoDraft.ts`: "tela isolada,
+  // sem ParadaProvider"), então busca a lista da rota e monta o grupo com a
+  // MESMA função (`resolvePedidosDaParada`) que `ParadaContext` usa por baixo
+  // — não uma derivação nova, só o mesmo dado buscado localmente. Precisa
+  // disso para saber, ao registrar o insucesso, se a porta ainda tem outra
+  // nota por trabalhar (Task 5, `useDestinoAposNota`).
+  const { services: routeServices } = useFindServicesByRoutingId(service?.routingId || rotaId || '');
+  const pedidosDaParada = useMemo(
+    () => resolvePedidosDaParada(routeServices, serviceId),
+    [routeServices, serviceId],
+  );
+  const navegarAposFecharNota = useDestinoAposNota(pedidosDaParada, serviceId, rotaId);
+
   const {
     selectedReason,
     setSelectedReason,
@@ -41,6 +57,13 @@ export default function FalhaScreen() {
     getUploadedPhotoUrls,
   } = useInsucessoDraft(serviceId);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // Vira `true` quando o insucesso foi registrado com sucesso — dispara o
+  // `useEffect` abaixo que navega. Ver comentário no `useEffect`: só um FLAG
+  // aqui, não o `setTimeout`/navegação direto no `onSuccess` da mutation,
+  // porque a decisão de PARA ONDE ir depende de `pedidosDaParada` (via
+  // `navegarAposFecharNota`), e esse dado só fica atualizado depois do
+  // `refetchQueries` — que roda DEPOIS deste `onSuccess` retornar, não antes.
+  const [insucessoRegistrado, setInsucessoRegistrado] = useState(false);
 
   const { reasons, isLoading: isLoadingReasons, isError: isReasonsError } = useFindOccurrenceReasons('LAST_MILE');
   const [mirror, setMirror] = useState<OrderOccurrenceReasonResponse[]>([]);
@@ -81,11 +104,15 @@ export default function FalhaScreen() {
       // Aguardar refetch explícito para garantir que os dados sejam atualizados
       await queryClient.refetchQueries({ queryKey: [KEY_SERVICES, 'routing', rotaId] });
 
-      // Navegar de volta para a rota após atualizar os dados
-      // Pequeno delay para garantir que a UI seja atualizada
-      setTimeout(() => {
-        router.push(`/(auth)/(tabs)/rotas-detalhadas/${rotaId}`);
-      }, 500);
+      // NÃO navega aqui. `navegarAposFecharNota` foi capturado no closure
+      // desta função no RENDER em que a mutation foi disparada — o `await`
+      // acima atualiza o cache do react-query e pode re-renderizar o
+      // componente com um `pedidosDaParada`/`navegarAposFecharNota` NOVOS, mas
+      // este `onSuccess` já em execução continua com a versão VELHA no
+      // closure. Chamar `navegarAposFecharNota()` diretamente aqui decidiria
+      // com dado pré-refetch. Em vez disso, só sinaliza — o `useEffect`
+      // abaixo roda no próximo render (já com o hook atualizado) e decide lá.
+      setInsucessoRegistrado(true);
     },
     onError: (error) => {
       setIsSubmitting(false);
@@ -93,6 +120,25 @@ export default function FalhaScreen() {
       showToast({ message: 'Não foi possível marcar o serviço como insucesso. Tente novamente.', type: 'error' });
     },
   });
+
+  // Navegar após o insucesso ser registrado — Task 5: índice da parada (a
+  // porta ainda tem outra nota por trabalhar) ou lista de paradas da rota
+  // (era a última nota). MESMO padrão reativo que `entrega`/`coleta`/
+  // `service` usam para o próprio redirect de sucesso: a decisão mora aqui,
+  // não dentro do `onSuccess` da mutation (comentário acima), porque
+  // `navegarAposFecharNota` está nas dependências — se `pedidosDaParada`
+  // mudar (o refetch do `onSuccess` chegando, ou qualquer outro motivo)
+  // enquanto este efeito ainda não disparou, o cleanup cancela o timer velho
+  // e um novo roda com a closure fresca. Pequeno delay para dar tempo da UI
+  // (toast) aparecer antes de sair da tela.
+  useEffect(() => {
+    if (insucessoRegistrado) {
+      const timer = setTimeout(() => {
+        navegarAposFecharNota();
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [insucessoRegistrado, navegarAposFecharNota]);
 
   // Solicitar permissões de mídia
   useEffect(() => {
