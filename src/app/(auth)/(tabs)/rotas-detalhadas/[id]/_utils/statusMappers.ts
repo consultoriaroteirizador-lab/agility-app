@@ -212,6 +212,13 @@ export function getRotaStatus(paradas: Parada[]): RotaStatus {
  * O representante (`grupo[0]`, o primeiro do itinerário) fornece endereço, nome,
  * tipo e ETA de chegada. O que é agregado vem do grupo inteiro: status (§3.2),
  * janela (§3.4), conclusão real e pendência.
+ *
+ * PRÉ-CONDIÇÃO: `grupo` não é vazio. `groupContiguousBy` só cria um grupo ao ver
+ * um item, então nenhum grupo dele nasce vazio — mas esta função é exportada
+ * pelo barrel, e um chamador novo pode passar `[]`. `getParadaStatusGrupo` já
+ * trata o caso; aqui não dá para tratar (uma parada sem nenhum pedido não tem
+ * endereço, nome nem tipo), então falha alto e com o motivo escrito, em vez de
+ * estourar um `TypeError` de `undefined.serviceType` trinta linhas abaixo.
  */
 export function mapGrupoToParada(
     grupo: ServiceResponse[],
@@ -219,6 +226,12 @@ export function mapGrupoToParada(
     returnAddress?: string | null,
 ): Parada {
     const service = grupo[0]
+    if (!service) {
+        throw new Error(
+            'mapGrupoToParada: grupo vazio. Uma parada é sempre ao menos um pedido — ' +
+            'use a saída de groupContiguousStops, que nunca produz grupo vazio.',
+        )
+    }
     const numero = index + 1
 
     const isRetorno = service.serviceType === ServiceType.RETURN
@@ -288,7 +301,15 @@ export function mapGrupoToParada(
     }
 }
 
-/** Compatibilidade: um pedido é uma parada de um pedido só. */
+/**
+ * Compatibilidade: um pedido é uma parada de um pedido só.
+ *
+ * @deprecated Sem chamador de produção desde a Camada 2 — existe só para não
+ * quebrar consumidor externo. NÃO usar em código novo: ela pula o agrupamento e
+ * devolve uma parada por PEDIDO, que é exatamente o defeito que este épico
+ * corrige (56 paradas onde são 26). Para transformar serviços em paradas use
+ * `mapServicesToParadas`; para um grupo já formado, `mapGrupoToParada`.
+ */
 export function mapServiceToParada(
     service: ServiceResponse,
     index: number,

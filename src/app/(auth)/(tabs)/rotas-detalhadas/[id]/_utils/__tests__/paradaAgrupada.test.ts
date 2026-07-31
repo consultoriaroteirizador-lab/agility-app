@@ -5,7 +5,7 @@ import { ServiceType } from '@/domain/agility/service/dto/types'
 import type { Parada } from '../../_types/rota.types'
 import { collectLiveServiceIds, countParadasByStatus, findOutrasParadas, findParadasConcluidasInsucesso, getParadasOrdenadas, hasMultipleParadasEmAndamento, mapServicesToParadas, resolvePedidosDaParada, withLedgerNonDelivered } from '../routeCalculations'
 import { buildInsucessoList, countLedgerOnly } from '../routeNonDelivered'
-import { pathForServiceType } from '../statusMappers'
+import { mapGrupoToParada, pathForServiceType } from '../statusMappers'
 import { findGrupoDoServico, groupContiguousStops } from '../stopGrouping'
 
 function parada(over: Partial<Parada> & { serviceId: string }): Parada {
@@ -108,6 +108,14 @@ describe('mapServicesToParadas — agrupamento', () => {
         expect(parada.pedidos).toHaveLength(1)
         expect(parada.status).toBe('pendente')
         expect(parada.enderecoRepetido).toBeFalsy()
+    })
+})
+
+describe('mapGrupoToParada — pré-condição do grupo', () => {
+    it('grupo vazio falha alto e com o motivo, em vez de estourar undefined lá adiante', () => {
+        // `groupContiguousBy` nunca produz grupo vazio, mas a função é exportada
+        // pelo barrel: um chamador novo com `[]` merece ler o porquê.
+        expect(() => mapGrupoToParada([], 0)).toThrow(/grupo vazio/i)
     })
 })
 
