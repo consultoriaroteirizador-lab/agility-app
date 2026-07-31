@@ -11,6 +11,7 @@ import { Box, Text } from '@/components'
 import { measure } from '@/theme'
 
 import { useRota } from '../_context/RotaContext'
+import { resolveProgressoTexto } from '../_utils/paradaDisplay'
 
 /**
  * Componente de barra de progresso da rota
@@ -41,11 +42,10 @@ export function RouteProgress() {
     // Calcula a porcentagem formatada
     const porcentagemFormatada = Math.round(progress)
 
-    // Paradas e notas são coisas diferentes: 26 portas, 56 notas. O cliente já
-    // opera com essa distinção (a planilha tem as duas colunas).
-    const textoContagem = contagem.notasTotal > contagem.total
-        ? `${contagem.concluidas} de ${contagem.total} paradas · ${contagem.notasConcluidas} de ${contagem.notasTotal} notas`
-        : `${contagem.concluidas} de ${contagem.total} concluídas`
+    // Paradas e notas são coisas diferentes: 26 portas, 56 notas. A derivação é
+    // pura e testada em `_utils/paradaDisplay` — este repo não tem teste de
+    // componente, e a condição `notasTotal > total` regredia em silêncio.
+    const textoContagem = resolveProgressoTexto(contagem)
 
     return (
         <Box marginBottom="y24">

@@ -91,15 +91,23 @@ export {
 // ============================================
 
 export {
+    type MapPointKeyInput,
     type StopKeyInput,
     contarChavesRepetidas,
     findGrupoDoServico,
     groupContiguousBy,
     groupContiguousStops,
+    mapPointStopKeyOf,
     stopKeyOf,
 } from './stopGrouping'
 
+// ============================================
+// EXIBIÇÃO DA PARADA (selo de notas / progresso)
+// ============================================
+
 export {
-    type MapPointKeyInput,
-    mapPointStopKeyOf,
-} from './stopGrouping'
+    type NotasBadge,
+    type NotasBadgeInput,
+    resolveNotasBadge,
+    resolveProgressoTexto,
+} from './paradaDisplay'

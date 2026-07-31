@@ -9,6 +9,7 @@ import { measure, StatusColorConfig, ThemeColors } from '@/theme';
 
 import { useRota } from '../_context/RotaContext'
 import type { Parada, ParadaStatus } from '../_types/rota.types'
+import { resolveNotasBadge } from '../_utils/paradaDisplay'
 
 /**
  * Recalcula os sinais de atraso ao vivo (relógio local) com fallback para o
@@ -129,10 +130,9 @@ export function ParadaListItem({
 
     const statusConfig = STATUS_CONFIG[parada.status]
 
-    // Uma parada pode ter N notas (mesma porta). Contagem para o card.
-    const totalNotas = parada.pedidos?.length ?? 1
-    const notasEntregues = parada.pedidos?.filter((p) => p.isCompleted === true).length ?? 0
-    const isGrupoMisto = parada.status === 'concluida-insucesso' && notasEntregues > 0
+    // Uma parada pode ter N notas (mesma porta). A derivação é pura e testada em
+    // `_utils/paradaDisplay` — este repo não tem teste de componente.
+    const notasBadge = resolveNotasBadge(parada)
 
     // Relógio vivo (60s) para marcar atraso mesmo entre refetches.
     const now = useNow(60_000)
@@ -249,12 +249,10 @@ export function ParadaListItem({
                         </Text>
                     </Box>
 
-                    {totalNotas > 1 && (
+                    {notasBadge.label && (
                         <Box backgroundColor="gray100" paddingHorizontal="x8" paddingVertical="y2" borderRadius="s4" flexShrink={0}>
                             <Text preset="text13" color="gray600">
-                                {isGrupoMisto
-                                    ? `${notasEntregues} de ${totalNotas} entregues`
-                                    : `${totalNotas} notas`}
+                                {notasBadge.label}
                             </Text>
                         </Box>
                     )}
