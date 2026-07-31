@@ -176,6 +176,14 @@ interface ParadaContextValue {
 
   // Utilitários
   isServiceStarted: boolean;
+  /**
+   * A PORTA (não este serviço) já tem alguma nota em atendimento ou além.
+   * Exposto separadamente de `isServiceStarted` (ver comentário na declaração,
+   * mais abaixo no Provider) — só quem precisa da pergunta por PARADA a usa
+   * (hoje: `entrega/index.tsx`, para não reabrir `EtapaInicial` na nota 2..N
+   * de uma porta já atendida).
+   */
+  isParadaAtendida: boolean;
   resetState: () => void;
 
   // Pagamento (cobrança na entrega)
@@ -293,11 +301,23 @@ export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderPr
   );
 
   // A PARADA está atendida quando QUALQUER nota dela chegou (IN_ATTENDANCE) ou
-  // passou disso — substitui, aqui embaixo em `isServiceStarted`, o gate por
-  // SERVIÇO que existia antes (Camada 3, §3 da spec): chegada é da PORTA, não de
-  // cada nota. Sem isto, abrir a nota 2 de uma porta de N reabriria
-  // `EtapaInicial` e pediria "Estou aqui" de novo, mesmo com o motorista já
-  // atendendo a porta.
+  // passou disso (Camada 3, §3 da spec: chegada é da PORTA, não de cada nota).
+  //
+  // EXPOSTO AO LADO de `isServiceStarted` (abaixo), NÃO no lugar dele — revisão
+  // do Task 2 (findings 1 e 3): redefinir `isServiceStarted` globalmente para
+  // este valor vazou a semântica de "porta" para consumidores que perguntam
+  // sobre o SERVIÇO, não a parada:
+  //   - com a rota vazia/offline (cold start, deep link, `routingId` zerado por
+  //     CANCEL_ORDER/RETURN_TO_POOL), `pedidosDaParada` cai para `[]` e
+  //     `isParadaAtendida` mentia `false` mesmo com o serviço já IN_ATTENDANCE
+  //     — reabria `EtapaInicial` até numa parada de 1 nota;
+  //   - `service/index.tsx` usa `isServiceStarted` para o pré-check de
+  //     equipamento (`!isServiceStarted && needsMaterialCheck`), que é "antes
+  //     do motorista iniciar ESTE serviço", não "antes da porta ser atendida"
+  //     — com o valor da parada, notas 2..N de um grupo D (DELIVERY+SERVICE)
+  //     pulariam a conferência de equipamento.
+  // Só `entrega/index.tsx` (o único lugar onde a chegada por PORTA faz
+  // sentido) combina os dois — ver comentário lá.
   const isParadaAtendida = resolveParadaAtendida(pedidosDaParada);
 
   // Hook para check de material
@@ -381,12 +401,12 @@ export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderPr
     loading: false,
   });
 
-  // Verificar se a PARADA já está iniciada — `isParadaAtendida` (Camada 3), não
-  // `isServiceStartedRaw` (que é só deste serviço e segue existindo acima para
-  // `arrived`, hoje sem consumidor fora deste arquivo). Numa parada de 1 nota
-  // (a maioria hoje) `pedidosDaParada` é só o próprio serviço, e o resultado é
-  // idêntico a `isServiceStartedRaw` — comportamento inalterado nesse caso.
-  const isServiceStarted = isParadaAtendida;
+  // `isServiceStarted` volta a ser SÓ deste serviço (revisão do Task 2, findings
+  // 1/3) — mesma fonte de verdade que `arrived`, como sempre foi. Continua
+  // sendo o que os outros 4 consumidores (coleta/service/transfer e os
+  // handleBack de *Confirmacao) esperam. A pergunta "a PORTA chegou" é
+  // `isParadaAtendida`, acima, exposta separadamente.
+  const isServiceStarted = isServiceStartedRaw;
 
   // Função de checklist (declarada antes de ser usada)
   const updateChecklist = useCallback(
@@ -1198,6 +1218,7 @@ export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderPr
 
     // Utilitários
     isServiceStarted: !!isServiceStarted,
+    isParadaAtendida,
     resetState,
 
     // Pagamento (cobrança na entrega)

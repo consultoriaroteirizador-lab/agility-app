@@ -25,7 +25,6 @@ import { formatResumoDaNota, mapGrupoToParada, pathForServiceType, resolveNotaFi
 import { EquipmentList, StopActions, StopTabs } from './_components';
 import { Map } from './_components/shared/Map';
 import { useStopActions, useStopStatus, useUserLocation } from './_hooks';
-import { getCurrentCoords } from './_hooks/getCurrentCoords';
 import { TabType } from './_types/stop.types';
 import { resolveCompanyRules } from './_utils/companyRules';
 import { isValidCoordinate } from './_utils/mapUtils';
@@ -136,6 +135,28 @@ export default function StopDetailScreen() {
   // chegada (ver ramo `isParadaAgrupada` mais abaixo).
   const paradaAtendida = resolveParadaAtendida(pedidosDaParada);
 
+  // Tipos com CHECKPOINT DE CÓDIGO na chegada (revisão do Task 2, finding 2):
+  // o backend recusa `start-attendance` sem o código de retirada quando a
+  // empresa exige (`ServiceService.startAttendance`, `agility-services`) —
+  // mesma condição que gera o desvio de custódia no cross-docking
+  // (`legType === 'TRANSFER'`). PICKUP tem esse checkpoint via
+  // `PickupCodeCard`, que só existe dentro de `ColetaEtapaInicial` — o bloco de
+  // chegada novo desta tela não tem campo de código nenhum. Para esses tipos,
+  // a porta mantém o comportamento de HOJE ponta a ponta: sem bloco de
+  // chegada aqui, a lista de notas aparece direto, e `handleOpenNota` NÃO
+  // dispara start-attendance — quem faz isso é o próprio fluxo da nota
+  // (ColetaEtapaInicial), com o código quando exigido. TRANSFER nunca agrupa
+  // (`stopKeyOf` força chave própria em `_utils/stopGrouping.ts`), então esta
+  // checagem é inócua para ele hoje — mantido por fidelidade à condição do
+  // backend, caso isso mude.
+  const temCheckpointDeCodigo = pedidosDaParada.some(
+    (p) => p.serviceType === ServiceType.PICKUP || p.serviceType === ServiceType.TRANSFER,
+  );
+
+  // A porta só ganha o bloco de chegada novo quando NÃO há checkpoint de
+  // código E a parada ainda não foi atendida.
+  const mostraBlocoDeChegada = !temCheckpointDeCodigo && !paradaAtendida;
+
   // Ações de chegada amarradas ao REPRESENTANTE do grupo (`pedidosDaParada[0]`)
   // — é ele que registra a chegada na porta (§3 da spec: a 1ª nota entra em
   // atendimento na chegada; as demais, ao serem abertas — ver `handleOpenNota`).
@@ -181,7 +202,12 @@ export default function StopDetailScreen() {
       showToast({ message: stopStatus.startBlockReason!, type: 'error' });
       return;
     }
-    handleStartAttendanceParada();
+    // `handleStartAttendanceParada` devolve `Promise<boolean>` (sucesso vs
+    // falha real, ex.: código de retirada inválido) — aqui não há wizard para
+    // travar em caso de `false` (a tela troca de bloco sozinha quando
+    // `paradaAtendida` virar true no refetch), então só descartamos a promise
+    // explicitamente em vez de deixar uma promise solta sem tratamento.
+    void handleStartAttendanceParada();
   }, [isStartBlockedParada, stopStatus.startBlockReason, showToast, handleStartAttendanceParada]);
 
   // Abrir uma nota entra em atendimento (decisão do dono do produto, §3): o
@@ -191,39 +217,53 @@ export default function StopDetailScreen() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: [KEY_SERVICES, 'routing', routeId] });
     },
+    // Revisão do Task 2 (finding 4): sem `onError`, uma rejeição ficava
+    // invisível — a nota seguia PENDING enquanto o motorista tirava fotos e
+    // colhia assinatura, e a falha só aparecia na hora de concluir. Mesmo
+    // padrão de `useStopActions.ts` (idempotência tratada como sucesso;
+    // qualquer outra falha mostra a mensagem do backend).
+    onError: (error: any) => {
+      const errorMessage = error?.error?.message || error?.message || '';
+      if (errorMessage.includes('em atendimento') || errorMessage.includes('IN_ATTENDANCE')) {
+        void queryClient.invalidateQueries({ queryKey: [KEY_SERVICES, 'routing', routeId] });
+        return;
+      }
+      showToast({
+        message: errorMessage || 'Não foi possível registrar a chegada nesta nota. Tente novamente ao abri-la.',
+        type: 'error',
+      });
+    },
   });
 
   // `onOpen` do card do índice de notas. Só chama start-attendance quando a
-  // nota AINDA NÃO está em atendimento (ou além) — o backend é idempotente para
-  // IN_ATTENDANCE, mas a checagem evita uma chamada à toa a cada reabertura de
-  // nota já em curso ou já terminal.
+  // nota AINDA NÃO está em atendimento (ou além) — reusa `resolveParadaAtendida`
+  // (mesmo predicado testado do gate da tela, não uma checagem de status
+  // escrita à mão de novo) — e quando o tipo NÃO tem checkpoint de código
+  // (`temCheckpointDeCodigo`), senão o backend recusaria por falta do código.
   const handleOpenNota = useCallback((pid: string) => {
     const pedido = pedidosDaParada.find((p) => p.id === pid);
-    const jaAtendidaOuAlem = !!(
-      pedido?.isInAttendance === true ||
-      pedido?.status === 'IN_ATTENDANCE' ||
-      pedido?.isCompleted === true ||
-      pedido?.isCanceled === true ||
-      pedido?.isFailed === true
-    );
+    const podeIniciarAtendimentoPeloIndice =
+      !!pedido && !temCheckpointDeCodigo && !resolveParadaAtendida([pedido]);
 
-    if (pedido && !jaAtendidaOuAlem) {
-      // Fire-and-forget: NÃO aguardamos a resposta antes de navegar — o
-      // motorista já está olhando a nota que escolheu, travar a navegação numa
-      // rede lenta pareceria a tela ter travado à toa. Falha aqui é só log (via
-      // React Query); o pior caso é a nota ficar sem o registro incremental de
-      // atendimento, recuperável reabrindo o card.
-      void (async () => {
-        const location = await getCurrentCoords();
-        startAttendanceDaNota({ id: pid, location });
-      })();
+    if (podeIniciarAtendimentoPeloIndice) {
+      // Fire-and-forget e SEM esperar o GPS (revisão do Task 2, finding 4):
+      // `getCurrentCoords` pode levar até ~15s somando os timeouts internos de
+      // permissão + posição, e isso atrasaria o PRÓPRIO start-attendance — não
+      // só a navegação (que já não esperava nada). A nota ficaria PENDING no
+      // backend por mais tempo do que o necessário, e o motorista já estaria
+      // na tela de conferência tirando fotos. Localização aqui é metadado
+      // best-effort (de onde o motorista abriu a nota), não uma precondição —
+      // por isso este disparo específico abre mão dela; o botão "Estou aqui"
+      // explícito (chegada da porta, acima) continua capturando via
+      // `useStopActions`/`getCurrentCoords`.
+      startAttendanceDaNota({ id: pid });
     }
 
     router.push({
       pathname: rotaDaNota,
       params: { id: routeId, pid },
     });
-  }, [pedidosDaParada, rotaDaNota, routeId, router, startAttendanceDaNota]);
+  }, [pedidosDaParada, temCheckpointDeCodigo, rotaDaNota, routeId, router, startAttendanceDaNota]);
 
   // Local state
   const [activeTab, setActiveTab] = useState<TabType>('local');
@@ -558,11 +598,13 @@ export default function StopDetailScreen() {
         }
       >
         <Box flex={1} backgroundColor="white" pt="y8" px="x16" gap="y16">
-          {!paradaAtendida ? (
+          {mostraBlocoDeChegada ? (
             // Chegada da PORTA (Camada 3, §3): antes de ver as notas, o motorista
             // chega na parada — UMA vez, igual ao balcão. A lista de notas só
             // aparece depois (`paradaAtendida` vira true assim que a 1ª nota
-            // entra em atendimento).
+            // entra em atendimento). PICKUP/TRANSFER nunca caem aqui —
+            // `temCheckpointDeCodigo` mantém o comportamento de hoje (ver
+            // comentário na declaração de `temCheckpointDeCodigo` acima).
             <Box gap="y12" alignItems="center" pb="y24">
               <Box alignSelf="stretch">
                 <Text preset="text15" fontWeightPreset="semibold" color="colorTextPrimary">{customerName}</Text>

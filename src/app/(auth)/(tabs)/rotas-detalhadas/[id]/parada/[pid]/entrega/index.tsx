@@ -26,6 +26,7 @@ function EntregaOrchestrator() {
         service,
         etapa,
         isServiceStarted,
+        isParadaAtendida,
         delivered,
         recipient,
         showSuccess,
@@ -42,6 +43,19 @@ function EntregaOrchestrator() {
     // Serviço já finalizado → tela read-only (não reabre o fluxo de execução).
     const isServiceFinalized =
         service?.isCompleted === true || service?.isCanceled === true || service?.isFailed === true;
+
+    // A pergunta de CHEGADA (etapa 1) é da PARADA (porta), não deste serviço —
+    // revisão do Task 2 (finding 1): `isServiceStarted` sozinho é só deste
+    // serviço; sem o OR com `isParadaAtendida`, a nota 2..N de uma porta já
+    // atendida cairia no fallback `EtapaInicial` no fim desta função enquanto a
+    // PRÓPRIA nota ainda não tivesse virado IN_ATTENDANCE (corrida com o
+    // start-attendance disparado ao abrir o card no índice da parada). Usado
+    // nas DUAS metades do gate (abaixo, nas linhas que decidem `EtapaInicial` x
+    // `EtapaConfirmacao`) porque são o mesmo gate espelhado — mudar só uma
+    // reabre o defeito pela outra. Numa parada de 1 nota (a maioria hoje),
+    // `isParadaAtendida` é EXATAMENTE `isServiceStarted` (mesmo serviço, mesma
+    // derivação), então este OR não muda nada nesse caso.
+    const arrivedAtStop = isServiceStarted || isParadaAtendida;
 
     // Buscar materiais quando entrar na etapa de confirmação (para saber se tem materiais)
     useEffect(() => {
@@ -102,12 +116,12 @@ function EntregaOrchestrator() {
 
     // Renderizar etapa atual baseado no estado
     // Etapa 1: "Indo pra lá" / "Estou aqui!"
-    if (etapa === 1 && !isServiceStarted) {
+    if (etapa === 1 && !arrivedAtStop) {
         return <EtapaInicial />;
     }
 
     // Etapa 2: "Entreguei" / "Não delivered"
-    if ((etapa === 2 || (isServiceStarted && etapa === 1)) && !delivered) {
+    if ((etapa === 2 || (arrivedAtStop && etapa === 1)) && !delivered) {
         return <EtapaConfirmacao />;
     }
 
