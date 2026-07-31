@@ -139,6 +139,34 @@ export function resolveTemEtapaPropriaAntesDoAtendimento(pedidos: ServiceRespons
     return pedidos.some((pedido) => pedido.serviceType !== ServiceType.DELIVERY)
 }
 
+/**
+ * A parada está ATENDIDA **e elegível** para o gate de chegada por PORTA — o
+ * que `ParadaContext.isParadaAtendida` expõe.
+ *
+ * Revisão de código, ronda 3: um grupo `D` (mesmo sentido em `stopKeyOf`) pode
+ * misturar DELIVERY e SERVICE. Sem o filtro de elegibilidade, `isParadaAtendida`
+ * viraria `true` assim que a nota SERVICE entrasse em atendimento (via seu
+ * próprio pré-passo de equipamento), e a nota DELIVERY do MESMO grupo pularia
+ * `EtapaInicial` (`entrega/index.tsx`) achando que a porta já foi atendida —
+ * sem NUNCA disparar o próprio `start-attendance` dela (o índice também
+ * recusa, porque `mostraBlocoDeChegada`/`handleOpenNota` já veem o grupo como
+ * não-elegível). A nota faria toda a conferência, foto e assinatura com o
+ * backend ainda em PENDING.
+ *
+ * Por isso o índice (`mostraBlocoDeChegada`) e o fluxo
+ * (`ParadaContext.isParadaAtendida`, via esta função) têm que concordar sobre
+ * elegibilidade usando o MESMO predicado
+ * (`resolveTemEtapaPropriaAntesDoAtendimento`) — se um recuar e o outro não, a
+ * nota atravessa a etapa 1 sem nunca ter entrado em atendimento de verdade.
+ *
+ * Grupo NÃO elegível (alguma nota com etapa própria) sempre devolve `false`
+ * aqui, mesmo com alguma nota em atendimento — o consumidor cai de volta para
+ * `isServiceStarted` (por serviço), que é exatamente o comportamento de hoje.
+ */
+export function resolveParadaAtendidaElegivel(pedidos: ServiceResponse[]): boolean {
+    return !resolveTemEtapaPropriaAntesDoAtendimento(pedidos) && resolveParadaAtendida(pedidos)
+}
+
 /** Campos do pedido que identificam a nota para quem está no balcão. */
 export interface NotaFiscalInput {
     /** Número da NOTA FISCAL do pedido. */

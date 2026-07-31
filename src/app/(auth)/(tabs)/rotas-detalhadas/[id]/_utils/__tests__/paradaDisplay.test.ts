@@ -16,6 +16,7 @@ import {
     resolveNotaFiscalLabel,
     resolveNotasBadge,
     resolveParadaAtendida,
+    resolveParadaAtendidaElegivel,
     resolveProgressoTexto,
     resolveTemEtapaPropriaAntesDoAtendimento,
 } from '../paradaDisplay'
@@ -220,6 +221,50 @@ describe('resolveTemEtapaPropriaAntesDoAtendimento — a porta tem nota com pré
 
     it('lista vazia → false', () => {
         expect(resolveTemEtapaPropriaAntesDoAtendimento([])).toBe(false)
+    })
+})
+
+describe('resolveParadaAtendidaElegivel — composição usada por ParadaContext.isParadaAtendida (Camada 3, revisão 3)', () => {
+    // Regressão da revisão 3: um grupo D (DELIVERY+SERVICE, mesmo sentido em
+    // `stopKeyOf`) pode se formar. Se `isParadaAtendida` olhasse só
+    // `resolveParadaAtendida` (ignorando o pré-passo do SERVICE), a nota
+    // DELIVERY do grupo pularia `EtapaInicial` assim que a nota SERVICE
+    // entrasse em atendimento — e nunca teria seu próprio start-attendance
+    // chamado, ficando PENDING no backend enquanto conferia/fotografava/
+    // assinava. `resolveParadaAtendidaElegivel` é o que fecha isso: só conta
+    // como "parada atendida" quando o grupo TAMBÉM é elegível (todas as notas
+    // DELIVERY) — senão cada nota volta a pedir a própria chegada, que é
+    // exatamente o comportamento de hoje.
+    it('grupo misto DELIVERY+SERVICE, a nota SERVICE já em atendimento → false (não elegível, mesmo com uma nota atendida)', () => {
+        expect(resolveParadaAtendidaElegivel([
+            nota({ id: 'd1', serviceType: ServiceType.DELIVERY }),
+            nota({ id: 's1', serviceType: ServiceType.SERVICE, isInAttendance: true }),
+        ])).toBe(false)
+    })
+
+    it('grupo misto DELIVERY+SERVICE, nenhuma nota atendida → false', () => {
+        expect(resolveParadaAtendidaElegivel([
+            nota({ id: 'd1', serviceType: ServiceType.DELIVERY }),
+            nota({ id: 's1', serviceType: ServiceType.SERVICE }),
+        ])).toBe(false)
+    })
+
+    it('grupo todo DELIVERY, uma nota em atendimento → true (elegível e atendida)', () => {
+        expect(resolveParadaAtendidaElegivel([
+            nota({ id: 'd1', serviceType: ServiceType.DELIVERY, isInAttendance: true }),
+            nota({ id: 'd2', serviceType: ServiceType.DELIVERY }),
+        ])).toBe(true)
+    })
+
+    it('grupo todo DELIVERY, nenhuma nota atendida → false (elegível mas ainda não chegou)', () => {
+        expect(resolveParadaAtendidaElegivel([
+            nota({ id: 'd1', serviceType: ServiceType.DELIVERY }),
+            nota({ id: 'd2', serviceType: ServiceType.DELIVERY }),
+        ])).toBe(false)
+    })
+
+    it('lista vazia → false', () => {
+        expect(resolveParadaAtendidaElegivel([])).toBe(false)
     })
 })
 

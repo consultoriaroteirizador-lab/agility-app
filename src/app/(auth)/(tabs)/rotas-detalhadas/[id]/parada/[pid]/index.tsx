@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Linking } from 'react-native';
 
 import { useQueryClient } from '@tanstack/react-query';
@@ -212,50 +212,21 @@ export default function StopDetailScreen() {
     void handleStartAttendanceParada();
   }, [isStartBlockedParada, stopStatus.startBlockReason, showToast, handleStartAttendanceParada]);
 
-  // `useStartAttendance` é UMA instância compartilhada entre todas as notas do
-  // índice (a lista chama `handleOpenNota` com um `pid` diferente por card) —
-  // `onSuccess`/`onError` do wrapper (`useMutationService`) só recebem a
-  // resposta, não as variáveis da mutation, então não dá pra saber "de qual
-  // nota" a partir do callback. Guardamos o pid pendente num ref, escrito
-  // imediatamente antes de cada chamada.
-  const notaPendenteRef = useRef<string | null>(null);
-
-  // Abrir uma nota entra em atendimento (decisão do dono do produto, §3): o
-  // motorista confere uma de cada vez, não todas juntas na chegada — é o que
-  // o backend já sabe fazer por serviço, só o gate por-serviço impedia.
-  const { startAttendance: startAttendanceDaNota } = useStartAttendance({
-    onSuccess: () => {
-      // Revisão do Task 2 (novo finding, ronda 2): invalidar SÓ a lista da
-      // rota não bastava — `GET /services/:id` desta nota específica (o que
-      // `entrega/index.tsx` lê via `useFindOneService`) tem cache próprio
-      // (`staleTime` de 5min, sem refetch-on-focus — `src/app/_layout.tsx`) e
-      // não é prefixo de `['services', 'routing', routeId]`, então continuava
-      // servindo o status antigo (PENDING) pro `EtapaConfirmacao` da própria
-      // nota, deixando `isServiceStarted` falso e o botão voltar inerte
-      // (`handleBack` caía no `setEtapa(1)`, mesmo valor, sem re-render).
-      // Mesmo par de chaves que `useStopActions.ts:69-70` invalida.
-      const pid = notaPendenteRef.current;
-      if (pid) void queryClient.invalidateQueries({ queryKey: [KEY_SERVICES, pid] });
-      void queryClient.invalidateQueries({ queryKey: [KEY_SERVICES, 'routing', routeId] });
-    },
-    // Revisão do Task 2 (finding 4): sem `onError`, uma rejeição ficava
-    // invisível — a nota seguia PENDING enquanto o motorista tirava fotos e
-    // colhia assinatura, e a falha só aparecia na hora de concluir. Mesmo
-    // padrão de `useStopActions.ts` (idempotência tratada como sucesso;
-    // qualquer outra falha mostra a mensagem do backend).
-    onError: (error: any) => {
-      const errorMessage = error?.error?.message || error?.message || '';
-      if (errorMessage.includes('em atendimento') || errorMessage.includes('IN_ATTENDANCE')) {
-        const pid = notaPendenteRef.current;
-        if (pid) void queryClient.invalidateQueries({ queryKey: [KEY_SERVICES, pid] });
-        void queryClient.invalidateQueries({ queryKey: [KEY_SERVICES, 'routing', routeId] });
-        return;
-      }
-      showToast({
-        message: errorMessage || 'Não foi possível registrar a chegada nesta nota. Tente novamente ao abri-la.',
-        type: 'error',
-      });
-    },
+  // `startAttendanceAsync` (não `startAttendance`/onSuccess-onError do hook) —
+  // revisão do Task 2, ronda 3: a instância é compartilhada entre todas as
+  // notas do índice, mas `mutateAsync` devolve uma PROMISE por chamada, então
+  // `pid` fica capturado no closure de cada `.then()/.catch()` abaixo — sem
+  // precisar de um ref pra "lembrar" de qual nota era (a versão anterior usava
+  // um ref e o review encontrou a classe de corrida: 2º card tocado durante a
+  // transição de navegação, ou voltar-e-tocar com a 1ª chamada ainda em voo,
+  // atribuiria a invalidação à nota errada). `onSuccess`/`onError` do hook são
+  // no-op de propósito: sem eles, `useMutationService` cai no comportamento
+  // default (toast genérico de `data.message` no sucesso, MODAL de erro em
+  // `handleError`) — o tratamento de verdade (idempotência + toast + qual pid
+  // invalidar) mora no `.then()/.catch()` de cada chamada, não aqui.
+  const { startAttendanceAsync: startAttendanceDaNotaAsync } = useStartAttendance({
+    onSuccess: () => {},
+    onError: () => {},
   });
 
   // `onOpen` do card do índice de notas. Só chama start-attendance quando a
@@ -271,7 +242,6 @@ export default function StopDetailScreen() {
       !!pedido && !temEtapaPropriaAntesDoAtendimento && !resolveParadaAtendida([pedido]);
 
     if (podeIniciarAtendimentoPeloIndice) {
-      notaPendenteRef.current = pid;
       // Fire-and-forget e SEM esperar o GPS (revisão do Task 2, finding 4):
       // `getCurrentCoords` pode levar até ~15s somando os timeouts internos de
       // permissão + posição, e isso atrasaria o PRÓPRIO start-attendance — não
@@ -282,14 +252,44 @@ export default function StopDetailScreen() {
       // por isso este disparo específico abre mão dela; o botão "Estou aqui"
       // explícito (chegada da porta, acima) continua capturando via
       // `useStopActions`/`getCurrentCoords`.
-      startAttendanceDaNota({ id: pid });
+      void startAttendanceDaNotaAsync({ id: pid })
+        .then(() => {
+          // Revisão do Task 2 (finding, ronda 2): invalidar SÓ a lista da rota
+          // não bastava — `GET /services/:id` desta nota (o que
+          // `entrega/index.tsx` lê via `useFindOneService`) tem cache próprio
+          // (`staleTime` de 5min, sem refetch-on-focus — `src/app/_layout.tsx`)
+          // e não é prefixo de `['services', 'routing', routeId]`, então
+          // continuava servindo o status antigo (PENDING), deixando
+          // `isServiceStarted` falso e o botão voltar inerte (`handleBack`
+          // caía no `setEtapa(1)`, mesmo valor, sem re-render). Mesmo par de
+          // chaves que `useStopActions.ts:69-70` invalida.
+          void queryClient.invalidateQueries({ queryKey: [KEY_SERVICES, pid] });
+          void queryClient.invalidateQueries({ queryKey: [KEY_SERVICES, 'routing', routeId] });
+        })
+        .catch((error: any) => {
+          // Revisão do Task 2 (finding 4): sem tratamento de erro, uma rejeição
+          // ficava invisível — a nota seguia PENDING enquanto o motorista
+          // tirava fotos e colhia assinatura, e a falha só aparecia na hora de
+          // concluir. Mesmo padrão de `useStopActions.ts` (idempotência tratada
+          // como sucesso; qualquer outra falha mostra a mensagem do backend).
+          const errorMessage = error?.error?.message || error?.message || '';
+          if (errorMessage.includes('em atendimento') || errorMessage.includes('IN_ATTENDANCE')) {
+            void queryClient.invalidateQueries({ queryKey: [KEY_SERVICES, pid] });
+            void queryClient.invalidateQueries({ queryKey: [KEY_SERVICES, 'routing', routeId] });
+            return;
+          }
+          showToast({
+            message: errorMessage || 'Não foi possível registrar a chegada nesta nota. Tente novamente ao abri-la.',
+            type: 'error',
+          });
+        });
     }
 
     router.push({
       pathname: rotaDaNota,
       params: { id: routeId, pid },
     });
-  }, [pedidosDaParada, temEtapaPropriaAntesDoAtendimento, rotaDaNota, routeId, router, startAttendanceDaNota]);
+  }, [pedidosDaParada, temEtapaPropriaAntesDoAtendimento, rotaDaNota, routeId, router, startAttendanceDaNotaAsync, queryClient, showToast]);
 
   // Local state
   const [activeTab, setActiveTab] = useState<TabType>('local');

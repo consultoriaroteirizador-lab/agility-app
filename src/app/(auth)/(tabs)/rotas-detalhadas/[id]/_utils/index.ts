@@ -115,6 +115,7 @@ export {
     resolveNotaFiscalLabel,
     resolveNotasBadge,
     resolveParadaAtendida,
+    resolveParadaAtendidaElegivel,
     resolveProgressoTexto,
     resolveTemEtapaPropriaAntesDoAtendimento,
 } from './paradaDisplay'
