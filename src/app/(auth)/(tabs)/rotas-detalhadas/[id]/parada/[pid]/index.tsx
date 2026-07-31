@@ -21,6 +21,7 @@ import { measure } from '@/theme';
 
 import { TransferOrderList } from '../../_components/TransferOrderList';
 import {
+  formatNotasLabel,
   formatResumoDaNota,
   mapGrupoToParada,
   pathForServiceType,
@@ -32,6 +33,7 @@ import {
 
 import { EquipmentList, StopActions, StopTabs } from './_components';
 import { Map } from './_components/shared/Map';
+import { StopArrivalView } from './_components/shared/StopArrivalView';
 import { useStopActions, useStopStatus, useUserLocation } from './_hooks';
 import { TabType } from './_types/stop.types';
 import { resolveCompanyRules } from './_utils/companyRules';
@@ -631,32 +633,27 @@ export default function StopDetailScreen() {
             // entra em atendimento). PICKUP/TRANSFER/SERVICE nunca caem aqui —
             // `temEtapaPropriaAntesDoAtendimento` mantém o comportamento de hoje
             // (ver comentário na declaração acima e em `resolveTemEtapaPropriaAntesDoAtendimento`).
-            <Box gap="y12" alignItems="center" pb="y24">
-              <Box alignSelf="stretch">
-                <Text preset="text15" fontWeightPreset="semibold" color="colorTextPrimary">{customerName}</Text>
-                <Text preset="text13" color="gray600">
-                  {notas.length} notas nesta parada — chegue na porta para ver a lista.
-                </Text>
-              </Box>
-              <Button
-                title={isStartingParada ? 'Iniciando...' : isEnRouteParada ? 'A caminho ✓' : 'Indo pra lá'}
-                preset="outline"
-                onPress={handleGoToLocationParada}
-                disabled={isStartingParada || isStartingAttendanceParada || isEnRouteParada || isStartBlockedParada}
-                width={measure.x330}
-              />
-              <Button
-                title={isStartingAttendanceParada ? 'Iniciando atendimento...' : 'Estou aqui!'}
-                onPress={handleArrivedParada}
-                disabled={isStartingParada || isStartingAttendanceParada || isStartBlockedParada}
-                width={measure.x330}
-              />
-              {isStartBlockedParada && (
-                <Text preset="text13" color="redError" textAlign="center">
-                  {stopStatus.startBlockReason}
-                </Text>
-              )}
-            </Box>
+            //
+            // MESMA tela de chegada do fluxo de uma nota (`StopArrivalView`,
+            // reusada de `EtapaInicial` — Camada 3, Task 4): mapa, tags de
+            // tipo/horário, card do cliente com endereço completo e volumes,
+            // botões e mensagem de bloqueio. Ganha só o selo de notas ao lado
+            // das tags — o resto é idêntico de propósito, não uma versão
+            // reduzida. Ações amarradas ao REPRESENTANTE do grupo (comentário
+            // acima, na declaração de `representanteDaParada`).
+            <StopArrivalView
+              service={representanteDaParada}
+              effectiveAddress={address}
+              routeId={routeId}
+              isEnRoute={isEnRouteParada}
+              isStarting={isStartingParada}
+              isStartingAttendance={isStartingAttendanceParada}
+              isStartBlocked={isStartBlockedParada}
+              startBlockReason={stopStatus.startBlockReason}
+              onGoToLocation={handleGoToLocationParada}
+              onArrived={handleArrivedParada}
+              notasBadge={formatNotasLabel(pedidosDaParada.length, 0, false)}
+            />
           ) : (
             <>
               <Box>
