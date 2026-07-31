@@ -16,15 +16,19 @@ export {
     PARADA_STATUS_COLORS,
     PARADA_STATUS_LABELS,
     SERVICE_TYPE_LABELS,
-    
+
     // Funções de mapeamento
     getServiceTypeLabel,
     getParadaStatus,
+    getParadaStatusGrupo,
     getParadaStatusLabel,
     getParadaStatusColor,
     getRotaStatus,
+    mapGrupoToParada,
     mapServiceToParada,
-    
+    pathForServiceType,
+    type StopServiceRoutePath,
+
     // Funções de verificação
     isParadaAtiva,
     isParadaConcluida,
@@ -40,15 +44,17 @@ export {
     
     // Funções de ordenação
     getParadasOrdenadas,
-    
+
     // Funções de mapeamento
     mapServicesToParadas,
-    
+    resolvePedidosDaParada,
+
     // Funções de cálculo de progresso
     calculateProgress,
     calculateProgressFromParadas,
     
     // Funções de contagem
+    collectLiveServiceIds,
     countParadasByStatus,
     withLedgerNonDelivered,
 
@@ -80,3 +86,36 @@ export {
     countLedgerOnly,
     outcomeLabel,
 } from './routeNonDelivered'
+
+// ============================================
+// AGRUPAMENTO DE PARADAS (Camada 2)
+// ============================================
+
+export {
+    type MapPointKeyInput,
+    type StopKeyInput,
+    contarChavesRepetidas,
+    findGrupoDoServico,
+    groupContiguousBy,
+    groupContiguousStops,
+    mapPointStopKeyOf,
+    stopKeyOf,
+} from './stopGrouping'
+
+// ============================================
+// EXIBIÇÃO DA PARADA (selo de notas / progresso)
+// ============================================
+
+export {
+    type NotaFiscalInput,
+    type NotasBadge,
+    type NotasBadgeInput,
+    formatNotasLabel,
+    formatResumoDaNota,
+    resolveNotaFiscalLabel,
+    resolveNotasBadge,
+    resolveParadaAtendida,
+    resolveParadaAtendidaElegivel,
+    resolveProgressoTexto,
+    resolveTemEtapaPropriaAntesDoAtendimento,
+} from './paradaDisplay'

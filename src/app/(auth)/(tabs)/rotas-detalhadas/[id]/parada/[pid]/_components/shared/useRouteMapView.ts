@@ -21,6 +21,7 @@ import { ServiceStatus } from '@/domain/agility/service/dto/types'
 import { colors } from '@/theme'
 
 import { outcomeLabel } from '../../../../_utils/routeNonDelivered'
+import { groupContiguousBy, mapPointStopKeyOf } from '../../../../_utils/stopGrouping'
 
 import { splitRouteAtLastStop, type LatLng } from './geo'
 import { MapPoint } from './Map'
@@ -126,14 +127,28 @@ export function useRouteMapView(routeId: string): RouteMapView {
             })
         }
 
-        sortedServices.forEach((service, index) => {
+        // Um pino por PARADA, não por pedido: cinco notas na mesma porta viravam
+        // cinco pinos empilhados com números diferentes. `mapPointStopKeyOf` usa a
+        // MESMA identidade da lista (endereço + cliente), então o agrupamento
+        // concorda com o dos cards.
+        //
+        // A NUMERAÇÃO, porém, não é garantida idêntica à da lista, e não afirmamos
+        // que seja: o mapa numera as paradas DESENHÁVEIS, e a lista numera todas.
+        // Um serviço sem coordenada é filtrado em `sortedServices` (:70-76) e some
+        // do mapa, deslocando em -1 todos os números seguintes; as duas telas também
+        // bebem de endpoints diferentes (`/map-data` × `/services`), que podem
+        // divergir no conjunto de serviços. Fechar isso exige decidir o que
+        // desenhar para uma parada sem coordenada — trabalho de outra camada.
+        groupContiguousBy(sortedServices, mapPointStopKeyOf).forEach((grupo, index) => {
+            const representante = grupo[0]
+            const sufixo = grupo.length > 1 ? ` (${grupo.length} notas)` : ''
             points.push({
-                id: service.id,
-                latitude: service.latitude,
-                longitude: service.longitude,
-                title: service.title || `Parada ${index + 1}`,
+                id: representante.id,
+                latitude: representante.latitude,
+                longitude: representante.longitude,
+                title: `${representante.title || `Parada ${index + 1}`}${sufixo}`,
                 label: index + 1,
-                color: stopColorByStatus(service.status),
+                color: stopColorByStatus(representante.status),
             })
         })
 

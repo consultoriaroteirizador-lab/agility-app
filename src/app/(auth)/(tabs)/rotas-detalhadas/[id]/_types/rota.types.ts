@@ -78,6 +78,24 @@ export interface Parada {
     /** ID do serviço associado à parada */
     serviceId: string
 
+    /**
+     * Pedidos desta parada, na ordem do itinerário. SEMPRE tem ao menos 1.
+     * `serviceId` acima é o do REPRESENTANTE (`pedidos[0]`) — o agrupamento é
+     * aditivo justamente para que quem só lê `serviceId` continue funcionando.
+     */
+    pedidos: ServiceResponse[]
+
+    /** Chave de agrupamento (ver `_utils/stopGrouping`). Uso interno/diagnóstico. */
+    chaveParada: string
+
+    /**
+     * A mesma porta aparece em OUTRA parada da rota. Acontece em rota legada
+     * (planejada antes da Camada 1) ou reordenada à mão: os pedidos não estão
+     * contíguos e o app não funde o que o itinerário separou. Serve para avisar
+     * o motorista — é comportamento correto, mas parece defeito.
+     */
+    enderecoRepetido?: boolean
+
     /** Nome do cliente/local da parada */
     nome: string
 

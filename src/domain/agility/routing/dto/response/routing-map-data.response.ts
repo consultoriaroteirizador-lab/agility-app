@@ -26,6 +26,25 @@ export interface ServicePointResponse {
     status?: string | null
 
     /**
+     * Identidade da PARADA (a porta), não do pedido. O backend já mandava estes
+     * três campos em `buildServicePoints` — só não estavam declarados aqui, e por
+     * isso o mapa agrupava por título (texto livre por pedido) em vez de por
+     * endereço. Ver `_utils/stopGrouping.mapPointStopKeyOf`.
+     *
+     * `addressId` vem do acessor cru da entidade (`string | undefined`), então a
+     * chave pode estar AUSENTE do JSON — daí ser opcional de verdade, e não só
+     * "às vezes null". `customerId` não é enviado: o cliente é aproximado por
+     * `fantasyName ?? responsible`, os mesmos fallbacks da lista de paradas.
+     */
+    addressId?: string | null
+
+    /** Nome fantasia do cliente (identifica o recebedor no mapa). */
+    fantasyName?: string | null
+
+    /** Responsável pelo recebimento — fallback quando não há `fantasyName`. */
+    responsible?: string | null
+
+    /**
      * Fase de custódia (cross-docking): AT_ORIGIN | IN_TRANSIT | AT_HUB |
      * OUT_FOR_DELIVERY | DELIVERED | EXCEPTION. Pós-handoff, um pedido entregue no
      * CD fica AT_HUB+ com status ainda PENDING (segue no last-mile) — o gate do

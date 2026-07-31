@@ -3,6 +3,7 @@ import {
   useContext,
   useState,
   useCallback,
+  useMemo,
   ReactNode,
   useEffect,
   useRef,
@@ -37,6 +38,7 @@ import {
 } from '@/services/storage/paradaDraftStorage';
 import { parseBRLToCents } from '@/utils/parseCurrency';
 
+import { resolveParadaAtendidaElegivel, resolvePedidosDaParada } from '../../../_utils';
 import { useStopStatus } from '../_hooks/useStopStatus';
 import { resolveCompanyRules } from '../_utils/companyRules';
 
@@ -174,6 +176,18 @@ interface ParadaContextValue {
 
   // Utilitários
   isServiceStarted: boolean;
+  /**
+   * A PORTA (não este serviço) já tem alguma nota em atendimento ou além, **E**
+   * o grupo é elegível para o gate por porta (todas as notas DELIVERY —
+   * `resolveParadaAtendidaElegivel`). Um grupo NÃO elegível (com PICKUP/
+   * TRANSFER/SERVICE) sempre devolve `false` aqui, mesmo com uma nota irmã em
+   * atendimento — cada nota volta a depender só de `isServiceStarted`, que é o
+   * comportamento de hoje. Exposto separadamente de `isServiceStarted` (ver
+   * comentário na declaração, mais abaixo no Provider) — só quem precisa da
+   * pergunta por PARADA a usa (hoje: `entrega/index.tsx`, para não reabrir
+   * `EtapaInicial` na nota 2..N de uma porta elegível já atendida).
+   */
+  isParadaAtendida: boolean;
   resetState: () => void;
 
   // Pagamento (cobrança na entrega)
@@ -281,6 +295,52 @@ export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderPr
   const canStartService = stopGate.canStartService;
   const startBlockReason = stopGate.startBlockReason;
 
+  // Pedidos da MESMA PARADA que o serviço corrente — MESMA função
+  // (`resolvePedidosDaParada`) que a tela do índice de notas usa, para as duas
+  // concordarem sobre o que é "uma parada" (mesmo motivo do `stopGate` acima,
+  // que já agrupa por vizinhança para o gate de "uma por vez"/ordem).
+  const pedidosDaParada = useMemo(
+    () => resolvePedidosDaParada(routeServices, serviceId),
+    [routeServices, serviceId],
+  );
+
+  // A PARADA está atendida quando QUALQUER nota dela chegou (IN_ATTENDANCE) ou
+  // passou disso (Camada 3, §3 da spec: chegada é da PORTA, não de cada nota)
+  // **E** o grupo é ELEGÍVEL para esse gate (`resolveParadaAtendidaElegivel`,
+  // que por baixo já filtra por `resolveTemEtapaPropriaAntesDoAtendimento` —
+  // todas as notas DELIVERY).
+  //
+  // O filtro de elegibilidade (revisão 3) é obrigatório: sem ele, um grupo
+  // misto (DELIVERY+SERVICE, mesmo sentido `D` em `stopKeyOf`) vazava a
+  // chegada por PORTA para uma nota que ainda não tinha entrado em atendimento
+  // de verdade — a nota SERVICE entra em atendimento pelo próprio pré-passo de
+  // equipamento, `isParadaAtendida` virava `true`, e a nota DELIVERY do MESMO
+  // grupo pulava `EtapaInicial` (`entrega/index.tsx`) sem NUNCA disparar seu
+  // próprio `start-attendance` — o índice também já recusa esse grupo
+  // (`mostraBlocoDeChegada`/`handleOpenNota` em `parada/[pid]/index.tsx` usam
+  // o MESMO `resolveTemEtapaPropriaAntesDoAtendimento`), então a nota fazia
+  // toda a conferência com o backend ainda em PENDING. Índice e fluxo têm que
+  // concordar sobre elegibilidade usando o MESMO predicado — se um recuar e o
+  // outro não, a nota atravessa a etapa 1 sem chegada real.
+  //
+  // EXPOSTO AO LADO de `isServiceStarted` (abaixo), NÃO no lugar dele — revisão
+  // do Task 2 (findings 1 e 3): redefinir `isServiceStarted` globalmente para
+  // este valor vazou a semântica de "porta" para consumidores que perguntam
+  // sobre o SERVIÇO, não a parada:
+  //   - com a rota vazia/offline (cold start, deep link, `routingId` zerado por
+  //     CANCEL_ORDER/RETURN_TO_POOL), `pedidosDaParada` cai para `[]` e
+  //     `isParadaAtendida` mentia `false` mesmo com o serviço já IN_ATTENDANCE
+  //     — reabria `EtapaInicial` até numa parada de 1 nota;
+  //   - `service/index.tsx` usa `isServiceStarted` para o pré-check de
+  //     equipamento (`!isServiceStarted && needsMaterialCheck`), que é "antes
+  //     do motorista iniciar ESTE serviço", não "antes da porta ser atendida"
+  //     — com o valor da parada (sem o filtro de elegibilidade), notas 2..N de
+  //     um grupo D (DELIVERY+SERVICE) pulariam a conferência de equipamento.
+  // Só `entrega/index.tsx` (o único lugar onde a chegada por PORTA faz
+  // sentido) combina `isServiceStarted` com `isParadaAtendida` — ver
+  // comentário lá.
+  const isParadaAtendida = resolveParadaAtendidaElegivel(pedidosDaParada);
+
   // Hook para check de material
   const checkMaterialMutation = useCheckMaterial();
 
@@ -362,7 +422,11 @@ export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderPr
     loading: false,
   });
 
-  // Verificar se o serviço já está iniciado (mesma fonte de verdade que `arrived`).
+  // `isServiceStarted` volta a ser SÓ deste serviço (revisão do Task 2, findings
+  // 1/3) — mesma fonte de verdade que `arrived`, como sempre foi. Continua
+  // sendo o que os outros 4 consumidores (coleta/service/transfer e os
+  // handleBack de *Confirmacao) esperam. A pergunta "a PORTA chegou" é
+  // `isParadaAtendida`, acima, exposta separadamente.
   const isServiceStarted = isServiceStartedRaw;
 
   // Função de checklist (declarada antes de ser usada)
@@ -1175,6 +1239,7 @@ export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderPr
 
     // Utilitários
     isServiceStarted: !!isServiceStarted,
+    isParadaAtendida,
     resetState,
 
     // Pagamento (cobrança na entrega)

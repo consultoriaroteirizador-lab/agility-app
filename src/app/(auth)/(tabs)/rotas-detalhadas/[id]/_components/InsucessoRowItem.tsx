@@ -16,7 +16,7 @@ import { formatDatePtBr, formatHHmm } from '@/functions/dateFunctions'
 import { measure } from '@/theme'
 
 import type { InsucessoRow } from '../_utils'
-import { outcomeLabel } from '../_utils'
+import { formatNotasLabel, outcomeLabel } from '../_utils'
 
 export interface InsucessoRowItemProps {
     row: InsucessoRow
@@ -38,6 +38,9 @@ export function InsucessoRowItem({ row, onPress }: InsucessoRowItemProps) {
     const label = outcomeLabel(row.outcome)
     const quando = formatOccurredAt(row.occurredAt)
     const titulo = row.recipientName ?? row.code ?? 'Pedido'
+    // A linha é sempre de insucesso, então "misto" é simplesmente ter alguma nota
+    // entregue. Mesma frase do card da lista — a formatação tem um dono só.
+    const notasLabel = formatNotasLabel(row.totalNotas, row.notasEntregues, row.notasEntregues > 0)
 
     // Box quando read-only, TouchableOpacityBox quando navegável. O cast alinha os
     // tipos (Box não declara onPress; em runtime um onPress undefined é ignorado).
@@ -66,6 +69,23 @@ export function InsucessoRowItem({ row, onPress }: InsucessoRowItemProps) {
                         ✕ {label}
                     </Text>
                 </Box>
+                {/* Porta agrupada com insucesso parcial: "3 de 5 entregues" (§3.3).
+                    É o recorte que não esconde do operador que a porta foi
+                    parcialmente atendida — sem ele a linha diria só "Insucesso"
+                    para uma parada em que a maioria das notas foi entregue. */}
+                {notasLabel && (
+                    <Box
+                        backgroundColor="gray100"
+                        paddingHorizontal="x8"
+                        paddingVertical="y2"
+                        borderRadius="s4"
+                        flexShrink={0}
+                    >
+                        <Text preset="text13" color="gray600">
+                            {notasLabel}
+                        </Text>
+                    </Box>
+                )}
                 {row.code && (
                     <Box
                         backgroundColor="gray200"

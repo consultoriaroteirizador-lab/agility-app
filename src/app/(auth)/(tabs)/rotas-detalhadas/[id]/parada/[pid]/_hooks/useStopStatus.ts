@@ -2,6 +2,8 @@ import { useMemo } from 'react';
 
 import { ServiceStatus } from '@/domain/agility/service/dto/types';
 
+import { getParadasOrdenadas } from '../../../_utils/routeCalculations';
+import { findGrupoDoServico, groupContiguousStops } from '../../../_utils/stopGrouping';
 import { StopStatus } from '../_types/stop.types';
 
 interface Service {
@@ -14,6 +16,13 @@ interface Service {
     isCompleted?: boolean;
     isCanceled?: boolean;
     isFailed?: boolean;
+    // Identificam a PARADA (a porta), não o pedido. Opcionais: um caller que não
+    // os passe cai no comportamento antigo (cada pedido é a sua própria parada).
+    addressId?: string | null;
+    customerId?: string | null;
+    fantasyName?: string | null;
+    responsible?: string | null;
+    serviceType?: string | null;
 }
 
 interface UseStopStatusParams {
@@ -68,21 +77,47 @@ export const useStopStatus = ({
         const isCompleted = service?.isCompleted === true;
         const isCanceled = service?.isCanceled === true;
 
-        // Outra parada em execução (a caminho OU em atendimento), diferente da atual
+        // Irmãos = pedidos da MESMA PARADA (mesmo grupo contíguo). Com a Camada 2
+        // uma porta tem N notas; iniciar a nota 1 não pode contar como "outra
+        // parada em andamento" para as notas 2..N, senão a regra "uma por vez"
+        // trava o motorista na primeira nota. Usa o MESMO comparador
+        // (`getParadasOrdenadas`) que a tela do índice de notas usa — duas
+        // cópias inline já divergiram no fallback de sequenceOrder (999 vs
+        // Number.MAX_SAFE_INTEGER); se divergirem de novo, o gate bloqueia algo
+        // que a tela mostra como uma parada só, e o motorista não tem como
+        // entender.
+        const ordenados = getParadasOrdenadas(allServices);
+        // Os grupos são as PARADAS na ordem do itinerário — a mesma decomposição
+        // que `mapServicesToParadas` usa para numerar a lista da tela. Serve para
+        // duas coisas: saber quem são os irmãos e saber qual é o NÚMERO da parada.
+        const grupos = groupContiguousStops(ordenados);
+        const grupoAtual = findGrupoDoServico(grupos, currentServiceId);
+        // Sem grupo (serviço ainda não carregado na lista da rota) → só ele mesmo,
+        // que é exatamente o comportamento anterior à Camada 2.
+        const irmaosIds = new Set<string>(
+            grupoAtual ? grupoAtual.map((s) => s.id) : [currentServiceId],
+        );
+
+        // Outra PARADA em execução (a caminho OU em atendimento) — irmãos não contam.
         const hasOtherServiceInProgress = allServices.some(
             (s) =>
-                s.id !== currentServiceId &&
+                !irmaosIds.has(s.id) &&
                 (s.isInProgress === true ||
                     s.isInAttendance === true ||
                     s.status === ServiceStatus.IN_PROGRESS ||
                     s.status === ServiceStatus.IN_ATTENDANCE),
         );
 
-        // Próxima parada esperada na ordem: menor sequenceOrder entre as não-terminais.
-        const nextExpected = [...allServices]
-            .filter((s) => !isTerminal(s))
-            .sort((a, b) => (a.sequenceOrder ?? Number.MAX_SAFE_INTEGER) - (b.sequenceOrder ?? Number.MAX_SAFE_INTEGER))[0];
-        const isNextInOrder = !nextExpected || nextExpected.id === currentServiceId;
+        // Próxima parada esperada na ordem: a primeira não-terminal do itinerário.
+        // Usa `getParadasOrdenadas` — o comparador único do módulo. Aqui havia uma
+        // segunda ordenação inline com fallback diferente (`?? Number.MAX_SAFE_INTEGER`
+        // contra `?? 999`): é exatamente a duplicação que o docblock de
+        // `getParadasOrdenadas` avisa, e ela decide qual parada a mensagem cita.
+        const nextExpected = getParadasOrdenadas(allServices.filter((s) => !isTerminal(s)))[0];
+        // "Próxima esperada" é a próxima PARADA: qualquer nota dela serve para
+        // iniciar. `irmaosIds` sempre contém o serviço atual, então isto também
+        // cobre o caso de 1 pedido por parada.
+        const isNextInOrder = !nextExpected || irmaosIds.has(nextExpected.id);
 
         // "Uma por vez" IMPLICA "seguir ordem": sem isso, a combinação
         // (uma-por-vez ON + ordem OFF) vira armadilha — o motorista inicia uma
@@ -93,8 +128,17 @@ export const useStopStatus = ({
         // Regras configuráveis: monta o motivo do bloqueio (null = pode iniciar).
         let startBlockReason: string | null = null;
         if (orderEnforced && !isNextInOrder) {
-            const pos = (nextExpected?.sequenceOrder ?? 0) + 1;
-            startBlockReason = `Você deve seguir a ordem das paradas. Inicie a parada #${pos} primeiro.`;
+            // O número tem que ser o da PARADA, que é o que o motorista vê na
+            // lista (`mapGrupoToParada` numera por índice de grupo). `sequenceOrder`
+            // é posição de PEDIDO: numa rota agrupada ele mandaria "inicie a parada
+            // #34" numa lista que termina em 26 — e esta frase é a única orientação
+            // que o motorista tem no instante em que é bloqueado.
+            const indiceParada = nextExpected
+                ? grupos.findIndex((grupo) => grupo.some((s) => s.id === nextExpected.id))
+                : -1;
+            startBlockReason = indiceParada >= 0
+                ? `Você deve seguir a ordem das paradas. Inicie a parada #${indiceParada + 1} primeiro.`
+                : 'Você deve seguir a ordem das paradas. Conclua as paradas anteriores primeiro.';
         } else if (enforceSingleActiveStop && hasOtherServiceInProgress) {
             startBlockReason = 'Conclua a parada em andamento antes de iniciar outra.';
         }

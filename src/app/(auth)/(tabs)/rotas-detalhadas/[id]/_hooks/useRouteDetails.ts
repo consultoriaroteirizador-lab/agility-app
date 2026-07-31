@@ -16,6 +16,7 @@ import type { Parada, Rota, RotaStatus } from '../_types/rota.types'
 import {
     buildInsucessoList,
     calculateProgress,
+    collectLiveServiceIds,
     countLedgerOnly,
     countParadasByStatus,
     findOutrasParadas,
@@ -29,6 +30,7 @@ import {
     mapServicesToParadas,
     withLedgerNonDelivered,
     type InsucessoRow,
+    type ParadaCountResult,
 } from '../_utils'
 
 // ============================================
@@ -64,14 +66,7 @@ export interface UseRouteDetailsResult {
     status: RotaStatus
 
     /** Contagem de paradas por status */
-    contagem: {
-        total: number
-        pendentes: number
-        emAndamento: number
-        concluidasSucesso: number
-        concluidasInsucesso: number
-        concluidas: number
-    }
+    contagem: ParadaCountResult
 
     // ========================================
     // Paradas Derivadas
@@ -244,13 +239,16 @@ export function useRouteDetails(rotaId: string | null | undefined): UseRouteDeta
     /**
      * Pedidos que saíram da rota (cancelado / devolvido à fila) — contados a
      * partir do ledger porque já não existem em `paradas`.
+     *
+     * A identidade do que "ainda está na rota" é por NOTA e vem de TODAS as
+     * paradas (`collectLiveServiceIds`), não do `serviceId` das paradas de
+     * insucesso: com o agrupamento aquele campo é só o representante, e uma nota
+     * recusada numa porta de cinco seria contada como "saiu da rota" estando ali
+     * na tela. É também o que a tela de histórico faz.
      */
     const ledgerOnlyCount = useMemo(() => {
-        return countLedgerOnly(
-            paradasConcluidasInsucesso.map((p) => p.serviceId),
-            nonDeliveredItems,
-        )
-    }, [paradasConcluidasInsucesso, nonDeliveredItems])
+        return countLedgerOnly(collectLiveServiceIds(paradas), nonDeliveredItems)
+    }, [paradas, nonDeliveredItems])
 
     /**
      * Contagem de paradas por status, somando os não-entregues que saíram da

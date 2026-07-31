@@ -5,10 +5,12 @@
 import { Box, Text, TouchableOpacityBox } from '@/components'
 import { formatHHmm } from '@/functions/dateFunctions'
 import { useNow } from '@/hooks'
-import { measure, StatusColorConfig, ThemeColors } from '@/theme';
+import { measure, ThemeColors } from '@/theme';
 
 import { useRota } from '../_context/RotaContext'
 import type { Parada, ParadaStatus } from '../_types/rota.types'
+import { resolveNotasBadge } from '../_utils/paradaDisplay'
+import { PARADA_STATUS_CHIP } from '../_utils/statusMappers'
 
 /**
  * Recalcula os sinais de atraso ao vivo (relógio local) com fallback para o
@@ -70,38 +72,10 @@ export interface ParadaListItemProps {
 // CONSTANTES
 // ============================================
 
-const STATUS_CONFIG: Record<ParadaStatus, StatusColorConfig> = {
-    'pendente': {
-        label: 'Pendente',
-        bgColor: 'gray100',
-        textColor: 'gray600',
-        borderColor: 'gray200',
-    },
-    'em-andamento': {
-        label: 'Em andamento ',
-        bgColor: 'primary10',
-        textColor: 'primary100',
-        borderColor: 'primary100',
-    },
-    'em-atendimento': {
-        label: 'Em atendimento',
-        bgColor: 'secondary10',
-        textColor: 'secondary100',
-        borderColor: 'secondary100',
-    },
-    'concluida-sucesso': {
-        label: 'Concluída',
-        bgColor: 'tertiary10',
-        textColor: 'tertiary100',
-        borderColor: 'tertiary100',
-    },
-    'concluida-insucesso': {
-        label: 'Insucesso',
-        bgColor: 'redError',
-        textColor: 'white',
-        borderColor: 'redError',
-    },
-}
+// A paleta de status mora em `_utils/statusMappers` (PARADA_STATUS_CHIP): o mesmo
+// status também é pintado no card de cada nota dentro da parada agrupada, e duas
+// cópias divergiriam sem ninguém notar.
+const STATUS_CONFIG = PARADA_STATUS_CHIP
 
 // ============================================
 // COMPONENTE
@@ -128,6 +102,10 @@ export function ParadaListItem({
     )
 
     const statusConfig = STATUS_CONFIG[parada.status]
+
+    // Uma parada pode ter N notas (mesma porta). A derivação é pura e testada em
+    // `_utils/paradaDisplay` — este repo não tem teste de componente.
+    const notasBadge = resolveNotasBadge(parada)
 
     // Relógio vivo (60s) para marcar atraso mesmo entre refetches.
     const now = useNow(60_000)
@@ -244,6 +222,14 @@ export function ParadaListItem({
                         </Text>
                     </Box>
 
+                    {notasBadge.label && (
+                        <Box backgroundColor="gray100" paddingHorizontal="x8" paddingVertical="y2" borderRadius="s4" flexShrink={0}>
+                            <Text preset="text13" color="gray600">
+                                {notasBadge.label}
+                            </Text>
+                        </Box>
+                    )}
+
                     {parada.status === 'concluida-sucesso' && parada.deliveryOutcome === 'WITH_ISSUES' && (
                         <Box
                             backgroundColor="secondary10"
@@ -300,6 +286,14 @@ export function ParadaListItem({
                         </Box>
                     )}
                 </Box>
+
+                {parada.enderecoRepetido && (
+                    <Box marginBottom="y4">
+                        <Text preset="text12" color="gray600">
+                            ⓘ Este endereço aparece em outra parada da rota — siga a ordem do roteiro.
+                        </Text>
+                    </Box>
+                )}
 
                 <Box marginBottom="y4">
                     <Box flexDirection="row" alignItems="center" gap="x4" marginBottom="y4">
