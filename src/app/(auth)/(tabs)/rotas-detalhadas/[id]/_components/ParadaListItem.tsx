@@ -129,6 +129,11 @@ export function ParadaListItem({
 
     const statusConfig = STATUS_CONFIG[parada.status]
 
+    // Uma parada pode ter N notas (mesma porta). Contagem para o card.
+    const totalNotas = parada.pedidos?.length ?? 1
+    const notasEntregues = parada.pedidos?.filter((p) => p.isCompleted === true).length ?? 0
+    const isGrupoMisto = parada.status === 'concluida-insucesso' && notasEntregues > 0
+
     // Relógio vivo (60s) para marcar atraso mesmo entre refetches.
     const now = useNow(60_000)
     const { lateEta, lateWindow, delayMin, deliveredLate, deliveredLateMin } = computeLateness(parada, now)
@@ -244,6 +249,16 @@ export function ParadaListItem({
                         </Text>
                     </Box>
 
+                    {totalNotas > 1 && (
+                        <Box backgroundColor="gray100" paddingHorizontal="x8" paddingVertical="y2" borderRadius="s4" flexShrink={0}>
+                            <Text preset="text13" color="gray600">
+                                {isGrupoMisto
+                                    ? `${notasEntregues} de ${totalNotas} entregues`
+                                    : `${totalNotas} notas`}
+                            </Text>
+                        </Box>
+                    )}
+
                     {parada.status === 'concluida-sucesso' && parada.deliveryOutcome === 'WITH_ISSUES' && (
                         <Box
                             backgroundColor="secondary10"
@@ -300,6 +315,14 @@ export function ParadaListItem({
                         </Box>
                     )}
                 </Box>
+
+                {parada.enderecoRepetido && (
+                    <Box marginBottom="y4">
+                        <Text preset="text12" color="gray600">
+                            ⓘ Este endereço aparece em outra parada da rota — siga a ordem do roteiro.
+                        </Text>
+                    </Box>
+                )}
 
                 <Box marginBottom="y4">
                     <Box flexDirection="row" alignItems="center" gap="x4" marginBottom="y4">
