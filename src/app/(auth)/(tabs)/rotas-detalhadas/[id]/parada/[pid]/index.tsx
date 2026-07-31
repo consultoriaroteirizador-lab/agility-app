@@ -13,17 +13,19 @@ import { useFindOneAddress } from '@/domain/agility/address/useCase';
 import { useGetMe } from '@/domain/agility/driver/useCase';
 import { useCompleteRouting } from '@/domain/agility/routing/useCase';
 import { ServiceType } from '@/domain/agility/service/dto/types';
-import { useFindOneService, useFindServicesByRoutingId } from '@/domain/agility/service/useCase';
-import { KEY_ROUTINGS } from '@/domain/queryKeys';
+import { useFindOneService, useFindServicesByRoutingId, useStartAttendance } from '@/domain/agility/service/useCase';
+import { KEY_ROUTINGS, KEY_SERVICES } from '@/domain/queryKeys';
 import { formatHHmm } from '@/functions';
+import { useToastService } from '@/services/Toast/useToast';
 import { measure } from '@/theme';
 
 import { TransferOrderList } from '../../_components/TransferOrderList';
-import { formatResumoDaNota, mapGrupoToParada, pathForServiceType, resolveNotaFiscalLabel, resolvePedidosDaParada } from '../../_utils';
+import { formatResumoDaNota, mapGrupoToParada, pathForServiceType, resolveNotaFiscalLabel, resolveParadaAtendida, resolvePedidosDaParada } from '../../_utils';
 
 import { EquipmentList, StopActions, StopTabs } from './_components';
 import { Map } from './_components/shared/Map';
 import { useStopActions, useStopStatus, useUserLocation } from './_hooks';
+import { getCurrentCoords } from './_hooks/getCurrentCoords';
 import { TabType } from './_types/stop.types';
 import { resolveCompanyRules } from './_utils/companyRules';
 import { isValidCoordinate } from './_utils/mapUtils';
@@ -61,6 +63,14 @@ export default function StopDetailScreen() {
     () => pedidosDaParada.map((p, i) => mapGrupoToParada([p], i, null)),
     [pedidosDaParada],
   );
+
+  // Rota do fluxo de entrega/coleta/serviço de cada nota — MESMO mapa
+  // (`pathForServiceType`) do useEffect de auto-redirect abaixo para
+  // DELIVERY/PICKUP/SERVICE. O grupo é sempre homogêneo em tipo (o tipo entra
+  // na chave de agrupamento), então basta olhar o tipo do serviço corrente uma
+  // vez. Calculado aqui (antes dos early returns) porque `handleOpenNota`
+  // também precisa dele; `pathForServiceType` aceita `undefined` (loading).
+  const rotaDaNota = pathForServiceType(service?.serviceType);
 
   // Embedded address from service (when backend sends it)
   const embeddedAddress = service?.address ?? addressFromList ?? null;
@@ -115,6 +125,106 @@ export default function StopDetailScreen() {
     serviceStartDate: service?.startDate ? String(service.startDate) : null,
   });
 
+  // Query client hoisted aqui (em vez de perto do `completeRouting` mais abaixo)
+  // porque o bloco de chegada da parada, logo a seguir, também precisa dele.
+  const queryClient = useQueryClient();
+
+  // ── Chegada da PARADA (Camada 3 — parada ≠ pedido) ────────────────────────
+  // A parada está atendida quando QUALQUER nota já chegou (ou passou disso) —
+  // mesma derivação que o `ParadaContext` usa para não pedir "Estou aqui" de
+  // novo na nota 2. Enquanto falso, a tela troca a lista de notas pelo bloco de
+  // chegada (ver ramo `isParadaAgrupada` mais abaixo).
+  const paradaAtendida = resolveParadaAtendida(pedidosDaParada);
+
+  // Ações de chegada amarradas ao REPRESENTANTE do grupo (`pedidosDaParada[0]`)
+  // — é ele que registra a chegada na porta (§3 da spec: a 1ª nota entra em
+  // atendimento na chegada; as demais, ao serem abertas — ver `handleOpenNota`).
+  // NÃO reusa o `useStopActions` de cima (ligado a `serviceId`, o pid da
+  // navegação): hoje os dois sempre coincidem, porque a lista da rota navega
+  // para cá com `parada.serviceId` = `grupo[0].id` (`mapGrupoToParada`) — mas se
+  // o itinerário for reordenado entre o fetch e o toque, este hook continua
+  // certo mesmo assim, e o custo de mais uma instância do hook é irrelevante
+  // (mutations não disparam nada até serem chamadas).
+  const representanteDaParada = pedidosDaParada[0] ?? service;
+  const representanteId = representanteDaParada?.id ?? serviceId;
+  const {
+    handleStartService: handleStartServiceParada,
+    handleStartAttendance: handleStartAttendanceParada,
+    isStarting: isStartingParada,
+    isStartingAttendance: isStartingAttendanceParada,
+  } = useStopActions({
+    serviceId: representanteId,
+    routeId,
+    serviceStatus: representanteDaParada?.status,
+    isServiceInProgress: representanteDaParada?.isInProgress,
+    serviceStartDate: representanteDaParada?.startDate ? String(representanteDaParada.startDate) : null,
+  });
+
+  const { showToast } = useToastService();
+  // Mesmo gate de "uma parada por vez"/ordem que `EtapaInicial` respeita — o
+  // bloqueio continua valendo ENTRE portas; dentro da mesma porta some assim
+  // que a primeira nota chega (`stopStatus` já agrupa por vizinhança).
+  const isStartBlockedParada = stopStatus.startBlockReason !== null;
+  const isEnRouteParada =
+    representanteDaParada?.isInProgress === true || representanteDaParada?.status === 'IN_PROGRESS';
+
+  const handleGoToLocationParada = useCallback(() => {
+    if (isStartBlockedParada) {
+      showToast({ message: stopStatus.startBlockReason!, type: 'error' });
+      return;
+    }
+    handleStartServiceParada();
+  }, [isStartBlockedParada, stopStatus.startBlockReason, showToast, handleStartServiceParada]);
+
+  const handleArrivedParada = useCallback(() => {
+    if (isStartBlockedParada) {
+      showToast({ message: stopStatus.startBlockReason!, type: 'error' });
+      return;
+    }
+    handleStartAttendanceParada();
+  }, [isStartBlockedParada, stopStatus.startBlockReason, showToast, handleStartAttendanceParada]);
+
+  // Abrir uma nota entra em atendimento (decisão do dono do produto, §3): o
+  // motorista confere uma de cada vez, não todas juntas na chegada — é o que
+  // o backend já sabe fazer por serviço, só o gate por-serviço impedia.
+  const { startAttendance: startAttendanceDaNota } = useStartAttendance({
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: [KEY_SERVICES, 'routing', routeId] });
+    },
+  });
+
+  // `onOpen` do card do índice de notas. Só chama start-attendance quando a
+  // nota AINDA NÃO está em atendimento (ou além) — o backend é idempotente para
+  // IN_ATTENDANCE, mas a checagem evita uma chamada à toa a cada reabertura de
+  // nota já em curso ou já terminal.
+  const handleOpenNota = useCallback((pid: string) => {
+    const pedido = pedidosDaParada.find((p) => p.id === pid);
+    const jaAtendidaOuAlem = !!(
+      pedido?.isInAttendance === true ||
+      pedido?.status === 'IN_ATTENDANCE' ||
+      pedido?.isCompleted === true ||
+      pedido?.isCanceled === true ||
+      pedido?.isFailed === true
+    );
+
+    if (pedido && !jaAtendidaOuAlem) {
+      // Fire-and-forget: NÃO aguardamos a resposta antes de navegar — o
+      // motorista já está olhando a nota que escolheu, travar a navegação numa
+      // rede lenta pareceria a tela ter travado à toa. Falha aqui é só log (via
+      // React Query); o pior caso é a nota ficar sem o registro incremental de
+      // atendimento, recuperável reabrindo o card.
+      void (async () => {
+        const location = await getCurrentCoords();
+        startAttendanceDaNota({ id: pid, location });
+      })();
+    }
+
+    router.push({
+      pathname: rotaDaNota,
+      params: { id: routeId, pid },
+    });
+  }, [pedidosDaParada, rotaDaNota, routeId, router, startAttendanceDaNota]);
+
   // Local state
   const [activeTab, setActiveTab] = useState<TabType>('local');
   const [showCompleteModal, setShowCompleteModal] = useState(false);
@@ -130,8 +240,7 @@ export default function StopDetailScreen() {
     service?.status === 'IN_ATTENDANCE'
   );
 
-  // Complete routing mutation
-  const queryClient = useQueryClient();
+  // Complete routing mutation (`queryClient` já foi obtido acima, perto do bloco de chegada da parada)
   const {
     completeRouting,
     isLoading: isCompletingRouting,
@@ -438,13 +547,6 @@ export default function StopDetailScreen() {
   );
 
   if (isParadaAgrupada) {
-    // Rota do fluxo de entrega/coleta/serviço de cada nota — MESMO mapa
-    // (`pathForServiceType`) do useEffect de auto-redirect acima para
-    // DELIVERY/PICKUP/SERVICE. O grupo é sempre homogêneo em tipo (o tipo
-    // entra na chave de agrupamento), então basta olhar o tipo do serviço
-    // corrente uma vez.
-    const rotaDaNota = pathForServiceType(service.serviceType);
-
     return (
       <ScreenBase
         scrollable
@@ -456,32 +558,62 @@ export default function StopDetailScreen() {
         }
       >
         <Box flex={1} backgroundColor="white" pt="y8" px="x16" gap="y16">
-          <Box>
-            <Text preset="text15" fontWeightPreset="semibold" color="colorTextPrimary">{customerName}</Text>
-            <Text preset="text13" color="gray600">
-              {notas.length} notas nesta parada — confirme uma de cada vez.
-            </Text>
-          </Box>
+          {!paradaAtendida ? (
+            // Chegada da PORTA (Camada 3, §3): antes de ver as notas, o motorista
+            // chega na parada — UMA vez, igual ao balcão. A lista de notas só
+            // aparece depois (`paradaAtendida` vira true assim que a 1ª nota
+            // entra em atendimento).
+            <Box gap="y12" alignItems="center" pb="y24">
+              <Box alignSelf="stretch">
+                <Text preset="text15" fontWeightPreset="semibold" color="colorTextPrimary">{customerName}</Text>
+                <Text preset="text13" color="gray600">
+                  {notas.length} notas nesta parada — chegue na porta para ver a lista.
+                </Text>
+              </Box>
+              <Button
+                title={isStartingParada ? 'Iniciando...' : isEnRouteParada ? 'A caminho ✓' : 'Indo pra lá'}
+                preset="outline"
+                onPress={handleGoToLocationParada}
+                disabled={isStartingParada || isStartingAttendanceParada || isEnRouteParada || isStartBlockedParada}
+                width={measure.x330}
+              />
+              <Button
+                title={isStartingAttendanceParada ? 'Iniciando atendimento...' : 'Estou aqui!'}
+                onPress={handleArrivedParada}
+                disabled={isStartingParada || isStartingAttendanceParada || isStartBlockedParada}
+                width={measure.x330}
+              />
+              {isStartBlockedParada && (
+                <Text preset="text13" color="redError" textAlign="center">
+                  {stopStatus.startBlockReason}
+                </Text>
+              )}
+            </Box>
+          ) : (
+            <>
+              <Box>
+                <Text preset="text15" fontWeightPreset="semibold" color="colorTextPrimary">{customerName}</Text>
+                <Text preset="text13" color="gray600">
+                  {notas.length} notas nesta parada — confirme uma de cada vez.
+                </Text>
+              </Box>
 
-          <TransferOrderList
-            paradas={notas}
-            titulo={`Notas desta parada (${notas.length})`}
-            openLabel="Abrir"
-            notaFiscalDeCard={(nota, i) => resolveNotaFiscalLabel(pedidosDaParada[i])}
-            statusDeCard={(nota) => nota.status}
-            subtituloDeCard={(nota, i) => {
-              const janela = nota.promisedStartISO || nota.promisedEndISO
-                ? `Janela ${formatHHmm(nota.promisedStartISO)}–${formatHHmm(nota.promisedEndISO)}`
-                : null;
-              return formatResumoDaNota(i + 1, notas.length, janela);
-            }}
-            onOpen={(pid) => {
-              router.push({
-                pathname: rotaDaNota,
-                params: { id: routeId, pid },
-              });
-            }}
-          />
+              <TransferOrderList
+                paradas={notas}
+                titulo={`Notas desta parada (${notas.length})`}
+                openLabel="Abrir"
+                notaFiscalDeCard={(nota, i) => resolveNotaFiscalLabel(pedidosDaParada[i])}
+                statusDeCard={(nota) => nota.status}
+                subtituloDeCard={(nota, i) => {
+                  const janela = nota.promisedStartISO || nota.promisedEndISO
+                    ? `Janela ${formatHHmm(nota.promisedStartISO)}–${formatHHmm(nota.promisedEndISO)}`
+                    : null;
+                  return formatResumoDaNota(i + 1, notas.length, janela);
+                }}
+                onOpen={handleOpenNota}
+              />
+            </>
+          )}
         </Box>
       </ScreenBase>
     );

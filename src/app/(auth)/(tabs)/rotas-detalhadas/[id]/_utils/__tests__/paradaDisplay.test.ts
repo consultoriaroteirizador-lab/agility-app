@@ -8,12 +8,14 @@
  * `notasTotal > total` regredia em silêncio. Aqui a derivação é pura e coberta.
  */
 import type { ServiceResponse } from '@/domain/agility/service/dto'
+import { ServiceStatus } from '@/domain/agility/service/dto/types'
 
 import type { ParadaStatus } from '../../_types/rota.types'
 import {
     formatResumoDaNota,
     resolveNotaFiscalLabel,
     resolveNotasBadge,
+    resolveParadaAtendida,
     resolveProgressoTexto,
 } from '../paradaDisplay'
 import type { ParadaCountResult } from '../routeCalculations'
@@ -133,6 +135,57 @@ describe('resolveNotaFiscalLabel — o número que o motorista tem no papel', ()
         expect(resolveNotaFiscalLabel({})).toBeNull()
         expect(resolveNotaFiscalLabel(null)).toBeNull()
         expect(resolveNotaFiscalLabel({ invoicing: '   ' })).toBeNull()
+    })
+})
+
+describe('resolveParadaAtendida — a PORTA (não a nota) já foi atendida (Camada 3)', () => {
+    it('nenhuma nota iniciada → false', () => {
+        expect(resolveParadaAtendida([nota({ id: 'a' }), nota({ id: 'b' })])).toBe(false)
+    })
+
+    it('uma nota em atendimento (chegou na porta) → true', () => {
+        expect(resolveParadaAtendida([
+            nota({ id: 'a', isInAttendance: true }),
+            nota({ id: 'b' }),
+        ])).toBe(true)
+    })
+
+    it('status IN_ATTENDANCE sem a flag isInAttendance também conta (mesmo fallback do resto do código)', () => {
+        expect(resolveParadaAtendida([
+            nota({ id: 'a', status: ServiceStatus.IN_ATTENDANCE }),
+        ])).toBe(true)
+    })
+
+    it('uma concluída e o resto pendente → true (terminal conta como já atendida)', () => {
+        expect(resolveParadaAtendida([
+            nota({ id: 'a', isCompleted: true }),
+            nota({ id: 'b' }),
+            nota({ id: 'c' }),
+        ])).toBe(true)
+    })
+
+    it('uma em insucesso (isFailed) e o resto pendente → true', () => {
+        expect(resolveParadaAtendida([
+            nota({ id: 'a', isFailed: true }),
+            nota({ id: 'b' }),
+        ])).toBe(true)
+    })
+
+    it('uma cancelada (isCanceled) e o resto pendente → true', () => {
+        expect(resolveParadaAtendida([
+            nota({ id: 'a', isCanceled: true }),
+            nota({ id: 'b' }),
+        ])).toBe(true)
+    })
+
+    it('lista vazia → false', () => {
+        expect(resolveParadaAtendida([])).toBe(false)
+    })
+
+    it('nota apenas "a caminho" (IN_PROGRESS) NÃO conta — chegada é IN_ATTENDANCE ou além, igual ao resto do código', () => {
+        expect(resolveParadaAtendida([
+            nota({ id: 'a', isInProgress: true, status: ServiceStatus.IN_PROGRESS }),
+        ])).toBe(false)
     })
 })
 

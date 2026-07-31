@@ -114,5 +114,6 @@ export {
     formatResumoDaNota,
     resolveNotaFiscalLabel,
     resolveNotasBadge,
+    resolveParadaAtendida,
     resolveProgressoTexto,
 } from './paradaDisplay'

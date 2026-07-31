@@ -13,6 +13,7 @@
  */
 
 import type { ServiceResponse } from '@/domain/agility/service/dto'
+import { ServiceStatus } from '@/domain/agility/service/dto/types'
 
 import type { ParadaStatus } from '../_types/rota.types'
 
@@ -76,6 +77,35 @@ export function resolveNotasBadge(parada: NotasBadgeInput): NotasBadge {
         isGrupoMisto,
         label: formatNotasLabel(totalNotas, notasEntregues, isGrupoMisto),
     }
+}
+
+/**
+ * A PARADA está atendida quando QUALQUER nota dela já chegou (IN_ATTENDANCE) ou
+ * passou disso — terminal (entregue/insucesso/cancelada) conta como "já
+ * atendida" também, senão reabrir uma porta parcialmente concluída voltaria a
+ * pedir chegada de novo.
+ *
+ * É o que substitui, na tela e no `ParadaContext`, o gate por SERVIÇO que
+ * existia antes: chegada é propriedade da PORTA, não de cada nota (Camada 3,
+ * §3 da spec) — uma vez que a primeira nota entra em atendimento, as demais não
+ * pedem "Estou aqui" de novo, só entram em atendimento conforme são abertas
+ * (`resolveNotaFiscalLabel`/tela do índice cuidam disso).
+ *
+ * Usa os MESMOS campos booleanos que o resto do código confia
+ * (`isInAttendance`/`isCompleted`/`isCanceled`/`isFailed`, com o `status` como
+ * fallback — igual a `useStopStatus`/`ParadaContext`), não uma lista de status
+ * escrita à mão aqui. `isInProgress` ("a caminho") fica de fora de propósito:
+ * é o mesmo corte que `EtapaInicial`/`hasArrivedAtLocation` já fazem — a
+ * caminho ainda não é chegada, só o começo dela.
+ */
+export function resolveParadaAtendida(pedidos: ServiceResponse[]): boolean {
+    return pedidos.some((pedido) => {
+        const emAtendimento =
+            pedido.isInAttendance === true || pedido.status === ServiceStatus.IN_ATTENDANCE
+        const terminal =
+            pedido.isCompleted === true || pedido.isCanceled === true || pedido.isFailed === true
+        return emAtendimento || terminal
+    })
 }
 
 /** Campos do pedido que identificam a nota para quem está no balcão. */

@@ -3,6 +3,7 @@ import {
   useContext,
   useState,
   useCallback,
+  useMemo,
   ReactNode,
   useEffect,
   useRef,
@@ -37,6 +38,7 @@ import {
 } from '@/services/storage/paradaDraftStorage';
 import { parseBRLToCents } from '@/utils/parseCurrency';
 
+import { resolveParadaAtendida, resolvePedidosDaParada } from '../../../_utils';
 import { useStopStatus } from '../_hooks/useStopStatus';
 import { resolveCompanyRules } from '../_utils/companyRules';
 
@@ -281,6 +283,23 @@ export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderPr
   const canStartService = stopGate.canStartService;
   const startBlockReason = stopGate.startBlockReason;
 
+  // Pedidos da MESMA PARADA que o serviço corrente — MESMA função
+  // (`resolvePedidosDaParada`) que a tela do índice de notas usa, para as duas
+  // concordarem sobre o que é "uma parada" (mesmo motivo do `stopGate` acima,
+  // que já agrupa por vizinhança para o gate de "uma por vez"/ordem).
+  const pedidosDaParada = useMemo(
+    () => resolvePedidosDaParada(routeServices, serviceId),
+    [routeServices, serviceId],
+  );
+
+  // A PARADA está atendida quando QUALQUER nota dela chegou (IN_ATTENDANCE) ou
+  // passou disso — substitui, aqui embaixo em `isServiceStarted`, o gate por
+  // SERVIÇO que existia antes (Camada 3, §3 da spec): chegada é da PORTA, não de
+  // cada nota. Sem isto, abrir a nota 2 de uma porta de N reabriria
+  // `EtapaInicial` e pediria "Estou aqui" de novo, mesmo com o motorista já
+  // atendendo a porta.
+  const isParadaAtendida = resolveParadaAtendida(pedidosDaParada);
+
   // Hook para check de material
   const checkMaterialMutation = useCheckMaterial();
 
@@ -362,8 +381,12 @@ export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderPr
     loading: false,
   });
 
-  // Verificar se o serviço já está iniciado (mesma fonte de verdade que `arrived`).
-  const isServiceStarted = isServiceStartedRaw;
+  // Verificar se a PARADA já está iniciada — `isParadaAtendida` (Camada 3), não
+  // `isServiceStartedRaw` (que é só deste serviço e segue existindo acima para
+  // `arrived`, hoje sem consumidor fora deste arquivo). Numa parada de 1 nota
+  // (a maioria hoje) `pedidosDaParada` é só o próprio serviço, e o resultado é
+  // idêntico a `isServiceStartedRaw` — comportamento inalterado nesse caso.
+  const isServiceStarted = isParadaAtendida;
 
   // Função de checklist (declarada antes de ser usada)
   const updateChecklist = useCallback(
