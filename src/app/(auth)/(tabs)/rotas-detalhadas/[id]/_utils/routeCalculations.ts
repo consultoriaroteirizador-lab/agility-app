@@ -16,7 +16,7 @@ import type {
 } from '../_types/rota.types'
 
 import { mapGrupoToParada } from './statusMappers'
-import { contarChavesRepetidas, groupContiguousStops } from './stopGrouping'
+import { contarChavesRepetidas, findGrupoDoServico, groupContiguousStops } from './stopGrouping'
 
 // ============================================
 // TIPOS
@@ -46,15 +46,23 @@ export interface ParadaCountResult {
 
 /**
  * Ordena serviços por sequenceOrder
- * 
+ *
+ * ÚNICO comparador de sequenceOrder do módulo — a tela (índice de notas) e o
+ * gate de "uma parada por vez" (`useStopStatus`) precisam concordar sobre a
+ * ordem do itinerário para concordar sobre o que é "uma parada"; duas cópias
+ * inline com fallbacks diferentes (`?? 999` vs `?? Number.MAX_SAFE_INTEGER`)
+ * já divergiram no passado. Genérico só no TIPO (não no comportamento) para
+ * servir tanto `ServiceResponse[]` quanto o subconjunto de campos que
+ * `useStopStatus` usa nos seus testes — o fallback `?? 999` não muda.
+ *
  * @param services - Lista de serviços do backend
  * @returns Lista de serviços ordenada por sequenceOrder
- * 
+ *
  * @example
  * const sorted = getParadasOrdenadas(services)
  * // Retorna serviços ordenados por sequenceOrder
  */
-export function getParadasOrdenadas(services: ServiceResponse[]): ServiceResponse[] {
+export function getParadasOrdenadas<T extends { sequenceOrder?: number | null }>(services: T[]): T[] {
     if (!services || services.length === 0) {
         return []
     }
@@ -64,6 +72,22 @@ export function getParadasOrdenadas(services: ServiceResponse[]): ServiceRespons
         const orderB = b.sequenceOrder ?? 999
         return orderA - orderB
     })
+}
+
+/**
+ * Pedidos da MESMA PARADA que `serviceId` — ordenados pelo itinerário
+ * (`getParadasOrdenadas`) e agrupados por vizinhança contígua
+ * (`groupContiguousStops`). Extraída para ser testável isoladamente: é a
+ * derivação que a tela do índice de notas (Task 5) usa para decidir se
+ * mostra o fluxo de entrega direto (1 pedido) ou o índice (N>1).
+ *
+ * `serviceId` desconhecido (ainda não carregado na lista da rota) devolve
+ * `[]` — comportamento seguro para quem chama antes do fetch terminar.
+ */
+export function resolvePedidosDaParada(services: ServiceResponse[], serviceId: string): ServiceResponse[] {
+    const ordenados = getParadasOrdenadas(services)
+    const grupos = groupContiguousStops(ordenados)
+    return findGrupoDoServico(grupos, serviceId) ?? []
 }
 
 // ============================================

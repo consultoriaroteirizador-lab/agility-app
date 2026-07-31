@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 
 import { ServiceStatus } from '@/domain/agility/service/dto/types';
 
+import { getParadasOrdenadas } from '../../../_utils/routeCalculations';
 import { findGrupoDoServico, groupContiguousStops } from '../../../_utils/stopGrouping';
 import { StopStatus } from '../_types/stop.types';
 
@@ -79,12 +80,13 @@ export const useStopStatus = ({
         // Irmãos = pedidos da MESMA PARADA (mesmo grupo contíguo). Com a Camada 2
         // uma porta tem N notas; iniciar a nota 1 não pode contar como "outra
         // parada em andamento" para as notas 2..N, senão a regra "uma por vez"
-        // trava o motorista na primeira nota. Usa a MESMA função que monta a
-        // lista da tela — se divergissem, o gate bloquearia algo que a tela
-        // mostra como uma parada só, e o motorista não teria como entender.
-        const ordenados = [...allServices].sort(
-            (a, b) => (a.sequenceOrder ?? Number.MAX_SAFE_INTEGER) - (b.sequenceOrder ?? Number.MAX_SAFE_INTEGER),
-        );
+        // trava o motorista na primeira nota. Usa o MESMO comparador
+        // (`getParadasOrdenadas`) que a tela do índice de notas usa — duas
+        // cópias inline já divergiram no fallback de sequenceOrder (999 vs
+        // Number.MAX_SAFE_INTEGER); se divergirem de novo, o gate bloqueia algo
+        // que a tela mostra como uma parada só, e o motorista não tem como
+        // entender.
+        const ordenados = getParadasOrdenadas(allServices);
         const grupoAtual = findGrupoDoServico(groupContiguousStops(ordenados), currentServiceId);
         // Sem grupo (serviço ainda não carregado na lista da rota) → só ele mesmo,
         // que é exatamente o comportamento anterior à Camada 2.

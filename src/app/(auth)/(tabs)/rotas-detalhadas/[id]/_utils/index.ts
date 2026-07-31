@@ -16,7 +16,7 @@ export {
     PARADA_STATUS_COLORS,
     PARADA_STATUS_LABELS,
     SERVICE_TYPE_LABELS,
-    
+
     // Funções de mapeamento
     getServiceTypeLabel,
     getParadaStatus,
@@ -26,6 +26,8 @@ export {
     getRotaStatus,
     mapGrupoToParada,
     mapServiceToParada,
+    pathForServiceType,
+    type StopServiceRoutePath,
 
     // Funções de verificação
     isParadaAtiva,
@@ -42,10 +44,11 @@ export {
     
     // Funções de ordenação
     getParadasOrdenadas,
-    
+
     // Funções de mapeamento
     mapServicesToParadas,
-    
+    resolvePedidosDaParada,
+
     // Funções de cálculo de progresso
     calculateProgress,
     calculateProgressFromParadas,

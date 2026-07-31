@@ -2,7 +2,9 @@ import type { ServiceResponse } from '@/domain/agility/service/dto'
 import { ServiceType } from '@/domain/agility/service/dto/types'
 
 import type { Parada } from '../../_types/rota.types'
-import { findOutrasParadas, hasMultipleParadasEmAndamento, mapServicesToParadas } from '../routeCalculations'
+import { findOutrasParadas, getParadasOrdenadas, hasMultipleParadasEmAndamento, mapServicesToParadas, resolvePedidosDaParada } from '../routeCalculations'
+import { pathForServiceType } from '../statusMappers'
+import { findGrupoDoServico, groupContiguousStops } from '../stopGrouping'
 
 function parada(over: Partial<Parada> & { serviceId: string }): Parada {
     return {
@@ -168,6 +170,60 @@ describe('janela de tempo da parada (§3.4)', () => {
         ])
         expect(parada.promisedStartISO).toBeNull()
         expect(parada.promisedEndISO).toBe('2026-07-30T12:00:00.000Z')
+    })
+})
+
+describe('resolvePedidosDaParada — fonte única entre a tela (índice de notas) e o gate de "uma por vez"', () => {
+    it('devolve o grupo contíguo inteiro para qualquer id-membro (5 notas na mesma porta → todas as 5, seja qual for o id perguntado)', () => {
+        const services = [0, 1, 2, 3, 4].map((i) => pedido({ id: `n${i}`, sequenceOrder: i }))
+
+        for (const alvo of services) {
+            expect(resolvePedidosDaParada(services, alvo.id).map((s) => s.id)).toEqual(['n0', 'n1', 'n2', 'n3', 'n4'])
+        }
+    })
+
+    it('serviceId desconhecido → []', () => {
+        const services = [pedido({ id: 'a', sequenceOrder: 0 })]
+        expect(resolvePedidosDaParada(services, 'zzz')).toEqual([])
+    })
+
+    it('paridade: o grupo que a tela vê é IDÊNTICO ao que o gate de "uma por vez" vê, mesmo com sequenceOrder nulo misturado a numerado', () => {
+        // Antes desta correção, a tela (index.tsx) e o gate (useStopStatus)
+        // ordenavam com fallbacks DIFERENTES para pedido sem sequenceOrder (999
+        // vs Number.MAX_SAFE_INTEGER) — duas fontes podiam discordar sobre o que
+        // é "uma parada". Este teste fixa que os dois lados passam pelo MESMO
+        // `getParadasOrdenadas`: resolvePedidosDaParada (usado pela tela) contra
+        // a composição order→group→find que o gate usa internamente.
+        const services = [
+            pedido({ id: 'a', sequenceOrder: 2 }),
+            pedido({ id: 'b', sequenceOrder: null }),
+            pedido({ id: 'c', sequenceOrder: 1 }),
+        ]
+
+        const daTela = resolvePedidosDaParada(services, 'b').map((s) => s.id)
+        const doGate = (findGrupoDoServico(groupContiguousStops(getParadasOrdenadas(services)), 'b') ?? []).map((s) => s.id)
+
+        expect(daTela).toEqual(doGate)
+        expect(daTela).toEqual(['c', 'a', 'b'])
+    })
+})
+
+describe('pathForServiceType', () => {
+    it('DELIVERY → tela de entrega', () => {
+        expect(pathForServiceType(ServiceType.DELIVERY)).toBe('/rotas-detalhadas/[id]/parada/[pid]/entrega')
+    })
+
+    it('PICKUP → tela de coleta', () => {
+        expect(pathForServiceType(ServiceType.PICKUP)).toBe('/rotas-detalhadas/[id]/parada/[pid]/coleta')
+    })
+
+    it('SERVICE → tela de serviço', () => {
+        expect(pathForServiceType(ServiceType.SERVICE)).toBe('/rotas-detalhadas/[id]/parada/[pid]/service')
+    })
+
+    it('tipo desconhecido/nulo → default de entrega (mesmo fallback do índice de notas)', () => {
+        expect(pathForServiceType(null)).toBe('/rotas-detalhadas/[id]/parada/[pid]/entrega')
+        expect(pathForServiceType('QUALQUER_OUTRO')).toBe('/rotas-detalhadas/[id]/parada/[pid]/entrega')
     })
 })
 

@@ -79,6 +79,29 @@ export function getServiceTypeLabel(serviceType: ServiceType | string | null | u
     return SERVICE_TYPE_LABELS[serviceType] ?? serviceType
 }
 
+/** Rotas do fluxo por-pedido que o índice de notas (Task 5) e o auto-redirect da tela da parada abrem. */
+export type StopServiceRoutePath =
+    | '/rotas-detalhadas/[id]/parada/[pid]/entrega'
+    | '/rotas-detalhadas/[id]/parada/[pid]/coleta'
+    | '/rotas-detalhadas/[id]/parada/[pid]/service'
+
+/**
+ * Mapeia o tipo do serviço para a rota do fluxo por-pedido (DELIVERY/PICKUP/
+ * SERVICE). TRANSFER e RETURN não passam por aqui — `stopKeyOf` nunca os
+ * agrupa (são sempre `solo:`), então uma parada agrupada (N>1) nunca tem
+ * esses tipos; o default de DELIVERY cobre esse caso e qualquer tipo
+ * desconhecido.
+ */
+export function pathForServiceType(serviceType: ServiceType | string | null | undefined): StopServiceRoutePath {
+    if (serviceType === ServiceType.PICKUP) {
+        return '/rotas-detalhadas/[id]/parada/[pid]/coleta'
+    }
+    if (serviceType === ServiceType.SERVICE) {
+        return '/rotas-detalhadas/[id]/parada/[pid]/service'
+    }
+    return '/rotas-detalhadas/[id]/parada/[pid]/entrega'
+}
+
 /**
  * Determina o status da parada baseado nos campos booleanos do serviço
  * 

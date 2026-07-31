@@ -19,7 +19,7 @@ import { formatHHmm } from '@/functions';
 import { measure } from '@/theme';
 
 import { TransferOrderList } from '../../_components/TransferOrderList';
-import { findGrupoDoServico, groupContiguousStops, mapGrupoToParada, getParadaStatusLabel } from '../../_utils';
+import { mapGrupoToParada, getParadaStatusLabel, pathForServiceType, resolvePedidosDaParada } from '../../_utils';
 
 import { EquipmentList, StopActions, StopTabs } from './_components';
 import { Map } from './_components/shared/Map';
@@ -46,14 +46,13 @@ export default function StopDetailScreen() {
   const serviceFromList = allServices.find((s) => s.id === serviceId);
   const addressFromList = serviceFromList?.address ?? null;
 
-  // Pedidos DESTA parada (mesma porta, contíguos). Mesma função que monta a lista
-  // da rota e que o gate de "uma por vez" usa — as três precisam concordar.
-  const pedidosDaParada = useMemo(() => {
-    const ordenados = [...allServices].sort(
-      (a, b) => (a.sequenceOrder ?? 999) - (b.sequenceOrder ?? 999),
-    );
-    return findGrupoDoServico(groupContiguousStops(ordenados), serviceId) ?? [];
-  }, [allServices, serviceId]);
+  // Pedidos DESTA parada (mesma porta, contíguos). Mesma função (`resolvePedidosDaParada`,
+  // que por sua vez usa `getParadasOrdenadas`) que o gate de "uma por vez" (useStopStatus)
+  // usa — as duas precisam concordar sobre o que é "uma parada".
+  const pedidosDaParada = useMemo(
+    () => resolvePedidosDaParada(allServices, serviceId),
+    [allServices, serviceId],
+  );
 
   const isParadaAgrupada = pedidosDaParada.length > 1;
 
@@ -439,15 +438,12 @@ export default function StopDetailScreen() {
   );
 
   if (isParadaAgrupada) {
-    // Rota do fluxo de entrega/coleta/serviço de cada nota — MESMO mapa do
-    // useEffect de auto-redirect acima. O grupo é sempre homogêneo em tipo
-    // (o tipo entra na chave de agrupamento), então basta olhar o tipo do
-    // serviço corrente uma vez.
-    const rotaDaNota = service.serviceType === ServiceType.PICKUP
-      ? '/rotas-detalhadas/[id]/parada/[pid]/coleta'
-      : service.serviceType === ServiceType.SERVICE
-        ? '/rotas-detalhadas/[id]/parada/[pid]/service'
-        : '/rotas-detalhadas/[id]/parada/[pid]/entrega';
+    // Rota do fluxo de entrega/coleta/serviço de cada nota — MESMO mapa
+    // (`pathForServiceType`) do useEffect de auto-redirect acima para
+    // DELIVERY/PICKUP/SERVICE. O grupo é sempre homogêneo em tipo (o tipo
+    // entra na chave de agrupamento), então basta olhar o tipo do serviço
+    // corrente uma vez.
+    const rotaDaNota = pathForServiceType(service.serviceType);
 
     return (
       <ScreenBase
