@@ -46,15 +46,28 @@ export function useDestinoAposNota(
             // mantém as duas rotas de entrada (lista → índice, nota → índice)
             // consistentes.
             const representanteId = pedidosDaParada[0]?.id ?? notaAtualId;
-            // `replace`, não `push`: o motorista JÁ VEIO do índice — ele o
-            // empilhou ao abrir esta nota (`handleOpenNota`, em
-            // `parada/[pid]/index.tsx`). Empilhar outro índice por cima faria a
-            // pilha crescer 1 nível por nota fechada (4 notas = 4 índices
-            // empilhados até a rota), tornando o botão "voltar" do device uma
-            // viagem por telas de notas já concluídas. `replace` troca a tela da
-            // nota (agora terminal, sem mais função) pelo índice atualizado, sem
-            // aumentar a profundidade da pilha.
-            router.replace({
+            // `dismissTo`, não `push` nem `replace`: o índice já está NA PILHA —
+            // o motorista o empilhou ao abrir esta nota (`handleOpenNota`, em
+            // `parada/[pid]/index.tsx`) — mas a profundidade até lá VARIA por
+            // tela. `entrega`/`coleta`/`service` são empilhadas direto sobre o
+            // índice (1 nível: [..., índice, nota]), mas `insucesso` pode estar
+            // 3 níveis abaixo, porque o caminho até ela passa por
+            // `nao-realizado` (`entrega/_components/.../EtapaConfirmacao.tsx` →
+            // push `nao-realizado` → push `insucesso`): [..., índice, nota,
+            // nao-realizado, insucesso]. `replace` só troca o frame ATUAL pelo
+            // índice — o índice original de baixo continua na pilha, então cada
+            // nota fechada empilharia mais um índice por cima (4 notas = 4
+            // índices sobrepostos até a rota, o mesmo amontoado que esta task
+            // existe pra evitar). `push` teria o mesmo problema, pior.
+            // `dismissTo` resolve os dois formatos de uma vez: ele DESEMPILHA
+            // (`POP_TO`, via React Navigation) até encontrar uma tela já
+            // existente com esse pathname na pilha — não importa se está 1 ou 3
+            // níveis abaixo — e só atualiza os params dela; nada novo é
+            // empilhado. Se por algum motivo o índice não estiver na pilha
+            // (ex.: deep link direto pra uma nota, sem passar pelo índice
+            // antes), a própria API cai para `replace` como fallback — degrada
+            // para o comportamento antigo em vez de quebrar.
+            router.dismissTo({
                 pathname: '/rotas-detalhadas/[id]/parada/[pid]',
                 params: { id: rotaId, pid: representanteId },
             });

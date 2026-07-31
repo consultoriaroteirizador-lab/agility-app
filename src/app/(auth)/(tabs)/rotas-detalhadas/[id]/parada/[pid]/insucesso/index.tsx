@@ -57,6 +57,13 @@ export default function FalhaScreen() {
     getUploadedPhotoUrls,
   } = useInsucessoDraft(serviceId);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // Vira `true` quando o insucesso foi registrado com sucesso — dispara o
+  // `useEffect` abaixo que navega. Ver comentário no `useEffect`: só um FLAG
+  // aqui, não o `setTimeout`/navegação direto no `onSuccess` da mutation,
+  // porque a decisão de PARA ONDE ir depende de `pedidosDaParada` (via
+  // `navegarAposFecharNota`), e esse dado só fica atualizado depois do
+  // `refetchQueries` — que roda DEPOIS deste `onSuccess` retornar, não antes.
+  const [insucessoRegistrado, setInsucessoRegistrado] = useState(false);
 
   const { reasons, isLoading: isLoadingReasons, isError: isReasonsError } = useFindOccurrenceReasons('LAST_MILE');
   const [mirror, setMirror] = useState<OrderOccurrenceReasonResponse[]>([]);
@@ -97,12 +104,15 @@ export default function FalhaScreen() {
       // Aguardar refetch explícito para garantir que os dados sejam atualizados
       await queryClient.refetchQueries({ queryKey: [KEY_SERVICES, 'routing', rotaId] });
 
-      // Navegar após atualizar os dados — Task 5: índice da parada (a porta
-      // ainda tem outra nota por trabalhar) ou lista de paradas da rota (era a
-      // última nota). Pequeno delay para garantir que a UI seja atualizada.
-      setTimeout(() => {
-        navegarAposFecharNota();
-      }, 500);
+      // NÃO navega aqui. `navegarAposFecharNota` foi capturado no closure
+      // desta função no RENDER em que a mutation foi disparada — o `await`
+      // acima atualiza o cache do react-query e pode re-renderizar o
+      // componente com um `pedidosDaParada`/`navegarAposFecharNota` NOVOS, mas
+      // este `onSuccess` já em execução continua com a versão VELHA no
+      // closure. Chamar `navegarAposFecharNota()` diretamente aqui decidiria
+      // com dado pré-refetch. Em vez disso, só sinaliza — o `useEffect`
+      // abaixo roda no próximo render (já com o hook atualizado) e decide lá.
+      setInsucessoRegistrado(true);
     },
     onError: (error) => {
       setIsSubmitting(false);
@@ -110,6 +120,25 @@ export default function FalhaScreen() {
       showToast({ message: 'Não foi possível marcar o serviço como insucesso. Tente novamente.', type: 'error' });
     },
   });
+
+  // Navegar após o insucesso ser registrado — Task 5: índice da parada (a
+  // porta ainda tem outra nota por trabalhar) ou lista de paradas da rota
+  // (era a última nota). MESMO padrão reativo que `entrega`/`coleta`/
+  // `service` usam para o próprio redirect de sucesso: a decisão mora aqui,
+  // não dentro do `onSuccess` da mutation (comentário acima), porque
+  // `navegarAposFecharNota` está nas dependências — se `pedidosDaParada`
+  // mudar (o refetch do `onSuccess` chegando, ou qualquer outro motivo)
+  // enquanto este efeito ainda não disparou, o cleanup cancela o timer velho
+  // e um novo roda com a closure fresca. Pequeno delay para dar tempo da UI
+  // (toast) aparecer antes de sair da tela.
+  useEffect(() => {
+    if (insucessoRegistrado) {
+      const timer = setTimeout(() => {
+        navegarAposFecharNota();
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [insucessoRegistrado, navegarAposFecharNota]);
 
   // Solicitar permissões de mídia
   useEffect(() => {
