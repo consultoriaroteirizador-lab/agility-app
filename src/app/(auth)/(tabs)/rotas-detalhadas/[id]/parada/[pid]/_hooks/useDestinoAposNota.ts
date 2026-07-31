@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 
 import { useRouter } from 'expo-router';
 
@@ -36,8 +36,30 @@ export function useDestinoAposNota(
 ) {
     const router = useRouter();
 
+    // A função devolvida tem IDENTIDADE ESTÁVEL (deps `[router]`, que o
+    // expo-router mantém estável) e lê os dados frescos deste ref na hora em que
+    // é CHAMADA. Não é preciosismo — é correção de um bug real:
+    //
+    // As quatro telas de fechamento armam o redirect num `useEffect` que tem
+    // esta função nas dependências. A tela de uma nota JÁ CONCLUÍDA continua
+    // montada (o destino final é `push`, que empilha por cima em vez de
+    // substituir). Enquanto a identidade mudava a cada refetch da lista da rota
+    // — `pedidosDaParada` é um array novo a cada resposta —, aquela tela zumbi
+    // re-armava o timer e navegava DE NOVO, arrastando o motorista para fora da
+    // tela em que ele estava. Provado por log em 31/07/2026: `destinoAposNota`
+    // chamado com o id da nota anterior enquanto o motorista estava em OUTRA
+    // parada, três vezes seguidas.
+    //
+    // O efeito original (antes da Task 5) dependia só de valores estáveis e por
+    // isso disparava UMA vez. O ref devolve essa propriedade sem abrir mão de
+    // decidir com o dado mais recente.
+    const dadosRef = useRef({ pedidosDaParada, notaAtualId, rotaId, router });
+    dadosRef.current = { pedidosDaParada, notaAtualId, rotaId, router };
+
     return useCallback(() => {
-        if (temOutraNotaPorTrabalhar(pedidosDaParada, notaAtualId)) {
+        const { pedidosDaParada: pedidos, notaAtualId: notaId, rotaId: rota, router: nav } = dadosRef.current;
+
+        if (temOutraNotaPorTrabalhar(pedidos, notaId)) {
             // Representante do grupo (`pedidos[0]`) — mesma convenção que a lista
             // da rota usa para abrir uma parada (`mapGrupoToParada` numera pelo
             // grupo; `useParadaNavigation.navigateToStop` navega com
@@ -45,7 +67,7 @@ export function useDestinoAposNota(
             // partir de QUALQUER id membro, mas usar sempre o representante
             // mantém as duas rotas de entrada (lista → índice, nota → índice)
             // consistentes.
-            const representanteId = pedidosDaParada[0]?.id ?? notaAtualId;
+            const representanteId = pedidos[0]?.id ?? notaId;
             // `dismissTo`, não `push` nem `replace`: o índice já está NA PILHA —
             // o motorista o empilhou ao abrir esta nota (`handleOpenNota`, em
             // `parada/[pid]/index.tsx`) — mas a profundidade até lá VARIA por
@@ -67,9 +89,9 @@ export function useDestinoAposNota(
             // (ex.: deep link direto pra uma nota, sem passar pelo índice
             // antes), a própria API cai para `replace` como fallback — degrada
             // para o comportamento antigo em vez de quebrar.
-            router.dismissTo({
+            nav.dismissTo({
                 pathname: '/rotas-detalhadas/[id]/parada/[pid]',
-                params: { id: rotaId, pid: representanteId },
+                params: { id: rota, pid: representanteId },
             });
             return;
         }
@@ -77,6 +99,9 @@ export function useDestinoAposNota(
         // Última nota da porta: comportamento de hoje, intocado. Aqui o `push`
         // original já fazia sentido (sai do fluxo da parada para a lista da
         // rota, uma tela "de cima" na hierarquia) — mantido como estava.
-        router.push(`/(auth)/(tabs)/rotas-detalhadas/${rotaId}`);
-    }, [pedidosDaParada, notaAtualId, rotaId, router]);
+        nav.push(`/(auth)/(tabs)/rotas-detalhadas/${rota}`);
+    // Sem dependências de propósito: TUDO vem do ref, então a identidade nunca
+    // muda e o efeito que arma o redirect não re-arma. Ver o bloco acima.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 }
