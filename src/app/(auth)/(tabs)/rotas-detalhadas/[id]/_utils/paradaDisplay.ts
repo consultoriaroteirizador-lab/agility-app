@@ -167,6 +167,40 @@ export function resolveParadaAtendidaElegivel(pedidos: ServiceResponse[]): boole
     return !resolveTemEtapaPropriaAntesDoAtendimento(pedidos) && resolveParadaAtendida(pedidos)
 }
 
+/**
+ * A porta ainda tem OUTRA nota por trabalhar, depois de fechar `notaAtualId`
+ * (entrega, coleta, serviço ou insucesso) — Task 5.
+ *
+ * **Cuidado com o cache**: a nota que acabou de fechar pode ainda não estar
+ * terminal nesta lista em memória (o refetch que traria o status novo pode
+ * não ter chegado). Por isso `notaAtualId` é SEMPRE excluído da checagem —
+ * a decisão olha só para as OUTRAS notas do grupo, nunca depende de a
+ * corrente já ter virado terminal. Sem essa exclusão explícita, a nota que
+ * acabou de fechar contaria como "por trabalhar" enquanto o cache não
+ * atualizasse, e o motorista nunca sairia da porta.
+ *
+ * Terminal = `COMPLETED`/`CANCELED`/`FAILED` (flags booleanas com fallback de
+ * `status`, mesmo critério de `resolveParadaAtendida`/`useStopStatus`
+ * acima). Pendente e em atendimento contam como "por trabalhar".
+ *
+ * Parada de UMA nota devolve `false` naturalmente: sem outra nota na lista,
+ * não há nada além da corrente (que é sempre excluída) — o motorista volta
+ * para a lista de paradas da rota, comportamento de hoje.
+ */
+export function temOutraNotaPorTrabalhar(pedidos: ServiceResponse[], notaAtualId: string): boolean {
+    return pedidos.some((pedido) => {
+        if (pedido.id === notaAtualId) return false
+        const terminal =
+            pedido.isCompleted === true ||
+            pedido.isCanceled === true ||
+            pedido.isFailed === true ||
+            pedido.status === ServiceStatus.COMPLETED ||
+            pedido.status === ServiceStatus.CANCELED ||
+            pedido.status === ServiceStatus.FAILED
+        return !terminal
+    })
+}
+
 /** Campos do pedido que identificam a nota para quem está no balcão. */
 export interface NotaFiscalInput {
     /** Número da NOTA FISCAL do pedido. */

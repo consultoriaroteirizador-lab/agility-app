@@ -1,27 +1,28 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ScrollView, Image as RNImage, Platform } from 'react-native';
 
 import { useQueryClient } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 
 import { Box, Button, Text, TouchableOpacityBox, ActivityIndicator, ScreenBase, Input } from '@/components';
 import { ButtonBack } from '@/components/Button/ButtonBack';
 import type { OrderOccurrenceReasonResponse } from '@/domain/agility/order-occurrence-reason/dto';
 import { useFindOccurrenceReasons } from '@/domain/agility/order-occurrence-reason/useCase';
 import type { ApplyOccurrenceRequest } from '@/domain/agility/service/dto';
-import { useFindOneService, useRegisterOccurrence } from '@/domain/agility/service/useCase';
+import { useFindOneService, useFindServicesByRoutingId, useRegisterOccurrence } from '@/domain/agility/service/useCase';
 import { KEY_SERVICES } from '@/domain/queryKeys';
 import { loadOccurrenceReasonsMirror } from '@/services/storage/occurrenceReasonsStorage';
 import { useToastService } from '@/services/Toast/useToast';
 import { measure } from '@/theme';
 
+import { resolvePedidosDaParada } from '../../../_utils';
+import { useDestinoAposNota } from '../_hooks/useDestinoAposNota';
 import { useInsucessoDraft } from '../_hooks/useInsucessoDraft';
 
 import { occurrenceOutcomeMessage } from './occurrenceOutcome';
 
 export default function FalhaScreen() {
-  const router = useRouter();
   const queryClient = useQueryClient();
   const { id, pid } = useLocalSearchParams<{ id: string; pid: string }>();
   const rotaId = id as string;
@@ -29,6 +30,21 @@ export default function FalhaScreen() {
   const { showToast } = useToastService();
 
   const { service, isLoading: isLoadingService } = useFindOneService(serviceId || '');
+
+  // Pedidos da MESMA PARADA que este serviço (Camada 2/3) — esta tela não tem
+  // `ParadaProvider` (ver comentário em `useInsucessoDraft.ts`: "tela isolada,
+  // sem ParadaProvider"), então busca a lista da rota e monta o grupo com a
+  // MESMA função (`resolvePedidosDaParada`) que `ParadaContext` usa por baixo
+  // — não uma derivação nova, só o mesmo dado buscado localmente. Precisa
+  // disso para saber, ao registrar o insucesso, se a porta ainda tem outra
+  // nota por trabalhar (Task 5, `useDestinoAposNota`).
+  const { services: routeServices } = useFindServicesByRoutingId(service?.routingId || rotaId || '');
+  const pedidosDaParada = useMemo(
+    () => resolvePedidosDaParada(routeServices, serviceId),
+    [routeServices, serviceId],
+  );
+  const navegarAposFecharNota = useDestinoAposNota(pedidosDaParada, serviceId, rotaId);
+
   const {
     selectedReason,
     setSelectedReason,
@@ -81,10 +97,11 @@ export default function FalhaScreen() {
       // Aguardar refetch explícito para garantir que os dados sejam atualizados
       await queryClient.refetchQueries({ queryKey: [KEY_SERVICES, 'routing', rotaId] });
 
-      // Navegar de volta para a rota após atualizar os dados
-      // Pequeno delay para garantir que a UI seja atualizada
+      // Navegar após atualizar os dados — Task 5: índice da parada (a porta
+      // ainda tem outra nota por trabalhar) ou lista de paradas da rota (era a
+      // última nota). Pequeno delay para garantir que a UI seja atualizada.
       setTimeout(() => {
-        router.push(`/(auth)/(tabs)/rotas-detalhadas/${rotaId}`);
+        navegarAposFecharNota();
       }, 500);
     },
     onError: (error) => {

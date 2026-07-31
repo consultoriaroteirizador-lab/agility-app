@@ -19,6 +19,7 @@ import {
     resolveParadaAtendidaElegivel,
     resolveProgressoTexto,
     resolveTemEtapaPropriaAntesDoAtendimento,
+    temOutraNotaPorTrabalhar,
 } from '../paradaDisplay'
 import type { ParadaCountResult } from '../routeCalculations'
 
@@ -265,6 +266,58 @@ describe('resolveParadaAtendidaElegivel — composição usada por ParadaContext
 
     it('lista vazia → false', () => {
         expect(resolveParadaAtendidaElegivel([])).toBe(false)
+    })
+})
+
+describe('temOutraNotaPorTrabalhar — a porta ainda tem outra nota, ignorando a que acabou de fechar (Task 5)', () => {
+    // Cuidado com o cache (§ da task): a nota que acabou de fechar pode ainda
+    // NÃO estar terminal na lista em memória (o refetch pode não ter chegado
+    // ainda). Por isso `notaAtualId` é SEMPRE excluído da checagem — a decisão
+    // olha só para as outras notas, nunca para o próprio status da corrente.
+
+    it('parada de 1 nota (só a atual) → false — nenhuma outra nota', () => {
+        expect(temOutraNotaPorTrabalhar([nota({ id: 'a' })], 'a')).toBe(false)
+    })
+
+    it('outra nota PENDENTE → true', () => {
+        expect(temOutraNotaPorTrabalhar([
+            nota({ id: 'a', isCompleted: true }),
+            nota({ id: 'b' }),
+        ], 'a')).toBe(true)
+    })
+
+    it('outra nota EM ATENDIMENTO → true', () => {
+        expect(temOutraNotaPorTrabalhar([
+            nota({ id: 'a', isCompleted: true }),
+            nota({ id: 'b', isInAttendance: true }),
+        ], 'a')).toBe(true)
+    })
+
+    it('outras notas TODAS terminais (entregue + insucesso) → false', () => {
+        expect(temOutraNotaPorTrabalhar([
+            nota({ id: 'a', isCompleted: true }),
+            nota({ id: 'b', isCompleted: true }),
+            nota({ id: 'c', isFailed: true }),
+        ], 'a')).toBe(false)
+    })
+
+    it('lista vazia → false', () => {
+        expect(temOutraNotaPorTrabalhar([], 'a')).toBe(false)
+    })
+
+    it('a nota ATUAL ainda não-terminal na lista (cache atrasado) NÃO conta como "outra" — é ela mesma', () => {
+        // `a` (a nota que acabou de fechar) ainda aparece PENDING na lista em
+        // memória — o refetch que traria o status novo não chegou. Sem
+        // exclusão explícita por id, isto contaria como "por trabalhar" e o
+        // motorista nunca sairia da porta.
+        expect(temOutraNotaPorTrabalhar([nota({ id: 'a' })], 'a')).toBe(false)
+    })
+
+    it('outra nota terminal via `status` (sem a flag isCompleted) também conta como terminal — mesmo fallback do resto do código', () => {
+        expect(temOutraNotaPorTrabalhar([
+            nota({ id: 'a', isCompleted: true }),
+            nota({ id: 'b', status: ServiceStatus.COMPLETED }),
+        ], 'a')).toBe(false)
     })
 })
 

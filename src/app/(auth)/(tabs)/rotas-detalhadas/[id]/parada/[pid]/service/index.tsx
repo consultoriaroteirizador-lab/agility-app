@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 
 import { Box, ActivityIndicator, Text } from '@/components';
 import { measure } from '@/theme';
@@ -12,14 +12,15 @@ import { SharedEtapaFinalizacao } from '../_components/shared/SharedEtapaFinaliz
 import { SharedEtapaFormulario } from '../_components/shared/SharedEtapaFormulario';
 import { SharedEtapaRecebedor } from '../_components/shared/SharedEtapaRecebedor';
 import { ParadaProvider, useParada } from '../_context/ParadaContext';
+import { useDestinoAposNota } from '../_hooks/useDestinoAposNota';
 
 /**
  * Orchestrator do service - gerencia qual etapa exibir
  */
 function ServiceOrchestrator() {
-    const router = useRouter();
     const {
         rotaId,
+        serviceId,
         service,
         etapa,
         isServiceStarted,
@@ -32,7 +33,13 @@ function ServiceOrchestrator() {
         fetchMaterials,
         hasFormGroups,
         formCompleted,
+        pedidosDaParada,
     } = useParada();
+
+    // Task 5: para onde ir depois de fechar ESTA nota — índice da parada (se a
+    // porta ainda tem outra nota por trabalhar) ou lista de paradas da rota
+    // (se era a última, comportamento de hoje). Ver `useDestinoAposNota`.
+    const navegarAposFecharNota = useDestinoAposNota(pedidosDaParada, serviceId, rotaId);
 
     // Serviço já finalizado → tela read-only (não reabre o fluxo de execução).
     const isServiceFinalized =
@@ -48,15 +55,16 @@ function ServiceOrchestrator() {
         }
     }, [isLoading, materialsState.materials.length, materialsState.loading, fetchMaterials]);
 
-    // Redirecionar após sucesso
+    // Redirecionar após sucesso — Task 5: índice da parada (outra nota por
+    // trabalhar) ou lista de paradas da rota (era a última).
     useEffect(() => {
         if (showSuccess) {
             const timer = setTimeout(() => {
-                router.push(`/(auth)/(tabs)/rotas-detalhadas/${rotaId}`);
+                navegarAposFecharNota();
             }, 2500);
             return () => clearTimeout(timer);
         }
-    }, [showSuccess, router, rotaId]);
+    }, [showSuccess, navegarAposFecharNota]);
 
     // Loading
     if (isLoading) {
