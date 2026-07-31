@@ -262,4 +262,36 @@ describe('contagem de paradas e de notas', () => {
         expect(comLedger.notasTotal).toBe(2)
         expect(comLedger.notasConcluidas).toBe(2)
     })
+
+    it('parada concluída sem `pedidos` usa o status da própria parada como fallback: 1 de 1 nota, não 0 de 1', () => {
+        // parada() não popula `pedidos` com itens (fica []), simulando dado que não
+        // carrega o campo. O numerador (notasConcluidas) precisa concordar com o
+        // denominador (notasTotal) sobre o que "1 nota" significa aqui — senão o
+        // "X de Y notas" que o cliente lê mente sem erro nenhum.
+        const p = parada({ serviceId: 'sem-pedidos', status: 'concluida-sucesso' })
+        const contagem = countParadasByStatus([p])
+        expect(contagem.notasTotal).toBe(1)
+        expect(contagem.notasConcluidas).toBe(1)
+    })
+
+    it('parada pendente sem `pedidos` conta 1 nota no total mas 0 concluída', () => {
+        const p = parada({ serviceId: 'sem-pedidos-pendente', status: 'pendente' })
+        const contagem = countParadasByStatus([p])
+        expect(contagem.notasTotal).toBe(1)
+        expect(contagem.notasConcluidas).toBe(0)
+    })
+
+    it('nota cancelada conta como concluída no numerador', () => {
+        const paradas = mapServicesToParadas([
+            pedido({ id: 'c0', sequenceOrder: 0, isCanceled: true, isPending: false, status: 'CANCELED' }),
+        ])
+        expect(countParadasByStatus(paradas).notasConcluidas).toBe(1)
+    })
+
+    it('nota com insucesso (isFailed) conta como concluída no numerador', () => {
+        const paradas = mapServicesToParadas([
+            pedido({ id: 'f0', sequenceOrder: 0, isFailed: true, isPending: false, status: 'FAILED' }),
+        ])
+        expect(countParadasByStatus(paradas).notasConcluidas).toBe(1)
+    })
 })

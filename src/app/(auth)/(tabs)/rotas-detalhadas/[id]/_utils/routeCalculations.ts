@@ -15,7 +15,7 @@ import type {
     RotaTabType,
 } from '../_types/rota.types'
 
-import { mapGrupoToParada } from './statusMappers'
+import { isParadaConcluida, mapGrupoToParada } from './statusMappers'
 import { contarChavesRepetidas, findGrupoDoServico, groupContiguousStops } from './stopGrouping'
 
 // ============================================
@@ -193,11 +193,18 @@ export function countParadasByStatus(paradas: Parada[]): ParadaCountResult {
     }
 
     for (const parada of paradas) {
+        // O numerador (notasConcluidas) e o denominador (notasTotal) precisam
+        // concordar sobre o que "1 nota" significa quando `pedidos` está ausente
+        // — se o denominador cai para 1 (a própria parada) mas o numerador
+        // continua filtrando um array vazio (sempre 0), a parada concluída
+        // reporta "0 de 1" e o "X de Y notas" que o cliente lê mente sem erro
+        // nenhum. No fallback, deriva-se a nota única do status da própria
+        // parada com o mesmo `isParadaConcluida` que decide `concluidas` acima.
         const pedidos = parada.pedidos ?? []
         result.notasTotal += pedidos.length || 1
-        result.notasConcluidas += pedidos.filter(
-            (p) => p.isCompleted === true || p.isCanceled === true || p.isFailed === true,
-        ).length
+        result.notasConcluidas += pedidos.length
+            ? pedidos.filter((p) => p.isCompleted === true || p.isCanceled === true || p.isFailed === true).length
+            : (isParadaConcluida(parada.status) ? 1 : 0)
 
         switch (parada.status) {
             case 'pendente':
