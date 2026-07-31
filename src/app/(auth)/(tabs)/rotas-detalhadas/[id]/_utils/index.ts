@@ -107,9 +107,12 @@ export {
 // ============================================
 
 export {
+    type NotaFiscalInput,
     type NotasBadge,
     type NotasBadgeInput,
     formatNotasLabel,
+    formatResumoDaNota,
+    resolveNotaFiscalLabel,
     resolveNotasBadge,
     resolveProgressoTexto,
 } from './paradaDisplay'

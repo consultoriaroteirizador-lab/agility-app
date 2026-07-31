@@ -1,6 +1,6 @@
 import { Box, Text } from '@/components';
 
-import type { Parada } from '../_types/rota.types';
+import type { Parada, ParadaStatus } from '../_types/rota.types';
 
 import { TransferOrderCard, type TransferOrderOutcome } from './TransferOrderCard';
 
@@ -22,7 +22,8 @@ export function TransferOrderList({
     openLabel,
     tituloDeCard,
     subtituloDeCard,
-    badgeDeCard,
+    notaFiscalDeCard,
+    statusDeCard,
 }: {
     paradas: Parada[];
     outcomes?: Record<string, TransferOrderOutcome>;
@@ -34,7 +35,10 @@ export function TransferOrderList({
     openLabel?: string;
     tituloDeCard?: (parada: Parada, index: number) => string;
     subtituloDeCard?: (parada: Parada, index: number) => string | undefined;
-    badgeDeCard?: (parada: Parada, index: number) => string | undefined;
+    /** Nota fiscal de cada card — o número que o motorista casa com o papel. */
+    notaFiscalDeCard?: (parada: Parada, index: number) => string | null;
+    /** Status de cada card, para o selo colorido. */
+    statusDeCard?: (parada: Parada, index: number) => ParadaStatus;
 }) {
     return (
         <Box gap="y8">
@@ -51,7 +55,8 @@ export function TransferOrderList({
                     outcome={outcomes?.[parada.serviceId]}
                     titulo={tituloDeCard?.(parada, index)}
                     subtitulo={subtituloDeCard?.(parada, index)}
-                    badge={badgeDeCard?.(parada, index)}
+                    notaFiscal={notaFiscalDeCard?.(parada, index)}
+                    status={statusDeCard?.(parada, index)}
                     onOpen={onOpen ? () => onOpen(parada.serviceId) : undefined}
                     openLabel={openLabel}
                     onMarkNotReceived={onMarkNotReceived ? () => onMarkNotReceived(parada.serviceId) : undefined}

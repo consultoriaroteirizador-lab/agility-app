@@ -10,7 +10,12 @@
 import type { ServiceResponse } from '@/domain/agility/service/dto'
 
 import type { ParadaStatus } from '../../_types/rota.types'
-import { resolveNotasBadge, resolveProgressoTexto } from '../paradaDisplay'
+import {
+    formatResumoDaNota,
+    resolveNotaFiscalLabel,
+    resolveNotasBadge,
+    resolveProgressoTexto,
+} from '../paradaDisplay'
 import type { ParadaCountResult } from '../routeCalculations'
 
 function nota(over: Partial<ServiceResponse> & { id: string }): ServiceResponse {
@@ -97,5 +102,46 @@ describe('resolveProgressoTexto — linha de progresso da rota', () => {
 
     it('rota vazia não quebra', () => {
         expect(resolveProgressoTexto(contagem({}))).toBe('0 de 0 concluídas')
+    })
+})
+
+describe('resolveNotaFiscalLabel — o número que o motorista tem no papel', () => {
+    it('usa invoicing (a nota fiscal), não o código interno do sistema', () => {
+        expect(
+            resolveNotaFiscalLabel({ invoicing: 'NF-12354', identificationCode: 'ARA-260513-1542-WMFR' }),
+        ).toBe('NF-12354')
+    })
+
+    it('prefixa NF quando o valor vem só como número', () => {
+        expect(resolveNotaFiscalLabel({ invoicing: '12354' })).toBe('NF 12354')
+    })
+
+    it('não duplica o prefixo quando o valor já o traz', () => {
+        expect(resolveNotaFiscalLabel({ invoicing: 'nf 998' })).toBe('nf 998')
+    })
+
+    it('sem nota fiscal, cai para o código interno em vez de deixar o card sem identidade', () => {
+        expect(resolveNotaFiscalLabel({ identificationCode: 'ARA-260513-1542-WMFR' }))
+            .toBe('ARA-260513-1542-WMFR')
+    })
+
+    it('não chama de NF o que não é: o código interno entra cru, sem prefixo', () => {
+        expect(resolveNotaFiscalLabel({ invoicing: null, identificationCode: '998' })).toBe('998')
+    })
+
+    it('sem nenhum dos dois → null (o card usa o ordinal da nota)', () => {
+        expect(resolveNotaFiscalLabel({})).toBeNull()
+        expect(resolveNotaFiscalLabel(null)).toBeNull()
+        expect(resolveNotaFiscalLabel({ invoicing: '   ' })).toBeNull()
+    })
+})
+
+describe('formatResumoDaNota — linha de apoio do card', () => {
+    it('junta ordinal e janela', () => {
+        expect(formatResumoDaNota(1, 2, 'Janela 08:00–12:00')).toBe('Nota 1 de 2 · Janela 08:00–12:00')
+    })
+
+    it('sem janela, fica só o ordinal', () => {
+        expect(formatResumoDaNota(2, 5)).toBe('Nota 2 de 5')
     })
 })

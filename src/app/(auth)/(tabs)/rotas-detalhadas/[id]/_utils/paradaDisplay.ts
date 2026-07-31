@@ -78,6 +78,43 @@ export function resolveNotasBadge(parada: NotasBadgeInput): NotasBadge {
     }
 }
 
+/** Campos do pedido que identificam a nota para quem está no balcão. */
+export interface NotaFiscalInput {
+    /** Número da NOTA FISCAL do pedido. */
+    invoicing?: string | null
+    /** Código interno do sistema (ex.: ARA-260513-1542-WMFR). Último recurso. */
+    identificationCode?: string | null
+}
+
+/**
+ * Identificação da nota no card do índice da parada.
+ *
+ * O motorista está no balcão com as notas de papel na mão e precisa casar papel
+ * com tela. O que casa é o número da NOTA FISCAL (`invoicing`), não o
+ * `identificationCode`, que é código interno do sistema e não aparece em lugar
+ * nenhum do papel.
+ *
+ * Quando a NF vem só como número, ganha o prefixo `NF` para o motorista saber o
+ * que está lendo — mas o prefixo NÃO é aplicado ao código interno, porque
+ * chamá-lo de nota fiscal seria mentira. Sem nenhum dos dois, devolve `null` e o
+ * card cai no ordinal ("Nota 2 de 5").
+ */
+export function resolveNotaFiscalLabel(pedido?: NotaFiscalInput | null): string | null {
+    const nf = pedido?.invoicing?.trim()
+    if (nf) {
+        return /^nf/i.test(nf) ? nf : `NF ${nf}`
+    }
+
+    const interno = pedido?.identificationCode?.trim()
+    return interno || null
+}
+
+/** Linha de apoio do card: posição da nota no grupo e, quando há, a janela dela. */
+export function formatResumoDaNota(indice: number, total: number, janela?: string | null): string {
+    const ordinal = `Nota ${indice} de ${total}`
+    return janela ? `${ordinal} · ${janela}` : ordinal
+}
+
 /**
  * Texto da linha de progresso da rota.
  *

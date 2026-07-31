@@ -19,7 +19,7 @@ import { formatHHmm } from '@/functions';
 import { measure } from '@/theme';
 
 import { TransferOrderList } from '../../_components/TransferOrderList';
-import { mapGrupoToParada, getParadaStatusLabel, pathForServiceType, resolvePedidosDaParada } from '../../_utils';
+import { formatResumoDaNota, mapGrupoToParada, pathForServiceType, resolveNotaFiscalLabel, resolvePedidosDaParada } from '../../_utils';
 
 import { EquipmentList, StopActions, StopTabs } from './_components';
 import { Map } from './_components/shared/Map';
@@ -467,18 +467,14 @@ export default function StopDetailScreen() {
             paradas={notas}
             titulo={`Notas desta parada (${notas.length})`}
             openLabel="Abrir"
-            tituloDeCard={(nota, i) => {
-              const pedido = pedidosDaParada[i];
-              return pedido?.identificationCode
-                ? `Nota ${i + 1} · #${pedido.identificationCode}`
-                : `Nota ${i + 1}`;
-            }}
-            subtituloDeCard={(nota) =>
-              nota.promisedStartISO || nota.promisedEndISO
+            notaFiscalDeCard={(nota, i) => resolveNotaFiscalLabel(pedidosDaParada[i])}
+            statusDeCard={(nota) => nota.status}
+            subtituloDeCard={(nota, i) => {
+              const janela = nota.promisedStartISO || nota.promisedEndISO
                 ? `Janela ${formatHHmm(nota.promisedStartISO)}–${formatHHmm(nota.promisedEndISO)}`
-                : undefined
-            }
-            badgeDeCard={(nota) => getParadaStatusLabel(nota.status)}
+                : null;
+              return formatResumoDaNota(i + 1, notas.length, janela);
+            }}
             onOpen={(pid) => {
               router.push({
                 pathname: rotaDaNota,

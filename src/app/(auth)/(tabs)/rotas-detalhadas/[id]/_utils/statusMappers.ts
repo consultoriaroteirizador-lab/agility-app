@@ -11,6 +11,7 @@ import { formatAddress } from '@/domain/agility/address/dto'
 import type { ServiceResponse } from '@/domain/agility/service/dto'
 import { ServiceType } from '@/domain/agility/service/dto/types'
 import { formatHHmm } from '@/functions'
+import type { StatusColorConfig } from '@/theme'
 
 import type {
     Parada,
@@ -56,6 +57,46 @@ export const PARADA_STATUS_COLORS: Record<ParadaStatus, string> = {
     'em-atendimento': 'secondary100',
     'concluida-sucesso': 'greenSuccess',
     'concluida-insucesso': 'redError',
+}
+
+/**
+ * Selo de status (fundo, texto e borda) — UM dono para a linguagem de cor.
+ *
+ * O mesmo status aparece no card da lista da rota e no card de cada nota dentro
+ * da parada agrupada. Se cada tela pintasse do seu jeito, o motorista teria que
+ * aprender duas linguagens para a mesma informação.
+ */
+export const PARADA_STATUS_CHIP: Record<ParadaStatus, StatusColorConfig> = {
+    'pendente': {
+        label: 'Pendente',
+        bgColor: 'gray100',
+        textColor: 'gray600',
+        borderColor: 'gray200',
+    },
+    'em-andamento': {
+        label: 'Em andamento',
+        bgColor: 'primary10',
+        textColor: 'primary100',
+        borderColor: 'primary100',
+    },
+    'em-atendimento': {
+        label: 'Em atendimento',
+        bgColor: 'secondary10',
+        textColor: 'secondary100',
+        borderColor: 'secondary100',
+    },
+    'concluida-sucesso': {
+        label: 'Concluída',
+        bgColor: 'tertiary10',
+        textColor: 'tertiary100',
+        borderColor: 'tertiary100',
+    },
+    'concluida-insucesso': {
+        label: 'Insucesso',
+        bgColor: 'redError',
+        textColor: 'white',
+        borderColor: 'redError',
+    },
 }
 
 // ============================================
