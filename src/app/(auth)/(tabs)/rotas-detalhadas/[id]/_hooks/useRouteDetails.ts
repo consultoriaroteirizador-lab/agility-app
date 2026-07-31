@@ -29,6 +29,7 @@ import {
     mapServicesToParadas,
     withLedgerNonDelivered,
     type InsucessoRow,
+    type ParadaCountResult,
 } from '../_utils'
 
 // ============================================
@@ -64,14 +65,7 @@ export interface UseRouteDetailsResult {
     status: RotaStatus
 
     /** Contagem de paradas por status */
-    contagem: {
-        total: number
-        pendentes: number
-        emAndamento: number
-        concluidasSucesso: number
-        concluidasInsucesso: number
-        concluidas: number
-    }
+    contagem: ParadaCountResult
 
     // ========================================
     // Paradas Derivadas

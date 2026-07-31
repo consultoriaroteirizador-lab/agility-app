@@ -37,29 +37,13 @@ import type {
     RotaStatus,
     RotaTabType,
 } from '../_types/rota.types'
-import type { InsucessoRow } from '../_utils'
+import type { InsucessoRow, ParadaCountResult } from '../_utils'
 
 // ============================================
 // TIPOS
 // ============================================
 
-/**
- * Resultado da contagem de paradas por status
- */
-export interface ParadaCountResult {
-    /** Total de paradas */
-    total: number
-    /** Paradas pendentes */
-    pendentes: number
-    /** Paradas em andamento */
-    emAndamento: number
-    /** Paradas concluídas com sucesso */
-    concluidasSucesso: number
-    /** Paradas concluídas com insucesso */
-    concluidasInsucesso: number
-    /** Total de paradas concluídas (sucesso + insucesso) */
-    concluidas: number
-}
+export type { ParadaCountResult }
 
 /**
  * Interface do Context da Rota
@@ -376,7 +360,7 @@ export function RotaProvider({ children, routeId }: RotaProviderProps) {
         // Status e progresso
         progress,
         status,
-        contagem: contagem as ParadaCountResult,
+        contagem,
 
         // Paradas derivadas
         proximaParada,

@@ -38,6 +38,10 @@ export interface ParadaCountResult {
     concluidasInsucesso: number
     /** Total de paradas concluídas (sucesso + insucesso) */
     concluidas: number
+    /** Total de NOTAS (pedidos) — a parada pode ter várias. */
+    notasTotal: number
+    /** Notas em estado terminal (entregue, cancelada ou insucesso). */
+    notasConcluidas: number
 }
 
 // ============================================
@@ -184,9 +188,17 @@ export function countParadasByStatus(paradas: Parada[]): ParadaCountResult {
         concluidasSucesso: 0,
         concluidasInsucesso: 0,
         concluidas: 0,
+        notasTotal: 0,
+        notasConcluidas: 0,
     }
 
     for (const parada of paradas) {
+        const pedidos = parada.pedidos ?? []
+        result.notasTotal += pedidos.length || 1
+        result.notasConcluidas += pedidos.filter(
+            (p) => p.isCompleted === true || p.isCanceled === true || p.isFailed === true,
+        ).length
+
         switch (parada.status) {
             case 'pendente':
                 result.pendentes++
@@ -232,6 +244,8 @@ export function withLedgerNonDelivered(
         total: base.total + ledgerOnly,
         concluidasInsucesso: base.concluidasInsucesso + ledgerOnly,
         concluidas: base.concluidas + ledgerOnly,
+        notasTotal: base.notasTotal + ledgerOnly,
+        notasConcluidas: base.notasConcluidas + ledgerOnly,
     }
 }
 

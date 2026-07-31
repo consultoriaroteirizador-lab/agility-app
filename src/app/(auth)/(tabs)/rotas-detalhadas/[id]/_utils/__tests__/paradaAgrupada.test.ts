@@ -2,7 +2,7 @@ import type { ServiceResponse } from '@/domain/agility/service/dto'
 import { ServiceType } from '@/domain/agility/service/dto/types'
 
 import type { Parada } from '../../_types/rota.types'
-import { findOutrasParadas, getParadasOrdenadas, hasMultipleParadasEmAndamento, mapServicesToParadas, resolvePedidosDaParada } from '../routeCalculations'
+import { countParadasByStatus, findOutrasParadas, getParadasOrdenadas, hasMultipleParadasEmAndamento, mapServicesToParadas, resolvePedidosDaParada, withLedgerNonDelivered } from '../routeCalculations'
 import { pathForServiceType } from '../statusMappers'
 import { findGrupoDoServico, groupContiguousStops } from '../stopGrouping'
 
@@ -237,5 +237,29 @@ describe('hasMultipleParadasEmAndamento', () => {
         ])
         expect(paradas).toHaveLength(1)
         expect(hasMultipleParadasEmAndamento(paradas)).toBe(false)
+    })
+})
+
+describe('contagem de paradas e de notas', () => {
+    it('conta paradas e notas separadamente (26 paradas, 56 notas)', () => {
+        const paradas = mapServicesToParadas([
+            pedido({ id: 'a0', sequenceOrder: 0, isCompleted: true, isPending: false, status: 'COMPLETED' }),
+            pedido({ id: 'a1', sequenceOrder: 1, isCompleted: true, isPending: false, status: 'COMPLETED' }),
+            pedido({ id: 'b0', sequenceOrder: 2, addressId: 'addr-2', customerId: 'cli-2' }),
+        ])
+        const contagem = countParadasByStatus(paradas)
+
+        expect(contagem.total).toBe(2)
+        expect(contagem.concluidas).toBe(1)
+        expect(contagem.notasTotal).toBe(3)
+        expect(contagem.notasConcluidas).toBe(2)
+    })
+
+    it('pedido que saiu da rota (ledger) conta como 1 parada e 1 nota', () => {
+        const base = countParadasByStatus([])
+        const comLedger = withLedgerNonDelivered(base, 2)
+        expect(comLedger.total).toBe(2)
+        expect(comLedger.notasTotal).toBe(2)
+        expect(comLedger.notasConcluidas).toBe(2)
     })
 })

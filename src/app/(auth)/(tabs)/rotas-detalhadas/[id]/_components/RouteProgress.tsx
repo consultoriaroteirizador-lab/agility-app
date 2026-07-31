@@ -41,8 +41,11 @@ export function RouteProgress() {
     // Calcula a porcentagem formatada
     const porcentagemFormatada = Math.round(progress)
 
-    // Texto de contagem de paradas
-    const textoContagem = `${contagem.concluidas} de ${contagem.total} concluídas`
+    // Paradas e notas são coisas diferentes: 26 portas, 56 notas. O cliente já
+    // opera com essa distinção (a planilha tem as duas colunas).
+    const textoContagem = contagem.notasTotal > contagem.total
+        ? `${contagem.concluidas} de ${contagem.total} paradas · ${contagem.notasConcluidas} de ${contagem.notasTotal} notas`
+        : `${contagem.concluidas} de ${contagem.total} concluídas`
 
     return (
         <Box marginBottom="y24">
