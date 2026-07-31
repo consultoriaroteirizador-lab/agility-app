@@ -12,8 +12,11 @@ import { ServiceType } from '@/domain/agility/service/dto/types'
 import {
     contarChavesRepetidas,
     findGrupoDoServico,
+    groupContiguousBy,
     groupContiguousStops,
+    mapPointStopKeyOf,
     stopKeyOf,
+    type MapPointKeyInput,
     type StopKeyInput,
 } from '../stopGrouping'
 
@@ -111,5 +114,34 @@ describe('contarChavesRepetidas', () => {
         const repetidas = contarChavesRepetidas(groups)
         expect(repetidas.has(stopKeyOf(svc({ id: 'a' })))).toBe(true)
         expect(repetidas.has(stopKeyOf(svc({ id: 'meio', addressId: 'addr-2', customerId: 'cli-2' })))).toBe(false)
+    })
+})
+
+describe('mapPointStopKeyOf', () => {
+    const ponto = (over: Partial<MapPointKeyInput> & { id: string }): MapPointKeyInput => ({
+        latitude: -7.2345678,
+        longitude: -39.4098765,
+        title: 'SAO LUIZ CRATO',
+        serviceType: 'DELIVERY',
+        ...over,
+    })
+
+    it('mesma coordenada e mesmo título → mesma chave', () => {
+        expect(mapPointStopKeyOf(ponto({ id: 'a' }))).toBe(mapPointStopKeyOf(ponto({ id: 'b' })))
+    })
+
+    it('coordenadas distintas → chaves distintas', () => {
+        expect(mapPointStopKeyOf(ponto({ id: 'a' })))
+            .not.toBe(mapPointStopKeyOf(ponto({ id: 'b', latitude: -7.3 })))
+    })
+
+    it('sem título não agrupa (não dá para afirmar que é o mesmo recebedor)', () => {
+        expect(mapPointStopKeyOf(ponto({ id: 'a', title: null })))
+            .not.toBe(mapPointStopKeyOf(ponto({ id: 'b', title: null })))
+    })
+
+    it('5 pontos contíguos na mesma porta → 1 pino', () => {
+        const pontos = [0, 1, 2, 3, 4].map((i) => ponto({ id: `p${i}` }))
+        expect(groupContiguousBy(pontos, mapPointStopKeyOf)).toHaveLength(1)
     })
 })

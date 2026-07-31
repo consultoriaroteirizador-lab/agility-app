@@ -123,3 +123,37 @@ export function contarChavesRepetidas(groups: StopKeyInput[][]): Set<string> {
 
     return repetidas
 }
+
+/** Ponto do mapa (`/map-data`) — payload leve, sem `addressId`/`customerId`. */
+export interface MapPointKeyInput {
+    id: string
+    latitude: number
+    longitude: number
+    title?: string | null
+    serviceType?: string | null
+}
+
+/**
+ * Chave de parada para os PONTOS DO MAPA.
+ *
+ * `/map-data` devolve um payload leve que não traz `addressId` nem `customerId`,
+ * então aqui a porta é aproximada por coordenada arredondada (5 casas ≈ 1 m) +
+ * título. É deliberadamente mais conservadora que `stopKeyOf`: sem título, não
+ * agrupa. Errar para o lado de desenhar dois pinos é melhor que fundir duas
+ * portas distintas no mapa.
+ */
+export function mapPointStopKeyOf(point: MapPointKeyInput): string {
+    if (
+        point.serviceType === ServiceType.RETURN ||
+        point.serviceType === ServiceType.TRANSFER
+    ) {
+        return `solo:${point.id}`
+    }
+
+    const titulo = point.title ? normalizar(point.title) : ''
+    if (!titulo) {
+        return `solo:${point.id}`
+    }
+
+    return `geo:${point.latitude.toFixed(5)},${point.longitude.toFixed(5)}|t:${titulo}|tipo:${point.serviceType ?? ''}`
+}

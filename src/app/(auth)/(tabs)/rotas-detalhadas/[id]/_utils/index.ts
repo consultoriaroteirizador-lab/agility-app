@@ -98,3 +98,8 @@ export {
     groupContiguousStops,
     stopKeyOf,
 } from './stopGrouping'
+
+export {
+    type MapPointKeyInput,
+    mapPointStopKeyOf,
+} from './stopGrouping'

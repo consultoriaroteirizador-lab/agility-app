@@ -21,6 +21,7 @@ import { ServiceStatus } from '@/domain/agility/service/dto/types'
 import { colors } from '@/theme'
 
 import { outcomeLabel } from '../../../../_utils/routeNonDelivered'
+import { groupContiguousBy, mapPointStopKeyOf } from '../../../../_utils/stopGrouping'
 
 import { splitRouteAtLastStop, type LatLng } from './geo'
 import { MapPoint } from './Map'
@@ -126,14 +127,19 @@ export function useRouteMapView(routeId: string): RouteMapView {
             })
         }
 
-        sortedServices.forEach((service, index) => {
+        // Um pino por PARADA, não por pedido: cinco notas na mesma porta viravam
+        // cinco pinos empilhados com números diferentes. A numeração aqui passa a
+        // bater com a da lista de paradas.
+        groupContiguousBy(sortedServices, mapPointStopKeyOf).forEach((grupo, index) => {
+            const representante = grupo[0]
+            const sufixo = grupo.length > 1 ? ` (${grupo.length} notas)` : ''
             points.push({
-                id: service.id,
-                latitude: service.latitude,
-                longitude: service.longitude,
-                title: service.title || `Parada ${index + 1}`,
+                id: representante.id,
+                latitude: representante.latitude,
+                longitude: representante.longitude,
+                title: `${representante.title || `Parada ${index + 1}`}${sufixo}`,
                 label: index + 1,
-                color: stopColorByStatus(service.status),
+                color: stopColorByStatus(representante.status),
             })
         })
 
