@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Linking } from 'react-native';
 
 import { useQueryClient } from '@tanstack/react-query';
@@ -20,7 +20,15 @@ import { useToastService } from '@/services/Toast/useToast';
 import { measure } from '@/theme';
 
 import { TransferOrderList } from '../../_components/TransferOrderList';
-import { formatResumoDaNota, mapGrupoToParada, pathForServiceType, resolveNotaFiscalLabel, resolveParadaAtendida, resolvePedidosDaParada } from '../../_utils';
+import {
+  formatResumoDaNota,
+  mapGrupoToParada,
+  pathForServiceType,
+  resolveNotaFiscalLabel,
+  resolveParadaAtendida,
+  resolvePedidosDaParada,
+  resolveTemEtapaPropriaAntesDoAtendimento,
+} from '../../_utils';
 
 import { EquipmentList, StopActions, StopTabs } from './_components';
 import { Map } from './_components/shared/Map';
@@ -135,27 +143,21 @@ export default function StopDetailScreen() {
   // chegada (ver ramo `isParadaAgrupada` mais abaixo).
   const paradaAtendida = resolveParadaAtendida(pedidosDaParada);
 
-  // Tipos com CHECKPOINT DE CÓDIGO na chegada (revisão do Task 2, finding 2):
-  // o backend recusa `start-attendance` sem o código de retirada quando a
-  // empresa exige (`ServiceService.startAttendance`, `agility-services`) —
-  // mesma condição que gera o desvio de custódia no cross-docking
-  // (`legType === 'TRANSFER'`). PICKUP tem esse checkpoint via
-  // `PickupCodeCard`, que só existe dentro de `ColetaEtapaInicial` — o bloco de
-  // chegada novo desta tela não tem campo de código nenhum. Para esses tipos,
-  // a porta mantém o comportamento de HOJE ponta a ponta: sem bloco de
-  // chegada aqui, a lista de notas aparece direto, e `handleOpenNota` NÃO
-  // dispara start-attendance — quem faz isso é o próprio fluxo da nota
-  // (ColetaEtapaInicial), com o código quando exigido. TRANSFER nunca agrupa
-  // (`stopKeyOf` força chave própria em `_utils/stopGrouping.ts`), então esta
-  // checagem é inócua para ele hoje — mantido por fidelidade à condição do
-  // backend, caso isso mude.
-  const temCheckpointDeCodigo = pedidosDaParada.some(
-    (p) => p.serviceType === ServiceType.PICKUP || p.serviceType === ServiceType.TRANSFER,
-  );
+  // A porta só é elegível para o bloco de chegada novo quando NENHUMA nota tem
+  // uma etapa própria antes do atendimento (revisão do Task 2, ronda 2:
+  // `resolveTemEtapaPropriaAntesDoAtendimento` — código de retirada em
+  // PICKUP/TRANSFER OU conferência de equipamento em SERVICE). Deixar o dado
+  // correto (a nota realmente em atendimento) NÃO é suficiente aqui: mesmo com
+  // o cache certo, pular a etapa própria da nota seria o app decidindo por ela
+  // algo que só a PRÓPRIA tela da nota sabe perguntar. Ver o comentário da
+  // função (`_utils/paradaDisplay.ts`) para por que isto NÃO reusa
+  // `resolveCodeRequirement`/`codeGate.ts` (regra mais ampla, não depende de
+  // `confirmationCode` estar populado na lista da rota).
+  const temEtapaPropriaAntesDoAtendimento = resolveTemEtapaPropriaAntesDoAtendimento(pedidosDaParada);
 
-  // A porta só ganha o bloco de chegada novo quando NÃO há checkpoint de
-  // código E a parada ainda não foi atendida.
-  const mostraBlocoDeChegada = !temCheckpointDeCodigo && !paradaAtendida;
+  // A porta só ganha o bloco de chegada novo quando TODAS as notas são
+  // DELIVERY (sem etapa própria) E a parada ainda não foi atendida.
+  const mostraBlocoDeChegada = !temEtapaPropriaAntesDoAtendimento && !paradaAtendida;
 
   // Ações de chegada amarradas ao REPRESENTANTE do grupo (`pedidosDaParada[0]`)
   // — é ele que registra a chegada na porta (§3 da spec: a 1ª nota entra em
@@ -210,11 +212,30 @@ export default function StopDetailScreen() {
     void handleStartAttendanceParada();
   }, [isStartBlockedParada, stopStatus.startBlockReason, showToast, handleStartAttendanceParada]);
 
+  // `useStartAttendance` é UMA instância compartilhada entre todas as notas do
+  // índice (a lista chama `handleOpenNota` com um `pid` diferente por card) —
+  // `onSuccess`/`onError` do wrapper (`useMutationService`) só recebem a
+  // resposta, não as variáveis da mutation, então não dá pra saber "de qual
+  // nota" a partir do callback. Guardamos o pid pendente num ref, escrito
+  // imediatamente antes de cada chamada.
+  const notaPendenteRef = useRef<string | null>(null);
+
   // Abrir uma nota entra em atendimento (decisão do dono do produto, §3): o
   // motorista confere uma de cada vez, não todas juntas na chegada — é o que
   // o backend já sabe fazer por serviço, só o gate por-serviço impedia.
   const { startAttendance: startAttendanceDaNota } = useStartAttendance({
     onSuccess: () => {
+      // Revisão do Task 2 (novo finding, ronda 2): invalidar SÓ a lista da
+      // rota não bastava — `GET /services/:id` desta nota específica (o que
+      // `entrega/index.tsx` lê via `useFindOneService`) tem cache próprio
+      // (`staleTime` de 5min, sem refetch-on-focus — `src/app/_layout.tsx`) e
+      // não é prefixo de `['services', 'routing', routeId]`, então continuava
+      // servindo o status antigo (PENDING) pro `EtapaConfirmacao` da própria
+      // nota, deixando `isServiceStarted` falso e o botão voltar inerte
+      // (`handleBack` caía no `setEtapa(1)`, mesmo valor, sem re-render).
+      // Mesmo par de chaves que `useStopActions.ts:69-70` invalida.
+      const pid = notaPendenteRef.current;
+      if (pid) void queryClient.invalidateQueries({ queryKey: [KEY_SERVICES, pid] });
       void queryClient.invalidateQueries({ queryKey: [KEY_SERVICES, 'routing', routeId] });
     },
     // Revisão do Task 2 (finding 4): sem `onError`, uma rejeição ficava
@@ -225,6 +246,8 @@ export default function StopDetailScreen() {
     onError: (error: any) => {
       const errorMessage = error?.error?.message || error?.message || '';
       if (errorMessage.includes('em atendimento') || errorMessage.includes('IN_ATTENDANCE')) {
+        const pid = notaPendenteRef.current;
+        if (pid) void queryClient.invalidateQueries({ queryKey: [KEY_SERVICES, pid] });
         void queryClient.invalidateQueries({ queryKey: [KEY_SERVICES, 'routing', routeId] });
         return;
       }
@@ -238,14 +261,17 @@ export default function StopDetailScreen() {
   // `onOpen` do card do índice de notas. Só chama start-attendance quando a
   // nota AINDA NÃO está em atendimento (ou além) — reusa `resolveParadaAtendida`
   // (mesmo predicado testado do gate da tela, não uma checagem de status
-  // escrita à mão de novo) — e quando o tipo NÃO tem checkpoint de código
-  // (`temCheckpointDeCodigo`), senão o backend recusaria por falta do código.
+  // escrita à mão de novo) — e quando o tipo NÃO tem etapa própria antes do
+  // atendimento (`temEtapaPropriaAntesDoAtendimento`): PICKUP/TRANSFER exigem
+  // código (o backend recusaria sem ele) e SERVICE precisa da conferência de
+  // equipamento antes, nenhum dos dois perguntável por esta tela.
   const handleOpenNota = useCallback((pid: string) => {
     const pedido = pedidosDaParada.find((p) => p.id === pid);
     const podeIniciarAtendimentoPeloIndice =
-      !!pedido && !temCheckpointDeCodigo && !resolveParadaAtendida([pedido]);
+      !!pedido && !temEtapaPropriaAntesDoAtendimento && !resolveParadaAtendida([pedido]);
 
     if (podeIniciarAtendimentoPeloIndice) {
+      notaPendenteRef.current = pid;
       // Fire-and-forget e SEM esperar o GPS (revisão do Task 2, finding 4):
       // `getCurrentCoords` pode levar até ~15s somando os timeouts internos de
       // permissão + posição, e isso atrasaria o PRÓPRIO start-attendance — não
@@ -263,7 +289,7 @@ export default function StopDetailScreen() {
       pathname: rotaDaNota,
       params: { id: routeId, pid },
     });
-  }, [pedidosDaParada, temCheckpointDeCodigo, rotaDaNota, routeId, router, startAttendanceDaNota]);
+  }, [pedidosDaParada, temEtapaPropriaAntesDoAtendimento, rotaDaNota, routeId, router, startAttendanceDaNota]);
 
   // Local state
   const [activeTab, setActiveTab] = useState<TabType>('local');
@@ -602,9 +628,9 @@ export default function StopDetailScreen() {
             // Chegada da PORTA (Camada 3, §3): antes de ver as notas, o motorista
             // chega na parada — UMA vez, igual ao balcão. A lista de notas só
             // aparece depois (`paradaAtendida` vira true assim que a 1ª nota
-            // entra em atendimento). PICKUP/TRANSFER nunca caem aqui —
-            // `temCheckpointDeCodigo` mantém o comportamento de hoje (ver
-            // comentário na declaração de `temCheckpointDeCodigo` acima).
+            // entra em atendimento). PICKUP/TRANSFER/SERVICE nunca caem aqui —
+            // `temEtapaPropriaAntesDoAtendimento` mantém o comportamento de hoje
+            // (ver comentário na declaração acima e em `resolveTemEtapaPropriaAntesDoAtendimento`).
             <Box gap="y12" alignItems="center" pb="y24">
               <Box alignSelf="stretch">
                 <Text preset="text15" fontWeightPreset="semibold" color="colorTextPrimary">{customerName}</Text>

@@ -8,7 +8,7 @@
  * `notasTotal > total` regredia em silêncio. Aqui a derivação é pura e coberta.
  */
 import type { ServiceResponse } from '@/domain/agility/service/dto'
-import { ServiceStatus } from '@/domain/agility/service/dto/types'
+import { ServiceStatus, ServiceType } from '@/domain/agility/service/dto/types'
 
 import type { ParadaStatus } from '../../_types/rota.types'
 import {
@@ -17,6 +17,7 @@ import {
     resolveNotasBadge,
     resolveParadaAtendida,
     resolveProgressoTexto,
+    resolveTemEtapaPropriaAntesDoAtendimento,
 } from '../paradaDisplay'
 import type { ParadaCountResult } from '../routeCalculations'
 
@@ -186,6 +187,39 @@ describe('resolveParadaAtendida — a PORTA (não a nota) já foi atendida (Cama
         expect(resolveParadaAtendida([
             nota({ id: 'a', isInProgress: true, status: ServiceStatus.IN_PROGRESS }),
         ])).toBe(false)
+    })
+})
+
+describe('resolveTemEtapaPropriaAntesDoAtendimento — a porta tem nota com pré-passo próprio (Camada 3, revisão 2)', () => {
+    it('todas DELIVERY → false (elegível pro bloco de chegada novo)', () => {
+        expect(resolveTemEtapaPropriaAntesDoAtendimento([
+            nota({ id: 'a', serviceType: ServiceType.DELIVERY }),
+            nota({ id: 'b', serviceType: ServiceType.DELIVERY }),
+        ])).toBe(false)
+    })
+
+    it('uma nota PICKUP → true (código de retirada é pré-passo próprio)', () => {
+        expect(resolveTemEtapaPropriaAntesDoAtendimento([
+            nota({ id: 'a', serviceType: ServiceType.DELIVERY }),
+            nota({ id: 'b', serviceType: ServiceType.PICKUP }),
+        ])).toBe(true)
+    })
+
+    it('uma nota TRANSFER → true', () => {
+        expect(resolveTemEtapaPropriaAntesDoAtendimento([
+            nota({ id: 'a', serviceType: ServiceType.TRANSFER }),
+        ])).toBe(true)
+    })
+
+    it('uma nota SERVICE → true (conferência de equipamento é pré-passo próprio)', () => {
+        expect(resolveTemEtapaPropriaAntesDoAtendimento([
+            nota({ id: 'a', serviceType: ServiceType.DELIVERY }),
+            nota({ id: 'b', serviceType: ServiceType.SERVICE }),
+        ])).toBe(true)
+    })
+
+    it('lista vazia → false', () => {
+        expect(resolveTemEtapaPropriaAntesDoAtendimento([])).toBe(false)
     })
 })
 

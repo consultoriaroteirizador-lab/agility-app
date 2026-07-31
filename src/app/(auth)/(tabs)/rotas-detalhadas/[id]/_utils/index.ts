@@ -116,4 +116,5 @@ export {
     resolveNotasBadge,
     resolveParadaAtendida,
     resolveProgressoTexto,
+    resolveTemEtapaPropriaAntesDoAtendimento,
 } from './paradaDisplay'

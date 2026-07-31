@@ -13,7 +13,7 @@
  */
 
 import type { ServiceResponse } from '@/domain/agility/service/dto'
-import { ServiceStatus } from '@/domain/agility/service/dto/types'
+import { ServiceStatus, ServiceType } from '@/domain/agility/service/dto/types'
 
 import type { ParadaStatus } from '../_types/rota.types'
 
@@ -106,6 +106,37 @@ export function resolveParadaAtendida(pedidos: ServiceResponse[]): boolean {
             pedido.isCompleted === true || pedido.isCanceled === true || pedido.isFailed === true
         return emAtendimento || terminal
     })
+}
+
+/**
+ * A parada tem alguma nota com uma ETAPA PRÓPRIA antes do atendimento — código
+ * de retirada (PICKUP/TRANSFER, capturado por `PickupCodeCard` dentro de
+ * `ColetaEtapaInicial`/`TransferEtapaInicial`) ou conferência de equipamento
+ * (SERVICE, `ServiceEtapaCheckEquipamento`) — que só o fluxo da PRÓPRIA nota
+ * sabe pedir.
+ *
+ * Usada para decidir se o ÍNDICE da parada (a tela nova da Camada 3) pode
+ * "resolver" a chegada da porta sozinho ou se precisa recuar para o
+ * comportamento de hoje. Regra deliberadamente simples (revisão de código,
+ * ronda 2): a porta só é elegível para o bloco de chegada novo quando TODAS as
+ * notas são DELIVERY — qualquer nota de outro tipo faz a porta inteira manter
+ * o comportamento de hoje (lista de notas direto, sem `start-attendance`
+ * disparado pelo índice), porque a porta não tem como perguntar, por outra
+ * tela, o que só a própria nota sabe perguntar.
+ *
+ * NÃO reusa `resolveCodeRequirement`/`PICKUP_CHECKPOINT_TYPES`
+ * (`@/domain/agility/service/codeGate`) — ver nota no report do Task 2: aquela
+ * função responde "esta empresa exige código NESTE serviço", que depende de
+ * `confirmationCode` (dado que, na prática, só a tela de UM serviço
+ * (`useFindOneService`) lê — nenhum consumidor hoje lê `confirmationCode` a
+ * partir da lista da rota). Esta função responde uma pergunta mais simples e
+ * mais ampla — "este tipo tem ALGUM pré-passo próprio, código ou não" —
+ * porque a conferência de equipamento (SERVICE) não depende de configuração
+ * de código nenhuma. Uma regra só, sem depender do dado de `confirmationCode`
+ * estar populado na lista.
+ */
+export function resolveTemEtapaPropriaAntesDoAtendimento(pedidos: ServiceResponse[]): boolean {
+    return pedidos.some((pedido) => pedido.serviceType !== ServiceType.DELIVERY)
 }
 
 /** Campos do pedido que identificam a nota para quem está no balcão. */
