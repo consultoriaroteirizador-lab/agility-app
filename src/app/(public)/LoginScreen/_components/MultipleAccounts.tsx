@@ -10,9 +10,10 @@ interface Props {
     selectUser: (u: UserCredentials) => void;
     removeUser: (u: UserCredentials) => void;
     onNewAccount: () => void;
+    onCancel: () => void;
 }
 
-export function MultipleAccounts({ list, selectUser, removeUser, onNewAccount }: Props) {
+export function MultipleAccounts({ list, selectUser, removeUser, onNewAccount, onCancel }: Props) {
     return (
         <Box
             justifyContent="center"
@@ -41,6 +42,15 @@ export function MultipleAccounts({ list, selectUser, removeUser, onNewAccount }:
                 mt="t18"
                 preset="textPrimaryUnderline"
                 title="Adicionar outra conta"
+            />
+
+            {/* Sem isto o unico jeito de fechar a lista era escolher ou remover
+                uma conta. */}
+            <TextButton
+                onPress={onCancel}
+                mt="t14"
+                preset="textUnderline"
+                title="Voltar"
             />
         </Box>
     );

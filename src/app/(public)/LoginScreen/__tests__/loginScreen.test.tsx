@@ -102,6 +102,7 @@ describe('Bug 1 — card de contas salvas', () => {
         selectUser={jest.fn()}
         removeUser={jest.fn()}
         onNewAccount={onNewAccount}
+        onCancel={jest.fn()}
       />,
     );
 
@@ -119,6 +120,38 @@ describe('Bug 1 — card de contas salvas', () => {
     expect(flattenColor(action[0].props.style)).not.toBe(theme.colors.white);
   });
 
+  it('deixa sair da lista sem precisar escolher ou remover uma conta', () => {
+    const onCancel = jest.fn();
+    const renderer = renderWithTheme(
+      <MultipleAccounts
+        list={list}
+        selectUser={jest.fn()}
+        removeUser={jest.fn()}
+        onNewAccount={jest.fn()}
+        onCancel={onCancel}
+      />,
+    );
+
+    const back = renderer.root.findAll(
+      (n) =>
+        typeof n.type === 'string' &&
+        typeof n.props.children === 'string' &&
+        /voltar|cancelar/i.test(n.props.children),
+      { deep: true },
+    );
+    expect(back.length).toBeGreaterThan(0);
+    expect(flattenColor(back[0].props.style)).not.toBe(theme.colors.white);
+
+    // O texto e filho do TouchableOpacity que dispara a acao.
+    const touchable = renderer.root.find(
+      (n) => typeof n.type !== 'string' && n.props.onPress === onCancel,
+    );
+    act(() => {
+      touchable.props.onPress();
+    });
+    expect(onCancel).toHaveBeenCalledTimes(1);
+  });
+
   it('mostra o titulo do card em cor legivel', () => {
     const renderer = renderWithTheme(
       <MultipleAccounts
@@ -126,6 +159,7 @@ describe('Bug 1 — card de contas salvas', () => {
         selectUser={jest.fn()}
         removeUser={jest.fn()}
         onNewAccount={jest.fn()}
+        onCancel={jest.fn()}
       />,
     );
 

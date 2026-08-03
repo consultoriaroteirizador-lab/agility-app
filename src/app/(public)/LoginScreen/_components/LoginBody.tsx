@@ -111,6 +111,7 @@ export function LoginBody({ controller }: Props) {
                     selectUser={handleSelectAccount}
                     removeUser={removeUserCredentials}
                     onNewAccount={handleNewUsername}
+                    onCancel={() => setShowMultipleAccounts(false)}
                 />
             ) : (
                 <>
