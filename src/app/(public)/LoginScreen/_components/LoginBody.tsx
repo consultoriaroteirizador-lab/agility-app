@@ -35,14 +35,15 @@ export function LoginBody({ controller }: Props) {
         resolver: zodResolver(formLoginSchema),
         defaultValues: {
             tenantCode: tenantInfo?.tenantCode || '',
-            email: 'motorista@transportadoraexpress.com',
-            password: '12345678'
+            email: '',
+            password: ''
         },
     });
 
     const {
         showMultipleAccounts,
         isEmailField,
+        isLoadingSignIn,
         userCredentialsCurrent,
         messageError,
         setMessageError,
@@ -192,7 +193,8 @@ export function LoginBody({ controller }: Props) {
                         marginBottom="b16"
                         height={measure.y44}
                         onPress={handleSubmit(handleSubmitForm)}
-                        disabled={!formState.isValid}
+                        isLoading={isLoadingSignIn}
+                        disabled={!formState.isValid || isLoadingSignIn}
                     />
 
 
