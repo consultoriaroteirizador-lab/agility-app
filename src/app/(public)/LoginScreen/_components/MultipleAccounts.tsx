@@ -10,9 +10,10 @@ interface Props {
     selectUser: (u: UserCredentials) => void;
     removeUser: (u: UserCredentials) => void;
     onNewAccount: () => void;
+    onCancel: () => void;
 }
 
-export function MultipleAccounts({ list, selectUser, removeUser, onNewAccount }: Props) {
+export function MultipleAccounts({ list, selectUser, removeUser, onNewAccount, onCancel }: Props) {
     return (
         <Box
             justifyContent="center"
@@ -20,7 +21,7 @@ export function MultipleAccounts({ list, selectUser, removeUser, onNewAccount }:
             width={measure.x330}
             borderRadius="s10"
         >
-            <Text color="white" preset="text17" fontWeightPreset="semibold" mb="b10">
+            <Text color="gray700" preset="text17" fontWeightPreset="semibold" mb="b10">
                 Qual conta deseja acessar?
             </Text>
 
@@ -34,12 +35,22 @@ export function MultipleAccounts({ list, selectUser, removeUser, onNewAccount }:
                 </Box>
             ))}
 
+            {/* Fundo da tela e branco: cor branca aqui deixava a acao invisivel
+                e o unico caminho para cadastrar outra conta era remover a atual. */}
             <TextButton
                 onPress={onNewAccount}
                 mt="t18"
-                color="white"
-                preset="primary"
-                title="Acessar outra conta"
+                preset="textPrimaryUnderline"
+                title="Adicionar outra conta"
+            />
+
+            {/* Sem isto o unico jeito de fechar a lista era escolher ou remover
+                uma conta. */}
+            <TextButton
+                onPress={onCancel}
+                mt="t14"
+                preset="textUnderline"
+                title="Voltar"
             />
         </Box>
     );

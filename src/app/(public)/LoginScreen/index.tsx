@@ -12,7 +12,11 @@ export default function Login() {
   useNavigationNotActionOnBack();
   const controller = useLoginController();
 
-  if (controller.isLoadingCredentials || controller.isLoadingSignIn) {
+  // Somente a hidratacao das credenciais troca a tela pelo spinner. O signIn
+  // NAO pode desmontar o formulario: quando a senha esta errada o form remonta
+  // zerado e o motorista perde a empresa e o usuario que ja tinha digitado.
+  // O feedback de "entrando..." fica no proprio botao (ver LoginBody).
+  if (controller.isLoadingCredentials) {
     return (
       <Box flex={1} alignItems="center" justifyContent="center">
         <ActivityIndicator />
