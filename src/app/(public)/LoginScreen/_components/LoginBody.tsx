@@ -62,7 +62,13 @@ export function LoginBody({ controller }: Props) {
     function handleSelectAccount(selectedUser: UserCredentials) {
         saveUserCredentials(selectedUser);
         setShowMultipleAccounts(false);
-        reset({ password: '' });
+        // reset() substitui o form INTEIRO: passar so a senha zerava tambem
+        // empresa e e-mail, deixando o schema invalido e o botao Acessar travado.
+        reset({
+            tenantCode: tenantInfo?.tenantCode || '',
+            email: selectedUser.username,
+            password: '',
+        });
         setMessageError('');
     }
 

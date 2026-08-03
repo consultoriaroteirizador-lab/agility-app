@@ -7,6 +7,8 @@ import { useAuthSignIn } from '@/domain/Auth/useCases/useAuthSignIn';
 import { FormLoginSchema } from '@/formValidate/formLoginSchema';
 import { useAuthCredentialsService, useNotification, useTenantService } from '@/services';
 
+import { resolveCredentialsToSave, shouldPromptBiometric } from '../_utils/accountBiometrics';
+
 export function useLoginController() {
     const {
         userCredentialsCurrent,
@@ -27,12 +29,14 @@ export function useLoginController() {
     const [email, setEmail] = useState<string>('');
 
     const [errorTrigger, setErrorTrigger] = useState(0);
-    const [hasAttemptedBiometric, setHasAttemptedBiometric] = useState(false);
+    // Guarda o USUARIO para quem a digital ja foi oferecida — nao um booleano.
+    // Com booleano, apos trocar de conta a nova nunca recebia a oferta.
+    const [biometricAttemptedFor, setBiometricAttemptedFor] = useState<string | null>(null);
 
     // Reset biometric flag when deviceId changes
     useEffect(() => {
         if (deviceId) {
-            setHasAttemptedBiometric(false);
+            setBiometricAttemptedFor(null);
         }
     }, [deviceId]);
 
@@ -69,26 +73,23 @@ export function useLoginController() {
             console.log('[LoginController] userPassword:', userPassword ? 'definida' : 'vazia');
 
             if (userEmail && userPassword) {
-                // Manter allowsBiometrics atual se existir
-                // Se não existir (primeiro login), deixar undefined para que o _layout
-                // redirecione para RegisterAllowsBiometricScreen
-                const shouldAllowBiometrics = userCredentialsCurrent?.allowsBiometrics ?? false;
-
-                console.log('[LoginController] shouldAllowBiometrics:', shouldAllowBiometrics);
-
-                // Usar nome do userAuth retornado pelo saveCredentials (que vem do profile)
-                const userName = userAuthFromProfile?.fullname || userCredentialsCurrent?.name || '';
-                const userAlias = userAuthFromProfile?.nickname || userCredentialsCurrent?.alias || '';
-
-                console.log('[LoginController] userName:', userName);
-
-                await saveUserCredentials({
-                    name: userName,
-                    alias: userAlias,
+                // A preferencia de biometria (e o nome) vem da PROPRIA conta que
+                // esta entrando — nunca de userCredentialsCurrent, que ao trocar
+                // ou adicionar conta ainda aponta para a conta anterior.
+                // Conta desconhecida fica com allowsBiometrics undefined e o
+                // _layout leva para RegisterAllowsBiometricScreen.
+                const credentialsToSave = resolveCredentialsToSave({
                     username: userEmail,
                     password: userPassword,
-                    allowsBiometrics: shouldAllowBiometrics,
+                    savedList: userCredentialsList,
+                    profileName: userAuthFromProfile?.fullname,
+                    profileAlias: userAuthFromProfile?.nickname,
                 });
+
+                console.log('[LoginController] allowsBiometrics:', credentialsToSave.allowsBiometrics);
+                console.log('[LoginController] userName:', credentialsToSave.name);
+
+                await saveUserCredentials(credentialsToSave);
             }
 
             // NÃO navegar aqui - deixar o _layout.tsx fazer a navegação
@@ -99,18 +100,22 @@ export function useLoginController() {
     // Biometric authentication logic (like Agility-App)
     useEffect(() => {
         async function handleAuthenticationBiometric() {
-            // Prevenir múltiplos prompts
-            if (hasAttemptedBiometric) return;
-
-            if (isLoadingCredentials) return;
-
-            // Só tentar biometria se tem credenciais salvas com allowsBiometrics true
-            if (!userCredentialsCurrent || !userCredentialsCurrent.allowsBiometrics ||
-                !userCredentialsCurrent.password || !deviceId) {
+            // Prevenir múltiplos prompts para a MESMA conta, mas voltar a oferecer
+            // quando o motorista troca de conta.
+            if (!shouldPromptBiometric({
+                isLoadingCredentials,
+                deviceId,
+                current: userCredentialsCurrent,
+                attemptedFor: biometricAttemptedFor,
+            })) {
                 return;
             }
 
-            setHasAttemptedBiometric(true);
+            const account = userCredentialsCurrent;
+            // Redundante em runtime (o gate acima ja garante), so estreita o tipo.
+            if (!account?.password) return;
+
+            setBiometricAttemptedFor(account.username);
             console.log('[Biometric] Iniciando autenticação biométrica');
 
             const compatible = await LocalAuthentication.hasHardwareAsync();
@@ -134,10 +139,10 @@ export function useLoginController() {
 
             if (result.success) {
                 console.log('[Biometric] Autenticação bem-sucedida, chamando signIn');
-                setPassword(userCredentialsCurrent.password);
+                setPassword(account.password);
                 signIn({
-                    emailOrUsername: userCredentialsCurrent.username!,
-                    password: userCredentialsCurrent.password!,
+                    emailOrUsername: account.username,
+                    password: account.password,
                     tenantCode: tenantInfo?.tenantCode,
                 });
             } else {
@@ -145,7 +150,7 @@ export function useLoginController() {
             }
         }
         handleAuthenticationBiometric();
-    }, [isLoadingCredentials, userCredentialsCurrent, deviceId, hasAttemptedBiometric, signIn, tenantInfo]);
+    }, [isLoadingCredentials, userCredentialsCurrent, deviceId, biometricAttemptedFor, signIn, tenantInfo]);
 
     function handleSubmitForm({ tenantCode, email, password }: FormLoginSchema) {
         setTenantCode(tenantCode);

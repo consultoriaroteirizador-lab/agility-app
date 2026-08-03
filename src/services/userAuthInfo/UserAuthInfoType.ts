@@ -48,5 +48,10 @@ export type UserCredentials = {
     password?: string;
     name?: string,
     alias?: string;
-    allowsBiometrics: boolean;
+    /**
+     * `undefined` = o motorista ainda nao decidiu sobre a digital nesta conta.
+     * O _layout usa isso para levar a tela de escolha em vez de assumir um
+     * padrao (ou pior, herdar a preferencia da conta anterior).
+     */
+    allowsBiometrics?: boolean;
 };
