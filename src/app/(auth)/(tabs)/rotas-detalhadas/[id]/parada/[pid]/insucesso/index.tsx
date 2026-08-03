@@ -11,7 +11,7 @@ import type { OrderOccurrenceReasonResponse } from '@/domain/agility/order-occur
 import { useFindOccurrenceReasons } from '@/domain/agility/order-occurrence-reason/useCase';
 import type { ApplyOccurrenceRequest } from '@/domain/agility/service/dto';
 import { useFindOneService, useFindServicesByRoutingId, useRegisterOccurrence } from '@/domain/agility/service/useCase';
-import { KEY_SERVICES } from '@/domain/queryKeys';
+import { KEY_SERVICES, routeStopChangedKeys } from '@/domain/queryKeys';
 import { loadOccurrenceReasonsMirror } from '@/services/storage/occurrenceReasonsStorage';
 import { useToastService } from '@/services/Toast/useToast';
 import { measure } from '@/theme';
@@ -97,9 +97,12 @@ export default function FalhaScreen() {
       // (best-effort; o cleanStaleParadaDrafts global também resolve no próximo open).
       await clearDraft();
 
-      // Invalidar queries relacionadas
-      queryClient.invalidateQueries({ queryKey: [KEY_SERVICES, serviceId] });
-      queryClient.invalidateQueries({ queryKey: [KEY_SERVICES, 'routing', rotaId] });
+      // Invalidar queries relacionadas — inclui o /map-data, de onde sai a trava
+      // do "Cheguei no retorno" (ver `routeStopChangedKeys`). Sem ele, o retorno
+      // continuava vendo esta parada como pendente e o botão ficava morto.
+      for (const queryKey of routeStopChangedKeys(rotaId, serviceId)) {
+        void queryClient.invalidateQueries({ queryKey });
+      }
 
       // Aguardar refetch explícito para garantir que os dados sejam atualizados
       await queryClient.refetchQueries({ queryKey: [KEY_SERVICES, 'routing', rotaId] });

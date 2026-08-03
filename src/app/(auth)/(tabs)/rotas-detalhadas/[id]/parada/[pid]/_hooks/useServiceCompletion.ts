@@ -4,7 +4,7 @@ import { useQueryClient } from '@tanstack/react-query';
 
 import type { ServiceCompletionDetailsRequest } from '@/domain/agility/service/dto/request/service-completion-details.request';
 import { useCompleteServiceWithDetails } from '@/domain/agility/service/useCase';
-import { KEY_SERVICES, KEY_ROUTINGS } from '@/domain/queryKeys';
+import { routeStopChangedKeys } from '@/domain/queryKeys';
 import { useToastService } from '@/services/Toast/useToast';
 import { parseBRLToCents } from '@/utils/parseCurrency';
 
@@ -93,10 +93,11 @@ export function useServiceCompletion() {
         // Invalidação cirúrgica em background — NÃO aguardamos o refetch (UI desbloqueia
         // na hora). Antes usava [KEY_SERVICES] + refetchType:'all', que refazia TODAS as
         // queries de serviço do app a cada conclusão. Agora mira só o que mudou: este
-        // serviço, a lista da rota e a própria rota.
-        void queryClient.invalidateQueries({ queryKey: [KEY_SERVICES, serviceId] });
-        void queryClient.invalidateQueries({ queryKey: [KEY_SERVICES, 'routing', rotaId] });
-        void queryClient.invalidateQueries({ queryKey: [KEY_ROUTINGS, rotaId] });
+        // serviço, a lista da rota, a própria rota e o /map-data (que também carrega o
+        // status das paradas — ver `routeStopChangedKeys`).
+        for (const queryKey of routeStopChangedKeys(rotaId, serviceId)) {
+            void queryClient.invalidateQueries({ queryKey });
+        }
     }, [queryClient, serviceId, rotaId]);
 
     // Finalizar serviço

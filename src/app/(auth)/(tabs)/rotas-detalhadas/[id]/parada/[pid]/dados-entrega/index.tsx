@@ -17,7 +17,7 @@ import { ServiceStatus } from '@/domain/agility/service/dto';
 import { serviceService } from '@/domain/agility/service/serviceService';
 import { uploadMultipleServicePhotos, uploadSignature } from '@/domain/agility/service/serviceUploadUtils';
 import { useCompleteServiceWithDetails, useFindOneService, useStartService } from '@/domain/agility/service/useCase';
-import { KEY_ROUTINGS, KEY_SERVICES } from '@/domain/queryKeys';
+import { KEY_ROUTINGS, KEY_SERVICES, routeStopChangedKeys } from '@/domain/queryKeys';
 import { formatHHmm } from '@/functions';
 import { useToastService } from '@/services/Toast/useToast';
 import { measure } from '@/theme';
@@ -75,11 +75,11 @@ export default function DadosEntregaScreen() {
 
   const { completeServiceWithDetails, isLoading: isCompletingWithDetails } = useCompleteServiceWithDetails({
     onSuccess: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: [KEY_SERVICES, 'routing', rotaId] }),
-        queryClient.invalidateQueries({ queryKey: [KEY_SERVICES, serviceId] }),
-        queryClient.invalidateQueries({ queryKey: [KEY_ROUTINGS, rotaId] }),
-      ]);
+      await Promise.all(
+        routeStopChangedKeys(rotaId, serviceId).map((queryKey) =>
+          queryClient.invalidateQueries({ queryKey }),
+        ),
+      );
       queryClient.refetchQueries({ queryKey: [KEY_SERVICES, 'routing', rotaId] });
       queryClient.refetchQueries({ queryKey: [KEY_ROUTINGS, rotaId] });
 
