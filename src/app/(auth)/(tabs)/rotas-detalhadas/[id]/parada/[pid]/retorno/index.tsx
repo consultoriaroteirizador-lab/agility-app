@@ -81,7 +81,10 @@ export default function RetornoScreen() {
 
   const { service, isLoading } = useFindOneService(serviceId || '');
   const { items, isLoading: isLoadingManifest } = useReturnManifest(routeId || '');
-  const { mapData, services } = useGetRoutingMapData(routeId || '');
+  // `alwaysFresh`: é daqui que sai o `othersDone` — a trava do "Cheguei no
+  // retorno". Decidir por cache velho deixava o botão morto depois de concluir
+  // todas as paradas (a lista, que lê /services, já mostrava tudo concluído).
+  const { mapData, services } = useGetRoutingMapData(routeId || '', { alwaysFresh: true });
   const { userLocation } = useUserLocation();
 
   const router = useRouter();

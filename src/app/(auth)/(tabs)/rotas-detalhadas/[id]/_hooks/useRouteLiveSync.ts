@@ -12,15 +12,16 @@ import { useCallback, useEffect } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 
 import { useTrackingWebSocket } from '@/domain/agility/tracking/useCase/useTrackingWebSocket'
-import { KEY_ROUTINGS, KEY_SERVICES } from '@/domain/queryKeys'
+import { routeStopChangedKeys } from '@/domain/queryKeys'
 
 export function useRouteLiveSync(routeId: string | undefined) {
     const queryClient = useQueryClient()
 
     const invalidate = useCallback(() => {
         if (!routeId) return
-        void queryClient.invalidateQueries({ queryKey: [KEY_ROUTINGS, routeId] })
-        void queryClient.invalidateQueries({ queryKey: [KEY_SERVICES, 'routing', routeId] })
+        for (const queryKey of routeStopChangedKeys(routeId)) {
+            void queryClient.invalidateQueries({ queryKey })
+        }
     }, [queryClient, routeId])
 
     const { connect, disconnect } = useTrackingWebSocket({

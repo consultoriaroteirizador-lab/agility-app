@@ -9,7 +9,7 @@ import {
     useStartService,
     useStartAttendance,
 } from '@/domain/agility/service/useCase';
-import { KEY_SERVICES } from '@/domain/queryKeys';
+import { routeStopChangedKeys } from '@/domain/queryKeys';
 import { useToastService } from '@/services/Toast/useToast';
 
 import { getCurrentCoords } from './getCurrentCoords';
@@ -66,8 +66,11 @@ export const useStopActions = ({
         // Dispara o refetch em background e NÃO aguarda: a UI desbloqueia na hora.
         // O React Query atualiza a tela do serviço e a lista da rota quando o refetch
         // retornar. Antes isso era awaited e travava o spinner até a rota inteira voltar.
-        void queryClient.invalidateQueries({ queryKey: [KEY_SERVICES, serviceId] });
-        void queryClient.invalidateQueries({ queryKey: [KEY_SERVICES, 'routing', routeId] });
+        // Inclui o /map-data: ele também carrega o status das paradas (cor dos pinos
+        // e a trava do "Cheguei no retorno") — ver `routeStopChangedKeys`.
+        for (const queryKey of routeStopChangedKeys(routeId, serviceId)) {
+            void queryClient.invalidateQueries({ queryKey });
+        }
     }, [queryClient, serviceId, routeId]);
 
     // Loading "estendido": a mutation resolve rápido, mas o status só reflete na UI
