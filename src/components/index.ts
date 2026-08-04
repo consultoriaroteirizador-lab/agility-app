@@ -35,4 +35,5 @@ export * from './ParadaCard';
 export * from './BiometricToggle';
 export * from './NavigationPopup';
 export * from './PessoaContatoRow';
+export * from './AjudantesDaRota';
 

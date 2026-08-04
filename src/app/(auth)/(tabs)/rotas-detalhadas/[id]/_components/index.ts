@@ -23,7 +23,6 @@ export { RouteProgress } from './RouteProgress'
 // COMPONENTES DE AJUDANTES
 // ============================================
 
-export { AjudantesDaRota } from './AjudantesDaRota'
 
 // ============================================
 // COMPONENTES DE PARADAS

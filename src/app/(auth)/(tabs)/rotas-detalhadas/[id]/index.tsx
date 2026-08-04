@@ -9,14 +9,21 @@ import { FlatList, SectionList } from 'react-native'
 
 import { Redirect, useLocalSearchParams } from 'expo-router'
 
-import { ActivityIndicator, Box, Button, ScreenBase, Text, TouchableOpacityBox } from '@/components'
+import {
+  ActivityIndicator,
+  AjudantesDaRota,
+  Box,
+  Button,
+  ScreenBase,
+  Text,
+  TouchableOpacityBox,
+} from '@/components'
 import { ButtonBack } from '@/components/Button/ButtonBack'
 import Modal from '@/components/Modal/Modal'
 import { measure } from '@/theme'
 
 import {
   RouteProgress,
-  AjudantesDaRota,
   ParadaListItem,
   EmptyParadasList,
   RouteActions,
