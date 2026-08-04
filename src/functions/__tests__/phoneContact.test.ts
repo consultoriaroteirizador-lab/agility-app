@@ -37,4 +37,14 @@ describe('toWhatsAppHrefs', () => {
         expect(toWhatsAppHrefs(null)).toBeNull()
         expect(toWhatsAppHrefs('1234')).toBeNull()
     })
+
+    // DDD 55 (Santa Maria/RS) e o caso que quebraria uma heuristica baseada em
+    // prefixo: o discriminador real e o COMPRIMENTO, nao o "55" da frente.
+    it('acrescenta DDI a um fixo de DDD 55 sem duplicar o 55', () => {
+        expect(toWhatsAppHrefs('(55) 3321-1234')?.web).toBe('https://wa.me/555533211234')
+    })
+
+    it('nao acrescenta DDI a um fixo que ja veio com DDI', () => {
+        expect(toWhatsAppHrefs('553533211234')?.web).toBe('https://wa.me/553533211234')
+    })
 })

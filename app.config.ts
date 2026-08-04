@@ -22,6 +22,11 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       NSLocationAlwaysAndWhenInUseUsageDescription: 'Este app precisa da sua localização para rastrear suas rotas de entrega mesmo em segundo plano.',
       NSFaceIDUsageDescription: 'Este app usa Face ID ou Touch ID para autenticação rápida e segura.',
       UIBackgroundModes: ['location', 'fetch', 'remote-notification'],
+      // Sem isso, Linking.canOpenURL('whatsapp://...') no PessoaContatoRow sempre
+      // devolve false no iOS 9+ (esquema custom fora de LSApplicationQueriesSchemes
+      // é invisível para o app) e o fallback wa.me vira o único caminho, mesmo com
+      // o WhatsApp instalado.
+      LSApplicationQueriesSchemes: ['whatsapp'],
       // Licença do Background Geolocation para iOS
       TSLocationManagerLicense: 'eyJhbGciOiJFZERTQSIsImtpZCI6ImVkMjU1MTktbWFpbi12MSJ9.eyJvcyI6ImlvcyIsImFwcF9pZCI6ImJyLmNvbS5hZ2lsaXR5LmFnaWxpdHlhcHAiLCJvcmRlcl9udW1iZXIiOjE1MzQ0LCJyZW5ld2FsX3VybCI6Imh0dHBzOi8vc2hvcC50cmFuc2lzdG9yc29mdC5jb20vY2FydC8xNjUwNzg2MTUwNToxP25vdGU9MTAyMTMiLCJjdXN0b21lcl9pZCI6OTI5MiwicHJvZHVjdCI6InJlYWN0LW5hdGl2ZS1iYWNrZ3JvdW5kLWdlb2xvY2F0aW9uIiwia2V5X3ZlcnNpb24iOjEsImFsbG93ZWRfc3VmZml4ZXMiOlsiLmRldiIsIi5kZXZlbG9wbWVudCIsIi5zdGFnaW5nIiwiLnN0YWdlIiwiLnFhIiwiLnVhdCIsIi50ZXN0IiwiLmRlYnVnIl0sIm1heF9idWlsZF9zdGFtcCI6MjAyNzAyMjYsImdyYWNlX2J1aWxkcyI6MCwiZW50aXRsZW1lbnRzIjpbImNvcmUiXSwiaWF0IjoxNzY5NDUyMzM3fQ.iliR5Dui32zcTsa1OxEpMIoa_PrDtGy-4Y8IQg8PzwAHgR-s0iWh8TK3oxe-4wjv275_HhyqMDPNHSXnna0QAQ',
     },
@@ -97,6 +102,12 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         android: {
           extraManifestMergerClassPath: 'androidx.core.core',
           googleServicesVersion: '4.4.2',
+          // Equivalente Android do LSApplicationQueriesSchemes do iOS: no Android 11+
+          // (API 30+), sem declarar o pacote em <queries>, o app nao enxerga o
+          // WhatsApp instalado e Linking.canOpenURL('whatsapp://...') tambem falha.
+          manifestQueries: {
+            package: ['com.whatsapp'],
+          },
         },
       },
     ],
