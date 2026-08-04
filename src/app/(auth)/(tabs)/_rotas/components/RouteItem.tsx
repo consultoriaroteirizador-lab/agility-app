@@ -1,6 +1,6 @@
 import { memo } from 'react';
 
-import { Box, Text, TouchableOpacityBox } from '@/components';
+import { AjudantesDaRota, Box, Text, TouchableOpacityBox } from '@/components';
 import { Icon } from '@/components/Icon/Icon';
 import type { IconNameMaterial } from '@/components/Icon/Icon';
 import type { RoutingResponse } from '@/domain/agility/routing/dto';
@@ -212,6 +212,18 @@ function RouteItemComponent({ route, onPress }: RouteItemProps) {
                     )}
                     <Metric icon="straighten" text={formatDistance(route.totalDistanceKm)} />
                     <Metric icon="schedule" text={formatDuration(route.totalDurationMinutes)} />
+                </Box>
+
+                {/* Tripulação da viagem — recolhida por padrão, para o motorista
+                    ver com quem vai antes de abrir a rota. O bloco tem toque
+                    próprio dentro deste card, que também é tocável: o sistema de
+                    responder do RN faz o interno vencer, então expandir NÃO
+                    navega. É comportamento que só o dedo confirma — está no
+                    roteiro manual. Some quando não há ajudante, e some também
+                    enquanto o backend que devolve `helpers` no my-routings não
+                    estiver deployado. */}
+                <Box mt="y8">
+                    <AjudantesDaRota ajudantes={route.helpers} />
                 </Box>
 
                 {/* Rodapé: status + retorno + valor + chevron */}

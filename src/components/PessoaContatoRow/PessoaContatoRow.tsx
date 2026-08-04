@@ -1,7 +1,11 @@
 import { Linking } from 'react-native';
 
+import { Ionicons } from '@expo/vector-icons';
+
 import { Box, Text, TouchableOpacityBox } from '@/components';
+import { Icon } from '@/components/Icon/Icon';
 import { toTelHref, toWhatsAppHrefs } from '@/functions/phoneContact';
+import { useAppTheme } from '@/hooks';
 import { measure } from '@/theme';
 
 interface PessoaContatoRowProps {
@@ -20,6 +24,12 @@ interface PessoaContatoRowProps {
 export function PessoaContatoRow({ nome, telefone, etiqueta }: PessoaContatoRowProps) {
     const tel = toTelHref(telefone);
     const zap = toWhatsAppHrefs(telefone);
+    // `Icon` (o componente do projeto) envolve MaterialIcons, que NAO tem glifo
+    // de marca — WhatsApp so existe em Ionicons. Por isso o telefone usa o
+    // componente e o WhatsApp vem direto de @expo/vector-icons, como outras
+    // telas deste app ja fazem. `colors` existe so por causa disso: o Ionicons
+    // recebe a cor crua, enquanto o `Icon` resolve pelo tema sozinho.
+    const { colors } = useAppTheme();
 
     async function abrirWhatsApp() {
         if (!zap) return;
@@ -57,23 +67,30 @@ export function PessoaContatoRow({ nome, telefone, etiqueta }: PessoaContatoRowP
                     {!!tel && (
                         <TouchableOpacityBox
                             onPress={() => Linking.openURL(tel).catch(() => {})}
+                            accessibilityRole="button"
+                            // O rotulo sai da tela, nao da acessibilidade: sem
+                            // isto o leitor anunciaria dois botoes sem nome.
                             accessibilityLabel={`Ligar para ${nome}`}
-                            hitSlop={measure.x8}
+                            // O icone e menor que o texto que substituiu; o
+                            // hitSlop maior mantem o alvo perto de 44pt, que e o
+                            // dedo de quem esta num caminhao andando.
+                            hitSlop={measure.x12}
                         >
-                            <Text preset="text13" color="primary100">
-                                Ligar
-                            </Text>
+                            <Icon name="call" size={measure.m24} color="primary100" />
                         </TouchableOpacityBox>
                     )}
                     {!!zap && (
                         <TouchableOpacityBox
                             onPress={abrirWhatsApp}
+                            accessibilityRole="button"
                             accessibilityLabel={`Abrir WhatsApp de ${nome}`}
-                            hitSlop={measure.x8}
+                            hitSlop={measure.x12}
                         >
-                            <Text preset="text13" color="primary100">
-                                WhatsApp
-                            </Text>
+                            <Ionicons
+                                name="logo-whatsapp"
+                                size={measure.m24}
+                                color={colors.primary100}
+                            />
                         </TouchableOpacityBox>
                     )}
                 </Box>
