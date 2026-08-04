@@ -160,7 +160,10 @@ membros. O campo deve ser omitido (não `null`) nas demais superfícies.
 - Item novo no array `itens` de `menu/index.tsx` → rota `menu/equipe/`.
 - Domínio novo `src/domain/agility/team/` no formato dos demais (`teamAPI`, `teamService`,
   `dto/`, `useCase/useMyTeamRoster`).
-- **Bloco "Minha equipe"**: `GET /teams/roster/me`. Líder destacado, habilidades exibidas.
+- **Bloco "Minha equipe"**: `GET /teams/roster/me`. Líder destacado. **Habilidades NÃO
+  exibidas** (correção de 04/08, durante a execução): o roster devolve `skillIds` como
+  números, não nomes. Mostrar `1, 5, 7` ao motorista não informa nada, e traduzir exigiria
+  outra chamada de API — escopo que ninguém pediu.
   **Filtra a própria pessoa** — o roster inclui quem perguntou, por contrato do P2; sem o
   filtro o motorista aparece na própria lista (armadilha já registrada na plataforma). O
   filtro usa o `personId` do próprio envelope (§4.5), sem chamada adicional.

@@ -1342,7 +1342,12 @@ Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>"
 - Produces:
   - `toTelHref(phone: string | null): string | null`
   - `toWhatsAppHrefs(phone: string | null): { app: string; web: string } | null`
-  - `<PessoaContatoRow nome={string} telefone={string | null} etiqueta={string | undefined} habilidades={number[] | undefined} />`
+  - `<PessoaContatoRow nome={string} telefone={string | null} etiqueta={string | undefined} />`
+
+  **Sem prop de habilidades**, apesar de a spec original dizer "habilidades exibidas": o
+  roster devolve `skillIds` como **números** (`[1, 5, 7]`), não nomes. Renderizar ids crus
+  para o motorista não informa nada, e traduzir para nome exigiria mais uma chamada a um
+  endpoint de habilidades — escopo que ninguém pediu. Fica de fora, registrado.
 
   As Tasks 9 e 10 renderizam este componente.
 
