@@ -108,10 +108,15 @@ Uma PR, sem migration.
 
 1. **`src/shared/person-display.util.ts`** (§3.2) + testes das duas cascatas, incluindo
    prestador PJ sem `tradeName` e colaborador sem nome nem email.
-2. **`TeamMapper`**: `phone` no recorte do `include`, `personPhone` no
-   `TeamMemberEntity.toJson()`, delegando ao util. O `include` da repository precisa passar
-   a trazer `phone` — sem isso o campo volta `null` em produção com todos os testes verdes
-   (falha já ocorrida com `personName`; a spec da repository cobre exatamente esse cenário).
+2. **`TeamMapper`**: `phone` no recorte de tipo `PrismaTeamMemberWithPerson` e `personPhone`
+   no `TeamMemberEntity.toJson()`, delegando ao util.
+
+   **As repositories NÃO precisam mudar.** Verificado: os `include` são de modelo inteiro
+   (`collaborator: { include: { collaboratorSkills: … } }` e, no routing,
+   `include: { helper: true, provider: true }`) — o `select` aninhado só estreita a junction
+   de skills, não a pessoa. `phone` já vem no runtime hoje; o que falta é o **tipo** declará-lo.
+   Isto invalida a preocupação inicial de "o include precisa trazer `phone`", herdada do
+   incidente do `personName`: lá o problema era outro.
 3. **`routing.service.ts`**: `helperPhone` no retorno de `getRoutingHelpers`, delegando ao
    util; `nomeDoAjudante` e `AjudanteRow` deixam de existir.
 4. **`PersonIdentityService`** (§3.3) + refactor do `DriverProfileService` para consumi-lo.
@@ -143,7 +148,10 @@ membros. O campo deve ser omitido (não `null`) nas demais superfícies.
 - `RoutingHelperResponse` (`id`, `collaboratorId`, `providerId`, `helperName`, `helperPhone`)
   e `helpers?: RoutingHelperResponse[]` em `RoutingResponse`.
 - Componente `AjudantesDaRota` em `rotas-detalhadas/[id]/_components/`, lendo do
-  `RotaContext`. **Nenhuma requisição nova.**
+  `RotaContext`. **Nenhuma requisição nova** — confirmado: o `routing` do contexto vem de
+  `useRouteDetails` → `useFindOneRouting` → `GET /routings/:id`, que é justamente o endpoint
+  que embute `helpers`. (O `useFindMyRoutings` que também aparece no contexto serve a outra
+  pergunta — "há outra rota em andamento" — e seu payload leve **não** traz `helpers`.)
 - Posição: abaixo do `RouteProgress`, antes das abas. **Não renderiza nada** quando a lista
   é vazia — rota sem ajudante não ganha espaço morto nem título órfão.
 
