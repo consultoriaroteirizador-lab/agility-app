@@ -15,6 +15,7 @@ export const KEY_FORM_GROUPS = 'form-groups'
 export const KEY_FORM_GROUP_ANSWERS = 'form-group-answers'
 export const KEY_DISTRIBUTION_CENTERS = 'distribution-centers'
 export const KEY_OCCURRENCE_REASONS = 'order-occurrence-reasons'
+export const KEY_TEAMS = 'teams'
 
 /**
  * Chaves a invalidar quando o STATUS de uma parada muda (conclusão, insucesso,

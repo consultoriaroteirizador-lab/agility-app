@@ -30,6 +30,11 @@ export default function MenuScreen() {
       icon: require('@/assets/images/agility/menu/simbulo-hist-rotas-menu.png'),
     },
     {
+      label: 'Minha equipe',
+      href: '/(auth)/(tabs)/menu/equipe',
+      icon: require('@/assets/images/agility/menu/simbulo-hist-rotas-menu.png'), // Reutilizando ícone: sem asset dedicado de equipe/pessoas em menu/
+    },
+    {
       label: 'Notificações',
       href: '/(auth)/(tabs)/notificacoes',
       icon: require('@/assets/images/agility/menu/simbulo-notificacoes-menu.png'),
