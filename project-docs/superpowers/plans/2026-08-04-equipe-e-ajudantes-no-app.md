@@ -743,7 +743,9 @@ O app (Task 10) consome exatamente esta forma.
 
 **Por que envelope e não array cru:** o roster **inclui a própria pessoa**, por contrato do P2 (`team.service.ts:233`). Sem o `personId` na resposta o app precisaria de uma segunda chamada (`/drivers/me`) só para descobrir qual linha é ele mesmo.
 
-**Onde declarar o endpoint:** **antes** de `@Get(':id')`, junto de `by-person` e `roster`. O Nest casa na ordem de declaração e `roster/me` cairia em `@Get('roster/:personId')` — que é a rota existente e responderia com `personId = "me"`, resolvendo para lista vazia. Falha silenciosa, não erro.
+**Onde declarar o endpoint — o detalhe que decide se ele funciona:** `@Get('roster/me')` tem de vir **ANTES** de `@Get('roster/:personId')`, e não só antes de `@Get(':id')`.
+
+O Nest (Express por baixo) casa rotas na **ordem de registro**, não por especificidade. Com `roster/:personId` declarado primeiro, uma requisição a `/teams/roster/me` casa nele com `personId = "me"` — que não é id de ninguém, resolve para roster vazio e responde **200 com lista vazia**. O endpoint novo nunca executa e a tela do app mostra "você ainda não faz parte de uma equipe" para todo mundo. Falha silenciosa, sem log, sem erro.
 
 - [ ] **Step 1: Escrever o teste que falha**
 
@@ -907,12 +909,12 @@ Esperado: PASS.
 
 - [ ] **Step 6: Expor o endpoint e ligar o módulo**
 
-Em `src/team/controller/team.controller.ts`, **entre** o `@Get('roster/:personId')` e o `@Get(':id')`, acrescente:
+Em `src/team/controller/team.controller.ts`, **imediatamente ACIMA do `@Get('roster/:personId')` existente** (não depois dele, não antes do `@Get(':id')` — ver a explicação da ordem acima), acrescente:
 
 ```ts
-    // Rota estática ANTES de ':id' — e ANTES de 'roster/:personId' não é
-    // necessário porque o Nest casa por especificidade de segmento literal,
-    // mas mantenha-a aqui, no bloco das estáticas, longe do ':id'.
+    // ORDEM IMPORTA, e a falha é silenciosa: o Nest casa na ordem de registro.
+    // Declarada DEPOIS de `roster/:personId`, esta rota nunca executa — a
+    // requisição casa lá com `personId="me"` e responde 200 com lista vazia.
     @Get('roster/me')
     @Roles('COLLABORATOR')
     @ApiOperation({
