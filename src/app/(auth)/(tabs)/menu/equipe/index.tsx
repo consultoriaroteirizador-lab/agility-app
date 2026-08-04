@@ -55,6 +55,10 @@ export default function MinhaEquipeScreen() {
 
         {!isLoading && !isError && (
           <Box mb="y32">
+            <Text preset="text15" fontWeightPreset="bold" color="colorTextPrimary" mb="y8">
+              Minha equipe fixa
+            </Text>
+
             {/* Estado vazio honesto: o motorista não cria equipe, então não há
                 ação a oferecer aqui — só a informação. */}
             {!temEquipe && (

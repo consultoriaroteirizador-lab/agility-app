@@ -26,7 +26,10 @@ export function PessoaContatoRow({ nome, telefone, etiqueta }: PessoaContatoRowP
         // O esquema whatsapp:// so abre com o app instalado. Sem esta checagem,
         // o toque nao faz nada em quem nao tem WhatsApp.
         const temApp = await Linking.canOpenURL(zap.app).catch(() => false);
-        Linking.openURL(temApp ? zap.app : zap.web);
+        // openURL rejeita quando nao ha handler pro esquema (ex.: sem app de
+        // WhatsApp nem navegador capaz de abrir o link web) — sem o catch vira
+        // unhandled rejection.
+        Linking.openURL(temApp ? zap.app : zap.web).catch(() => {});
     }
 
     return (
@@ -53,7 +56,7 @@ export function PessoaContatoRow({ nome, telefone, etiqueta }: PessoaContatoRowP
                 <Box flexDirection="row" gap="x16" alignItems="center">
                     {!!tel && (
                         <TouchableOpacityBox
-                            onPress={() => Linking.openURL(tel)}
+                            onPress={() => Linking.openURL(tel).catch(() => {})}
                             accessibilityLabel={`Ligar para ${nome}`}
                             hitSlop={measure.x8}
                         >

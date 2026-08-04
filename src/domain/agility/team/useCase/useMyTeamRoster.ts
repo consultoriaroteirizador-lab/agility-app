@@ -2,16 +2,18 @@ import { useQuery } from '@tanstack/react-query'
 
 import { KEY_TEAMS } from '@/domain/queryKeys'
 
-import type { TeamRosterMemberResponse } from '../dto'
+import { filterColegas, hasTeam } from '../rosterFilter'
 import { teamService } from '../teamService'
 
 /**
  * A equipe fixa do motorista logado.
  *
- * O backend devolve o roster INCLUINDO a própria pessoa (contrato do P2) — o
- * filtro mora aqui, para que nenhuma tela precise lembrar dele. Compara pelo
- * `personId` do próprio envelope: não é preciso uma segunda chamada para o app
- * descobrir quem ele é.
+ * `teamService.getMyRoster` devolve `BaseResponse<MyRosterResponse>` — o
+ * payload real mora em `data.result` (ver docblock de `teamAPI.ts` sobre o
+ * `ResponseInterceptor` global do Nest). O filtro do próprio motorista (ele
+ * aparece no roster por contrato do backend) mora em `rosterFilter.ts`, como
+ * função pura, para que nenhuma tela precise lembrar dele e para poder ser
+ * testado sem montar o hook.
  */
 export function useMyTeamRoster() {
     const { data, isLoading, isError, refetch, isRefetching } = useQuery({
@@ -21,13 +23,11 @@ export function useMyTeamRoster() {
         staleTime: 5 * 60 * 1000,
     })
 
-    const colegas: TeamRosterMemberResponse[] = (data?.members ?? []).filter(
-        (m) => m.collaboratorId !== data?.personId && m.providerId !== data?.personId,
-    )
+    const roster = data?.result
 
     return {
-        colegas,
-        temEquipe: (data?.members?.length ?? 0) > 0,
+        colegas: filterColegas(roster),
+        temEquipe: hasTeam(roster),
         isLoading,
         isRefetching,
         isError,
