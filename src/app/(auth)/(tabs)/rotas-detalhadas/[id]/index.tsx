@@ -16,6 +16,7 @@ import { measure } from '@/theme'
 
 import {
   RouteProgress,
+  AjudantesDaRota,
   ParadaListItem,
   EmptyParadasList,
   RouteActions,
@@ -97,9 +98,12 @@ interface ListHeaderProps {
 }
 
 function ListHeader({ aba, setAba, proximaParada }: ListHeaderProps) {
+  const { routing } = useRota()
+
   return (
     <>
       <RouteProgress />
+      <AjudantesDaRota ajudantes={routing?.helpers} />
       <RotaTabs aba={aba} setAba={setAba} />
       {aba === 'andamento' && proximaParada && (
         <Text preset="text14" color="gray600" marginBottom="y8">

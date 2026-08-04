@@ -20,6 +20,12 @@ export { RouteHeader } from './RouteHeader'
 export { RouteProgress } from './RouteProgress'
 
 // ============================================
+// COMPONENTES DE AJUDANTES
+// ============================================
+
+export { AjudantesDaRota } from './AjudantesDaRota'
+
+// ============================================
 // COMPONENTES DE PARADAS
 // ============================================
 

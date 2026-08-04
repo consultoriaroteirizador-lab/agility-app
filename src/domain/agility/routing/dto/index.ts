@@ -21,7 +21,7 @@ export type {
 } from './request/routing-handoff.request'
 
 // Response DTOs
-export type { RoutingResponse } from './response/routing.response'
+export type { RoutingResponse, RoutingHelperResponse } from './response/routing.response'
 export type { RoutingCountResponse } from './response/routing-count.response'
 export type { ReturnPoint } from './response/routing.response'
 export type { RoutingSummaryResponse } from './response/routing-summary.response'
