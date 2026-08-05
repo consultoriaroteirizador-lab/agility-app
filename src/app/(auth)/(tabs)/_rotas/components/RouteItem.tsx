@@ -4,7 +4,7 @@ import { Box, Text, TouchableOpacityBox } from '@/components';
 import { Icon } from '@/components/Icon/Icon';
 import type { IconNameMaterial } from '@/components/Icon/Icon';
 import type { RoutingResponse } from '@/domain/agility/routing/dto';
-import { RoutingStatus, RoutingType } from '@/domain/agility/routing/dto/types';
+import { RoutingProfile, RoutingStatus, RoutingType } from '@/domain/agility/routing/dto/types';
 import { measure } from '@/theme';
 import type { ThemeColors } from '@/theme/theme';
 
@@ -43,20 +43,31 @@ function getStatusVisual(status: RoutingStatus): StatusVisual {
 /**
  * Badge de tipo — usado quando NÃO é trecho de cross-docking.
  *
- * A regra do produto é binária: **o que não é Serviço é Entrega**. Por isso o
- * `default` devolve "Entrega" em vez de `null`, e não há mais o rótulo
- * "Produto". Antes, rota com `routingType` nulo (a maioria hoje) ficava sem
- * etiqueta nenhuma — o motorista não tinha como saber o que ia fazer sem abrir.
+ * A regra do produto é binária: **o que não é Serviço é Entrega**. Nunca
+ * devolve `null`: toda rota comum carrega uma das duas etiquetas. Antes, rota
+ * sem tipo ficava sem etiqueta e o motorista não sabia o que ia fazer sem abrir.
  *
- * Nunca devolve `null`: toda rota comum carrega uma das duas etiquetas.
+ * O eixo é o `routingProfile`, NÃO o `routingType`. Este último é legado: só é
+ * gravado se o chamador mandar, o backend não o lê para decisão nenhuma, e no
+ * dev (04/08/2026) está nulo em 262 de 310 rotas — a última gravação é de 19/06.
+ * Uma rota de campo real (perfil FIELD_SERVICE, paradas SERVICE) tem
+ * `routingType` nulo e seria carimbada como "Entrega" se lêssemos esse campo.
+ *
+ * `routingType` fica só como desempate de rota antiga sem perfil — exatamente a
+ * regra que a plataforma do operador já aplica em `tipoMatchesFilter`
+ * (`monitoring/monitoringPage.tsx`), para as duas telas concordarem.
  */
 function getRoutingTypeBadge(
+    routingProfile: RoutingProfile | null | undefined,
     routingType: RoutingType | null
 ): { label: string; color: ThemeColors } {
-    if (routingType === RoutingType.SERVICE) {
-        return { label: 'Serviço', color: 'secondary100' };
-    }
-    return { label: 'Entrega', color: 'primary100' };
+    const isServico =
+        routingProfile === RoutingProfile.FIELD_SERVICE ||
+        (!routingProfile && routingType === RoutingType.SERVICE);
+
+    return isServico
+        ? { label: 'Serviço', color: 'secondary100' }
+        : { label: 'Entrega', color: 'primary100' };
 }
 
 /** Badge de trecho de malha (cross-docking). Tem prioridade sobre o tipo. */
@@ -113,7 +124,9 @@ function RouteItemComponent({ route, onPress }: RouteItemProps) {
     // decidir entre abrir a rota direto e abrir o popup de início. Preservado.
     const legacyStatus = isInProgress ? 'Iniciada' : 'Não iniciado';
 
-    const badge = getLegBadge(route.legType) ?? getRoutingTypeBadge(route.routingType);
+    const badge =
+        getLegBadge(route.legType) ??
+        getRoutingTypeBadge(route.routingProfile, route.routingType);
     const facilityLine = getFacilityLine(route);
     const dateText = formatRouteDate(route.date);
     const price = formatCurrency(route.totalValue);

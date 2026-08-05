@@ -1,4 +1,4 @@
-import type { RoutingStatus, OfferType, RoutingType } from '../types'
+import type { RoutingStatus, OfferType, RoutingType, RoutingProfile } from '../types'
 
 /**
  * Return point structure
@@ -44,8 +44,14 @@ export interface RoutingResponse {
     /** Offer type */
     offerType: OfferType | null
 
-    /** Routing type (SERVICE or PRODUCT) */
+    /** LEGADO — quase sempre nulo. Para saber o que a rota é, use `routingProfile`. */
     routingType: RoutingType | null
+
+    /**
+     * O que a rota é. O backend sempre enviou este campo; o app é que não o
+     * declarava, então o dado chegava e era descartado.
+     */
+    routingProfile?: RoutingProfile | null
 
     /** Offer time limit */
     offerTime: string | null
