@@ -40,18 +40,23 @@ function getStatusVisual(status: RoutingStatus): StatusVisual {
     }
 }
 
-/** Badge de tipo (Serviço/Produto) — usado quando NÃO é trecho de cross-docking. */
+/**
+ * Badge de tipo — usado quando NÃO é trecho de cross-docking.
+ *
+ * A regra do produto é binária: **o que não é Serviço é Entrega**. Por isso o
+ * `default` devolve "Entrega" em vez de `null`, e não há mais o rótulo
+ * "Produto". Antes, rota com `routingType` nulo (a maioria hoje) ficava sem
+ * etiqueta nenhuma — o motorista não tinha como saber o que ia fazer sem abrir.
+ *
+ * Nunca devolve `null`: toda rota comum carrega uma das duas etiquetas.
+ */
 function getRoutingTypeBadge(
     routingType: RoutingType | null
-): { label: string; color: ThemeColors } | null {
-    switch (routingType) {
-        case RoutingType.SERVICE:
-            return { label: 'Serviço', color: 'secondary100' };
-        case RoutingType.PRODUCT:
-            return { label: 'Produto', color: 'primary100' };
-        default:
-            return null;
+): { label: string; color: ThemeColors } {
+    if (routingType === RoutingType.SERVICE) {
+        return { label: 'Serviço', color: 'secondary100' };
     }
+    return { label: 'Entrega', color: 'primary100' };
 }
 
 /** Badge de trecho de malha (cross-docking). Tem prioridade sobre o tipo. */
@@ -153,19 +158,20 @@ function RouteItemComponent({ route, onPress }: RouteItemProps) {
                     >
                         {route.name || `Rota #${route.code}`}
                     </Text>
-                    {badge ? (
-                        <Box
-                            backgroundColor={badge.color}
-                            px="x12"
-                            py="y4"
-                            borderRadius="s12"
-                            style={{ flexShrink: 0 }}
-                        >
-                            <Text preset="text12" color="white">
-                                {badge.label}
-                            </Text>
-                        </Box>
-                    ) : null}
+                    {/* Sem guarda condicional: `badge` nunca é nulo — trecho de
+                        malha cai no rótulo do trecho, e todo o resto cai em
+                        Serviço ou Entrega. */}
+                    <Box
+                        backgroundColor={badge.color}
+                        px="x12"
+                        py="y4"
+                        borderRadius="s12"
+                        style={{ flexShrink: 0 }}
+                    >
+                        <Text preset="text12" color="white">
+                            {badge.label}
+                        </Text>
+                    </Box>
                 </Box>
 
                 {/* Data da rota */}
