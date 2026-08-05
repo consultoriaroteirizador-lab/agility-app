@@ -138,6 +138,12 @@ export function SharedEtapaDados({ serviceType }: SharedEtapaDadosProps) {
                   *Obrigatório
                 </Text>
               </Box>
+              {/* `photoSize` explicito: o default do MultiPhotoPicker e
+                  (largura da tela - 64) / 3, ~99dp num aparelho de 360dp — dois
+                  quadroes que empurravam observacao e botoes para fora da
+                  dobra. 64dp reduz ~35% e ainda fica bem acima do alvo minimo
+                  de toque (44dp), que importa aqui: o motorista preenche esta
+                  tela na rua, as vezes de luva. */}
               <MultiPhotoPicker
                 photos={photos}
                 onPhotosChange={setPhotos}
@@ -148,6 +154,7 @@ export function SharedEtapaDados({ serviceType }: SharedEtapaDadosProps) {
                 labelPreset="textParagraph"
                 padding="y4"
                 backgroundColor="gray50"
+                photoSize={measure.m64}
               />
             </Box>
 

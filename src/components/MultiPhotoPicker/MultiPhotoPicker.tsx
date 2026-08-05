@@ -43,6 +43,12 @@ export default function MultiPhotoPicker({
 }: MultiPhotoPickerProps) {
   const { colors, borderRadii } = useAppTheme();
 
+  // Ícone proporcional ao quadrado, e não fixo em 32: com `photoSize` menor um
+  // ícone fixo ocuparia metade do botão. A razão 0.32 foi escolhida porque
+  // reproduz exatamente o tamanho de hoje no default (~99dp * 0.32 ≈ 32), então
+  // nenhuma tela que não passa `photoSize` muda de aparência.
+  const iconSize = Math.round(photoSize * 0.32);
+
   const requestPermission = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
@@ -229,7 +235,7 @@ export default function MultiPhotoPicker({
           alignItems: 'center',
         }}
       >
-        <Icon name="add" size={32} color="gray700" />
+        <Icon name="add" size={iconSize} color="gray700" />
       </TouchableOpacity>
     );
   };
@@ -251,7 +257,7 @@ export default function MultiPhotoPicker({
           alignItems: 'center',
         }}
       >
-        <Icon name="photo-camera" size={32} color="gray700" />
+        <Icon name="photo-camera" size={iconSize} color="gray700" />
       </TouchableOpacity>
     );
   };
