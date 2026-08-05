@@ -9,7 +9,15 @@ import { FlatList, SectionList } from 'react-native'
 
 import { Redirect, useLocalSearchParams } from 'expo-router'
 
-import { ActivityIndicator, Box, Button, ScreenBase, Text, TouchableOpacityBox } from '@/components'
+import {
+  ActivityIndicator,
+  AjudantesDaRota,
+  Box,
+  Button,
+  ScreenBase,
+  Text,
+  TouchableOpacityBox,
+} from '@/components'
 import { ButtonBack } from '@/components/Button/ButtonBack'
 import Modal from '@/components/Modal/Modal'
 import { measure } from '@/theme'
@@ -97,9 +105,12 @@ interface ListHeaderProps {
 }
 
 function ListHeader({ aba, setAba, proximaParada }: ListHeaderProps) {
+  const { routing } = useRota()
+
   return (
     <>
       <RouteProgress />
+      <AjudantesDaRota ajudantes={routing?.helpers} />
       <RotaTabs aba={aba} setAba={setAba} />
       {aba === 'andamento' && proximaParada && (
         <Text preset="text14" color="gray600" marginBottom="y8">

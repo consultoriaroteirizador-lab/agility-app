@@ -8,7 +8,6 @@ import type {
     ListDriversRequest,
     DriverResponse,
     DriverMeResponse,
-    AssignDriverTeamRequest,
 } from './dto'
 
 
@@ -64,19 +63,6 @@ async function update(
     return data
 }
 
-async function assignToTeam(
-    id: Id,
-    payload: AssignDriverTeamRequest,
-): Promise<BaseResponse<DriverResponse>> {
-    const { data } = await apiService.patch<BaseResponse<DriverResponse>>(`/drivers/${id}/assign-team`, payload)
-    return data
-}
-
-async function removeFromTeam(id: Id): Promise<BaseResponse<DriverResponse>> {
-    const { data } = await apiService.patch<BaseResponse<DriverResponse>>(`/drivers/${id}/remove-team`)
-    return data
-}
-
 async function remove(id: Id): Promise<BaseResponse<void>> {
     const { data } = await apiService.delete<BaseResponse<void>>(`/drivers/${id}`)
     return data
@@ -90,7 +76,5 @@ export const driverAPI = {
     findByLicenseNumber,
     getMe,
     update,
-    assignToTeam,
-    removeFromTeam,
     remove,
 }

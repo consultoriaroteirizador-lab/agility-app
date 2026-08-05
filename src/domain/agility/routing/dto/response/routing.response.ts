@@ -10,6 +10,24 @@ export interface ReturnPoint {
 }
 
 /**
+ * Ajudante escalado para UMA viagem (`routing_helpers`) — a tripulação daquela
+ * rota, montada pelo operador. Não confundir com a equipe fixa de cadastro
+ * (`Team`/`TeamMember`), que é outra pergunta e outro endpoint.
+ *
+ * `id` é o id da LINHA de `routing_helpers`, não o da pessoa.
+ * Exatamente um entre `collaboratorId` e `providerId` vem preenchido
+ * (ajudante pode ser funcionário ou terceirizado).
+ */
+export interface RoutingHelperResponse {
+    id: string
+    collaboratorId: string | null
+    providerId: string | null
+    helperName: string | null
+    /** Só vem do `GET /routings/:id`; ausente enquanto o backend não estiver deployado. */
+    helperPhone?: string | null
+}
+
+/**
  * Routing response DTO
  * Maps to RoutingEntity.toJson() from backend
  */
@@ -161,6 +179,10 @@ export interface RoutingResponse {
     transferOrdersCount?: number | null
     /** Cross-docking: id do CD de destino do trecho (resolve coords via distribution-centers). */
     destinationFacilityId?: string | null
+
+    /** Ajudantes da viagem. Só o `GET /routings/:id` embute; o payload leve das
+     *  listagens não traz. Ausente também enquanto o backend não subir. */
+    helpers?: RoutingHelperResponse[]
 
     /** Creation timestamp */
     createdAt: Date | string

@@ -37,8 +37,14 @@ export default function MenuLayout() {
           headerShown: false,
         }}
       />
-      <Stack.Screen 
-        name="perfil" 
+      <Stack.Screen
+        name="perfil"
+        options={{
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen
+        name="equipe"
         options={{
           headerShown: false,
         }}
