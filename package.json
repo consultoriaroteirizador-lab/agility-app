@@ -20,7 +20,11 @@
     "wrap-ansi": "7.0.0"
   },
   "jest": {
-    "preset": "jest-expo"
+    "preset": "jest-expo",
+    "globalSetup": "<rootDir>/test/setup-timezone.ts",
+    "setupFilesAfterEnv": [
+      "<rootDir>/test/assert-timezone.ts"
+    ]
   },
   "dependencies": {
     "@expo-google-fonts/montserrat": "^0.4.2",
