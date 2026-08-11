@@ -230,6 +230,18 @@ const getDefaultConfig = (authConfig: TrackingAuthConfig) => {
 /**
  * Força uma leitura de posição imediata (persiste + POSTa). Usado no report
  * imediato ao ficar disponível, pra o motorista aparecer rápido no mapa.
+ *
+ * O `syncNow()` no fim NÃO é redundante com o `autoSync` da config — é o que
+ * torna este report de fato imediato. `persist: true` apenas ENFILEIRA a
+ * posição no banco local do SDK, e o POST automático só dispara quando a fila
+ * chega ao `autoSyncThreshold` (5). Parado, o motorista nunca completa o lote:
+ * medido no dev em 11/08/2026, a posição capturada às 13:53:51 só chegou ao
+ * servidor às 13:59:35 — 5min44s presa no aparelho, junto com outras 4.
+ *
+ * O flush roda mesmo se a leitura falhar: sem coordenada nova ainda pode haver
+ * posições presas de lotes anteriores, e esvaziar é melhor que o motorista
+ * sumir do mapa. `syncNow` trata o próprio erro, então esta função nunca
+ * rejeita — importa porque o `LocationTrackingProvider` a chama com `void`.
  */
 export async function requestCurrentPosition(): Promise<void> {
   try {
@@ -237,6 +249,8 @@ export async function requestCurrentPosition(): Promise<void> {
   } catch (err) {
     console.warn('[BGGeolocation] requestCurrentPosition falhou:', err);
   }
+
+  await syncNow();
 }
 
 /**
