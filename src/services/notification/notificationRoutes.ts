@@ -13,6 +13,25 @@ export type NotificationRoute =
     | "menu"
     | string; // Para rotas customizadas
 
+/**
+ * Abre a conversa de suporte. Aceita `id` ou `chatId` porque o push de mensagem antigo
+ * mandava `chatId` — sem isso, uma notificação já em trânsito cairia numa rota sem param.
+ * Sem nenhum dos dois, cai na lista de conversas em vez de abrir uma tela quebrada.
+ */
+function goToSupportChat(params?: any) {
+    const chatId = params?.id ?? params?.chatId;
+
+    if (!chatId) {
+        router.navigate('/(auth)/(tabs)/menu/suporte' as Href);
+        return;
+    }
+
+    router.navigate({
+        pathname: '/(auth)/(tabs)/menu/suporte/[id]' as any,
+        params: { ...params, id: chatId },
+    });
+}
+
 export const notificationRoutes: Record<string, (params?: any) => void> = {
     // Home
     home: () => router.replace('/(auth)/(tabs)' as Href),
@@ -61,9 +80,11 @@ export const notificationRoutes: Record<string, (params?: any) => void> = {
 
     // Menu
     menu: () => router.navigate('/(auth)/(tabs)/menu' as Href),
-    chat: (params?: any) => router.navigate({ pathname: '/(auth)/(tabs)/menu/chat' as any, params }),
+    // `menu/chat` é uma tela legada (chatId fixo, sem backend): notificação de chat NUNCA
+    // deve cair lá. Este nome só sobrevive para pushes antigos ainda em trânsito.
+    chat: (params?: any) => goToSupportChat(params),
     // Chat de suporte (abre a conversa específica via param `id` = chatId)
-    suporte: (params?: any) => router.navigate({ pathname: '/(auth)/(tabs)/menu/suporte/[id]' as any, params }),
+    suporte: (params?: any) => goToSupportChat(params),
     serviceChannel: () => router.navigate('/(auth)/MenuScreen/ServiceChannelScreen' as Href),
     changePassword: () => router.navigate('/(auth)/MenuScreen/ChangePasswordScreen' as Href),
     termsMenu: () => router.navigate('/(auth)/MenuScreen/Terms' as Href),
