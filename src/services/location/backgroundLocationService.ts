@@ -25,6 +25,8 @@ import BackgroundGeolocation, {
 import { isDevelopment } from '@/config/environment';
 import { urls } from '@/config/urls';
 
+import { createSingleFlight } from './singleFlight';
+
 // Interface para configuração do setConfig
 interface GeolocationSetConfig {
   extras?: Record<string, unknown>;
@@ -606,7 +608,23 @@ export async function ensureTrackingPermissions(): Promise<void> {
   }
 }
 
+/**
+ * Trava do start. O SDK rejeita um `start()` emitido enquanto outro não
+ * terminou (`Waiting for previous start action to complete`), e o efeito do
+ * `LocationTrackingProvider` re-dispara com facilidade — deps como `driverId` e
+ * `trackingEnabled` chegam de queries que resolvem em momentos diferentes.
+ *
+ * A trava fica AQUI, colada na chamada nativa, e não no `startLocationTracking`:
+ * assim protege todos os caminhos de start, não só o que passa por aquele
+ * wrapper. Ver `singleFlight.ts` para o porquê de uma flag não bastar.
+ */
+const startSingleFlight = createSingleFlight<void>();
+
 export async function startBackgroundTracking(driverId: string): Promise<void> {
+  return startSingleFlight(driverId, () => doStartBackgroundTracking(driverId));
+}
+
+async function doStartBackgroundTracking(driverId: string): Promise<void> {
   console.log('[BGGeolocation] Iniciando tracking para driver:', driverId);
 
   if (!trackingState.isInitialized) {

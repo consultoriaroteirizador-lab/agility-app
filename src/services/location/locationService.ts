@@ -48,11 +48,21 @@ export async function startLocationTracking(driverId: string): Promise<void> {
   console.log('[LocationService] Iniciando rastreamento para driver:', driverId);
 
   if (USE_BACKGROUND_GEOLOCATION) {
-    // Fonte de verdade é o estado REAL do SDK — não o flag `legacyTrackingActive`.
-    // Esse flag é global de módulo e sobrevive a um remount do provider; num
-    // logout→login rápido o stop (async, do unmount) só o zerava DEPOIS do await,
-    // então o novo start podia vê-lo ainda `true` e virar no-op, deixando o
-    // tracking sem reiniciar. Checar o SDK evita esse race.
+    // Atalho para o caso JÁ RESOLVIDO (tracking ligado e estável), não uma
+    // proteção contra concorrência — e o comentário anterior aqui afirmava o
+    // contrário ("fonte de verdade é o estado REAL do SDK"). Não é: o
+    // `getTrackingState()` devolve uma cópia de `trackingState`, outra flag
+    // global de módulo, e ela só vira `true` DEPOIS do `await ...start()`. Duas
+    // chamadas dentro dessa janela liam `false` as duas e disparavam dois
+    // `start()` — o erro `Waiting for previous start action to complete` no
+    // console. Quem impede isso agora é a trava de execução única em
+    // `startBackgroundTracking` (ver `singleFlight.ts`); esta guarda continua só
+    // para evitar trabalho redundante quando não há nada em voo.
+    //
+    // O motivo de ler `trackingState` e não `legacyTrackingActive` segue válido:
+    // aquele flag sobrevive a um remount do provider, e num logout→login rápido
+    // o stop (async, do unmount) só o zerava DEPOIS do await, então o novo start
+    // o via `true` e virava no-op, deixando o tracking sem reiniciar.
     if (getTrackingState().isTracking) {
       console.log('[LocationService] Tracking já está ativo (SDK)');
       legacyTrackingActive = true;
