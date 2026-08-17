@@ -6,6 +6,7 @@ import { Box, ScreenBase, Text } from '@/components';
 import { ListaDeNotificacoes } from '@/components/NotificationItem/ListaDeNotificacoes';
 import type { NotificationResponse } from '@/domain/agility/notification/dto';
 import { useFindAllNotifications, useMarkNotificationAsRead } from '@/domain/agility/notification/useCase';
+import { navigateToNotificationRoute } from '@/services/notification/notificationRoutes';
 
 
 export default function NotificacoesScreen() {
@@ -80,10 +81,23 @@ export default function NotificacoesScreen() {
           route = '/menu/ganhos';
           break;
 
+        case 'CHAT_MESSAGE': {
+          const chatId = notification.metadata?.chatId;
+          route = chatId ? `/menu/suporte/${chatId}` : '/menu/suporte';
+          break;
+        }
+
         case 'SYSTEM_ALERT':
         default:
           if (notification.linkUrl?.startsWith('/')) {
             route = notification.linkUrl;
+          } else if (notification.linkUrl) {
+            // `linkUrl` também pode ser um NOME de rota ('suporte', 'ofertas'), o mesmo
+            // vocabulário que o push usa. Resolver pelo mapa compartilhado evita que o item
+            // da lista fique morto enquanto o push equivalente funciona — foi o que
+            // aconteceu com o aviso de atendimento encerrado.
+            navigateToNotificationRoute(notification.linkUrl, notification.metadata?.params ?? notification.metadata);
+            return;
           }
           break;
       }
