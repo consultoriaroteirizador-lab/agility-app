@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { useQueryClient } from '@tanstack/react-query';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 
 import { useFindOneDriver, useUpdateDriver } from '@/domain/agility/driver/useCase';
 import { RoutingStatus } from '@/domain/agility/routing/dto/types';
@@ -90,6 +90,26 @@ function useRoutesList() {
         await refetch();
         setRefreshing(false);
     }, [refetch]);
+
+    // Atualiza a lista toda vez que a Home volta ao foco: voltar de uma rota,
+    // trocar de aba, ou tocar no push de rota nova e cair aqui. O `staleTime` de
+    // 5min do QueryClient (src/app/_layout.tsx) segurava o snapshot antigo, e o
+    // único jeito de forçar era o pull-to-refresh — gesto que muito motorista
+    // não conhece. Sem `setRefreshing`: é busca de fundo, a lista atual fica na
+    // tela até a nova chegar.
+    //
+    // O PRIMEIRO foco é pulado de propósito — a própria query já busca ao
+    // montar, e refetchar ali seria uma segunda requisição no mesmo instante.
+    const hasFocusedOnce = useRef(false);
+    useFocusEffect(
+        useCallback(() => {
+            if (!hasFocusedOnce.current) {
+                hasFocusedOnce.current = true;
+                return;
+            }
+            refetch();
+        }, [refetch])
+    );
 
     return {
         routes: filteredRoutes,

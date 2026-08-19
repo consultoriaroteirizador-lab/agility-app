@@ -10,11 +10,13 @@ import React, {
 import { Platform } from "react-native";
 
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useQueryClient } from "@tanstack/react-query";
 import * as Notifications from "expo-notifications";
 import { router } from "expo-router";
 
 import { isDevelopment } from "@/config/environment";
 import { useRegisterUserNotification } from "@/domain/notificationService/useCase/useRegisterUserNotification";
+import { KEY_NOTIFICATIONS, KEY_ROUTINGS } from "@/domain/queryKeys";
 import { getDeviceFingerprint } from "@/functions/getDeviceFingerprint";
 
 import { useAuthCredentialsService } from "../authCredentials/useAuthCredentialsService";
@@ -120,6 +122,23 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
   const previousStatusRef = useRef<string | undefined>(undefined);
 
   const isAuthenticated = !!authCredentials && !!userAuth;
+  const queryClient = useQueryClient();
+
+  /**
+   * Marca as rotas do motorista como desatualizadas quando chega um push.
+   *
+   * Não filtra por `type` de propósito: NÃO existe um tipo "rota atribuída" —
+   * a atribuição chega hoje como ROUTE_REPLANNED ou SERVICE_ADDED, e um filtro
+   * por tipo quebraria em silêncio no dia em que o backend mandar outro. A
+   * invalidação é barata e tem o efeito que se quer nos dois cenários: com a
+   * Home montada ela refaz a busca na hora; com a Home fora de tela a query
+   * fica stale e busca de novo quando o motorista voltar para ela — sem
+   * depender do pull-to-refresh nem do `staleTime` de 5min expirar.
+   */
+  const invalidateAfterPush = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: [KEY_ROUTINGS] });
+    queryClient.invalidateQueries({ queryKey: [KEY_NOTIFICATIONS] });
+  }, [queryClient]);
 
   // Seu hook de registro
   const { registerUserNotification } = useRegisterUserNotification({
@@ -445,6 +464,8 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
             setNotification(receivedNotification);
           }
 
+          invalidateAfterPush();
+
           onNotificationReceived?.(receivedNotification);
         }
       );
@@ -454,6 +475,11 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
         if (isDevelopment) console.log("Notificação Tocada:", response);
 
         const data = response.notification.request.content.data as NotificationData;
+
+        // Também aqui, e não só no listener de foreground: com o app fechado ou
+        // em background o push não passa pelo `received`, então tocar na
+        // notificação era o único evento que o app via.
+        invalidateAfterPush();
 
         handleNotificationNavigation(data);
         onNotificationResponse?.(response);
@@ -471,6 +497,7 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
   }, [
     authLoading,
     handleNotificationNavigation,
+    invalidateAfterPush,
     onNotificationReceived,
     onNotificationResponse,
     setBadgeCount,

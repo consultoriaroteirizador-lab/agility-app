@@ -114,7 +114,7 @@ export default function RoutesScreen() {
           onToggle={handleToggleAvailability}
         />
 
-        <RoutesHeader />
+        <RoutesHeader onRefresh={onRefresh} isRefreshing={refreshing} />
 
         <FlatList
           data={routes}
