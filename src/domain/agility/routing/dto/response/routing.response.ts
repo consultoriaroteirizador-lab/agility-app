@@ -62,8 +62,18 @@ export interface RoutingResponse {
     /** Offer type */
     offerType: OfferType | null
 
-    /** Routing type (SERVICE or PRODUCT) */
+    /** Routing type (SERVICE or PRODUCT) — campo APOSENTADO: o ERP não envia e
+     *  o backend não lê. Nulo em 86% das rotas. Só sobrevive como fallback de
+     *  legado; para saber a natureza da rota use `routingProfile`. */
     routingType: RoutingType | null
+
+    /**
+     * Perfil da roteirização — o campo VIVO (`LAST_MILE` | `FIELD_SERVICE` |
+     * `PICKUP_DELIVERY`). O backend já o envia no `toJson`; este contrato é que
+     * não o declarava, então o app decidia o badge pelo `routingType` nulo e
+     * mostrava "Entrega" para toda rota de serviço em campo.
+     */
+    routingProfile: string | null
 
     /** Offer time limit */
     offerTime: string | null
