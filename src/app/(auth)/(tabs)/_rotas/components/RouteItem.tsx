@@ -4,7 +4,8 @@ import { AjudantesDaRota, Box, Text, TouchableOpacityBox } from '@/components';
 import { Icon } from '@/components/Icon/Icon';
 import type { IconNameMaterial } from '@/components/Icon/Icon';
 import type { RoutingResponse } from '@/domain/agility/routing/dto';
-import { RoutingStatus, RoutingType } from '@/domain/agility/routing/dto/types';
+import { RoutingStatus } from '@/domain/agility/routing/dto/types';
+import { isFieldServiceRoute } from '../utils/routeKind';
 import { measure } from '@/theme';
 import type { ThemeColors } from '@/theme/theme';
 
@@ -49,11 +50,15 @@ function getStatusVisual(status: RoutingStatus): StatusVisual {
  * etiqueta nenhuma — o motorista não tinha como saber o que ia fazer sem abrir.
  *
  * Nunca devolve `null`: toda rota comum carrega uma das duas etiquetas.
+ *
+ * A decisão de qual das duas mora em `isFieldServiceRoute`: ler só o
+ * `routingType` (aposentado, nulo em 86% das rotas) fazia TODA rota de serviço
+ * em campo cair no `default` e aparecer como "Entrega" para o motorista.
  */
 function getRoutingTypeBadge(
-    routingType: RoutingType | null
+    route: Pick<RoutingResponse, 'routingProfile' | 'routingType'>
 ): { label: string; color: ThemeColors } {
-    if (routingType === RoutingType.SERVICE) {
+    if (isFieldServiceRoute(route)) {
         return { label: 'Serviço', color: 'secondary100' };
     }
     return { label: 'Entrega', color: 'primary100' };
@@ -113,7 +118,7 @@ function RouteItemComponent({ route, onPress }: RouteItemProps) {
     // decidir entre abrir a rota direto e abrir o popup de início. Preservado.
     const legacyStatus = isInProgress ? 'Iniciada' : 'Não iniciado';
 
-    const badge = getLegBadge(route.legType) ?? getRoutingTypeBadge(route.routingType);
+    const badge = getLegBadge(route.legType) ?? getRoutingTypeBadge(route);
     const facilityLine = getFacilityLine(route);
     const dateText = formatRouteDate(route.date);
     const price = formatCurrency(route.totalValue);
