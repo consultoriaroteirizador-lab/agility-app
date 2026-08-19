@@ -11,6 +11,7 @@ import {
 
 import * as ImagePicker from 'expo-image-picker';
 
+import { ServiceFlowTheme } from '@/components';
 import type { AddressResponse } from '@/domain/agility/address/dto';
 import { useFindOneAddress } from '@/domain/agility/address/useCase';
 import { useGetMe } from '@/domain/agility/driver/useCase';
@@ -1287,7 +1288,10 @@ export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderPr
   };
 
   return (
-    <ParadaContext.Provider value={value}>{children}</ParadaContext.Provider>
+    <ParadaContext.Provider value={value}>
+      {/* Nota de SERVIÇO pinta as ações de laranja — ver `ServiceFlowTheme`. */}
+      <ServiceFlowTheme serviceType={service?.serviceType}>{children}</ServiceFlowTheme>
+    </ParadaContext.Provider>
   );
 }
 

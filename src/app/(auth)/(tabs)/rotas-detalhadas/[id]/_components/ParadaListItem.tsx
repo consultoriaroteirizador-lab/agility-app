@@ -3,7 +3,7 @@
  */
 
 import { Box, Text, TouchableOpacityBox } from '@/components'
-import { formatHHmm } from '@/functions/dateFunctions'
+import { appDayKey, formatDDMM, formatHHmm } from '@/functions/dateFunctions'
 import { useNow } from '@/hooks'
 import { measure, ThemeColors } from '@/theme';
 
@@ -113,6 +113,15 @@ export function ParadaListItem({
     const janelaContratada = (parada.promisedStartISO || parada.promisedEndISO)
         ? `${formatHHmm(parada.promisedStartISO)}–${formatHHmm(parada.promisedEndISO)}`
         : null
+
+    // Só HH:mm esconde de que DIA o horário é: janela de ontem lida como 13:00–18:00
+    // parece de hoje, e aí o selo "Fora da janela" (que compara o instante inteiro)
+    // vira mistério. Quando não é hoje, o dia entra na frente.
+    const hojeKey = appDayKey(now)
+    const diaJanela = appDayKey(parada.promisedEndISO ?? parada.promisedStartISO)
+    const janelaEmOutroDia = !!diaJanela && !!hojeKey && diaJanela !== hojeKey
+    const diaEta = appDayKey(parada.estimatedArrivalISO)
+    const etaEmOutroDia = !!diaEta && !!hojeKey && diaEta !== hojeKey
 
     // ⏰ ETA: só exibir quando há horário REAL. formatHHmm devolve '--:--' quando
     // não há estimatedArrival/Completion — não queremos mostrar o relógio com o
@@ -232,13 +241,13 @@ export function ParadaListItem({
 
                     {parada.status === 'concluida-sucesso' && parada.deliveryOutcome === 'WITH_ISSUES' && (
                         <Box
-                            backgroundColor="secondary10"
+                            backgroundColor="yellow40"
                             paddingHorizontal="x8"
                             paddingVertical="y2"
                             borderRadius="s4"
                             flexShrink={0}
                         >
-                            <Text preset="text13" color="secondary100">
+                            <Text preset="text13" color="gray800">
                                 ⚠ com pendência
                             </Text>
                         </Box>
@@ -259,13 +268,13 @@ export function ParadaListItem({
                         </Box>
                     ) : lateEta ? (
                         <Box
-                            backgroundColor="secondary10"
+                            backgroundColor="yellow40"
                             paddingHorizontal="x8"
                             paddingVertical="y2"
                             borderRadius="s4"
                             flexShrink={0}
                         >
-                            <Text preset="text13" color="secondary100">
+                            <Text preset="text13" color="gray800">
                                 ⏱ Atrasado{delayMin && delayMin > 0 ? ` +${delayMin}min` : ''}
                             </Text>
                         </Box>
@@ -310,13 +319,13 @@ export function ParadaListItem({
                         </Box>
                         {parada.hasReturn && (
                             <Box
-                                backgroundColor="secondary10"
+                                backgroundColor="yellow40"
                                 paddingHorizontal="x6"
                                 paddingVertical="y2"
                                 borderRadius="s4"
                                 alignSelf="flex-start"
                             >
-                                <Text preset="text10" fontWeightPreset='bold' color="secondary100">
+                                <Text preset="text10" fontWeightPreset='bold' color="gray800">
                                     + RETORNO
                                 </Text>
                             </Box>
@@ -363,10 +372,15 @@ export function ParadaListItem({
                     </Text>
                 )}
 
+                {/* Janela CALCULADA (ETA). Vermelho só quando a janela CONTRATADA
+                    estourou — o mesmo caso do selo "⚠ Fora da janela" acima. Atraso
+                    contra o plano (`lateEta`) já tem o selo âmbar próprio; pintar a
+                    hora de vermelho também fazia parada DENTRO da janela parecer
+                    problema, que é o oposto do que a cor deveria dizer. */}
                 {(horaInicioValida || horaFimValida) && (
                     <Box flexDirection="row" alignItems="center" gap="x4" marginTop="y8">
-                        <Text preset="text12" color={lateEta || lateWindow ? 'redError' : 'gray400'}>
-                            ⏰{horaInicioValida ? ` ${parada.horarioInicio}` : ''}
+                        <Text preset="text12" fontWeightPreset="semibold" color={lateWindow ? 'redError' : 'gray400'}>
+                            ⏰{etaEmOutroDia ? ` ${formatDDMM(parada.estimatedArrivalISO)}` : ''}{horaInicioValida ? ` ${parada.horarioInicio}` : ''}
                         </Text>
                         {horaInicioValida && horaFimValida && (
                             <Text preset="text12" color="gray300">
@@ -374,7 +388,7 @@ export function ParadaListItem({
                             </Text>
                         )}
                         {horaFimValida && (
-                            <Text preset="text12" color={lateEta || lateWindow ? 'redError' : 'gray400'}>
+                            <Text preset="text12" fontWeightPreset="semibold" color={lateWindow ? 'redError' : 'gray400'}>
                                 {parada.horarioFim}
                             </Text>
                         )}
@@ -385,7 +399,7 @@ export function ParadaListItem({
                 {janelaContratada && (
                     <Box marginTop="y2">
                         <Text preset="text12" color="gray400">
-                            📄 Janela contratada: {janelaContratada}
+                            📄 Janela contratada: {janelaEmOutroDia ? `${formatDDMM(parada.promisedEndISO ?? parada.promisedStartISO)} ` : ''}{janelaContratada}
                         </Text>
                     </Box>
                 )}

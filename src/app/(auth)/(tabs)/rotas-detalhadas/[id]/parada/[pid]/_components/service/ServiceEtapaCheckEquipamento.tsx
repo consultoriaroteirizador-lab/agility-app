@@ -112,16 +112,20 @@ export function ServiceEtapaCheckEquipamento() {
                                 </Text>
                             </Box>
 
+                            {/* Verde quando tudo foi checado, laranja enquanto falta item.
+                                Não dá para usar `primary*` no "completo": esta tela só existe
+                                no fluxo de serviço, onde o tema pinta `primary*` do mesmo
+                                laranja do "pendente" (ver `serviceTheme`). */}
                             <Box
                                 paddingHorizontal="x12"
                                 paddingVertical="y8"
                                 borderRadius="s12"
-                                backgroundColor={materialsState.allChecked ? 'primary10' : 'secondary10'}
+                                backgroundColor={materialsState.allChecked ? 'tertiary10' : 'secondary10'}
                                 flexShrink={0}
                             >
                                 <Text
                                     preset="text14"
-                                    color={materialsState.allChecked ? 'primary100' : 'secondary80'}
+                                    color={materialsState.allChecked ? 'tertiary100' : 'secondary80'}
                                     fontWeightPreset="semibold"
                                     numberOfLines={1}
                                 >

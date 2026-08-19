@@ -4,8 +4,7 @@ import { Linking } from 'react-native';
 import { useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
-
-import { ActivityIndicator, Box, Button, Text, TouchableOpacityBox, LocalIcon, ScreenBase, NavigationPopup } from '@/components';
+import { ActivityIndicator, Box, Button, Text, TouchableOpacityBox, LocalIcon, ScreenBase, NavigationPopup, ServiceFlowTheme } from '@/components';
 import { ButtonBack } from '@/components/Button/ButtonBack';
 import Modal from '@/components/Modal/Modal';
 import { formatAddress } from '@/domain/agility/address/dto/response/address.response';
@@ -43,7 +42,7 @@ import { isValidCoordinate } from './_utils/mapUtils';
  * Stop Detail Screen
  * Displays detailed information about a stop/service
  */
-export default function StopDetailScreen() {
+function StopDetailContent() {
   const router = useRouter();
   const params = useLocalSearchParams<{ id: string; pid: string }>();
   const routeId = params.id as string;
@@ -744,5 +743,24 @@ export default function StopDetailScreen() {
         onClose={() => setShowConcluirRotaModal(false)}
       />
     </ScreenBase>
+  );
+}
+
+/**
+ * Nota de SERVIÇO usa o laranja nas ações — ver `ServiceFlowTheme`.
+ *
+ * O tema tem que envolver a tela inteira, e o `serviceType` só existe depois
+ * do fetch; por isso o wrapper fica aqui fora, com o conteúdo num componente
+ * separado. O `useFindOneService` é o MESMO do conteúdo (mesma chave de
+ * react-query), então não gera requisição a mais.
+ */
+export default function StopDetailScreen() {
+  const { pid } = useLocalSearchParams<{ id: string; pid: string }>();
+  const { service } = useFindOneService((pid as string) || '');
+
+  return (
+    <ServiceFlowTheme serviceType={service?.serviceType}>
+      <StopDetailContent />
+    </ServiceFlowTheme>
   );
 }

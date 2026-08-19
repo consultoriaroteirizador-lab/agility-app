@@ -19,12 +19,14 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'expo-router'
 
 
+import { ServiceFlowTheme } from '@/components'
 import type { RoutingResponse } from '@/domain/agility/routing/dto'
 import { RoutingStatus } from '@/domain/agility/routing/dto/types'
 import { useFindMyRoutings } from '@/domain/agility/routing/useCase'
 import { KEY_ROUTINGS } from '@/domain/queryKeys'
 import { useToastService } from '@/services/Toast/useToast'
 
+import { isFieldServiceRoute } from '../../../_rotas/utils/routeKind'
 import {
     useRouteDetails,
     useRouteActions,
@@ -421,7 +423,10 @@ export function RotaProvider({ children, routeId }: RotaProviderProps) {
 
     return (
         <RotaContext.Provider value={value}>
-            {children}
+            {/* Rota de serviço em campo pinta a tela de laranja — ver `ServiceFlowTheme`. */}
+            <ServiceFlowTheme isFieldService={isFieldServiceRoute(routing)}>
+                {children}
+            </ServiceFlowTheme>
         </RotaContext.Provider>
     )
 }

@@ -3,7 +3,7 @@ import { Linking, Platform } from 'react-native';
 
 import { useLocalSearchParams, usePathname, useRouter } from 'expo-router';
 
-import { Box, Button, ScreenBase, Text, TouchableOpacityBox } from '@/components';
+import { Box, Button, ScreenBase, Text, TouchableOpacityBox, ServiceFlowTheme } from '@/components';
 import { ButtonBack } from '@/components/Button/ButtonBack';
 import { createDriverSupportChatService, createDriverCustomerChatService } from '@/domain/agility/chat/chatService';
 import { useFindOneService } from '@/domain/agility/service/useCase';
@@ -11,7 +11,7 @@ import { useAuthCredentialsService } from '@/services';
 import { useToastService } from '@/services/Toast/useToast';
 import { measure } from '@/theme';
 
-export default function TentativaEntregaScreen() {
+function TentativaEntregaScreenContent() {
   const router = useRouter();
   const pathname = usePathname();
   const { id, pid } = useLocalSearchParams<{ id: string; pid: string }>();
@@ -212,5 +212,21 @@ export default function TentativaEntregaScreen() {
       </Box>
     </ScreenBase>
 
+  );
+}
+
+/**
+ * Nota de SERVIÇO usa o laranja nas ações — ver `ServiceFlowTheme`.
+ * Mesmo `useFindOneService` do conteúdo (react-query dedupa), só que aqui
+ * fora para o tema envolver a tela inteira.
+ */
+export default function TentativaEntregaScreen() {
+  const { pid } = useLocalSearchParams<{ id: string; pid: string }>();
+  const { service } = useFindOneService((pid as string) || '');
+
+  return (
+    <ServiceFlowTheme serviceType={service?.serviceType}>
+      <TentativaEntregaScreenContent />
+    </ServiceFlowTheme>
   );
 }

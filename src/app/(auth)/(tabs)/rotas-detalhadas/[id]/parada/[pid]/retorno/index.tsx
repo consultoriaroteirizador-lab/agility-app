@@ -5,15 +5,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
-import {
-  ActivityIndicator,
-  Box,
-  Button,
-  LocalIcon,
-  ScreenBase,
-  Text,
-  TouchableOpacityBox,
-} from '@/components';
+import { ActivityIndicator, Box, Button, LocalIcon, ScreenBase, Text, TouchableOpacityBox, ServiceFlowTheme } from '@/components';
 import { ButtonBack } from '@/components/Button/ButtonBack';
 import { Icon } from '@/components/Icon/Icon';
 import { MultiPhotoPicker } from '@/components/MultiPhotoPicker';
@@ -27,6 +19,7 @@ import { formatHHmm } from '@/functions';
 import { useToastService } from '@/services/Toast/useToast';
 import { measure } from '@/theme';
 
+import { useIsFieldServiceRoute } from '../../../../../_rotas/hooks';
 import { splitRouteAtLastStop } from '../_components/shared/geo';
 import { Map, MapPoint } from '../_components/shared/Map';
 import { useStopActions, useUserLocation } from '../_hooks';
@@ -74,7 +67,7 @@ function reasonLabel(reason?: string | null): string {
   }
 }
 
-export default function RetornoScreen() {
+function RetornoContent() {
   const params = useLocalSearchParams<{ id: string; pid: string }>();
   const routeId = params.id as string;
   const serviceId = params.pid as string;
@@ -401,10 +394,12 @@ export default function RetornoScreen() {
             Conferência de retorno
           </Text>
 
-          {/* Trava visual: a conferência só fica clicável após o check-in. */}
+          {/* Trava visual: a conferência só fica clicável após o check-in.
+              A dica é âmbar, não laranja: em rota de serviço o laranja é a cor da
+              própria rota (ver `serviceTheme`) e ela se perderia no fundo. */}
           {!hasArrived && (items.length > 0 || pedidosVolta.length > 0) ? (
-            <Box flexDirection="row" alignItems="center" gap="x8" backgroundColor="secondary10" p="y12" borderRadius="s12">
-              <LocalIcon iconName="location" size={measure.m20} color="secondary100" />
+            <Box flexDirection="row" alignItems="center" gap="x8" backgroundColor="yellow40" p="y12" borderRadius="s12">
+              <LocalIcon iconName="location" size={measure.m20} color="gray800" />
               <Text preset="text12" color="gray600" flex={1}>
                 Toque em &quot;Cheguei no retorno&quot; para liberar a conferência dos itens.
               </Text>
@@ -576,5 +571,21 @@ export default function RetornoScreen() {
         </Box>
       </Box>
     </ScreenBase>
+  );
+}
+
+/**
+ * A parada de retorno é `RETURN`, então quem manda na cor aqui é a ROTA:
+ * numa rota de serviço em campo a tela sai laranja como as demais.
+ * Ver `ServiceFlowTheme`.
+ */
+export default function RetornoScreen() {
+  const { id } = useLocalSearchParams<{ id: string; pid: string }>();
+  const isFieldService = useIsFieldServiceRoute(id as string);
+
+  return (
+    <ServiceFlowTheme isFieldService={isFieldService}>
+      <RetornoContent />
+    </ServiceFlowTheme>
   );
 }

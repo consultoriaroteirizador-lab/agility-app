@@ -10,6 +10,7 @@ export * from './PinValidation/PinValidation';
 export * from './RestyleComponent/RestyleComponent';
 export * from './ScreenContainer/ScreenContainer';
 export * from './ScreensBase/ScreenBase';
+export * from './ServiceFlowTheme/ServiceFlowTheme';
 export * from './Text/Text';
 export * from './Input/Input';
 export * from './BRLInput/BRLInput';

@@ -56,7 +56,7 @@ export function Button({
         <ActivityIndicator />
       ) : (
         <>
-          {iconName && <Icon color={preset === 'main' ? 'white' : 'primary100'} name={iconName!} />}
+          {iconName && <Icon color={preset === 'main' ? 'white' : 'colorBackgroundMainButton'} name={iconName!} />}
           <Text
             preset={presetText}
             color={buttonPreset.content}>

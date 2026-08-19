@@ -1,7 +1,7 @@
 import { formatRouteDate } from '@/app/(auth)/(tabs)/_rotas/utils/format';
 import { formatDateOnly } from '@/utils/formatDate';
 
-import { parseCalendarDay } from '../dateFunctions';
+import { appDayKey, formatDDMM, parseCalendarDay } from '../dateFunctions';
 
 // Fixa o fuso: o bug de dia-calendário só aparece em offset negativo
 // (America/Sao_Paulo, UTC-3). As funções sob teste criam Date em tempo de CHAMADA
@@ -54,5 +54,36 @@ describe('formatRouteDate — dia da rota sem hora fictícia', () => {
 
     it('valor nulo → null', () => {
         expect(formatRouteDate(null)).toBeNull();
+    });
+});
+
+/**
+ * Dia-calendário no fuso da operação. O caso que importa é o instante que cai
+ * em dias DIFERENTES em UTC e em São Paulo — é dele que sai o "Fora da janela"
+ * sem explicação na lista de paradas.
+ */
+describe('appDayKey', () => {
+    it('usa o dia de São Paulo, não o de UTC', () => {
+        // 19/08 02:00 UTC = 18/08 23:00 em São Paulo.
+        expect(appDayKey('2026-08-19T02:00:00.000Z')).toBe('2026-08-18');
+    });
+
+    it('mesmo instante do meio do dia fica no mesmo dia', () => {
+        expect(appDayKey('2026-08-19T17:00:00.000Z')).toBe('2026-08-19');
+    });
+
+    it.each([null, undefined, '', 'nao-e-data'])('devolve null para %p', (valor) => {
+        expect(appDayKey(valor as string | null | undefined)).toBeNull();
+    });
+});
+
+describe('formatDDMM', () => {
+    it('formata dd/MM no fuso da operação', () => {
+        expect(formatDDMM('2026-08-19T02:00:00.000Z')).toBe('18/08');
+    });
+
+    it('devolve o fallback quando não há data', () => {
+        expect(formatDDMM(null)).toBe('');
+        expect(formatDDMM(null, '--/--')).toBe('--/--');
     });
 });
