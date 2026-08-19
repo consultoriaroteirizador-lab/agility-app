@@ -81,9 +81,11 @@ export const PARADA_STATUS_CHIP: Record<ParadaStatus, StatusColorConfig> = {
     },
     'em-atendimento': {
         label: 'Em atendimento',
-        bgColor: 'secondary10',
-        textColor: 'secondary100',
-        borderColor: 'secondary100',
+        // Âmbar, não laranja: em rota de serviço o laranja é a cor da ROTA
+        // (ver `serviceTheme`) e este chip desapareceria dentro do card.
+        bgColor: 'yellow40',
+        textColor: 'gray800',
+        borderColor: 'yellow100',
     },
     'concluida-sucesso': {
         label: 'Concluída',

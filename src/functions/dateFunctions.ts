@@ -56,6 +56,46 @@ export function formatHHmm(value?: string | Date | null, fallback = '--:--'): st
   }
 }
 
+/**
+ * Dia-calendário do instante NO FUSO DA OPERAÇÃO, como `YYYY-MM-DD`.
+ *
+ * Serve para responder "isto é de hoje?" sem cair no bug clássico de ler o dia
+ * com getters locais do aparelho: o backend emite UTC e, num celular em UTC-3,
+ * `getDate()` sobre um instante da noite devolve o dia errado.
+ *
+ * Devolve `null` quando não há valor ou a data é inválida.
+ */
+export function appDayKey(value?: string | Date | null): string | null {
+  if (!value) return null;
+  const date = value instanceof Date ? value : new Date(value);
+  if (isNaN(date.getTime())) return null;
+  try {
+    // en-CA formata como YYYY-MM-DD, que ordena e compara como string.
+    return new Intl.DateTimeFormat('en-CA', {
+      timeZone: APP_TIMEZONE,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(date);
+  } catch {
+    return date.toISOString().slice(0, 10);
+  }
+}
+
+/**
+ * Formata um ISO/datetime para 'dd/MM' no fuso da operação.
+ *
+ * Usado quando um horário precisa dizer de QUE DIA ele é — uma janela mostrada
+ * só como '13:00–18:00' parece de hoje mesmo quando é de ontem.
+ * Retorna `fallback` quando o valor é nulo/ausente ou inválido.
+ */
+export function formatDDMM(value?: string | Date | null, fallback = ''): string {
+  const dia = appDayKey(value);
+  if (!dia) return fallback;
+
+  const [, mes, diaDoMes] = dia.split('-');
+  return `${diaDoMes}/${mes}`;
+}
 export function getLocalDateString(dateTimeString: string): string {
   return dateTimeString.split('T')[0];
 }

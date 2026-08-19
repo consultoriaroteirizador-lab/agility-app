@@ -5,7 +5,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams } from 'expo-router';
 
-import { Box, Button, Text, TouchableOpacityBox, ActivityIndicator, ScreenBase, Input } from '@/components';
+import { Box, Button, Text, TouchableOpacityBox, ActivityIndicator, ScreenBase, Input, ServiceFlowTheme } from '@/components';
 import { ButtonBack } from '@/components/Button/ButtonBack';
 import type { OrderOccurrenceReasonResponse } from '@/domain/agility/order-occurrence-reason/dto';
 import { useFindOccurrenceReasons } from '@/domain/agility/order-occurrence-reason/useCase';
@@ -22,7 +22,7 @@ import { useInsucessoDraft } from '../_hooks/useInsucessoDraft';
 
 import { occurrenceOutcomeMessage } from './occurrenceOutcome';
 
-export default function FalhaScreen() {
+function FalhaScreenContent() {
   const queryClient = useQueryClient();
   const { id, pid } = useLocalSearchParams<{ id: string; pid: string }>();
   const rotaId = id as string;
@@ -248,7 +248,6 @@ export default function FalhaScreen() {
       <Box flex={1} backgroundColor="white">
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 32 }}>
 
-
           <Box gap="y24" pt="y16">
             <Box>
               <Text preset="text16" fontWeightPreset='semibold' color="colorTextPrimary" mb="y12">
@@ -422,5 +421,21 @@ export default function FalhaScreen() {
       </Box>
     </ScreenBase>
 
+  );
+}
+
+/**
+ * Nota de SERVIÇO usa o laranja nas ações — ver `ServiceFlowTheme`.
+ * Mesmo `useFindOneService` do conteúdo (react-query dedupa), só que aqui
+ * fora para o tema envolver a tela inteira.
+ */
+export default function FalhaScreen() {
+  const { pid } = useLocalSearchParams<{ id: string; pid: string }>();
+  const { service } = useFindOneService((pid as string) || '');
+
+  return (
+    <ServiceFlowTheme serviceType={service?.serviceType}>
+      <FalhaScreenContent />
+    </ServiceFlowTheme>
   );
 }

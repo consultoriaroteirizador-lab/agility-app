@@ -6,7 +6,7 @@ import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
-import { Box, TouchableOpacityBox, Button, Text, ActivityIndicator, Input, ScreenBase, LocalIconButton, RecipientType } from '@/components';
+import { Box, TouchableOpacityBox, Button, Text, ActivityIndicator, Input, ScreenBase, LocalIconButton, RecipientType, ServiceFlowTheme } from '@/components';
 import { DocumentCollectionForm, DocumentData } from '@/components/DocumentCollectionForm';
 import { LocalIcon } from '@/components/Icon/LocalIcon';
 import Modal from '@/components/Modal/Modal';
@@ -25,7 +25,7 @@ import { measure } from '@/theme';
 
 type AppMap = 'waze' | 'googleMaps' | 'appleMaps';
 
-export default function DadosEntregaScreen() {
+function DadosEntregaContent() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { id, pid } = useLocalSearchParams<{ id: string; pid: string }>();
@@ -1204,4 +1204,20 @@ export default function DadosEntregaScreen() {
   }
 
   return renderEtapa1();
+}
+
+/**
+ * Nota de SERVIÇO usa o laranja nas ações — ver `ServiceFlowTheme`. Mesmo
+ * `useFindOneService` do conteúdo (react-query dedupa), só que aqui fora para
+ * o tema envolver a tela inteira.
+ */
+export default function DadosEntregaScreen() {
+  const { pid } = useLocalSearchParams<{ id: string; pid: string }>();
+  const { service } = useFindOneService((pid as string) || '');
+
+  return (
+    <ServiceFlowTheme serviceType={service?.serviceType}>
+      <DadosEntregaContent />
+    </ServiceFlowTheme>
+  );
 }

@@ -76,10 +76,11 @@ function ServiceOrchestrator() {
         );
     }
 
-    // Tela de sucesso - layout com cor para service
+    // Tela de sucesso — laranja (`secondary100`), a mesma cor da etiqueta
+    // "Serviço" na lista de rotas. Entrega e coleta seguem no roxo.
     if (showSuccess) {
         return (
-            <Box flex={1} backgroundColor="primary100" justifyContent="center" alignItems="center">
+            <Box flex={1} backgroundColor="secondary100" justifyContent="center" alignItems="center">
                 <Box width={measure.x120} height={measure.y12} backgroundColor="white" borderRadius="s10" marginBottom="y10" />
                 <Text preset="text18" color="white" textAlign="center">
                     Serviço realizado{'\n'}com sucesso
