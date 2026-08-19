@@ -5,7 +5,6 @@ import { Icon } from '@/components/Icon/Icon';
 import type { IconNameMaterial } from '@/components/Icon/Icon';
 import type { RoutingResponse } from '@/domain/agility/routing/dto';
 import { RoutingStatus } from '@/domain/agility/routing/dto/types';
-import { isFieldServiceRoute } from '../utils/routeKind';
 import { measure } from '@/theme';
 import type { ThemeColors } from '@/theme/theme';
 
@@ -16,6 +15,7 @@ import {
     formatRelativeSince,
     formatRouteDate,
 } from '../utils/format';
+import { isFieldServiceRoute } from '../utils/routeKind';
 
 interface StatusVisual {
     /** Rótulo padrão do status (quando não há detalhe dinâmico). */
