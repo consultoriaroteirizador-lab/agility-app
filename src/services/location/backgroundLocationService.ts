@@ -481,8 +481,28 @@ function onHttpHandler(event: HttpEvent) {
 
 /**
  * Handler: Heartbeat periódico
+ *
+ * Exportado só para o teste: a regressão que este handler já teve não aparece
+ * em nenhuma assinatura, só no que ele DEIXA de chamar.
+ *
+ * O heartbeat NÃO engaja o GPS sozinho (`event.location` é só o último
+ * conhecido), então forçamos uma leitura fresca. Mas ler não basta:
+ * `getCurrentPosition({ persist: true })` apenas ENFILEIRA no banco local do
+ * SDK, e o POST só sai quando a fila chega ao `autoSyncThreshold` (5) — ver o
+ * JSDoc de `requestCurrentPosition`, que documenta a medição.
+ *
+ * Este handler chamava `getCurrentPosition` sem o flush, e o comentário aqui
+ * afirmava que ele "persiste + POSTa". Não POSTava. Parado, o motorista gera
+ * uma posição por minuto e nunca completa o lote sozinho: as cinco só saíam
+ * juntas ~5min depois, e o "visto por último" que este heartbeat existe para
+ * manter fresco ficava velho exatamente no caso que ele deveria cobrir.
+ *
+ * `requestCurrentPosition` é a sequência completa (ler + esvaziar a fila), já
+ * testada, e que NUNCA rejeita — por isso o `void` aqui não esconde erro: ela
+ * trata os dela. Reusar em vez de repetir metade é o que impede a regressão de
+ * voltar pela terceira vez.
  */
-function onHeartbeatHandler(event: HeartbeatEvent) {
+export function onHeartbeatHandler(event: HeartbeatEvent) {
   console.log('[BGGeolocation] onHeartbeat:', {
     location: event.location ? {
       lat: event.location.coords.latitude.toFixed(6),
@@ -490,12 +510,7 @@ function onHeartbeatHandler(event: HeartbeatEvent) {
     } : null,
   });
 
-  // O heartbeat NÃO engaja o GPS sozinho (event.location é só o último conhecido).
-  // Forçamos uma posição fresca — que persiste + POSTa pro backend, mantendo o
-  // "ao vivo" mesmo parado.
-  BackgroundGeolocation.getCurrentPosition({ samples: 1, persist: true }).catch((err) => {
-    console.warn('[BGGeolocation] onHeartbeat getCurrentPosition falhou:', err);
-  });
+  void requestCurrentPosition();
 }
 
 /**
