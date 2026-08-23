@@ -329,6 +329,9 @@ export function useServiceCompletion(serviceType: ServiceFlowType = 'entrega') {
         // Estados
         isCompleting: isCompletingWithDetails || finalizing,
         canFinalize,
+        // Rotulos do que falta, na ordem da tela — a tela usa isto no rodape em vez
+        // de uma string fixa que pode citar campo que a config nem exige mais.
+        missing: completion.missing,
 
         // Checklist
         checklist,

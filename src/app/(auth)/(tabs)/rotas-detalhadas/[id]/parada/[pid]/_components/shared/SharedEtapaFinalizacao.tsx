@@ -110,7 +110,7 @@ export function SharedEtapaFinalizacao({ serviceType }: SharedEtapaFinalizacaoPr
 
   console.log('[SharedEtapaFinalizacao] safeChecklist', safeChecklist);
 
-  const { handleFinalizar, isCompleting, canFinalize } = useServiceCompletion(serviceType);
+  const { handleFinalizar, isCompleting, canFinalize, missing } = useServiceCompletion(serviceType);
 
   console.log('[SharedEtapaFinalizacao] useServiceCompletion()', {
     isCompleting,
@@ -332,97 +332,101 @@ export function SharedEtapaFinalizacao({ serviceType }: SharedEtapaFinalizacaoPr
 
             <Box gap="y12">
               {/* Documento */}
-              <Box
-                flexDirection="row"
-                justifyContent="space-between"
-                alignItems="center"
-                padding="y4"
-                borderWidth={measure.m1}
-                borderColor={safeChecklist.documento ? 'primary100' : 'borderColor'}
-                borderRadius="s12"
-                backgroundColor={safeChecklist.documento ? 'primary10' : 'white'}
-              >
-                <Box flexDirection="row" alignItems="center" gap="x4">
-                  <Text ml='l6' preset="text16" color="colorTextPrimary" fontWeightPreset={safeChecklist.documento ? 'bold' : 'regular'}>
-                    Documento preenchido
-                  </Text>
+              {requirements.recipientIdentity !== 'HIDDEN' && (
+                <Box
+                  flexDirection="row"
+                  justifyContent="space-between"
+                  alignItems="center"
+                  padding="y4"
+                  borderWidth={measure.m1}
+                  borderColor={safeChecklist.documento ? 'primary100' : 'borderColor'}
+                  borderRadius="s12"
+                  backgroundColor={safeChecklist.documento ? 'primary10' : 'white'}
+                >
+                  <Box flexDirection="row" alignItems="center" gap="x4">
+                    <Text ml='l6' preset="text16" color="colorTextPrimary" fontWeightPreset={safeChecklist.documento ? 'bold' : 'regular'}>
+                      Documento preenchido
+                    </Text>
+                  </Box>
+                  <Box flexDirection="row" gap="y12">
+                    <TouchableOpacityBox
+                      onPress={() => updateChecklist('documento', false)}
+                      width={measure.x44}
+                      height={measure.y44}
+                      borderRadius="s12"
+                      borderWidth={measure.m2}
+                      borderColor="redError"
+                      backgroundColor={!safeChecklist.documento ? 'redError' : 'transparent'}
+                      justifyContent="center"
+                      alignItems="center"
+                    >
+                      <Text preset="text20" color={!safeChecklist.documento ? 'white' : 'redError'} fontWeightPreset="bold">×</Text>
+                    </TouchableOpacityBox>
+                    <TouchableOpacityBox
+                      onPress={() => setEtapa(4)}
+                      width={measure.x44}
+                      height={measure.y44}
+                      borderRadius="s12"
+                      borderWidth={measure.m2}
+                      borderColor="primary100"
+                      backgroundColor={safeChecklist.documento ? 'primary100' : 'transparent'}
+                      justifyContent="center"
+                      alignItems="center"
+                    >
+                      <Text preset="text20" color={safeChecklist.documento ? 'white' : 'primary100'} fontWeightPreset="bold">✓</Text>
+                    </TouchableOpacityBox>
+                  </Box>
                 </Box>
-                <Box flexDirection="row" gap="y12">
-                  <TouchableOpacityBox
-                    onPress={() => updateChecklist('documento', false)}
-                    width={measure.x44}
-                    height={measure.y44}
-                    borderRadius="s12"
-                    borderWidth={measure.m2}
-                    borderColor="redError"
-                    backgroundColor={!safeChecklist.documento ? 'redError' : 'transparent'}
-                    justifyContent="center"
-                    alignItems="center"
-                  >
-                    <Text preset="text20" color={!safeChecklist.documento ? 'white' : 'redError'} fontWeightPreset="bold">×</Text>
-                  </TouchableOpacityBox>
-                  <TouchableOpacityBox
-                    onPress={() => setEtapa(4)}
-                    width={measure.x44}
-                    height={measure.y44}
-                    borderRadius="s12"
-                    borderWidth={measure.m2}
-                    borderColor="primary100"
-                    backgroundColor={safeChecklist.documento ? 'primary100' : 'transparent'}
-                    justifyContent="center"
-                    alignItems="center"
-                  >
-                    <Text preset="text20" color={safeChecklist.documento ? 'white' : 'primary100'} fontWeightPreset="bold">✓</Text>
-                  </TouchableOpacityBox>
-                </Box>
-              </Box>
+              )}
 
               {/* Foto */}
-              <Box
-                flexDirection="row"
-                justifyContent="space-between"
-                alignItems="center"
-                padding="y4"
-                borderWidth={measure.m1}
-                borderColor={safeChecklist.foto ? 'primary100' : 'borderColor'}
-                borderRadius="s12"
-                backgroundColor={safeChecklist.foto ? 'primary10' : 'white'}
-              >
-                <Text ml='l6' preset="text16" color="colorTextPrimary" fontWeightPreset={safeChecklist.foto ? 'bold' : 'regular'}>
-                  Foto tirada
-                </Text>
-                <Box flexDirection="row" gap="y12">
-                  <TouchableOpacityBox
-                    onPress={() => {
-                      setPhotos([]);
-                      updateChecklist('foto', false);
-                    }}
-                    width={measure.x44}
-                    height={measure.y44}
-                    borderRadius="s12"
-                    borderWidth={measure.m2}
-                    borderColor="redError"
-                    backgroundColor={!safeChecklist.foto ? 'redError' : 'transparent'}
-                    justifyContent="center"
-                    alignItems="center"
-                  >
-                    <Text preset="text20" color={!safeChecklist.foto ? 'white' : 'redError'} fontWeightPreset="bold">×</Text>
-                  </TouchableOpacityBox>
-                  <TouchableOpacityBox
-                    onPress={() => updateChecklist('foto', true)}
-                    width={measure.x44}
-                    height={measure.y44}
-                    borderRadius="s12"
-                    borderWidth={measure.m2}
-                    borderColor="primary100"
-                    backgroundColor={safeChecklist.foto ? 'primary100' : 'transparent'}
-                    justifyContent="center"
-                    alignItems="center"
-                  >
-                    <Text preset="text20" color={safeChecklist.foto ? 'white' : 'primary100'} fontWeightPreset="bold">✓</Text>
-                  </TouchableOpacityBox>
+              {requirements.photos.mode !== 'HIDDEN' && (
+                <Box
+                  flexDirection="row"
+                  justifyContent="space-between"
+                  alignItems="center"
+                  padding="y4"
+                  borderWidth={measure.m1}
+                  borderColor={safeChecklist.foto ? 'primary100' : 'borderColor'}
+                  borderRadius="s12"
+                  backgroundColor={safeChecklist.foto ? 'primary10' : 'white'}
+                >
+                  <Text ml='l6' preset="text16" color="colorTextPrimary" fontWeightPreset={safeChecklist.foto ? 'bold' : 'regular'}>
+                    Foto tirada
+                  </Text>
+                  <Box flexDirection="row" gap="y12">
+                    <TouchableOpacityBox
+                      onPress={() => {
+                        setPhotos([]);
+                        updateChecklist('foto', false);
+                      }}
+                      width={measure.x44}
+                      height={measure.y44}
+                      borderRadius="s12"
+                      borderWidth={measure.m2}
+                      borderColor="redError"
+                      backgroundColor={!safeChecklist.foto ? 'redError' : 'transparent'}
+                      justifyContent="center"
+                      alignItems="center"
+                    >
+                      <Text preset="text20" color={!safeChecklist.foto ? 'white' : 'redError'} fontWeightPreset="bold">×</Text>
+                    </TouchableOpacityBox>
+                    <TouchableOpacityBox
+                      onPress={() => updateChecklist('foto', true)}
+                      width={measure.x44}
+                      height={measure.y44}
+                      borderRadius="s12"
+                      borderWidth={measure.m2}
+                      borderColor="primary100"
+                      backgroundColor={safeChecklist.foto ? 'primary100' : 'transparent'}
+                      justifyContent="center"
+                      alignItems="center"
+                    >
+                      <Text preset="text20" color={safeChecklist.foto ? 'white' : 'primary100'} fontWeightPreset="bold">✓</Text>
+                    </TouchableOpacityBox>
+                  </Box>
                 </Box>
-              </Box>
+              )}
 
               {/* Assinatura */}
               {requirements.signature !== 'HIDDEN' && (
@@ -485,7 +489,7 @@ export function SharedEtapaFinalizacao({ serviceType }: SharedEtapaFinalizacaoPr
               />
               {!canFinalize && (
                 <Text preset="text12" color="primary100" textAlign="center" marginTop="y8">
-                  * Documento, foto e assinatura são obrigatórios
+                  * Obrigatório: {missing.join(', ')}
                 </Text>
               )}
               {canFinalize && paymentPending && (
