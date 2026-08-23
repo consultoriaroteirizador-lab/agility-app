@@ -1,6 +1,13 @@
+import { CompletionRequirements, resolveCompletionRequirements } from './completionRequirements'
+
 export interface CompanyRules {
     enforceSingleActiveStop: boolean
     enforceStopOrder: boolean
+    /**
+     * O que o motorista precisa preencher para concluir, por fluxo. Mesma logica
+     * de falha fechada das flags acima: ausente = exija tudo.
+     */
+    completionRequirements: CompletionRequirements
 }
 
 /**
@@ -19,5 +26,8 @@ export function resolveCompanyRules(
     return {
         enforceSingleActiveStop: features?.enforceSingleActiveStop !== false,
         enforceStopOrder: features?.enforceStopOrder !== false,
+        completionRequirements: resolveCompletionRequirements(
+            (features as { completionRequirements?: unknown } | null | undefined)?.completionRequirements,
+        ),
     }
 }

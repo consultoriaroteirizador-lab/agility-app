@@ -3,6 +3,7 @@ import type {
     Gender,
     WorkSchedule,
 } from '../types'
+import { CompletionRequirements } from '@/app/(auth)/(tabs)/rotas-detalhadas/[id]/parada/[pid]/_utils/completionRequirements'
 
 /**
  * Collaborator response DTO
@@ -133,5 +134,7 @@ export interface CompanyFeatures {
     enforceSingleActiveStop?: boolean;
     /** Obriga iniciar as paradas na ordem definida pelo roteirizador. */
     enforceStopOrder?: boolean;
+    /** Exigencias de finalizacao por fluxo (spec 2026-08-23). */
+    completionRequirements?: CompletionRequirements;
 }
 
