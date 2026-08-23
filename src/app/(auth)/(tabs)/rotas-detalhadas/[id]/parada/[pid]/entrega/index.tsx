@@ -18,6 +18,7 @@ import { SharedEtapaRecebedor } from '../_components/shared/SharedEtapaRecebedor
 import { ParadaProvider, useParada } from '../_context/ParadaContext';
 import { useDestinoAposNota } from '../_hooks/useDestinoAposNota';
 import { resolveCompletionStep } from '../_utils/completionStep';
+import { entregaReadyAfterChecks } from '../_utils/readyAfterChecks';
 
 /**
  * Orchestrator da entrega - gerencia qual etapa exibir
@@ -153,8 +154,13 @@ function EntregaOrchestrator() {
 
     // A partir daqui quem decide a etapa e resolveCompletionStep: ocultar a etapa
     // de recebedor sem alguem assumir o lugar dela deixa o motorista preso.
-    const readyAfterChecks =
-        delivered && !needsDeliveryCheck && !needsReturnCheck && (!hasFormGroups || formCompleted);
+    const readyAfterChecks = entregaReadyAfterChecks({
+        delivered,
+        needsDeliveryCheck,
+        needsReturnCheck,
+        hasFormGroups,
+        formCompleted,
+    });
 
     const step = resolveCompletionStep({
         etapa,

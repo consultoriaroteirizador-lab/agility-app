@@ -15,6 +15,7 @@ import { SharedEtapaRecebedor } from '../_components/shared/SharedEtapaRecebedor
 import { ParadaProvider, useParada } from '../_context/ParadaContext';
 import { useDestinoAposNota } from '../_hooks/useDestinoAposNota';
 import { resolveCompletionStep } from '../_utils/completionStep';
+import { coletaReadyAfterChecks } from '../_utils/readyAfterChecks';
 
 /**
  * Orchestrator da coleta - gerencia qual etapa exibir
@@ -120,7 +121,12 @@ function ColetaOrchestrator() {
 
     // A partir daqui quem decide a etapa e resolveCompletionStep: ocultar a etapa
     // de recebedor sem alguem assumir o lugar dela deixa o motorista preso.
-    const readyAfterChecks = delivered && !needsMaterialCheck && (!hasFormGroups || formCompleted);
+    const readyAfterChecks = coletaReadyAfterChecks({
+        delivered,
+        needsMaterialCheck,
+        hasFormGroups,
+        formCompleted,
+    });
 
     const step = resolveCompletionStep({
         etapa,

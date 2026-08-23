@@ -16,6 +16,7 @@ import { TransferEtapaFinalizarColeta } from '../_components/transfer/TransferEt
 import { TransferEtapaInicial } from '../_components/transfer/TransferEtapaInicial';
 import { ParadaProvider, useParada } from '../_context/ParadaContext';
 import { resolveCompletionStep } from '../_utils/completionStep';
+import { transferReadyAfterChecks } from '../_utils/readyAfterChecks';
 
 /**
  * Orchestrator do TRANSFER — wizard de 2 pernas (coleta na origem → entrega no
@@ -93,8 +94,6 @@ function TransferOrchestrator() {
         return <EtapaConcluida />;
     }
 
-    const sharedType = isPickup ? 'coleta' : 'entrega';
-
     // Etapa 1: inicial (mapa origem/destino)
     if (etapa === 1) {
         return <TransferEtapaInicial />;
@@ -118,7 +117,10 @@ function TransferOrchestrator() {
 
     // A partir daqui quem decide a etapa e resolveCompletionStep: ocultar a etapa
     // de recebedor sem alguem assumir o lugar dela deixa o motorista preso.
-    const readyAfterChecks = delivered && !needsCheck;
+    // `sharedType` sai daqui, junto com `readyAfterChecks`, para nao poder se
+    // desalinhar de `isPickup` sem que o teste de `transferReadyAfterChecks`
+    // denuncie (ver `_utils/readyAfterChecks.ts`).
+    const { readyAfterChecks, sharedType } = transferReadyAfterChecks({ isPickup, delivered, needsCheck });
 
     const step = resolveCompletionStep({
         etapa,

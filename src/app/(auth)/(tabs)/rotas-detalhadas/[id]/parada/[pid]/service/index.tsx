@@ -15,6 +15,7 @@ import { SharedEtapaRecebedor } from '../_components/shared/SharedEtapaRecebedor
 import { ParadaProvider, useParada } from '../_context/ParadaContext';
 import { useDestinoAposNota } from '../_hooks/useDestinoAposNota';
 import { resolveCompletionStep } from '../_utils/completionStep';
+import { servicoReadyAfterChecks } from '../_utils/readyAfterChecks';
 
 /**
  * Orchestrator do service - gerencia qual etapa exibir
@@ -121,7 +122,7 @@ function ServiceOrchestrator() {
 
     // A partir daqui quem decide a etapa e resolveCompletionStep: ocultar a etapa
     // de recebedor sem alguem assumir o lugar dela deixa o motorista preso.
-    const readyAfterChecks = delivered && (!hasFormGroups || formCompleted);
+    const readyAfterChecks = servicoReadyAfterChecks({ delivered, hasFormGroups, formCompleted });
 
     const step = resolveCompletionStep({
         etapa,
