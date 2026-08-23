@@ -5,6 +5,7 @@ import { Box, Button, ScreenBase, Text, TouchableOpacityBox } from '@/components
 import { ButtonBack } from '@/components/Button/ButtonBack';
 import Modal from '@/components/Modal/Modal';
 import { SignatureCanvas } from '@/components/SignatureCanvas';
+import { requirementsForServiceType } from '@/domain/agility/company/completionRequirements';
 import { resolveCodeRequirement } from '@/domain/agility/service/codeGate';
 import { PaymentMethodType } from '@/domain/agility/service/dto/types';
 import { useAuthCredentialsService } from '@/services';
@@ -89,7 +90,10 @@ export function SharedEtapaFinalizacao({ serviceType }: SharedEtapaFinalizacaoPr
     setBypassReasonCode,
     bypassReasonText,
     setBypassReasonText,
+    completionRequirements,
   } = useParada();
+
+  const requirements = requirementsForServiceType(completionRequirements, serviceType);
 
   console.log('[SharedEtapaFinalizacao] useParada()', {
     checklist,
@@ -106,7 +110,7 @@ export function SharedEtapaFinalizacao({ serviceType }: SharedEtapaFinalizacaoPr
 
   console.log('[SharedEtapaFinalizacao] safeChecklist', safeChecklist);
 
-  const { handleFinalizar, isCompleting, canFinalize } = useServiceCompletion();
+  const { handleFinalizar, isCompleting, canFinalize } = useServiceCompletion(serviceType);
 
   console.log('[SharedEtapaFinalizacao] useServiceCompletion()', {
     isCompleting,
@@ -421,53 +425,55 @@ export function SharedEtapaFinalizacao({ serviceType }: SharedEtapaFinalizacaoPr
               </Box>
 
               {/* Assinatura */}
-              <Box
-                flexDirection="row"
-                justifyContent="space-between"
-                alignItems="center"
-                padding="y4"
-                borderWidth={measure.m1}
-                borderColor={safeChecklist.signature ? 'primary100' : 'borderColor'}
-                borderRadius="s12"
-                backgroundColor={safeChecklist.signature ? 'primary10' : 'white'}
-              >
-                <Box flexDirection="row" alignItems="center" gap="x4">
-                  <Text ml='l6' preset="text16" color="colorTextPrimary" fontWeightPreset={safeChecklist.signature ? 'bold' : 'regular'}>
-                    Assinatura coletada
-                  </Text>
+              {requirements.signature !== 'HIDDEN' && (
+                <Box
+                  flexDirection="row"
+                  justifyContent="space-between"
+                  alignItems="center"
+                  padding="y4"
+                  borderWidth={measure.m1}
+                  borderColor={safeChecklist.signature ? 'primary100' : 'borderColor'}
+                  borderRadius="s12"
+                  backgroundColor={safeChecklist.signature ? 'primary10' : 'white'}
+                >
+                  <Box flexDirection="row" alignItems="center" gap="x4">
+                    <Text ml='l6' preset="text16" color="colorTextPrimary" fontWeightPreset={safeChecklist.signature ? 'bold' : 'regular'}>
+                      Assinatura coletada
+                    </Text>
+                  </Box>
+                  <Box flexDirection="row" gap="y12">
+                    <TouchableOpacityBox
+                      onPress={() => {
+                        setSignature(null);
+                        updateChecklist('signature', false);
+                      }}
+                      width={measure.x44}
+                      height={measure.y44}
+                      borderRadius="s12"
+                      borderWidth={measure.m2}
+                      borderColor="redError"
+                      backgroundColor={!safeChecklist.signature ? 'redError' : 'transparent'}
+                      justifyContent="center"
+                      alignItems="center"
+                    >
+                      <Text preset="text20" color={!safeChecklist.signature ? 'white' : 'redError'} fontWeightPreset="bold">×</Text>
+                    </TouchableOpacityBox>
+                    <TouchableOpacityBox
+                      onPress={() => setShowSignature(true)}
+                      width={measure.x44}
+                      height={measure.y44}
+                      borderRadius="s12"
+                      borderWidth={measure.m2}
+                      borderColor="primary100"
+                      backgroundColor={safeChecklist.signature ? 'primary100' : 'transparent'}
+                      justifyContent="center"
+                      alignItems="center"
+                    >
+                      <Text preset="text20" color={safeChecklist.signature ? 'white' : 'primary100'} fontWeightPreset="bold">✓</Text>
+                    </TouchableOpacityBox>
+                  </Box>
                 </Box>
-                <Box flexDirection="row" gap="y12">
-                  <TouchableOpacityBox
-                    onPress={() => {
-                      setSignature(null);
-                      updateChecklist('signature', false);
-                    }}
-                    width={measure.x44}
-                    height={measure.y44}
-                    borderRadius="s12"
-                    borderWidth={measure.m2}
-                    borderColor="redError"
-                    backgroundColor={!safeChecklist.signature ? 'redError' : 'transparent'}
-                    justifyContent="center"
-                    alignItems="center"
-                  >
-                    <Text preset="text20" color={!safeChecklist.signature ? 'white' : 'redError'} fontWeightPreset="bold">×</Text>
-                  </TouchableOpacityBox>
-                  <TouchableOpacityBox
-                    onPress={() => setShowSignature(true)}
-                    width={measure.x44}
-                    height={measure.y44}
-                    borderRadius="s12"
-                    borderWidth={measure.m2}
-                    borderColor="primary100"
-                    backgroundColor={safeChecklist.signature ? 'primary100' : 'transparent'}
-                    justifyContent="center"
-                    alignItems="center"
-                  >
-                    <Text preset="text20" color={safeChecklist.signature ? 'white' : 'primary100'} fontWeightPreset="bold">✓</Text>
-                  </TouchableOpacityBox>
-                </Box>
-              </Box>
+              )}
             </Box>
 
             <Box marginTop="y12" paddingBottom="y24">
