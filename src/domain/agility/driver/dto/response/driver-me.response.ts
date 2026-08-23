@@ -1,4 +1,4 @@
-import { CompletionRequirements } from '@/app/(auth)/(tabs)/rotas-detalhadas/[id]/parada/[pid]/_utils/completionRequirements'
+import { CompletionRequirements } from '@/domain/agility/company/completionRequirements'
 
 /**
  * Resposta de `GET /drivers/me` — perfil do motorista logado, funcionário OU

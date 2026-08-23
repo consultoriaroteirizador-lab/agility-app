@@ -4,7 +4,7 @@
  * Este utilitario passa a ser o unico dono. O caso "tudo REQUIRED" e o teste de
  * nao-regressao: ele tem que reproduzir exatamente o comportamento antigo.
  */
-import { DEFAULT_FLOW_REQUIREMENTS, FlowCompletionRequirements } from '../completionRequirements'
+import { DEFAULT_FLOW_REQUIREMENTS, FlowCompletionRequirements } from '@/domain/agility/company/completionRequirements'
 import { validateCompletion } from '../completionValidation'
 
 const VAZIO = { recipientTipo: null, nome: '', documento: '', hasSignature: false, photoCount: 0 }

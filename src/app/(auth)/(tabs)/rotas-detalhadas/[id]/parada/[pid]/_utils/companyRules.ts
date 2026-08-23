@@ -1,4 +1,4 @@
-import { CompletionRequirements, resolveCompletionRequirements } from './completionRequirements'
+import { CompletionRequirements, resolveCompletionRequirements } from '@/domain/agility/company/completionRequirements'
 
 export interface CompanyRules {
     enforceSingleActiveStop: boolean
@@ -26,8 +26,6 @@ export function resolveCompanyRules(
     return {
         enforceSingleActiveStop: features?.enforceSingleActiveStop !== false,
         enforceStopOrder: features?.enforceStopOrder !== false,
-        completionRequirements: resolveCompletionRequirements(
-            (features as { completionRequirements?: unknown } | null | undefined)?.completionRequirements,
-        ),
+        completionRequirements: resolveCompletionRequirements(features?.completionRequirements),
     }
 }

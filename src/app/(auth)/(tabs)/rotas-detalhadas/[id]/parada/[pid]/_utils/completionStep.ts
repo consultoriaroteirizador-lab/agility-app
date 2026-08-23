@@ -10,7 +10,7 @@
  * Devolve `null` quando nenhuma etapa final se aplica ainda — a tela segue com
  * as suas proprias etapas iniciais.
  */
-import { FlowCompletionRequirements } from './completionRequirements'
+import { FlowCompletionRequirements } from '@/domain/agility/company/completionRequirements'
 
 export type CompletionStep = 'recipient' | 'data' | 'final' | null
 

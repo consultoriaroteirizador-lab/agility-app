@@ -3,7 +3,7 @@
  * etapa de recebedor for ocultada e nenhum ramo do roteamento assumir o lugar
  * dela, a tela cai no fallback (EtapaInicial) e nao ha caminho para frente.
  */
-import { DEFAULT_FLOW_REQUIREMENTS, FlowCompletionRequirements } from '../completionRequirements'
+import { DEFAULT_FLOW_REQUIREMENTS, FlowCompletionRequirements } from '@/domain/agility/company/completionRequirements'
 import { resolveCompletionStep } from '../completionStep'
 
 const semRecebedor: FlowCompletionRequirements = { ...DEFAULT_FLOW_REQUIREMENTS, recipientType: 'HIDDEN' }

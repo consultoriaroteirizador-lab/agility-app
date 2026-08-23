@@ -3,7 +3,7 @@ import type {
     Gender,
     WorkSchedule,
 } from '../types'
-import { CompletionRequirements } from '@/app/(auth)/(tabs)/rotas-detalhadas/[id]/parada/[pid]/_utils/completionRequirements'
+import { CompletionRequirements } from '@/domain/agility/company/completionRequirements'
 
 /**
  * Collaborator response DTO

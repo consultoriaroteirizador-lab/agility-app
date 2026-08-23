@@ -5,7 +5,7 @@
  * de finalizar e a revalidacao dentro do handler), com as tres tendo que
  * concordar por coincidencia. Agora as tres chamam isto.
  */
-import { FlowCompletionRequirements } from './completionRequirements'
+import { FlowCompletionRequirements } from '@/domain/agility/company/completionRequirements'
 
 export interface CompletionState {
     /** Tipo escolhido na etapa "Quem recebeu?" (cliente, porteiro, ...). */
