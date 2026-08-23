@@ -14,6 +14,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { ServiceFlowTheme } from '@/components';
 import type { AddressResponse } from '@/domain/agility/address/dto';
 import { useFindOneAddress } from '@/domain/agility/address/useCase';
+import type { CompletionRequirements } from '@/domain/agility/company/completionRequirements';
 import { useGetMe } from '@/domain/agility/driver/useCase';
 import type { FormGroupResponse } from '@/domain/agility/form-group/dto/form-group.response';
 import { formGroupService } from '@/domain/agility/form-group/formGroupService';
@@ -180,6 +181,8 @@ interface ParadaContextValue {
   // bloqueio (null quando liberado), usado no toast ao tentar iniciar bloqueado.
   canStartService: boolean;
   startBlockReason: string | null;
+  /** Exigencias de finalizacao da empresa, ja resolvidas (spec 2026-08-23). */
+  completionRequirements: CompletionRequirements;
 
   // Utilitários
   isServiceStarted: boolean;
@@ -1246,6 +1249,7 @@ export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderPr
     // Gating de início de parada (regras configuráveis da empresa)
     canStartService,
     startBlockReason,
+    completionRequirements: rules.completionRequirements,
 
     // Utilitários
     isServiceStarted: !!isServiceStarted,

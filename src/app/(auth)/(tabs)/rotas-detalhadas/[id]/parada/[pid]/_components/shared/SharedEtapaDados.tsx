@@ -6,10 +6,12 @@ import { DocumentCollectionForm, DocumentData } from '@/components/DocumentColle
 import Modal from '@/components/Modal/Modal';
 import { MultiPhotoPicker } from '@/components/MultiPhotoPicker';
 import { SignatureCanvas } from '@/components/SignatureCanvas';
+import { requirementsForServiceType } from '@/domain/agility/company/completionRequirements';
 import { useToastService } from '@/services/Toast/useToast';
 import { measure } from '@/theme';
 
 import { useParada } from '../../_context/ParadaContext';
+import { validateCompletion } from '../../_utils/completionValidation';
 
 interface SharedEtapaDadosProps {
   serviceType: 'entrega' | 'coleta' | 'servico';
@@ -53,6 +55,7 @@ export function SharedEtapaDados({ serviceType }: SharedEtapaDadosProps) {
     setEtapa,
     setSignature,
     setPhotos,
+    completionRequirements,
   } = useParada();
 
   const documentData: DocumentData = {
@@ -73,22 +76,22 @@ export function SharedEtapaDados({ serviceType }: SharedEtapaDadosProps) {
     setEtapa(3);
   }, [setEtapa]);
 
-  // Validação de todos os requisitos
-  const hasName = !!recipient?.nome?.trim();
-  const hasDocument = !!recipient?.numeroDocumento?.trim();
-  const hasSignature = !!signature;
-  const hasPhoto = photos.length > 0;
+  const requirements = requirementsForServiceType(completionRequirements, serviceType);
 
-  const canProceed = useMemo(() => {
-    return hasName && hasDocument && hasSignature && hasPhoto;
-  }, [hasName, hasDocument, hasSignature, hasPhoto]);
+  const { canProceed, missing } = useMemo(
+    () =>
+      validateCompletion(requirements, {
+        recipientTipo: recipient?.tipo,
+        nome: recipient?.nome,
+        documento: recipient?.numeroDocumento,
+        hasSignature: !!signature,
+        photoCount: photos.length,
+      }),
+    [requirements, recipient?.tipo, recipient?.nome, recipient?.numeroDocumento, signature, photos.length],
+  );
 
   const handleNext = () => {
     if (!canProceed) {
-      const missing = [];
-      if (!hasName || !hasDocument) missing.push('nome e documento');
-      if (!hasSignature) missing.push('assinatura');
-      if (!hasPhoto) missing.push('foto');
       showToast({ message: `Preencha os campos obrigatórios: ${missing.join(', ')}`, type: 'error' });
       return;
     }
@@ -107,56 +110,66 @@ export function SharedEtapaDados({ serviceType }: SharedEtapaDadosProps) {
       <Box flex={1} backgroundColor="white">
         <Box scrollable pb="b32">
           <Box paddingTop="y24" paddingBottom="y4">
-            <DocumentCollectionForm
-              data={documentData}
-              onChange={handleDocumentChange}
-            />
-
-            <Box marginBottom="y12" mt="t14">
-              <Box flexDirection="row" alignItems="center" gap="x4" marginBottom="y4">
-                <Text preset="text14" color="gray600" fontWeightPreset="bold">
-                  Assinatura
-                </Text>
-                <Text preset="text12" color="primary100" fontWeightPreset="bold">
-                  *Obrigatório
-                </Text>
-              </Box>
-              <Button
-                onPress={() => setShowSignature(true)}
-                backgroundColor={signature ? 'primary40' : 'primary100'}
-                width={measure.x330}
-                title={signature ? 'Assinatura registrada ✓' : 'Registrar assinatura'}
+            {requirements.recipientIdentity !== 'HIDDEN' && (
+              <DocumentCollectionForm
+                data={documentData}
+                onChange={handleDocumentChange}
               />
-            </Box>
+            )}
 
-            <Box marginBottom="y12" mt="t14">
-              <Box flexDirection="row" alignItems="center" gap="x4" marginBottom="y4">
-                <Text preset="text14" color="gray600" fontWeightPreset="bold">
-                  {labels.photosLabel}
-                </Text>
-                <Text preset="text12" color="primary100" fontWeightPreset="bold">
-                  *Obrigatório
-                </Text>
+            {requirements.signature !== 'HIDDEN' && (
+              <Box marginBottom="y12" mt="t14">
+                <Box flexDirection="row" alignItems="center" gap="x4" marginBottom="y4">
+                  <Text preset="text14" color="gray600" fontWeightPreset="bold">
+                    Assinatura
+                  </Text>
+                  {requirements.signature === 'REQUIRED' && (
+                    <Text preset="text12" color="primary100" fontWeightPreset="bold">
+                      *Obrigatório
+                    </Text>
+                  )}
+                </Box>
+                <Button
+                  onPress={() => setShowSignature(true)}
+                  backgroundColor={signature ? 'primary40' : 'primary100'}
+                  width={measure.x330}
+                  title={signature ? 'Assinatura registrada ✓' : 'Registrar assinatura'}
+                />
               </Box>
-              {/* `photoSize` explicito: o default do MultiPhotoPicker e
-                  (largura da tela - 64) / 3, ~99dp num aparelho de 360dp — dois
-                  quadroes que empurravam observacao e botoes para fora da
-                  dobra. 80dp reduz ~19% e mantem a miniatura grande o bastante
-                  para o motorista conferir a foto que tirou. 64dp foi testado e
-                  ficou pequeno demais. */}
-              <MultiPhotoPicker
-                photos={photos}
-                onPhotosChange={setPhotos}
-                maxPhotos={5}
-                uploadProgress={uploadProgress}
-                label="Fotos"
-                allowCamera={true}
-                labelPreset="textParagraph"
-                padding="y4"
-                backgroundColor="gray50"
-                photoSize={measure.m80}
-              />
-            </Box>
+            )}
+
+            {requirements.photos.mode !== 'HIDDEN' && (
+              <Box marginBottom="y12" mt="t14">
+                <Box flexDirection="row" alignItems="center" gap="x4" marginBottom="y4">
+                  <Text preset="text14" color="gray600" fontWeightPreset="bold">
+                    {labels.photosLabel}
+                  </Text>
+                  {requirements.photos.mode === 'REQUIRED' && (
+                    <Text preset="text12" color="primary100" fontWeightPreset="bold">
+                      *Obrigatório
+                    </Text>
+                  )}
+                </Box>
+                {/* `photoSize` explicito: o default do MultiPhotoPicker e
+                    (largura da tela - 64) / 3, ~99dp num aparelho de 360dp — dois
+                    quadroes que empurravam observacao e botoes para fora da
+                    dobra. 80dp reduz ~19% e mantem a miniatura grande o bastante
+                    para o motorista conferir a foto que tirou. 64dp foi testado e
+                    ficou pequeno demais. */}
+                <MultiPhotoPicker
+                  photos={photos}
+                  onPhotosChange={setPhotos}
+                  maxPhotos={5}
+                  uploadProgress={uploadProgress}
+                  label="Fotos"
+                  allowCamera={true}
+                  labelPreset="textParagraph"
+                  padding="y4"
+                  backgroundColor="gray50"
+                  photoSize={measure.m80}
+                />
+              </Box>
+            )}
 
             <Box marginBottom="y12">
               <Input
@@ -179,7 +192,7 @@ export function SharedEtapaDados({ serviceType }: SharedEtapaDadosProps) {
               />
               {!canProceed && (
                 <Text preset="text12" color="primary100" textAlign="center" marginTop="y8">
-                  * Nome, documento, assinatura e foto são obrigatórios
+                  * Obrigatório: {missing.join(', ')}
                 </Text>
               )}
             </Box>
