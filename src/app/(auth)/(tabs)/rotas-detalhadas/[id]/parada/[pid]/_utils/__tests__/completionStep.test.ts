@@ -49,6 +49,17 @@ describe('resolveCompletionStep — comportamento de hoje (tudo obrigatorio)', (
         expect(step).toBe('recipient')
     })
 
+    it('etapa 3 e sempre a porta do recebedor, mesmo com tipo ja escolhido', () => {
+        const step = resolveCompletionStep({
+            etapa: 3,
+            readyAfterChecks: true,
+            hasRecipientType: true,
+            requirements: DEFAULT_FLOW_REQUIREMENTS,
+        })
+
+        expect(step).toBe('recipient')
+    })
+
     it('etapa 5 e sempre a finalizacao', () => {
         const step = resolveCompletionStep({
             etapa: 5,

@@ -41,13 +41,21 @@ export const DEFAULT_FLOW_REQUIREMENTS: FlowCompletionRequirements = {
 
 const MODES: RequirementMode[] = ['REQUIRED', 'OPTIONAL', 'HIDDEN']
 
+/** Espelha o `maxPhotos` default do MultiPhotoPicker: quem mudar la muda aqui. */
+const MAX_PHOTOS = 5
+
 function resolveMode(value: unknown): RequirementMode {
     return MODES.includes(value as RequirementMode) ? (value as RequirementMode) : 'REQUIRED'
 }
 
 function resolvePhotos(value: unknown): PhotosRequirement {
     const raw = (value ?? {}) as Partial<PhotosRequirement>
-    const min = Number.isInteger(raw.min) && (raw.min as number) > 0 ? (raw.min as number) : 1
+    // Sem teto aqui, um `min` acima do que o MultiPhotoPicker permite anexar
+    // (maxPhotos={5}) prende o motorista em campo para sempre: ele nunca
+    // alcanca o numero exigido porque a interface nem deixa tentar.
+    const min = Number.isInteger(raw.min) && (raw.min as number) > 0
+        ? Math.min(raw.min as number, MAX_PHOTOS)
+        : 1
     return { mode: resolveMode(raw.mode), min }
 }
 
