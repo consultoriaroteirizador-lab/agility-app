@@ -92,26 +92,32 @@ export function TransferEtapaFinalizarColeta() {
 
                         <Box gap="y12">
                             {/* Documento de quem entregou na origem */}
-                            <Row
-                                label="Documento de quem entregou"
-                                ok={safe.documento}
-                                onConfirm={() => setEtapa(4)}
-                                onClear={() => updateChecklist('documento', false)}
-                            />
+                            {requirements.recipientIdentity !== 'HIDDEN' && (
+                                <Row
+                                    label="Documento de quem entregou"
+                                    ok={safe.documento}
+                                    onConfirm={() => setEtapa(4)}
+                                    onClear={() => updateChecklist('documento', false)}
+                                />
+                            )}
                             {/* Foto */}
-                            <Row
-                                label="Foto da carga"
-                                ok={safe.foto}
-                                onConfirm={() => updateChecklist('foto', true)}
-                                onClear={() => { setPhotos([]); updateChecklist('foto', false); }}
-                            />
+                            {requirements.photos.mode !== 'HIDDEN' && (
+                                <Row
+                                    label="Foto da carga"
+                                    ok={safe.foto}
+                                    onConfirm={() => updateChecklist('foto', true)}
+                                    onClear={() => { setPhotos([]); updateChecklist('foto', false); }}
+                                />
+                            )}
                             {/* Assinatura */}
-                            <Row
-                                label="Assinatura coletada"
-                                ok={safe.signature}
-                                onConfirm={() => setShowSignature(true)}
-                                onClear={() => { setSignature(null); updateChecklist('signature', false); }}
-                            />
+                            {requirements.signature !== 'HIDDEN' && (
+                                <Row
+                                    label="Assinatura coletada"
+                                    ok={safe.signature}
+                                    onConfirm={() => setShowSignature(true)}
+                                    onClear={() => { setSignature(null); updateChecklist('signature', false); }}
+                                />
+                            )}
                         </Box>
 
                         <Box marginTop="y24" paddingBottom="y24" alignItems="center">

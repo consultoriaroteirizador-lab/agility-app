@@ -3,6 +3,7 @@ import { useEffect } from 'react';
 import { useLocalSearchParams } from 'expo-router';
 
 import { Box, ActivityIndicator, Text } from '@/components';
+import { requirementsForServiceType } from '@/domain/agility/company/completionRequirements';
 import { measure } from '@/theme';
 
 import { EtapaCheckItens } from '../_components/entrega/EtapaCheckItens';
@@ -16,6 +17,7 @@ import { SharedEtapaFormulario } from '../_components/shared/SharedEtapaFormular
 import { SharedEtapaRecebedor } from '../_components/shared/SharedEtapaRecebedor';
 import { ParadaProvider, useParada } from '../_context/ParadaContext';
 import { useDestinoAposNota } from '../_hooks/useDestinoAposNota';
+import { resolveCompletionStep } from '../_utils/completionStep';
 
 /**
  * Orchestrator da entrega - gerencia qual etapa exibir
@@ -40,6 +42,7 @@ function EntregaOrchestrator() {
         hasReturn,
         returnCheckCompleted,
         pedidosDaParada,
+        completionRequirements,
     } = useParada();
 
     // Task 5: para onde ir depois de fechar ESTA nota — índice da parada (se a
@@ -148,20 +151,21 @@ function EntregaOrchestrator() {
         return <SharedEtapaFormulario serviceType="entrega" />;
     }
 
-    // Etapa 4: Formulário de dados (verificar primeiro)
-    if (etapa === 4 && recipient.tipo) {
-        return <SharedEtapaDados serviceType="entrega" />;
-    }
+    // A partir daqui quem decide a etapa e resolveCompletionStep: ocultar a etapa
+    // de recebedor sem alguem assumir o lugar dela deixa o motorista preso.
+    const readyAfterChecks =
+        delivered && !needsDeliveryCheck && !needsReturnCheck && (!hasFormGroups || formCompleted);
 
-    // Etapa 3: Seleção de quem recebeu
-    if (etapa === 3 || (delivered && !recipient.tipo && !needsDeliveryCheck && !needsReturnCheck && (!hasFormGroups || formCompleted))) {
-        return <SharedEtapaRecebedor serviceType="entrega" />;
-    }
+    const step = resolveCompletionStep({
+        etapa,
+        readyAfterChecks,
+        hasRecipientType: !!recipient.tipo,
+        requirements: requirementsForServiceType(completionRequirements, 'entrega'),
+    });
 
-    // Etapa 5: Checklist final
-    if (etapa === 5) {
-        return <SharedEtapaFinalizacao serviceType="entrega" />;
-    }
+    if (step === 'recipient') return <SharedEtapaRecebedor serviceType="entrega" />;
+    if (step === 'data') return <SharedEtapaDados serviceType="entrega" />;
+    if (step === 'final') return <SharedEtapaFinalizacao serviceType="entrega" />;
 
     // Fallback para etapa inicial
     return <EtapaInicial />;

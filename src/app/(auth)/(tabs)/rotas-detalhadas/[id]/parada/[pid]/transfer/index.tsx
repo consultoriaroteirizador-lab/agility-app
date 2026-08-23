@@ -3,6 +3,7 @@ import { useEffect } from 'react';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 
 import { Box, ActivityIndicator, Text } from '@/components';
+import { requirementsForServiceType } from '@/domain/agility/company/completionRequirements';
 import { measure } from '@/theme';
 
 import { EtapaCheckItens } from '../_components/entrega/EtapaCheckItens';
@@ -14,6 +15,7 @@ import { TransferEtapaConfirmacao } from '../_components/transfer/TransferEtapaC
 import { TransferEtapaFinalizarColeta } from '../_components/transfer/TransferEtapaFinalizarColeta';
 import { TransferEtapaInicial } from '../_components/transfer/TransferEtapaInicial';
 import { ParadaProvider, useParada } from '../_context/ParadaContext';
+import { resolveCompletionStep } from '../_utils/completionStep';
 
 /**
  * Orchestrator do TRANSFER — wizard de 2 pernas (coleta na origem → entrega no
@@ -37,6 +39,7 @@ function TransferOrchestrator() {
         checkCompleted,
         fetchMaterials,
         transferLeg,
+        completionRequirements,
     } = useParada();
 
     const isPickup = transferLeg === 'pickup';
@@ -113,18 +116,20 @@ function TransferOrchestrator() {
         );
     }
 
-    // Dados do recebedor (documento)
-    if (etapa === 4 && recipient.tipo) {
-        return <SharedEtapaDados serviceType={sharedType} />;
-    }
+    // A partir daqui quem decide a etapa e resolveCompletionStep: ocultar a etapa
+    // de recebedor sem alguem assumir o lugar dela deixa o motorista preso.
+    const readyAfterChecks = delivered && !needsCheck;
 
-    // Quem entregou (origem) / Quem recebeu (destino)
-    if (etapa === 3 || (delivered && !recipient.tipo && !needsCheck)) {
-        return <SharedEtapaRecebedor serviceType={sharedType} />;
-    }
+    const step = resolveCompletionStep({
+        etapa,
+        readyAfterChecks,
+        hasRecipientType: !!recipient.tipo,
+        requirements: requirementsForServiceType(completionRequirements, sharedType),
+    });
 
-    // Finalização da perna
-    if (etapa === 5) {
+    if (step === 'recipient') return <SharedEtapaRecebedor serviceType={sharedType} />;
+    if (step === 'data') return <SharedEtapaDados serviceType={sharedType} />;
+    if (step === 'final') {
         return isPickup ? <TransferEtapaFinalizarColeta /> : <SharedEtapaFinalizacao serviceType="entrega" />;
     }
 
