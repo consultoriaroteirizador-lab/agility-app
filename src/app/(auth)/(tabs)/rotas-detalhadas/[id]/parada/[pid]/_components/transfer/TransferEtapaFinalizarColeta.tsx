@@ -9,6 +9,7 @@ import { useToastService } from '@/services/Toast/useToast';
 import { measure } from '@/theme';
 
 import { useParada } from '../../_context/ParadaContext';
+import { resolvePreviousStep } from '../../_utils/completionStep';
 import { validateCompletion } from '../../_utils/completionValidation';
 
 import { TransferStepHeader } from './TransferStepHeader';
@@ -27,7 +28,9 @@ export function TransferEtapaFinalizarColeta() {
         setSignature,
         setPhotos,
         setEtapa,
+        setDelivered,
         recipient,
+        updateRecipient,
         photos,
         signature,
         commitPickupLeg,
@@ -35,8 +38,14 @@ export function TransferEtapaFinalizarColeta() {
     } = useParada();
     const { showToast } = useToastService();
 
+    // Documento deriva do dado real (nome + numero preenchidos), nao de um
+    // flag de checklist manual — nada no fluxo chama `updateChecklist('documento', true)`,
+    // so `false` (no onClear), entao a linha ficaria vermelha para sempre se
+    // dependesse dele.
+    const documentoPreenchido = !!recipient?.nome?.trim() && !!recipient?.numeroDocumento?.trim();
+
     const safe = {
-        documento: checklist?.documento ?? false,
+        documento: documentoPreenchido,
         foto: checklist?.foto ?? false,
         signature: checklist?.signature ?? false,
     };
@@ -61,7 +70,14 @@ export function TransferEtapaFinalizarColeta() {
 
     const canCommit = completion.canProceed;
 
-    const handleBack = useCallback(() => setEtapa(4), [setEtapa]);
+    // A volta e config-aware, espelhando a ida: se a tela de dados (ou a de
+    // recebedor) estiver oculta, "voltar" pula direto para o que ainda existe —
+    // no limite, para o ponto de decisao (etapa 2), reabrindo a pergunta.
+    const handleBack = useCallback(() => {
+        const { etapa, resetDelivered } = resolvePreviousStep({ from: 'final', requirements });
+        setEtapa(etapa);
+        if (resetDelivered) setDelivered(false);
+    }, [setEtapa, setDelivered, requirements]);
 
     const handleConcluirColeta = useCallback(() => {
         const uploading = (photos as { __uploadStatus?: string }[]).some((p) => p.__uploadStatus === 'uploading');
@@ -97,7 +113,7 @@ export function TransferEtapaFinalizarColeta() {
                                     label="Documento de quem entregou"
                                     ok={safe.documento}
                                     onConfirm={() => setEtapa(4)}
-                                    onClear={() => updateChecklist('documento', false)}
+                                    onClear={() => updateRecipient({ nome: '', tipoDocumento: 'RG', numeroDocumento: '' })}
                                 />
                             )}
                             {/* Foto */}

@@ -15,6 +15,7 @@ import { parseBRLToCents } from '@/utils/parseCurrency';
 
 import { useParada } from '../../_context/ParadaContext';
 import { useServiceCompletion } from '../../_hooks/useServiceCompletion';
+import { resolvePreviousStep } from '../../_utils/completionStep';
 
 interface SharedEtapaFinalizacaoProps {
   serviceType: 'entrega' | 'coleta' | 'servico';
@@ -77,6 +78,7 @@ export function SharedEtapaFinalizacao({ serviceType }: SharedEtapaFinalizacaoPr
     setSignature,
     setPhotos,
     setEtapa,
+    setDelivered,
     service,
     showPaymentModal,
     setShowPaymentModal,
@@ -117,9 +119,14 @@ export function SharedEtapaFinalizacao({ serviceType }: SharedEtapaFinalizacaoPr
     canFinalize,
   });
 
+  // A volta e config-aware, espelhando a ida: se a tela de dados (ou a de
+  // recebedor) estiver oculta, "voltar" pula direto para o que ainda existe —
+  // no limite, para o ponto de decisao (etapa 2), reabrindo a pergunta.
   const handleBack = useCallback(() => {
-    setEtapa(4);
-  }, [setEtapa]);
+    const { etapa, resetDelivered } = resolvePreviousStep({ from: 'final', requirements });
+    setEtapa(etapa);
+    if (resetDelivered) setDelivered(false);
+  }, [setEtapa, setDelivered, requirements]);
 
   const handleFinalizarWrapper = useCallback(() => {
     console.log(`[SharedEtapaFinalizacao] Finalizando ${serviceType}...`);

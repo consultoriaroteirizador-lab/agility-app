@@ -11,6 +11,7 @@ import { useToastService } from '@/services/Toast/useToast';
 import { measure } from '@/theme';
 
 import { useParada } from '../../_context/ParadaContext';
+import { resolvePreviousStep } from '../../_utils/completionStep';
 import { validateCompletion } from '../../_utils/completionValidation';
 
 interface SharedEtapaDadosProps {
@@ -53,6 +54,7 @@ export function SharedEtapaDados({ serviceType }: SharedEtapaDadosProps) {
     showSignature,
     setShowSignature,
     setEtapa,
+    setDelivered,
     setSignature,
     setPhotos,
     completionRequirements,
@@ -72,11 +74,16 @@ export function SharedEtapaDados({ serviceType }: SharedEtapaDadosProps) {
     });
   };
 
-  const handleBack = useCallback(() => {
-    setEtapa(3);
-  }, [setEtapa]);
-
   const requirements = requirementsForServiceType(completionRequirements, serviceType);
+
+  // A volta e config-aware, espelhando a ida: se a etapa de recebedor estiver
+  // oculta, "voltar" nao existe mais como etapa 3 — devolve o motorista ao
+  // ponto de decisao (etapa 2) e reabre a pergunta ("Entreguei?").
+  const handleBack = useCallback(() => {
+    const { etapa, resetDelivered } = resolvePreviousStep({ from: 'data', requirements });
+    setEtapa(etapa);
+    if (resetDelivered) setDelivered(false);
+  }, [setEtapa, setDelivered, requirements]);
 
   const { canProceed, missing } = useMemo(
     () =>
