@@ -4,10 +4,12 @@ import { Box, Button, ScreenBase, Text, TouchableOpacityBox } from '@/components
 import { ButtonBack } from '@/components/Button/ButtonBack';
 import Modal from '@/components/Modal/Modal';
 import { SignatureCanvas } from '@/components/SignatureCanvas';
+import { requirementsForServiceType } from '@/domain/agility/company/completionRequirements';
 import { useToastService } from '@/services/Toast/useToast';
 import { measure } from '@/theme';
 
 import { useParada } from '../../_context/ParadaContext';
+import { validateCompletion } from '../../_utils/completionValidation';
 
 import { TransferStepHeader } from './TransferStepHeader';
 
@@ -29,6 +31,7 @@ export function TransferEtapaFinalizarColeta() {
         photos,
         signature,
         commitPickupLeg,
+        completionRequirements,
     } = useParada();
     const { showToast } = useToastService();
 
@@ -38,10 +41,25 @@ export function TransferEtapaFinalizarColeta() {
         signature: checklist?.signature ?? false,
     };
 
-    const canCommit = useMemo(() => {
-        const hasDoc = !!(checklist?.documento && recipient?.nome?.trim() && recipient?.numeroDocumento?.trim());
-        return hasDoc && photos.length > 0 && !!signature;
-    }, [checklist?.documento, recipient?.nome, recipient?.numeroDocumento, photos.length, signature]);
+    // A perna de COLETA de um TRANSFER le os requisitos de 'pickup' — mesma
+    // regra unica que as outras tres telas, para nao prender o motorista quando
+    // a empresa esconder um item (ex.: signature HIDDEN) que aqui era exigido
+    // manualmente sem nunca poder ser cumprido.
+    const requirements = requirementsForServiceType(completionRequirements, 'coleta');
+
+    const completion = useMemo(
+        () =>
+            validateCompletion(requirements, {
+                recipientTipo: recipient?.tipo,
+                nome: recipient?.nome,
+                documento: recipient?.numeroDocumento,
+                hasSignature: !!signature,
+                photoCount: photos?.length ?? 0,
+            }),
+        [requirements, recipient?.tipo, recipient?.nome, recipient?.numeroDocumento, signature, photos?.length],
+    );
+
+    const canCommit = completion.canProceed;
 
     const handleBack = useCallback(() => setEtapa(4), [setEtapa]);
 
@@ -105,7 +123,7 @@ export function TransferEtapaFinalizarColeta() {
                             />
                             {!canCommit && (
                                 <Text preset="text12" color="primary100" textAlign="center" marginTop="y8">
-                                    * Documento, foto e assinatura são obrigatórios
+                                    * Obrigatório: {completion.missing.join(', ')}
                                 </Text>
                             )}
                         </Box>
