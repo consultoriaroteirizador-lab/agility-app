@@ -1,4 +1,5 @@
 import { CompletionRequirements, resolveCompletionRequirements } from '@/domain/agility/company/completionRequirements'
+import { RecipientRelations, resolveRecipientRelations } from '@/domain/agility/company/recipientRelations'
 
 export interface CompanyRules {
     enforceSingleActiveStop: boolean
@@ -8,6 +9,11 @@ export interface CompanyRules {
      * de falha fechada das flags acima: ausente = exija tudo.
      */
     completionRequirements: CompletionRequirements
+    /**
+     * Opcoes de relacao de quem recebeu/entregou/acompanhou, por fluxo. Mesma
+     * logica de falha fechada: ausente = use os defaults de fabrica.
+     */
+    recipientRelations: RecipientRelations
 }
 
 /**
@@ -27,5 +33,6 @@ export function resolveCompanyRules(
         enforceSingleActiveStop: features?.enforceSingleActiveStop !== false,
         enforceStopOrder: features?.enforceStopOrder !== false,
         completionRequirements: resolveCompletionRequirements(features?.completionRequirements),
+        recipientRelations: resolveRecipientRelations(features?.recipientRelations),
     }
 }

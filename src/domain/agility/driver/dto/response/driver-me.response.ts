@@ -1,4 +1,5 @@
 import { CompletionRequirements } from '@/domain/agility/company/completionRequirements'
+import { RecipientRelations } from '@/domain/agility/company/recipientRelations'
 
 /**
  * Resposta de `GET /drivers/me` — perfil do motorista logado, funcionário OU
@@ -33,5 +34,7 @@ export interface DriverMeResponse {
         enforceStopOrder: boolean
         /** Exigencias de finalizacao por fluxo (spec 2026-08-23). */
         completionRequirements?: CompletionRequirements
+        /** Opcoes de relacao de quem recebeu/entregou/acompanhou (spec 2026-08-24). */
+        recipientRelations?: RecipientRelations
     }
 }
