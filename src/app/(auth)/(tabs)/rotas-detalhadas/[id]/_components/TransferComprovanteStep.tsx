@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 
 import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
@@ -8,6 +8,7 @@ import { DocumentCollectionForm, type DocumentData } from '@/components/Document
 import Modal from '@/components/Modal/Modal';
 import { MultiPhotoPicker } from '@/components/MultiPhotoPicker';
 import { SignatureCanvas } from '@/components/SignatureCanvas';
+import { useGetMe } from '@/domain/agility/driver/useCase';
 import type { OrderOccurrenceReasonResponse } from '@/domain/agility/order-occurrence-reason/dto';
 import { useFindOccurrenceReasons } from '@/domain/agility/order-occurrence-reason/useCase';
 import { useRoutingHandoff } from '@/domain/agility/routing/useCase/useRoutingHandoff';
@@ -17,6 +18,8 @@ import { useToastService } from '@/services/Toast/useToast';
 import { measure } from '@/theme';
 
 import { useRota } from '../_context/RotaContext';
+import { resolveTransferComprovanteCompletion } from '../_utils/transferComprovanteCompletion';
+import { resolveCompanyRules } from '../parada/[pid]/_utils/companyRules';
 
 import type { TransferOrderOutcome } from './TransferOrderCard';
 import { TransferOrderList } from './TransferOrderList';
@@ -43,6 +46,15 @@ export function TransferComprovanteStep({ routingId, onBack, onDone }: { routing
     const [reasonModalServiceId, setReasonModalServiceId] = useState<string | null>(null);
     const [reasonDraft, setReasonDraft] = useState<string>('');
     const [notesDraft, setNotesDraft] = useState<string>('');
+
+    // Exigencias de finalizacao configuraveis por empresa (mesma fonte que o
+    // last-mile, `parada/[pid]/_context/ParadaContext`) — esta tela nao usa
+    // ParadaContext (estado local, ver docblock acima), entao le `me` direto.
+    const { me } = useGetMe();
+    const completionRequirements = useMemo(
+        () => resolveCompanyRules(me?.companyFeatures).completionRequirements,
+        [me?.companyFeatures],
+    );
 
     const { reasons, isLoading: isLoadingReasons, isError: isReasonsError } = useFindOccurrenceReasons('TRANSFER');
     const [mirror, setMirror] = useState<OrderOccurrenceReasonResponse[]>([]);
@@ -109,13 +121,20 @@ export function TransferComprovanteStep({ routingId, onBack, onDone }: { routing
         },
     });
 
-    // Igual ao SharedEtapaDados do last-mile: exige TODOS — nome + documento do
-    // recebedor + foto + assinatura.
-    const canSubmit =
-        doc.recipientName.trim().length > 0 &&
-        doc.documentNumber.trim().length > 0 &&
-        photos.length > 0 &&
-        !!signature;
+    // Mesma regra do last-mile (validateCompletion), bucket 'entrega' — ver
+    // `resolveTransferComprovanteCompletion` para o porque desse bucket e
+    // como o "quem recebeu" (que esta tela nao tem) e neutralizado.
+    const { requirements, validation: completion } = useMemo(
+        () =>
+            resolveTransferComprovanteCompletion(completionRequirements, {
+                recipientName: doc.recipientName,
+                documentNumber: doc.documentNumber,
+                hasSignature: !!signature,
+                photoCount: photos.length,
+            }),
+        [completionRequirements, doc.recipientName, doc.documentNumber, signature, photos.length],
+    );
+    const canSubmit = completion.canProceed;
 
     async function onConfirm() {
         if (!canSubmit || submitting) return;
@@ -202,33 +221,39 @@ export function TransferComprovanteStep({ routingId, onBack, onDone }: { routing
                 onMarkReceived={clearOutcome}
             />
 
-            <DocumentCollectionForm data={doc} onChange={setDoc} />
+            {requirements.recipientIdentity !== 'HIDDEN' && (
+                <DocumentCollectionForm data={doc} onChange={setDoc} />
+            )}
 
-            <MultiPhotoPicker
-                photos={photos}
-                onPhotosChange={setPhotos}
-                label="Foto da carga"
-                maxPhotos={5}
-                allowCamera
-                photoSize={88}
-            />
-
-            <Box>
-                <Text preset="text12" color="gray600" mb="b4">
-                    Assinatura
-                </Text>
-                <Button
-                    preset="outline"
-                    title={signature ? 'Assinatura registrada ✓' : 'Registrar assinatura'}
-                    onPress={() => setShowSignature(true)}
+            {requirements.photos.mode !== 'HIDDEN' && (
+                <MultiPhotoPicker
+                    photos={photos}
+                    onPhotosChange={setPhotos}
+                    label="Foto da carga"
+                    maxPhotos={5}
+                    allowCamera
+                    photoSize={88}
                 />
-            </Box>
+            )}
+
+            {requirements.signature !== 'HIDDEN' && (
+                <Box>
+                    <Text preset="text12" color="gray600" mb="b4">
+                        Assinatura
+                    </Text>
+                    <Button
+                        preset="outline"
+                        title={signature ? 'Assinatura registrada ✓' : 'Registrar assinatura'}
+                        onPress={() => setShowSignature(true)}
+                    />
+                </Box>
+            )}
 
             <Box gap="y12" pb="y24">
                 <Button title="Registrar entrega da carga" onPress={onConfirm} disabled={!canSubmit || submitting} isLoading={submitting} />
                 {!canSubmit ? (
                     <Text preset="text12" color="gray500" textAlign="center">
-                        * Informe nome e documento do recebedor, foto e assinatura.
+                        * Obrigatório: {completion.missing.join(', ')}
                     </Text>
                 ) : null}
                 <Button title="Voltar" onPress={onBack} preset="outline" />

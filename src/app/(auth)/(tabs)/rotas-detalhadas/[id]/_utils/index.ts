@@ -120,3 +120,13 @@ export {
     resolveTemEtapaPropriaAntesDoAtendimento,
     temOutraNotaPorTrabalhar,
 } from './paradaDisplay'
+
+// ============================================
+// COMPROVANTE DO HANDOFF CD -> CD (TransferComprovanteStep)
+// ============================================
+
+export {
+    type TransferComprovanteCompletion,
+    type TransferComprovanteState,
+    resolveTransferComprovanteCompletion,
+} from './transferComprovanteCompletion'
