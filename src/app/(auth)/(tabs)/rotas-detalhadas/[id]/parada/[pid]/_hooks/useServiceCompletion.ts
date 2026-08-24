@@ -26,7 +26,12 @@ import { useServiceUpload } from './useServiceUpload';
  * 2. Enviar detalhes de conclusão + completar serviço - feito via completeServiceWithDetails()
  *    (O backend já chama service.complete() internamente no completeWithDetails)
  */
-export function useServiceCompletion(serviceType: ServiceFlowType = 'entrega') {
+// `serviceType` NAO tem default: um chamador futuro numa tela de servico ou
+// coleta que esqueca o argumento validaria contra o bucket errado (o mesmo
+// "nao especificado" -> permissivo que `companyRules.ts` documenta como pior
+// caso). O unico chamador de hoje (SharedEtapaFinalizacao) sempre passa
+// explicito — deixar obrigatorio nao custa nada e fecha essa porta.
+export function useServiceCompletion(serviceType: ServiceFlowType) {
     const queryClient = useQueryClient();
     const {
         service,

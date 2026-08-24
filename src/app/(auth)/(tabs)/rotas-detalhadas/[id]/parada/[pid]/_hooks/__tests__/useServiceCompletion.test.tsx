@@ -114,7 +114,7 @@ function makeParadaContext(overrides: ParadaOverrides = {}) {
 }
 
 /** Roda o hook fora de uma tela de verdade, capturando o resultado do render. */
-function runHook(serviceType?: Parameters<typeof useServiceCompletion>[0]) {
+function runHook(serviceType: Parameters<typeof useServiceCompletion>[0]) {
     const queryClient = new QueryClient();
     let captured: ReturnType<typeof useServiceCompletion> | undefined;
     function Probe() {
@@ -140,7 +140,10 @@ describe('useServiceCompletion — regra unica de conclusao', () => {
     it('tudo REQUIRED e estado vazio: canFinalize falso e missing com os quatro rotulos', () => {
         mockedUseParada.mockReturnValue(makeParadaContext());
 
-        const result = runHook();
+        // ALL_REQUIRED aplica o mesmo REQUIRED_FLOW aos tres buckets — o
+        // serviceType aqui e so o do unico chamador real (SharedEtapaFinalizacao
+        // sempre passa explicito, useServiceCompletion nao tem mais default).
+        const result = runHook('entrega');
 
         expect(result.canFinalize).toBe(false);
         expect(result.missing).toEqual(['quem recebeu', 'nome e documento', 'assinatura', 'foto']);
@@ -155,7 +158,7 @@ describe('useServiceCompletion — regra unica de conclusao', () => {
             }),
         );
 
-        const result = runHook();
+        const result = runHook('entrega');
 
         expect(result.canFinalize).toBe(true);
         expect(result.missing).toEqual([]);

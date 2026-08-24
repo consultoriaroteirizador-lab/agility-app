@@ -293,7 +293,12 @@ export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderPr
   const { me } = useGetMe();
   // Opt-out: mesma semântica do backend. Perfil ainda não carregado (rede ruim,
   // primeiro render) NÃO pode desligar a regra — na dúvida, ela vale.
-  const rules = resolveCompanyRules(me?.companyFeatures);
+  // `useMemo` (não só o objeto em si): sem isso `rules` — e `completionRequirements`
+  // dentro dele — ganham identidade nova A CADA RENDER, e todo `useMemo` rio abaixo
+  // que lista `requirements`/`completionRequirements` nas deps (SharedEtapaDados,
+  // useServiceCompletion, TransferEtapaFinalizarColeta) nunca bate o cache — a
+  // memoização inteira fica decorativa.
+  const rules = useMemo(() => resolveCompanyRules(me?.companyFeatures), [me?.companyFeatures]);
   const { services: routeServices } = useFindServicesByRoutingId(service?.routingId || rotaId || '');
   const stopGate = useStopStatus({
     service: service ?? null,

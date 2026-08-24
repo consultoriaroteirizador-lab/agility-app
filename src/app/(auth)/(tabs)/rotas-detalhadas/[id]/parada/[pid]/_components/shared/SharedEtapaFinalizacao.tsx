@@ -79,6 +79,7 @@ export function SharedEtapaFinalizacao({ serviceType }: SharedEtapaFinalizacaoPr
     setPhotos,
     setEtapa,
     setDelivered,
+    updateRecipient,
     service,
     showPaymentModal,
     setShowPaymentModal,
@@ -357,7 +358,13 @@ export function SharedEtapaFinalizacao({ serviceType }: SharedEtapaFinalizacaoPr
                   </Box>
                   <Box flexDirection="row" gap="y12">
                     <TouchableOpacityBox
-                      onPress={() => updateChecklist('documento', false)}
+                      // Limpa o dado real (nome + documento), nao so o flag do
+                      // checklist — canFinalize le recipient.nome/numeroDocumento
+                      // via validateCompletion, nao mais checklist.documento; so
+                      // marcar o flag deixava a linha vermelha com "Finalizar"
+                      // continuando habilitado. Mesmo padrao de
+                      // TransferEtapaFinalizarColeta.
+                      onPress={() => updateRecipient({ nome: '', tipoDocumento: 'RG', numeroDocumento: '' })}
                       width={measure.x44}
                       height={measure.y44}
                       borderRadius="s12"
