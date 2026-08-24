@@ -1,5 +1,6 @@
 import { Box, Button, ScreenBase, Text, TouchableOpacityBox } from '@/components';
 import { ButtonBack } from '@/components/Button/ButtonBack';
+import { requirementsForServiceType } from '@/domain/agility/company/completionRequirements';
 import { measure, ThemeColors } from '@/theme';
 
 import { useParada, RecipientType } from '../../_context/ParadaContext';
@@ -45,10 +46,16 @@ const CONFIG: Record<ServiceType, {
 };
 
 export function SharedEtapaRecebedor({ serviceType = 'servico' }: SharedEtapaRecebedorProps) {
-    const { service, recipient, updateRecipient, setEtapa, setDelivered } = useParada();
+    const { service, recipient, updateRecipient, setEtapa, setDelivered, completionRequirements } = useParada();
 
     const customerName = service?.fantasyName || service?.responsible || 'Cliente';
     const config = CONFIG[serviceType];
+
+    // OPTIONAL nao pode virar REQUIRED na pratica: com a config opcional o
+    // motorista tem que poder seguir sem escolher um tipo.
+    const requirements = requirementsForServiceType(completionRequirements, serviceType);
+    const isOptional = requirements.recipientType === 'OPTIONAL';
+    const nextDisabled = requirements.recipientType === 'REQUIRED' && !recipient.tipo;
 
     const getLabel = (type: RecipientType) => {
         if (type === 'cliente') return customerName;
@@ -78,6 +85,12 @@ export function SharedEtapaRecebedor({ serviceType = 'servico' }: SharedEtapaRec
                         <Text preset="text14" color="gray600" marginBottom="y12">
                             {config.description}
                         </Text>
+
+                        {isOptional && (
+                            <Text preset="text12" color="gray600" marginBottom="y12">
+                                Opcional — você pode seguir sem selecionar.
+                            </Text>
+                        )}
 
                         <Box gap="y8" marginBottom="y12">
                             {RECIPIENT_OPTIONS.map((option) => (
@@ -123,7 +136,7 @@ export function SharedEtapaRecebedor({ serviceType = 'servico' }: SharedEtapaRec
                                 width={measure.x330}
                                 title="Próximo"
                                 onPress={() => setEtapa(4)}
-                                disabled={!recipient.tipo}
+                                disabled={nextDisabled}
                             />
                         </Box>
                     </Box>

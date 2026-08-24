@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef } from 'react';
 
 import { useQueryClient } from '@tanstack/react-query';
 
+import { requirementsForServiceType, ServiceFlowType } from '@/domain/agility/company/completionRequirements';
 import type { ServiceCompletionDetailsRequest } from '@/domain/agility/service/dto/request/service-completion-details.request';
 import { useCompleteServiceWithDetails } from '@/domain/agility/service/useCase';
 import { routeStopChangedKeys } from '@/domain/queryKeys';
@@ -9,6 +10,7 @@ import { useToastService } from '@/services/Toast/useToast';
 import { parseBRLToCents } from '@/utils/parseCurrency';
 
 import { useParada } from '../_context/ParadaContext';
+import { validateCompletion } from '../_utils/completionValidation';
 
 import { getCurrentCoords } from './getCurrentCoords';
 import { useServiceUpload } from './useServiceUpload';
@@ -24,7 +26,12 @@ import { useServiceUpload } from './useServiceUpload';
  * 2. Enviar detalhes de conclusão + completar serviço - feito via completeServiceWithDetails()
  *    (O backend já chama service.complete() internamente no completeWithDetails)
  */
-export function useServiceCompletion() {
+// `serviceType` NAO tem default: um chamador futuro numa tela de servico ou
+// coleta que esqueca o argumento validaria contra o bucket errado (o mesmo
+// "nao especificado" -> permissivo que `companyRules.ts` documenta como pior
+// caso). O unico chamador de hoje (SharedEtapaFinalizacao) sempre passa
+// explicito — deixar obrigatorio nao custa nada e fecha essa porta.
+export function useServiceCompletion(serviceType: ServiceFlowType) {
     const queryClient = useQueryClient();
     const {
         service,
@@ -44,10 +51,25 @@ export function useServiceCompletion() {
         deliveryCode,
         bypassReasonCode,
         bypassReasonText,
+        completionRequirements,
     } = useParada();
     const { showToast } = useToastService();
 
     const { uploadPhotos, uploadSignature, signature } = useServiceUpload();
+
+    const requirements = requirementsForServiceType(completionRequirements, serviceType);
+
+    const completion = useMemo(
+        () =>
+            validateCompletion(requirements, {
+                recipientTipo: recipient?.tipo,
+                nome: recipient?.nome,
+                documento: recipient?.numeroDocumento,
+                hasSignature: !!signature,
+                photoCount: photos?.length ?? 0,
+            }),
+        [requirements, recipient?.tipo, recipient?.nome, recipient?.numeroDocumento, signature, photos?.length],
+    );
 
     // Ref para rastrear se o componente está montado (evitar memory leaks)
     const isMountedRef = useRef(true);
@@ -116,25 +138,11 @@ export function useServiceCompletion() {
                 return;
             }
 
-            // Validação robusta: verificar checklist E dados reais
-            const hasRealPhotos = photos && photos.length > 0;
-            const hasRealAssinatura = !!signature;
-            const hasDocumento = checklist?.documento && recipient?.nome?.trim() && recipient?.numeroDocumento?.trim();
-
-            if (!hasDocumento) {
-                showToast({ message: 'Preencha os dados do documento antes de finalizar.', type: 'error' });
-                finalizingRef.current = false;
-                return;
-            }
-
-            if (!hasRealPhotos) {
-                showToast({ message: 'Tire pelo menos uma foto antes de finalizar.', type: 'error' });
-                finalizingRef.current = false;
-                return;
-            }
-
-            if (!hasRealAssinatura) {
-                showToast({ message: 'Colete a assinatura antes de finalizar.', type: 'error' });
+            if (!completion.canProceed) {
+                showToast({
+                    message: `Preencha antes de finalizar: ${completion.missing.join(', ')}`,
+                    type: 'error',
+                });
                 finalizingRef.current = false;
                 return;
             }
@@ -294,7 +302,7 @@ export function useServiceCompletion() {
         }
     }, [
         serviceId,
-        checklist,
+        completion,
         finalizing,
         setFinalizing,
         uploadPhotos,
@@ -316,13 +324,8 @@ export function useServiceCompletion() {
         bypassReasonText,
     ]);
 
-    // Verificar se pode finalizar - validação robusta
-    const canFinalize = useMemo(() => {
-        const hasRealPhotos = photos && photos.length > 0;
-        const hasRealAssinatura = !!signature;
-        const hasDocumento = checklist?.documento && recipient?.nome?.trim() && recipient?.numeroDocumento?.trim();
-        return hasDocumento && hasRealPhotos && hasRealAssinatura;
-    }, [checklist?.documento, recipient?.nome, recipient?.numeroDocumento, photos?.length, signature]);
+    // Verificar se pode finalizar - mesma regra de `completion`, dono unico da pergunta
+    const canFinalize = completion.canProceed;
 
     return {
         // Ações
@@ -331,6 +334,9 @@ export function useServiceCompletion() {
         // Estados
         isCompleting: isCompletingWithDetails || finalizing,
         canFinalize,
+        // Rotulos do que falta, na ordem da tela — a tela usa isto no rodape em vez
+        // de uma string fixa que pode citar campo que a config nem exige mais.
+        missing: completion.missing,
 
         // Checklist
         checklist,

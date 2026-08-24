@@ -14,6 +14,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { ServiceFlowTheme } from '@/components';
 import type { AddressResponse } from '@/domain/agility/address/dto';
 import { useFindOneAddress } from '@/domain/agility/address/useCase';
+import type { CompletionRequirements } from '@/domain/agility/company/completionRequirements';
 import { useGetMe } from '@/domain/agility/driver/useCase';
 import type { FormGroupResponse } from '@/domain/agility/form-group/dto/form-group.response';
 import { formGroupService } from '@/domain/agility/form-group/formGroupService';
@@ -180,6 +181,8 @@ interface ParadaContextValue {
   // bloqueio (null quando liberado), usado no toast ao tentar iniciar bloqueado.
   canStartService: boolean;
   startBlockReason: string | null;
+  /** Exigencias de finalizacao da empresa, ja resolvidas (spec 2026-08-23). */
+  completionRequirements: CompletionRequirements;
 
   // Utilitários
   isServiceStarted: boolean;
@@ -290,7 +293,12 @@ export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderPr
   const { me } = useGetMe();
   // Opt-out: mesma semântica do backend. Perfil ainda não carregado (rede ruim,
   // primeiro render) NÃO pode desligar a regra — na dúvida, ela vale.
-  const rules = resolveCompanyRules(me?.companyFeatures);
+  // `useMemo` (não só o objeto em si): sem isso `rules` — e `completionRequirements`
+  // dentro dele — ganham identidade nova A CADA RENDER, e todo `useMemo` rio abaixo
+  // que lista `requirements`/`completionRequirements` nas deps (SharedEtapaDados,
+  // useServiceCompletion, TransferEtapaFinalizarColeta) nunca bate o cache — a
+  // memoização inteira fica decorativa.
+  const rules = useMemo(() => resolveCompanyRules(me?.companyFeatures), [me?.companyFeatures]);
   const { services: routeServices } = useFindServicesByRoutingId(service?.routingId || rotaId || '');
   const stopGate = useStopStatus({
     service: service ?? null,
@@ -1246,6 +1254,7 @@ export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderPr
     // Gating de início de parada (regras configuráveis da empresa)
     canStartService,
     startBlockReason,
+    completionRequirements: rules.completionRequirements,
 
     // Utilitários
     isServiceStarted: !!isServiceStarted,

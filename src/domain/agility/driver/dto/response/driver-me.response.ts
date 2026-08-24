@@ -1,3 +1,5 @@
+import { CompletionRequirements } from '@/domain/agility/company/completionRequirements'
+
 /**
  * Resposta de `GET /drivers/me` — perfil do motorista logado, funcionário OU
  * terceirizado (vinculado a Provider, não a Collaborator).
@@ -29,5 +31,7 @@ export interface DriverMeResponse {
     companyFeatures: {
         enforceSingleActiveStop: boolean
         enforceStopOrder: boolean
+        /** Exigencias de finalizacao por fluxo (spec 2026-08-23). */
+        completionRequirements?: CompletionRequirements
     }
 }

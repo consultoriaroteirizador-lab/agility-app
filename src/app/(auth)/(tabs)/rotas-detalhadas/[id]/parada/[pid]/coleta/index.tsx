@@ -3,6 +3,7 @@ import { useEffect } from 'react';
 import { useLocalSearchParams } from 'expo-router';
 
 import { Box, ActivityIndicator, Text } from '@/components';
+import { requirementsForServiceType } from '@/domain/agility/company/completionRequirements';
 import { measure } from '@/theme';
 
 import { ColetaEtapaCheckItens, ColetaEtapaConfirmacao, ColetaEtapaInicial } from '../_components/coleta';
@@ -13,6 +14,8 @@ import { SharedEtapaFormulario } from '../_components/shared/SharedEtapaFormular
 import { SharedEtapaRecebedor } from '../_components/shared/SharedEtapaRecebedor';
 import { ParadaProvider, useParada } from '../_context/ParadaContext';
 import { useDestinoAposNota } from '../_hooks/useDestinoAposNota';
+import { resolveCompletionStep } from '../_utils/completionStep';
+import { coletaReadyAfterChecks } from '../_utils/readyAfterChecks';
 
 /**
  * Orchestrator da coleta - gerencia qual etapa exibir
@@ -34,6 +37,7 @@ function ColetaOrchestrator() {
         hasFormGroups,
         formCompleted,
         pedidosDaParada,
+        completionRequirements,
     } = useParada();
 
     // Task 5: para onde ir depois de fechar ESTA nota — índice da parada (se a
@@ -115,20 +119,25 @@ function ColetaOrchestrator() {
         return <SharedEtapaFormulario serviceType="coleta" />;
     }
 
-    // Etapa 4: Formulário de dados (verificar primeiro)
-    if (etapa === 4 && recipient.tipo) {
-        return <SharedEtapaDados serviceType="coleta" />;
-    }
+    // A partir daqui quem decide a etapa e resolveCompletionStep: ocultar a etapa
+    // de recebedor sem alguem assumir o lugar dela deixa o motorista preso.
+    const readyAfterChecks = coletaReadyAfterChecks({
+        delivered,
+        needsMaterialCheck,
+        hasFormGroups,
+        formCompleted,
+    });
 
-    // Etapa 3: Seleção de quem entregou
-    if (etapa === 3 || (delivered && !recipient.tipo && !needsMaterialCheck && (!hasFormGroups || formCompleted))) {
-        return <SharedEtapaRecebedor serviceType="coleta" />;
-    }
+    const step = resolveCompletionStep({
+        etapa,
+        readyAfterChecks,
+        hasRecipientType: !!recipient.tipo,
+        requirements: requirementsForServiceType(completionRequirements, 'coleta'),
+    });
 
-    // Etapa 5: Checklist final
-    if (etapa === 5) {
-        return <SharedEtapaFinalizacao serviceType="coleta" />;
-    }
+    if (step === 'recipient') return <SharedEtapaRecebedor serviceType="coleta" />;
+    if (step === 'data') return <SharedEtapaDados serviceType="coleta" />;
+    if (step === 'final') return <SharedEtapaFinalizacao serviceType="coleta" />;
 
     // Fallback para etapa inicial
     return <ColetaEtapaInicial />;

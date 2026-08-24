@@ -4,10 +4,13 @@ import { Box, Button, ScreenBase, Text, TouchableOpacityBox } from '@/components
 import { ButtonBack } from '@/components/Button/ButtonBack';
 import Modal from '@/components/Modal/Modal';
 import { SignatureCanvas } from '@/components/SignatureCanvas';
+import { requirementsForServiceType } from '@/domain/agility/company/completionRequirements';
 import { useToastService } from '@/services/Toast/useToast';
 import { measure } from '@/theme';
 
 import { useParada } from '../../_context/ParadaContext';
+import { resolvePreviousStep } from '../../_utils/completionStep';
+import { validateCompletion } from '../../_utils/completionValidation';
 
 import { TransferStepHeader } from './TransferStepHeader';
 
@@ -25,25 +28,56 @@ export function TransferEtapaFinalizarColeta() {
         setSignature,
         setPhotos,
         setEtapa,
+        setDelivered,
         recipient,
+        updateRecipient,
         photos,
         signature,
         commitPickupLeg,
+        completionRequirements,
     } = useParada();
     const { showToast } = useToastService();
 
+    // Documento deriva do dado real (nome + numero preenchidos), nao de um
+    // flag de checklist manual — nada no fluxo chama `updateChecklist('documento', true)`,
+    // so `false` (no onClear), entao a linha ficaria vermelha para sempre se
+    // dependesse dele.
+    const documentoPreenchido = !!recipient?.nome?.trim() && !!recipient?.numeroDocumento?.trim();
+
     const safe = {
-        documento: checklist?.documento ?? false,
+        documento: documentoPreenchido,
         foto: checklist?.foto ?? false,
         signature: checklist?.signature ?? false,
     };
 
-    const canCommit = useMemo(() => {
-        const hasDoc = !!(checklist?.documento && recipient?.nome?.trim() && recipient?.numeroDocumento?.trim());
-        return hasDoc && photos.length > 0 && !!signature;
-    }, [checklist?.documento, recipient?.nome, recipient?.numeroDocumento, photos.length, signature]);
+    // A perna de COLETA de um TRANSFER le os requisitos de 'pickup' — mesma
+    // regra unica que as outras tres telas, para nao prender o motorista quando
+    // a empresa esconder um item (ex.: signature HIDDEN) que aqui era exigido
+    // manualmente sem nunca poder ser cumprido.
+    const requirements = requirementsForServiceType(completionRequirements, 'coleta');
 
-    const handleBack = useCallback(() => setEtapa(4), [setEtapa]);
+    const completion = useMemo(
+        () =>
+            validateCompletion(requirements, {
+                recipientTipo: recipient?.tipo,
+                nome: recipient?.nome,
+                documento: recipient?.numeroDocumento,
+                hasSignature: !!signature,
+                photoCount: photos?.length ?? 0,
+            }),
+        [requirements, recipient?.tipo, recipient?.nome, recipient?.numeroDocumento, signature, photos?.length],
+    );
+
+    const canCommit = completion.canProceed;
+
+    // A volta e config-aware, espelhando a ida: se a tela de dados (ou a de
+    // recebedor) estiver oculta, "voltar" pula direto para o que ainda existe —
+    // no limite, para o ponto de decisao (etapa 2), reabrindo a pergunta.
+    const handleBack = useCallback(() => {
+        const { etapa, resetDelivered } = resolvePreviousStep({ from: 'final', requirements });
+        setEtapa(etapa);
+        if (resetDelivered) setDelivered(false);
+    }, [setEtapa, setDelivered, requirements]);
 
     const handleConcluirColeta = useCallback(() => {
         const uploading = (photos as { __uploadStatus?: string }[]).some((p) => p.__uploadStatus === 'uploading');
@@ -74,26 +108,32 @@ export function TransferEtapaFinalizarColeta() {
 
                         <Box gap="y12">
                             {/* Documento de quem entregou na origem */}
-                            <Row
-                                label="Documento de quem entregou"
-                                ok={safe.documento}
-                                onConfirm={() => setEtapa(4)}
-                                onClear={() => updateChecklist('documento', false)}
-                            />
+                            {requirements.recipientIdentity !== 'HIDDEN' && (
+                                <Row
+                                    label="Documento de quem entregou"
+                                    ok={safe.documento}
+                                    onConfirm={() => setEtapa(4)}
+                                    onClear={() => updateRecipient({ nome: '', tipoDocumento: 'RG', numeroDocumento: '' })}
+                                />
+                            )}
                             {/* Foto */}
-                            <Row
-                                label="Foto da carga"
-                                ok={safe.foto}
-                                onConfirm={() => updateChecklist('foto', true)}
-                                onClear={() => { setPhotos([]); updateChecklist('foto', false); }}
-                            />
+                            {requirements.photos.mode !== 'HIDDEN' && (
+                                <Row
+                                    label="Foto da carga"
+                                    ok={safe.foto}
+                                    onConfirm={() => updateChecklist('foto', true)}
+                                    onClear={() => { setPhotos([]); updateChecklist('foto', false); }}
+                                />
+                            )}
                             {/* Assinatura */}
-                            <Row
-                                label="Assinatura coletada"
-                                ok={safe.signature}
-                                onConfirm={() => setShowSignature(true)}
-                                onClear={() => { setSignature(null); updateChecklist('signature', false); }}
-                            />
+                            {requirements.signature !== 'HIDDEN' && (
+                                <Row
+                                    label="Assinatura coletada"
+                                    ok={safe.signature}
+                                    onConfirm={() => setShowSignature(true)}
+                                    onClear={() => { setSignature(null); updateChecklist('signature', false); }}
+                                />
+                            )}
                         </Box>
 
                         <Box marginTop="y24" paddingBottom="y24" alignItems="center">
@@ -105,7 +145,7 @@ export function TransferEtapaFinalizarColeta() {
                             />
                             {!canCommit && (
                                 <Text preset="text12" color="primary100" textAlign="center" marginTop="y8">
-                                    * Documento, foto e assinatura são obrigatórios
+                                    * Obrigatório: {completion.missing.join(', ')}
                                 </Text>
                             )}
                         </Box>
