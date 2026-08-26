@@ -38,11 +38,27 @@ jest.mock('../../_context/ParadaContext', () => ({
     useParada: jest.fn(),
 }));
 
+// Nomeado com prefixo "mock" (exigencia do jest para ser referenciado dentro do
+// factory abaixo) — e o unico jeito de espionar o payload que `handleFinalizar`
+// manda para a API sem bater em rede de verdade.
+const mockCompleteServiceWithDetailsAsync = jest.fn();
+
 jest.mock('@/domain/agility/service/useCase', () => ({
     useCompleteServiceWithDetails: () => ({
-        completeServiceWithDetailsAsync: jest.fn(),
+        completeServiceWithDetailsAsync: mockCompleteServiceWithDetailsAsync,
         isLoading: false,
     }),
+}));
+
+// `handleFinalizar` sobe fotos/assinatura e le GPS antes de montar o payload —
+// nenhum dos tres precisa (nem pode, sem NativeModules) rodar de verdade aqui.
+jest.mock('@/domain/agility/service/serviceUploadUtils', () => ({
+    uploadMultipleServicePhotos: jest.fn().mockResolvedValue([]),
+    uploadBase64Signature: jest.fn().mockResolvedValue(null),
+}));
+
+jest.mock('../getCurrentCoords', () => ({
+    getCurrentCoords: jest.fn().mockResolvedValue(undefined),
 }));
 
 // `useParada` real devolve dezenas de campos; o mock so precisa dos que
@@ -78,7 +94,14 @@ const ALL_HIDDEN: CompletionRequirements = {
 };
 
 interface ParadaOverrides {
-    recipient?: { tipo?: string | null; nome?: string; numeroDocumento?: string } | null;
+    recipient?: {
+        tipo?: string | null;
+        nome?: string;
+        tipoDocumento?: string;
+        numeroDocumento?: string;
+        relationCode?: string;
+        relationLabel?: string;
+    } | null;
     signature?: string | null;
     photos?: unknown[];
     completionRequirements?: CompletionRequirements;
@@ -135,6 +158,7 @@ function runHook(serviceType: Parameters<typeof useServiceCompletion>[0]) {
 describe('useServiceCompletion — regra unica de conclusao', () => {
     afterEach(() => {
         mockedUseParada.mockReset();
+        mockCompleteServiceWithDetailsAsync.mockReset();
     });
 
     it('tudo REQUIRED e estado vazio: canFinalize falso e missing com os quatro rotulos', () => {
@@ -255,6 +279,68 @@ describe('useServiceCompletion — regra unica de conclusao', () => {
 
             expect(result.canFinalize).toBe(false);
             expect(result.missing).toEqual(['3 fotos']);
+        });
+    });
+
+    describe('payload de conclusao — identificacao de quem recebeu (Task 8)', () => {
+        // Gate de conclusao (canFinalize) ja e coberto pelos blocos acima — aqui
+        // o requirements e ALL_HIDDEN de proposito, para isolar o teste no que
+        // `handleFinalizar` monta no payload, sem a exigencia de campo interferir.
+        it('envia documento e relacao de quem recebeu no payload de conclusao', async () => {
+            mockedUseParada.mockReturnValue(
+                makeParadaContext({
+                    completionRequirements: ALL_HIDDEN,
+                    recipient: {
+                        tipo: 'porteiro',
+                        nome: 'Elaine Rocha',
+                        tipoDocumento: 'RG',
+                        numeroDocumento: '12.456.789-01',
+                        relationCode: 'PORTEIRO',
+                        relationLabel: 'Porteiro',
+                    },
+                    photos: [{ uri: 'a.jpg' }],
+                    signature: 'sig.png',
+                }),
+            );
+
+            const result = runHook('entrega');
+
+            await act(async () => {
+                await result.handleFinalizar();
+            });
+
+            expect(mockCompleteServiceWithDetailsAsync).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    details: expect.objectContaining({
+                        receivedBy: 'Elaine Rocha',
+                        receivedByDocumentType: 'RG',
+                        receivedByDocument: '12.456.789-01',
+                        receivedByRelationCode: 'PORTEIRO',
+                        receivedByRelationLabel: 'Porteiro',
+                    }),
+                }),
+            );
+        });
+
+        it('nao envia campo vazio — documento em branco nao vira string vazia no banco', async () => {
+            mockedUseParada.mockReturnValue(
+                makeParadaContext({
+                    completionRequirements: ALL_HIDDEN,
+                    recipient: { tipo: 'cliente', nome: 'Ana', tipoDocumento: 'RG', numeroDocumento: '   ' },
+                    photos: [{ uri: 'a.jpg' }],
+                    signature: 'sig.png',
+                }),
+            );
+
+            const result = runHook('entrega');
+
+            await act(async () => {
+                await result.handleFinalizar();
+            });
+
+            const [payloadArg] = mockCompleteServiceWithDetailsAsync.mock.calls[0];
+            expect(payloadArg.details).not.toHaveProperty('receivedByDocument');
+            expect(payloadArg.details).not.toHaveProperty('receivedByDocumentType');
         });
     });
 });

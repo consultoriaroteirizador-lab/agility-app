@@ -13,6 +13,18 @@ export interface ServiceCompletionDetailsRequest {
     /** Customer name who received - optional */
     receivedBy?: string
 
+    /** Tipo do documento de quem recebeu (RG/CPF/OUTRO) - optional */
+    receivedByDocumentType?: string
+
+    /** Numero do documento de quem recebeu - optional */
+    receivedByDocument?: string
+
+    /** Codigo da relacao de quem recebeu (opcoes da empresa) - optional */
+    receivedByRelationCode?: string
+
+    /** Rotulo da relacao, congelado no momento da escolha - optional */
+    receivedByRelationLabel?: string
+
     /** Actual duration in minutes - optional, minimum 0 */
     actualDurationMinutes?: number
 
@@ -44,6 +56,10 @@ export interface ServiceCompletionDetailsRequest {
     pickupCompletion?: {
         customerSignature?: string
         receivedBy?: string
+        receivedByDocumentType?: string
+        receivedByDocument?: string
+        receivedByRelationCode?: string
+        receivedByRelationLabel?: string
         photoProof?: string
         notes?: string
         completedAt?: string

@@ -75,6 +75,12 @@ export interface ChecklistState {
  */
 export interface PickupEvidence {
   receivedBy?: string;
+  /** Tipo/numero do documento de quem entregou na origem — mesmos campos da entrega. */
+  receivedByDocumentType?: string;
+  receivedByDocument?: string;
+  /** Relacao de quem entregou na origem (opcoes da empresa, spec 2026-08-24). */
+  receivedByRelationCode?: string;
+  receivedByRelationLabel?: string;
   signatureUrl?: string;
   photoUrls: string[];
   notes?: string;
@@ -682,6 +688,10 @@ export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderPr
 
     setPickupEvidence({
       receivedBy: recipient.nome || undefined,
+      receivedByDocumentType: recipient.numeroDocumento?.trim() ? recipient.tipoDocumento : undefined,
+      receivedByDocument: recipient.numeroDocumento?.trim() || undefined,
+      receivedByRelationCode: recipient.relationCode,
+      receivedByRelationLabel: recipient.relationLabel,
       signatureUrl: sigUrl,
       photoUrls,
       notes: observation || undefined,
@@ -699,7 +709,16 @@ export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderPr
     setPickupDone(true);
     setTransferLeg('delivery');
     setEtapa(1);
-  }, [photos, signature, recipient.nome, observation]);
+  }, [
+    photos,
+    signature,
+    recipient.nome,
+    recipient.tipoDocumento,
+    recipient.numeroDocumento,
+    recipient.relationCode,
+    recipient.relationLabel,
+    observation,
+  ]);
 
   // Formulário dinâmico - se o service tem formGroups
   const hasFormGroups = !!(service?.formGroupIds && service.formGroupIds.length > 0);
