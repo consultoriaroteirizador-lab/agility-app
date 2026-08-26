@@ -1,4 +1,5 @@
 import { resolveCompanyRules } from '../companyRules'
+import { resolveCompletionStep } from '../completionStep'
 import { requirementsForServiceType } from '@/domain/agility/company/completionRequirements'
 
 describe('resolveCompanyRules', () => {
@@ -77,6 +78,86 @@ describe('resolveCompanyRules — completionRequirements', () => {
 
         expect(rules.completionRequirements.service.recipientType).toBe('HIDDEN')
         expect(rules.completionRequirements.delivery).toEqual(TUDO_OBRIGATORIO)
+    })
+})
+
+/**
+ * C1 da revisao: `recipientRelations.<fluxo> = []` (config valida — spec
+ * 2026-08-24 §4.2) combinada com `recipientType` default REQUIRED travava o
+ * motorista num loop sem saida em `resolveCompletionStep`: a etapa 'recipient'
+ * nunca aceita `hasRecipientType=false`, e nao ha UI que preencha `tipo` sem
+ * nenhuma opcao para tocar. `resolveCompanyRules` agora forca `recipientType
+ * = 'HIDDEN'` quando a lista resolvida esta vazia — estes testes prezam pela
+ * PROVA de que o loop fecha, nao so pela config isolada.
+ */
+describe('resolveCompanyRules — lista de opcoes vazia esconde recipientType (evita o loop)', () => {
+    it('recipientRelations.delivery vazio forca recipientType HIDDEN so no fluxo de entrega', () => {
+        const rules = resolveCompanyRules({ recipientRelations: { delivery: [] } } as never)
+
+        expect(rules.completionRequirements.delivery.recipientType).toBe('HIDDEN')
+        // Os outros dois fluxos nao vieram com lista vazia — continuam no default.
+        expect(rules.completionRequirements.pickup.recipientType).toBe('REQUIRED')
+        expect(rules.completionRequirements.service.recipientType).toBe('REQUIRED')
+    })
+
+    it('recipientRelations.pickup vazio forca so o bucket de pickup', () => {
+        const rules = resolveCompanyRules({ recipientRelations: { pickup: [] } } as never)
+        expect(rules.completionRequirements.pickup.recipientType).toBe('HIDDEN')
+        expect(rules.completionRequirements.delivery.recipientType).toBe('REQUIRED')
+    })
+
+    it('recipientRelations.service vazio forca so o bucket de service', () => {
+        const rules = resolveCompanyRules({ recipientRelations: { service: [] } } as never)
+        expect(rules.completionRequirements.service.recipientType).toBe('HIDDEN')
+    })
+
+    it('a config PODE mandar recipientType=OPTIONAL explicito — lista vazia ainda assim esconde', () => {
+        // A trava nao e so contra REQUIRED: OPTIONAL com etapa < 4 tambem
+        // insiste em 'recipient' (`resolveCompletionStep`) sem nenhuma opcao
+        // para o motorista escolher.
+        const rules = resolveCompanyRules({
+            recipientRelations: { delivery: [] },
+            completionRequirements: { delivery: { recipientType: 'OPTIONAL' } },
+        } as never)
+
+        expect(rules.completionRequirements.delivery.recipientType).toBe('HIDDEN')
+    })
+
+    it('valor malformado (nao-array) em recipientRelations tambem sanitiza pra vazio e fecha a mesma porta', () => {
+        // Terceira porta apontada na revisao: `resolveFlow` so cai no default
+        // quando o valor e undefined/null — qualquer outra coisa que nao seja
+        // array vira lista vazia. Sem a correcao aqui, isso seria falha ABERTA
+        // direto no estado travado; com ela, vira "sem opcoes" (HIDDEN) — nunca
+        // um loop.
+        const rules = resolveCompanyRules({ recipientRelations: { delivery: 'nao-e-array' } } as never)
+        expect(rules.recipientRelations.delivery).toEqual([])
+        expect(rules.completionRequirements.delivery.recipientType).toBe('HIDDEN')
+    })
+
+    it('lista NAO vazia nao mexe em recipientType (sem regressao)', () => {
+        const rules = resolveCompanyRules({
+            recipientRelations: { delivery: [{ code: 'PORTEIRO', label: 'Porteiro' }] },
+        } as never)
+        expect(rules.completionRequirements.delivery.recipientType).toBe('REQUIRED')
+    })
+
+    it('PROVA DO LOOP FECHADO: resolveCompletionStep nao volta mais para "recipient" quando a lista esta vazia', () => {
+        const rules = resolveCompanyRules({ recipientRelations: { delivery: [] } } as never)
+        const requirements = requirementsForServiceType(rules.completionRequirements, 'entrega')
+
+        // Motorista chegou na etapa 3 (recebedor), nunca escolheu nada — nao
+        // ha opcao para escolher — e clicou "Proximo".
+        const step = resolveCompletionStep({
+            etapa: 3,
+            readyAfterChecks: true,
+            hasRecipientType: false,
+            requirements,
+        })
+
+        // Antes da correcao, isto devolvia 'recipient' de novo — loop sem
+        // saida, nenhuma UI resolve. Com recipientType HIDDEN, a etapa de
+        // recebedor deixa de existir para este fluxo e o motorista segue.
+        expect(step).not.toBe('recipient')
     })
 })
 

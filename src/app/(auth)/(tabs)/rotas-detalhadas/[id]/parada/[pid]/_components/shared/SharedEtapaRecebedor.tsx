@@ -29,9 +29,13 @@ export function SharedEtapaRecebedor({ serviceType = 'servico' }: SharedEtapaRec
     // motorista tem que poder seguir sem escolher um tipo.
     const requirements = requirementsForServiceType(completionRequirements, serviceType);
     const isOptional = requirements.recipientType === 'OPTIONAL';
-    // Lista vazia (empresa configurou assim de proposito) nunca trava o motorista
-    // em campo, mesmo com a etapa REQUIRED — nao ha opcao nenhuma para escolher.
-    const nextDisabled = requirements.recipientType === 'REQUIRED' && !recipient.relationCode && options.length > 0;
+    // Lista vazia nunca chega aqui com REQUIRED: `resolveCompanyRules` (via
+    // `hideRecipientTypeWhenNoOptions`) forca `recipientType = 'HIDDEN'` quando
+    // a lista resolvida do fluxo esta vazia — a propria etapa nem seria
+    // selecionada por `resolveCompletionStep`. A mensagem "Nenhuma opção
+    // cadastrada" abaixo fica como defesa, mas nao ha caminho REQUIRED + lista
+    // vazia para ela precisar liberar o avanco.
+    const nextDisabled = requirements.recipientType === 'REQUIRED' && !recipient.relationCode;
 
     // Depende de convencao: so troca pelo nome real do cliente quando o code e
     // literalmente 'CLIENTE' (o default de fabrica em recipientRelations.ts). Se
