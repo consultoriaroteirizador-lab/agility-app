@@ -15,6 +15,7 @@ import { ServiceFlowTheme } from '@/components';
 import type { AddressResponse } from '@/domain/agility/address/dto';
 import { useFindOneAddress } from '@/domain/agility/address/useCase';
 import type { CompletionRequirements } from '@/domain/agility/company/completionRequirements';
+import type { RecipientRelations } from '@/domain/agility/company/recipientRelations';
 import { useGetMe } from '@/domain/agility/driver/useCase';
 import type { FormGroupResponse } from '@/domain/agility/form-group/dto/form-group.response';
 import { formGroupService } from '@/domain/agility/form-group/formGroupService';
@@ -45,13 +46,21 @@ import { useStopStatus } from '../_hooks/useStopStatus';
 import { resolveCompanyRules } from '../_utils/companyRules';
 
 // Tipos
-export type RecipientType = 'cliente' | 'porteiro' | 'vizinho' | 'familiar' | 'outro';
+// Era uma uniao fixa ('cliente' | 'porteiro' | ...); com as opcoes vindo da
+// config da empresa (spec 2026-08-24, `recipientRelations`), o valor gravado
+// aqui e o `code` da opcao escolhida em minusculo — um catalogo aberto, nao
+// mais os 5 literais de fabrica.
+export type RecipientType = string;
 
 export interface RecipientData {
   tipo: RecipientType | null;
   nome: string;
   tipoDocumento: string;
   numeroDocumento: string;
+  /** Codigo da relacao (opcoes da empresa, spec 2026-08-24) — imutavel apos criado. */
+  relationCode?: string;
+  /** Rotulo congelado no momento da escolha — nao muda se a empresa renomear a opcao depois. */
+  relationLabel?: string;
 }
 
 export interface ChecklistState {
@@ -183,6 +192,8 @@ interface ParadaContextValue {
   startBlockReason: string | null;
   /** Exigencias de finalizacao da empresa, ja resolvidas (spec 2026-08-23). */
   completionRequirements: CompletionRequirements;
+  /** Opcoes de relacao de quem recebeu/entregou/acompanhou, ja resolvidas (spec 2026-08-24). */
+  recipientRelations: RecipientRelations;
 
   // Utilitários
   isServiceStarted: boolean;
@@ -1255,6 +1266,7 @@ export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderPr
     canStartService,
     startBlockReason,
     completionRequirements: rules.completionRequirements,
+    recipientRelations: rules.recipientRelations,
 
     // Utilitários
     isServiceStarted: !!isServiceStarted,

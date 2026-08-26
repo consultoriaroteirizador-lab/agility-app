@@ -7,6 +7,7 @@ import Modal from '@/components/Modal/Modal';
 import { MultiPhotoPicker } from '@/components/MultiPhotoPicker';
 import { SignatureCanvas } from '@/components/SignatureCanvas';
 import { requirementsForServiceType } from '@/domain/agility/company/completionRequirements';
+import { RECIPIENT_STEP_TITLES } from '@/domain/agility/company/recipientRelations';
 import { useToastService } from '@/services/Toast/useToast';
 import { measure } from '@/theme';
 
@@ -121,6 +122,7 @@ export function SharedEtapaDados({ serviceType }: SharedEtapaDadosProps) {
               <DocumentCollectionForm
                 data={documentData}
                 onChange={handleDocumentChange}
+                nameLabel={RECIPIENT_STEP_TITLES[serviceType].nameLabel}
               />
             )}
 

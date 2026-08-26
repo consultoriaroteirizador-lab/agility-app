@@ -1,65 +1,41 @@
 import { Box, Button, ScreenBase, Text, TouchableOpacityBox } from '@/components';
 import { ButtonBack } from '@/components/Button/ButtonBack';
 import { requirementsForServiceType } from '@/domain/agility/company/completionRequirements';
+import { relationsForServiceType, RECIPIENT_STEP_TITLES, ServiceFlowType } from '@/domain/agility/company/recipientRelations';
 import { measure, ThemeColors } from '@/theme';
 
-import { useParada, RecipientType } from '../../_context/ParadaContext';
-
-type ServiceType = 'entrega' | 'servico' | 'coleta';
+import { useParada } from '../../_context/ParadaContext';
 
 interface SharedEtapaRecebedorProps {
-    serviceType?: ServiceType;
+    serviceType?: ServiceFlowType;
 }
 
-const RECIPIENT_OPTIONS: { type: RecipientType; label: string }[] = [
-    { type: 'cliente', label: 'Cliente' },
-    { type: 'porteiro', label: 'Porteiro' },
-    { type: 'vizinho', label: 'Vizinho' },
-    { type: 'familiar', label: 'Familiar' },
-    { type: 'outro', label: 'Outro' },
-];
-
-const CONFIG: Record<ServiceType, {
-    title: string;
-    description: string;
-    selectedColor: ThemeColors;
-    selectedBg: ThemeColors;
-}> = {
-    coleta: {
-        title: 'Quem entregou?',
-        description: 'Escolha quem entregou os itens para coleta:',
-        selectedColor: 'secondary100',
-        selectedBg: 'secondary10',
-    },
-    entrega: {
-        title: 'Quem recebeu?',
-        description: 'Escolha para quem foi entregue:',
-        selectedColor: 'primary100',
-        selectedBg: 'primary10',
-    },
-    servico: {
-        title: 'Quem recebeu?',
-        description: 'Escolha para quem foi realizado o serviço:',
-        selectedColor: 'primary100',
-        selectedBg: 'primary10',
-    },
+// Cores por fluxo — coleta usa a paleta secundaria, entrega/servico a primaria.
+const SELECTED_COLORS: Record<ServiceFlowType, { selectedColor: ThemeColors; selectedBg: ThemeColors }> = {
+    coleta: { selectedColor: 'secondary100', selectedBg: 'secondary10' },
+    entrega: { selectedColor: 'primary100', selectedBg: 'primary10' },
+    servico: { selectedColor: 'primary100', selectedBg: 'primary10' },
 };
 
 export function SharedEtapaRecebedor({ serviceType = 'servico' }: SharedEtapaRecebedorProps) {
-    const { service, recipient, updateRecipient, setEtapa, setDelivered, completionRequirements } = useParada();
+    const { service, recipient, updateRecipient, setEtapa, setDelivered, completionRequirements, recipientRelations } = useParada();
 
     const customerName = service?.fantasyName || service?.responsible || 'Cliente';
-    const config = CONFIG[serviceType];
+    const titles = RECIPIENT_STEP_TITLES[serviceType];
+    const { selectedColor, selectedBg } = SELECTED_COLORS[serviceType];
+    const options = relationsForServiceType(recipientRelations, serviceType);
 
     // OPTIONAL nao pode virar REQUIRED na pratica: com a config opcional o
     // motorista tem que poder seguir sem escolher um tipo.
     const requirements = requirementsForServiceType(completionRequirements, serviceType);
     const isOptional = requirements.recipientType === 'OPTIONAL';
-    const nextDisabled = requirements.recipientType === 'REQUIRED' && !recipient.tipo;
+    // Lista vazia (empresa configurou assim de proposito) nunca trava o motorista
+    // em campo, mesmo com a etapa REQUIRED — nao ha opcao nenhuma para escolher.
+    const nextDisabled = requirements.recipientType === 'REQUIRED' && !recipient.relationCode && options.length > 0;
 
-    const getLabel = (type: RecipientType) => {
-        if (type === 'cliente') return customerName;
-        return RECIPIENT_OPTIONS.find(o => o.type === type)?.label || type;
+    const getLabel = (code: string, label: string) => {
+        if (code === 'CLIENTE') return customerName;
+        return label;
     };
 
     const handleBack = () => {
@@ -67,14 +43,20 @@ export function SharedEtapaRecebedor({ serviceType = 'servico' }: SharedEtapaRec
         setDelivered(false);
     };
 
-    const isSelected = (type: RecipientType) => recipient.tipo === type;
+    const handleSelect = (code: string, label: string) => {
+        // `tipo` (minusculo) continua sendo o que destrava o gate de
+        // validateCompletion — nao pode parar de ser gravado.
+        updateRecipient({ tipo: code.toLowerCase(), relationCode: code, relationLabel: label });
+    };
+
+    const isSelected = (code: string) => recipient.relationCode === code;
 
     return (
         <ScreenBase
             buttonLeft={<ButtonBack onPress={handleBack} />}
             title={
                 <Text preset="textTitleScreen" fontWeightPreset="bold" color="colorTextPrimary">
-                    {config.title}
+                    {titles.title}
                 </Text>
             }
         >
@@ -83,7 +65,7 @@ export function SharedEtapaRecebedor({ serviceType = 'servico' }: SharedEtapaRec
                     <Box paddingTop="y24" paddingBottom="y4">
 
                         <Text preset="text14" color="gray600" marginBottom="y12">
-                            {config.description}
+                            {titles.description}
                         </Text>
 
                         {isOptional && (
@@ -93,39 +75,44 @@ export function SharedEtapaRecebedor({ serviceType = 'servico' }: SharedEtapaRec
                         )}
 
                         <Box gap="y8" marginBottom="y12">
-                            {RECIPIENT_OPTIONS.map((option) => (
+                            {options.length === 0 && (
+                                <Text preset="text14" color="gray600">
+                                    Nenhuma opção cadastrada
+                                </Text>
+                            )}
+                            {options.map((option) => (
                                 <TouchableOpacityBox
-                                    key={option.type}
-                                    onPress={() => updateRecipient({ tipo: option.type })}
+                                    key={option.code}
+                                    onPress={() => handleSelect(option.code, option.label)}
                                     flexDirection="row"
                                     alignItems="center"
                                     gap="x12"
                                     padding="y12"
                                     borderWidth={measure.m2}
-                                    borderColor={isSelected(option.type) ? config.selectedColor : 'gray200'}
+                                    borderColor={isSelected(option.code) ? selectedColor : 'gray200'}
                                     borderRadius="s12"
-                                    backgroundColor={isSelected(option.type) ? config.selectedBg : 'white'}
+                                    backgroundColor={isSelected(option.code) ? selectedBg : 'white'}
                                 >
                                     <Box
                                         width={measure.x24}
                                         height={measure.y24}
                                         borderRadius="s4"
                                         borderWidth={measure.m2}
-                                        borderColor={isSelected(option.type) ? config.selectedColor : 'mutedElementsColor'}
-                                        backgroundColor={isSelected(option.type) ? config.selectedColor : 'transparent'}
+                                        borderColor={isSelected(option.code) ? selectedColor : 'mutedElementsColor'}
+                                        backgroundColor={isSelected(option.code) ? selectedColor : 'transparent'}
                                         justifyContent="center"
                                         alignItems="center"
                                     >
-                                        {isSelected(option.type) && (
+                                        {isSelected(option.code) && (
                                             <Box width={measure.x12} height={measure.y12} borderRadius="s4" backgroundColor="white" />
                                         )}
                                     </Box>
                                     <Text
                                         preset="text16"
                                         color="colorTextPrimary"
-                                        fontWeightPreset={isSelected(option.type) ? 'bold' : 'regular'}
+                                        fontWeightPreset={isSelected(option.code) ? 'bold' : 'regular'}
                                     >
-                                        {getLabel(option.type)}
+                                        {getLabel(option.code, option.label)}
                                     </Text>
                                 </TouchableOpacityBox>
                             ))}
