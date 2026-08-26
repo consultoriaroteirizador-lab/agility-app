@@ -15,6 +15,7 @@ import { ServiceFlowTheme } from '@/components';
 import type { AddressResponse } from '@/domain/agility/address/dto';
 import { useFindOneAddress } from '@/domain/agility/address/useCase';
 import type { CompletionRequirements } from '@/domain/agility/company/completionRequirements';
+import type { RecipientRelations } from '@/domain/agility/company/recipientRelations';
 import { useGetMe } from '@/domain/agility/driver/useCase';
 import type { FormGroupResponse } from '@/domain/agility/form-group/dto/form-group.response';
 import { formGroupService } from '@/domain/agility/form-group/formGroupService';
@@ -43,15 +44,30 @@ import { parseBRLToCents } from '@/utils/parseCurrency';
 import { resolveParadaAtendidaElegivel, resolvePedidosDaParada } from '../../../_utils';
 import { useStopStatus } from '../_hooks/useStopStatus';
 import { resolveCompanyRules } from '../_utils/companyRules';
+import {
+  draftHasAnyValue,
+  draftToPickupEvidence,
+  draftToRecipient,
+  pickupEvidenceToDraft,
+  recipientToDraft,
+} from '../_utils/paradaDraftMapping';
 
 // Tipos
-export type RecipientType = 'cliente' | 'porteiro' | 'vizinho' | 'familiar' | 'outro';
+// Era uma uniao fixa ('cliente' | 'porteiro' | ...); com as opcoes vindo da
+// config da empresa (spec 2026-08-24, `recipientRelations`), o valor gravado
+// aqui e o `code` da opcao escolhida em minusculo — um catalogo aberto, nao
+// mais os 5 literais de fabrica.
+export type RecipientType = string;
 
 export interface RecipientData {
   tipo: RecipientType | null;
   nome: string;
   tipoDocumento: string;
   numeroDocumento: string;
+  /** Codigo da relacao (opcoes da empresa, spec 2026-08-24) — imutavel apos criado. */
+  relationCode?: string;
+  /** Rotulo congelado no momento da escolha — nao muda se a empresa renomear a opcao depois. */
+  relationLabel?: string;
 }
 
 export interface ChecklistState {
@@ -66,6 +82,12 @@ export interface ChecklistState {
  */
 export interface PickupEvidence {
   receivedBy?: string;
+  /** Tipo/numero do documento de quem entregou na origem — mesmos campos da entrega. */
+  receivedByDocumentType?: string;
+  receivedByDocument?: string;
+  /** Relacao de quem entregou na origem (opcoes da empresa, spec 2026-08-24). */
+  receivedByRelationCode?: string;
+  receivedByRelationLabel?: string;
   signatureUrl?: string;
   photoUrls: string[];
   notes?: string;
@@ -183,6 +205,8 @@ interface ParadaContextValue {
   startBlockReason: string | null;
   /** Exigencias de finalizacao da empresa, ja resolvidas (spec 2026-08-23). */
   completionRequirements: CompletionRequirements;
+  /** Opcoes de relacao de quem recebeu/entregou/acompanhou, ja resolvidas (spec 2026-08-24). */
+  recipientRelations: RecipientRelations;
 
   // Utilitários
   isServiceStarted: boolean;
@@ -477,7 +501,27 @@ export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderPr
   }, [service?.materials]);
 
   // Efeito para preencher nome automaticamente quando selecionar "cliente"
+  //
+  // Depende de convencao: `tipo` e o `code` da opcao escolhida em minusculo, e
+  // este autofill so dispara quando esse code e literalmente 'cliente' (ou seja,
+  // a opcao configurada com `code: 'CLIENTE'` — o default de fabrica em
+  // recipientRelations.ts). Se uma empresa cadastrar a opcao de cliente com outro
+  // code (ex.: 'CONTRATANTE'), o autofill simplesmente nao dispara — o motorista
+  // digita o nome na mao, sem perda de dado (mesmo caso documentado no `getLabel`
+  // de SharedEtapaRecebedor.tsx). Nao inventar um mecanismo novo aqui: e um efeito
+  // cosmetico, nao um gate.
   useEffect(() => {
+    // Reidratacao acabou de gravar `tipo` + `nome` JUNTOS, no mesmo `setRecipient`
+    // (ver `skipNextRecipientAutofillRef`, declarado com `hydratedRef`). Sem este
+    // guard, este efeito le a mudanca de `tipo` (null -> o que veio do draft) como
+    // se fosse uma troca de tipo em uso e zera o `nome` que acabou de ser
+    // restaurado — perda silenciosa, um crash logo depois some com o nome de
+    // novo. So pula UMA vez (consome a flag); depois disso o autofill volta ao
+    // normal para trocas de tipo de verdade.
+    if (skipNextRecipientAutofillRef.current) {
+      skipNextRecipientAutofillRef.current = false;
+      return;
+    }
     if (recipient.tipo === 'cliente' && service) {
       const nomeCliente = service.fantasyName || service.responsible;
       if (nomeCliente) {
@@ -671,6 +715,10 @@ export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderPr
 
     setPickupEvidence({
       receivedBy: recipient.nome || undefined,
+      receivedByDocumentType: recipient.numeroDocumento?.trim() ? recipient.tipoDocumento : undefined,
+      receivedByDocument: recipient.numeroDocumento?.trim() || undefined,
+      receivedByRelationCode: recipient.relationCode,
+      receivedByRelationLabel: recipient.relationLabel,
       signatureUrl: sigUrl,
       photoUrls,
       notes: observation || undefined,
@@ -688,7 +736,16 @@ export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderPr
     setPickupDone(true);
     setTransferLeg('delivery');
     setEtapa(1);
-  }, [photos, signature, recipient.nome, observation]);
+  }, [
+    photos,
+    signature,
+    recipient.nome,
+    recipient.tipoDocumento,
+    recipient.numeroDocumento,
+    recipient.relationCode,
+    recipient.relationLabel,
+    observation,
+  ]);
 
   // Formulário dinâmico - se o service tem formGroups
   const hasFormGroups = !!(service?.formGroupIds && service.formGroupIds.length > 0);
@@ -774,6 +831,13 @@ export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderPr
   // Garante que (a) só hidratamos uma vez por troca de parada e
   //            (b) edições do usuário após hidratação não são sobrescritas.
   const hydratedRef = useRef<string | null>(null);
+  // Marca que o PRÓXIMO disparo do efeito de autofill de nome (abaixo) veio da
+  // reidratação do draft, não de uma escolha do motorista — a reidratação seta
+  // `tipo` e `nome` NO MESMO `setRecipient`, e sem este guard o efeito lê o
+  // `tipo` recém-restaurado como se fosse uma troca de tipo em uso e zera o
+  // `nome` que acabou de vir do draft. Setado logo antes do `setRecipient` da
+  // hidratação, consumido (e resetado) na primeira execução do efeito depois.
+  const skipNextRecipientAutofillRef = useRef(false);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const SAVE_DEBOUNCE_MS = 800;
 
@@ -825,12 +889,8 @@ export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderPr
 
       if (chosen) {
         if (chosen.recipient) {
-          setRecipient({
-            tipo: (chosen.recipient.tipo as RecipientType | null) ?? null,
-            nome: chosen.recipient.nome ?? '',
-            tipoDocumento: chosen.recipient.tipoDocumento ?? 'RG',
-            numeroDocumento: chosen.recipient.numeroDocumento ?? '',
-          });
+          skipNextRecipientAutofillRef.current = true;
+          setRecipient(draftToRecipient(chosen.recipient));
         }
         if (chosen.observation !== undefined) setObservation(chosen.observation);
         if (chosen.checklist) {
@@ -867,13 +927,9 @@ export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderPr
         // TRANSFER: restaura a perna do wizard + snapshot da evidência da origem.
         if (chosen.transferLeg) setTransferLeg(chosen.transferLeg);
         if (chosen.pickupDone) setPickupDone(true);
-        if (chosen.pickupEvidence) {
-          setPickupEvidence({
-            receivedBy: chosen.pickupEvidence.receivedBy,
-            signatureUrl: chosen.pickupEvidence.signatureUrl,
-            photoUrls: chosen.pickupEvidence.photoUrls ?? [],
-            notes: chosen.pickupEvidence.notes,
-          });
+        const restoredPickupEvidence = draftToPickupEvidence(chosen.pickupEvidence);
+        if (restoredPickupEvidence) {
+          setPickupEvidence(restoredPickupEvidence);
         }
       }
 
@@ -1018,8 +1074,16 @@ export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderPr
     const sigUrl = signature && signature.startsWith('http') ? signature : undefined;
     const cents = paymentAmount ? parseBRLToCents(paymentAmount) : null;
 
+    // Deriva de `recipientToDraft` em vez de repetir campo a campo (`!!recipient.nome`
+    // sozinho já perdeu `relationCode`/`relationLabel` uma vez): quando `recipientType`
+    // é a ÚNICA coisa que a empresa pede (ex.: "Ninguém acompanhou", tudo o mais HIDDEN),
+    // o motorista só preenche a relação — sem isto, `hasContent` fica falso e o draft
+    // nunca é gravado, perdendo a única evidência que existe se o app morrer aqui.
+    const recipientDraft = recipientToDraft(recipient);
+    const hasRecipientContent = draftHasAnyValue(recipientDraft);
+
     const hasContent =
-      !!recipient.nome ||
+      hasRecipientContent ||
       !!observation ||
       photoUrls.length > 0 ||
       !!sigUrl ||
@@ -1033,12 +1097,7 @@ export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderPr
     if (!hasContent) return;
 
     const draft: ServiceDraftData = {
-      recipient: {
-        tipo: recipient.tipo ?? undefined,
-        nome: recipient.nome || undefined,
-        tipoDocumento: recipient.tipoDocumento || undefined,
-        numeroDocumento: recipient.numeroDocumento || undefined,
-      },
+      recipient: recipientDraft,
       observation: observation || undefined,
       photoUrls: photoUrls.length > 0 ? photoUrls : undefined,
       signatureUrl: sigUrl,
@@ -1053,14 +1112,7 @@ export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderPr
         ? {
             transferLeg,
             pickupDone,
-            pickupEvidence: pickupEvidence
-              ? {
-                  receivedBy: pickupEvidence.receivedBy,
-                  signatureUrl: pickupEvidence.signatureUrl,
-                  photoUrls: pickupEvidence.photoUrls,
-                  notes: pickupEvidence.notes,
-                }
-              : undefined,
+            pickupEvidence: pickupEvidence ? pickupEvidenceToDraft(pickupEvidence) : undefined,
           }
         : {}),
     };
@@ -1255,6 +1307,7 @@ export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderPr
     canStartService,
     startBlockReason,
     completionRequirements: rules.completionRequirements,
+    recipientRelations: rules.recipientRelations,
 
     // Utilitários
     isServiceStarted: !!isServiceStarted,

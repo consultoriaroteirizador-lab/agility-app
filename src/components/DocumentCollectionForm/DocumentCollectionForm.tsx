@@ -16,6 +16,8 @@ export interface DocumentData {
 type DocumentCollectionFormProps = {
   data: DocumentData;
   onChange: (data: DocumentData) => void;
+  /** Rotulo do primeiro campo (nome). Default preserva o comportamento de quem não passa a prop. */
+  nameLabel?: string;
 };
 
 const DOCUMENT_TYPES: MyItemTypeDropDown[] = [
@@ -27,6 +29,7 @@ const DOCUMENT_TYPES: MyItemTypeDropDown[] = [
 export default function DocumentCollectionForm({
   data,
   onChange,
+  nameLabel = 'Nome do cliente',
 }: DocumentCollectionFormProps) {
   const updateField = <K extends keyof DocumentData>(
     field: K,
@@ -49,7 +52,7 @@ export default function DocumentCollectionForm({
   return (
     <Box backgroundColor="transparent">
       <Input
-        title="Nome do cliente"
+        title={nameLabel}
         placeholder="Digite o nome completo"
         value={data.recipientName}
         onChangeText={(value) => updateField('recipientName', value)}

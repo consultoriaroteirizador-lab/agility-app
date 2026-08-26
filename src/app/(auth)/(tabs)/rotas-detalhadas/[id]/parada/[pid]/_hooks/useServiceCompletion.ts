@@ -198,6 +198,23 @@ export function useServiceCompletion(serviceType: ServiceFlowType) {
                 payload.receivedBy = recipient.nome.trim();
             }
 
+            if (recipient?.numeroDocumento?.trim()) {
+                payload.receivedByDocumentType = recipient.tipoDocumento;
+                payload.receivedByDocument = recipient.numeroDocumento.trim();
+            }
+
+            // Gateia nos DOIS campos: `draftToRecipient` le JSON que outro cliente/versao
+            // pode ter escrito com `relationCode` sem `relationLabel` (ex.: draft antigo,
+            // JSON.stringify derruba `undefined` no meio do caminho). Code sem rotulo e
+            // dado incompleto — melhor nao gravar a relacao do que gravar um code que o
+            // comprovante nao consegue imprimir.
+            if (recipient?.relationCode && recipient?.relationLabel) {
+                payload.receivedByRelationCode = recipient.relationCode;
+                // O rotulo vai congelado: a empresa pode renomear a opcao depois, e o
+                // comprovante ja emitido nao pode mudar por causa disso.
+                payload.receivedByRelationLabel = recipient.relationLabel;
+            }
+
             if (photoUrls.length > 0) {
                 payload.photoProof = photoUrls.length === 1 ? photoUrls[0] : photoUrls.join(',');
             }
@@ -246,6 +263,18 @@ export function useServiceCompletion(serviceType: ServiceFlowType) {
                         : undefined,
                     notes: pickupEvidence.notes,
                 };
+
+                if (pickupEvidence.receivedByDocument) {
+                    payload.pickupCompletion.receivedByDocumentType = pickupEvidence.receivedByDocumentType;
+                    payload.pickupCompletion.receivedByDocument = pickupEvidence.receivedByDocument;
+                }
+
+                // Mesmo gate code+label do bloco principal, acima.
+                if (pickupEvidence.receivedByRelationCode && pickupEvidence.receivedByRelationLabel) {
+                    payload.pickupCompletion.receivedByRelationCode = pickupEvidence.receivedByRelationCode;
+                    // Mesmo congelamento do rotulo, aplicado a perna de coleta.
+                    payload.pickupCompletion.receivedByRelationLabel = pickupEvidence.receivedByRelationLabel;
+                }
             }
 
             console.log('[useServiceCompletion] Payload a ser enviado:', JSON.stringify(payload, null, 2));

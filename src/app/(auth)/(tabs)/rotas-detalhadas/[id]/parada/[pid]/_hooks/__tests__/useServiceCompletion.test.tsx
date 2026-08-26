@@ -38,11 +38,27 @@ jest.mock('../../_context/ParadaContext', () => ({
     useParada: jest.fn(),
 }));
 
+// Nomeado com prefixo "mock" (exigencia do jest para ser referenciado dentro do
+// factory abaixo) — e o unico jeito de espionar o payload que `handleFinalizar`
+// manda para a API sem bater em rede de verdade.
+const mockCompleteServiceWithDetailsAsync = jest.fn();
+
 jest.mock('@/domain/agility/service/useCase', () => ({
     useCompleteServiceWithDetails: () => ({
-        completeServiceWithDetailsAsync: jest.fn(),
+        completeServiceWithDetailsAsync: mockCompleteServiceWithDetailsAsync,
         isLoading: false,
     }),
+}));
+
+// `handleFinalizar` sobe fotos/assinatura e le GPS antes de montar o payload —
+// nenhum dos tres precisa (nem pode, sem NativeModules) rodar de verdade aqui.
+jest.mock('@/domain/agility/service/serviceUploadUtils', () => ({
+    uploadMultipleServicePhotos: jest.fn().mockResolvedValue([]),
+    uploadBase64Signature: jest.fn().mockResolvedValue(null),
+}));
+
+jest.mock('../getCurrentCoords', () => ({
+    getCurrentCoords: jest.fn().mockResolvedValue(undefined),
 }));
 
 // `useParada` real devolve dezenas de campos; o mock so precisa dos que
@@ -78,10 +94,27 @@ const ALL_HIDDEN: CompletionRequirements = {
 };
 
 interface ParadaOverrides {
-    recipient?: { tipo?: string | null; nome?: string; numeroDocumento?: string } | null;
+    recipient?: {
+        tipo?: string | null;
+        nome?: string;
+        tipoDocumento?: string;
+        numeroDocumento?: string;
+        relationCode?: string;
+        relationLabel?: string;
+    } | null;
     signature?: string | null;
     photos?: unknown[];
     completionRequirements?: CompletionRequirements;
+    pickupEvidence?: {
+        receivedBy?: string;
+        receivedByDocumentType?: string;
+        receivedByDocument?: string;
+        receivedByRelationCode?: string;
+        receivedByRelationLabel?: string;
+        signatureUrl?: string;
+        photoUrls: string[];
+        notes?: string;
+    } | null;
 }
 
 /** Contexto mínimo que `useServiceCompletion` + `useServiceUpload` precisam. */
@@ -100,7 +133,7 @@ function makeParadaContext(overrides: ParadaOverrides = {}) {
         photos: overrides.photos ?? [],
         paymentAmount: '',
         paymentMethod: null,
-        pickupEvidence: null,
+        pickupEvidence: overrides.pickupEvidence ?? null,
         deliveryCode: '',
         bypassReasonCode: null,
         bypassReasonText: '',
@@ -135,6 +168,7 @@ function runHook(serviceType: Parameters<typeof useServiceCompletion>[0]) {
 describe('useServiceCompletion — regra unica de conclusao', () => {
     afterEach(() => {
         mockedUseParada.mockReset();
+        mockCompleteServiceWithDetailsAsync.mockReset();
     });
 
     it('tudo REQUIRED e estado vazio: canFinalize falso e missing com os quatro rotulos', () => {
@@ -255,6 +289,216 @@ describe('useServiceCompletion — regra unica de conclusao', () => {
 
             expect(result.canFinalize).toBe(false);
             expect(result.missing).toEqual(['3 fotos']);
+        });
+    });
+
+    describe('payload de conclusao — identificacao de quem recebeu (Task 8)', () => {
+        // Gate de conclusao (canFinalize) ja e coberto pelos blocos acima — aqui
+        // o requirements e ALL_HIDDEN de proposito, para isolar o teste no que
+        // `handleFinalizar` monta no payload, sem a exigencia de campo interferir.
+        it('envia documento e relacao de quem recebeu no payload de conclusao', async () => {
+            mockedUseParada.mockReturnValue(
+                makeParadaContext({
+                    completionRequirements: ALL_HIDDEN,
+                    recipient: {
+                        tipo: 'porteiro',
+                        nome: 'Elaine Rocha',
+                        tipoDocumento: 'RG',
+                        numeroDocumento: '12.456.789-01',
+                        relationCode: 'PORTEIRO',
+                        relationLabel: 'Porteiro',
+                    },
+                    photos: [{ uri: 'a.jpg' }],
+                    signature: 'sig.png',
+                }),
+            );
+
+            const result = runHook('entrega');
+
+            await act(async () => {
+                await result.handleFinalizar();
+            });
+
+            expect(mockCompleteServiceWithDetailsAsync).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    details: expect.objectContaining({
+                        receivedBy: 'Elaine Rocha',
+                        receivedByDocumentType: 'RG',
+                        receivedByDocument: '12.456.789-01',
+                        receivedByRelationCode: 'PORTEIRO',
+                        receivedByRelationLabel: 'Porteiro',
+                    }),
+                }),
+            );
+        });
+
+        // Par direto do teste abaixo — mesmo `recipient` (tipo/nome/tipoDocumento),
+        // só o `numeroDocumento` muda (preenchido aqui, em branco lá). Sem este
+        // par, "nao envia campo vazio" passaria mesmo com o bloco inteiro
+        // removido, porque ausência de campo já é o comportamento de baseline.
+        it('documento preenchido: receivedByDocument/Type vao no payload', async () => {
+            mockedUseParada.mockReturnValue(
+                makeParadaContext({
+                    completionRequirements: ALL_HIDDEN,
+                    recipient: { tipo: 'cliente', nome: 'Ana', tipoDocumento: 'RG', numeroDocumento: '123.456.789-00' },
+                    photos: [{ uri: 'a.jpg' }],
+                    signature: 'sig.png',
+                }),
+            );
+
+            const result = runHook('entrega');
+
+            await act(async () => {
+                await result.handleFinalizar();
+            });
+
+            const [payloadArg] = mockCompleteServiceWithDetailsAsync.mock.calls[0];
+            expect(payloadArg.details).toEqual(
+                expect.objectContaining({
+                    receivedByDocumentType: 'RG',
+                    receivedByDocument: '123.456.789-00',
+                }),
+            );
+        });
+
+        it('nao envia campo vazio — documento em branco nao vira string vazia no banco', async () => {
+            mockedUseParada.mockReturnValue(
+                makeParadaContext({
+                    completionRequirements: ALL_HIDDEN,
+                    recipient: { tipo: 'cliente', nome: 'Ana', tipoDocumento: 'RG', numeroDocumento: '   ' },
+                    photos: [{ uri: 'a.jpg' }],
+                    signature: 'sig.png',
+                }),
+            );
+
+            const result = runHook('entrega');
+
+            await act(async () => {
+                await result.handleFinalizar();
+            });
+
+            const [payloadArg] = mockCompleteServiceWithDetailsAsync.mock.calls[0];
+            expect(payloadArg.details).not.toHaveProperty('receivedByDocument');
+            expect(payloadArg.details).not.toHaveProperty('receivedByDocumentType');
+        });
+
+        // relationCode sem relationLabel e dado incompleto (JSON.stringify
+        // derruba `undefined`, o backend recebe code sem rotulo — comprovante
+        // em branco). `draftToRecipient` le JSON que outro cliente/versao pode
+        // ter escrito assim; o gate tem que proteger os dois lados.
+        it('relationCode sem relationLabel: nenhum dos dois vai no payload', async () => {
+            mockedUseParada.mockReturnValue(
+                makeParadaContext({
+                    completionRequirements: ALL_HIDDEN,
+                    recipient: {
+                        tipo: 'porteiro',
+                        nome: 'Elaine Rocha',
+                        relationCode: 'PORTEIRO',
+                        // relationLabel ausente de proposito (draft antigo/outro cliente).
+                    },
+                    photos: [{ uri: 'a.jpg' }],
+                    signature: 'sig.png',
+                }),
+            );
+
+            const result = runHook('entrega');
+
+            await act(async () => {
+                await result.handleFinalizar();
+            });
+
+            const [payloadArg] = mockCompleteServiceWithDetailsAsync.mock.calls[0];
+            expect(payloadArg.details).not.toHaveProperty('receivedByRelationCode');
+            expect(payloadArg.details).not.toHaveProperty('receivedByRelationLabel');
+        });
+
+        // `pickupCompletion` (perna de coleta do TRANSFER) tinha os 4 campos
+        // acrescentados em useServiceCompletion.ts sem nenhum teste cobrindo —
+        // remover aquele bloco por engano nao quebrava nada. `pickupEvidence`
+        // no harness era sempre `null`; agora e configuravel via override.
+        it('TRANSFER: documento e relacao da perna de coleta vao dentro de pickupCompletion', async () => {
+            mockedUseParada.mockReturnValue(
+                makeParadaContext({
+                    completionRequirements: ALL_HIDDEN,
+                    photos: [],
+                    signature: null,
+                    pickupEvidence: {
+                        receivedBy: 'Joao Estoquista',
+                        receivedByDocumentType: 'RG',
+                        receivedByDocument: '98.765.432-00',
+                        receivedByRelationCode: 'ESTOQUISTA',
+                        receivedByRelationLabel: 'Estoquista',
+                        photoUrls: [],
+                    },
+                }),
+            );
+
+            const result = runHook('entrega');
+
+            await act(async () => {
+                await result.handleFinalizar();
+            });
+
+            const [payloadArg] = mockCompleteServiceWithDetailsAsync.mock.calls[0];
+            expect(payloadArg.details.pickupCompletion).toEqual(
+                expect.objectContaining({
+                    receivedBy: 'Joao Estoquista',
+                    receivedByDocumentType: 'RG',
+                    receivedByDocument: '98.765.432-00',
+                    receivedByRelationCode: 'ESTOQUISTA',
+                    receivedByRelationLabel: 'Estoquista',
+                }),
+            );
+        });
+
+        it('TRANSFER: pickupCompletion sem documento/relacao na origem nao ganha os campos', async () => {
+            mockedUseParada.mockReturnValue(
+                makeParadaContext({
+                    completionRequirements: ALL_HIDDEN,
+                    photos: [],
+                    signature: null,
+                    pickupEvidence: {
+                        receivedBy: 'Joao',
+                        photoUrls: [],
+                    },
+                }),
+            );
+
+            const result = runHook('entrega');
+
+            await act(async () => {
+                await result.handleFinalizar();
+            });
+
+            const [payloadArg] = mockCompleteServiceWithDetailsAsync.mock.calls[0];
+            expect(payloadArg.details.pickupCompletion).not.toHaveProperty('receivedByDocument');
+            expect(payloadArg.details.pickupCompletion).not.toHaveProperty('receivedByRelationCode');
+        });
+
+        it('TRANSFER: pickupCompletion com relationCode sem relationLabel tambem nao envia nenhum dos dois', async () => {
+            mockedUseParada.mockReturnValue(
+                makeParadaContext({
+                    completionRequirements: ALL_HIDDEN,
+                    photos: [],
+                    signature: null,
+                    pickupEvidence: {
+                        receivedBy: 'Joao',
+                        receivedByRelationCode: 'ESTOQUISTA',
+                        // receivedByRelationLabel ausente de proposito.
+                        photoUrls: [],
+                    },
+                }),
+            );
+
+            const result = runHook('entrega');
+
+            await act(async () => {
+                await result.handleFinalizar();
+            });
+
+            const [payloadArg] = mockCompleteServiceWithDetailsAsync.mock.calls[0];
+            expect(payloadArg.details.pickupCompletion).not.toHaveProperty('receivedByRelationCode');
+            expect(payloadArg.details.pickupCompletion).not.toHaveProperty('receivedByRelationLabel');
         });
     });
 });
