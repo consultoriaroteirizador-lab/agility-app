@@ -382,6 +382,36 @@ describe('useServiceCompletion — regra unica de conclusao', () => {
             expect(payloadArg.details).not.toHaveProperty('receivedByDocumentType');
         });
 
+        // relationCode sem relationLabel e dado incompleto (JSON.stringify
+        // derruba `undefined`, o backend recebe code sem rotulo — comprovante
+        // em branco). `draftToRecipient` le JSON que outro cliente/versao pode
+        // ter escrito assim; o gate tem que proteger os dois lados.
+        it('relationCode sem relationLabel: nenhum dos dois vai no payload', async () => {
+            mockedUseParada.mockReturnValue(
+                makeParadaContext({
+                    completionRequirements: ALL_HIDDEN,
+                    recipient: {
+                        tipo: 'porteiro',
+                        nome: 'Elaine Rocha',
+                        relationCode: 'PORTEIRO',
+                        // relationLabel ausente de proposito (draft antigo/outro cliente).
+                    },
+                    photos: [{ uri: 'a.jpg' }],
+                    signature: 'sig.png',
+                }),
+            );
+
+            const result = runHook('entrega');
+
+            await act(async () => {
+                await result.handleFinalizar();
+            });
+
+            const [payloadArg] = mockCompleteServiceWithDetailsAsync.mock.calls[0];
+            expect(payloadArg.details).not.toHaveProperty('receivedByRelationCode');
+            expect(payloadArg.details).not.toHaveProperty('receivedByRelationLabel');
+        });
+
         // `pickupCompletion` (perna de coleta do TRANSFER) tinha os 4 campos
         // acrescentados em useServiceCompletion.ts sem nenhum teste cobrindo —
         // remover aquele bloco por engano nao quebrava nada. `pickupEvidence`
@@ -443,6 +473,32 @@ describe('useServiceCompletion — regra unica de conclusao', () => {
             const [payloadArg] = mockCompleteServiceWithDetailsAsync.mock.calls[0];
             expect(payloadArg.details.pickupCompletion).not.toHaveProperty('receivedByDocument');
             expect(payloadArg.details.pickupCompletion).not.toHaveProperty('receivedByRelationCode');
+        });
+
+        it('TRANSFER: pickupCompletion com relationCode sem relationLabel tambem nao envia nenhum dos dois', async () => {
+            mockedUseParada.mockReturnValue(
+                makeParadaContext({
+                    completionRequirements: ALL_HIDDEN,
+                    photos: [],
+                    signature: null,
+                    pickupEvidence: {
+                        receivedBy: 'Joao',
+                        receivedByRelationCode: 'ESTOQUISTA',
+                        // receivedByRelationLabel ausente de proposito.
+                        photoUrls: [],
+                    },
+                }),
+            );
+
+            const result = runHook('entrega');
+
+            await act(async () => {
+                await result.handleFinalizar();
+            });
+
+            const [payloadArg] = mockCompleteServiceWithDetailsAsync.mock.calls[0];
+            expect(payloadArg.details.pickupCompletion).not.toHaveProperty('receivedByRelationCode');
+            expect(payloadArg.details.pickupCompletion).not.toHaveProperty('receivedByRelationLabel');
         });
     });
 });

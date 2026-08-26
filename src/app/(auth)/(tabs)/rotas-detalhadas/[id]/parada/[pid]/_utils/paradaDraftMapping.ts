@@ -41,6 +41,19 @@ export function recipientToDraft(recipient: DraftRecipientInput): DraftRecipient
     }
 }
 
+/**
+ * Ha algum campo do recebedor que valha persistir no draft? Existe porque o
+ * autosave (`ParadaContext.tsx`) tinha um `hasContent` escrito a mao
+ * (`!!recipient.nome || ...`) que esqueceu `relationCode`/`relationLabel` —
+ * quando `recipientType` e a UNICA coisa que a empresa pede (ex.: "Ninguem
+ * acompanhou", todo o resto HIDDEN), o motorista so preenche a relacao, e sem
+ * isto o draft nunca era gravado. Deriva de `recipientToDraft` para nao
+ * repetir a lista de campos pela SETIMA vez.
+ */
+export function draftHasAnyValue(draft: DraftRecipientPersisted): boolean {
+    return Object.values(draft).some((v) => v !== undefined)
+}
+
 /** Draft persistido -> estado do recebedor (reidratacao). */
 export function draftToRecipient(draft: DraftRecipientPersisted | undefined): DraftRecipientInput {
     return {

@@ -33,6 +33,25 @@ describe('resolveRecipientRelations', () => {
         const r = resolveRecipientRelations({ delivery: [{ code: 'X' }, { label: 'Y' }] })
         expect(r.delivery).toEqual([])
     })
+
+    it('code so com espaco e descartado (nao sobrevive so por causa de length > 0 cru)', () => {
+        // Sem trim, " ".length > 0 e verdade — a opcao passaria, o motorista
+        // selecionaria (code bruto e truthy), e so na conclusao o
+        // `validateCompletion` (que usa `!!v?.trim()`) recusaria — tela mentindo
+        // que deu certo. Ver comentario em `isValidRelation`.
+        const r = resolveRecipientRelations({ delivery: [{ code: '   ', label: 'Alguem' }, { code: 'OK', label: 'Valida' }] })
+        expect(r.delivery).toEqual([{ code: 'OK', label: 'Valida' }])
+    })
+
+    it('label so com espaco e descartado', () => {
+        const r = resolveRecipientRelations({ pickup: [{ code: 'OK', label: '   ' }] })
+        expect(r.pickup).toEqual([])
+    })
+
+    it('code/label com espacos nas bordas sao gravados ja trimados', () => {
+        const r = resolveRecipientRelations({ service: [{ code: '  PORTEIRO  ', label: '  Porteiro  ' }] })
+        expect(r.service).toEqual([{ code: 'PORTEIRO', label: 'Porteiro' }])
+    })
 })
 
 describe('relationsForServiceType', () => {

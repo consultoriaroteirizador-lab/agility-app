@@ -45,6 +45,7 @@ import { resolveParadaAtendidaElegivel, resolvePedidosDaParada } from '../../../
 import { useStopStatus } from '../_hooks/useStopStatus';
 import { resolveCompanyRules } from '../_utils/companyRules';
 import {
+  draftHasAnyValue,
   draftToPickupEvidence,
   draftToRecipient,
   pickupEvidenceToDraft,
@@ -510,6 +511,17 @@ export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderPr
   // de SharedEtapaRecebedor.tsx). Nao inventar um mecanismo novo aqui: e um efeito
   // cosmetico, nao um gate.
   useEffect(() => {
+    // Reidratacao acabou de gravar `tipo` + `nome` JUNTOS, no mesmo `setRecipient`
+    // (ver `skipNextRecipientAutofillRef`, declarado com `hydratedRef`). Sem este
+    // guard, este efeito le a mudanca de `tipo` (null -> o que veio do draft) como
+    // se fosse uma troca de tipo em uso e zera o `nome` que acabou de ser
+    // restaurado — perda silenciosa, um crash logo depois some com o nome de
+    // novo. So pula UMA vez (consome a flag); depois disso o autofill volta ao
+    // normal para trocas de tipo de verdade.
+    if (skipNextRecipientAutofillRef.current) {
+      skipNextRecipientAutofillRef.current = false;
+      return;
+    }
     if (recipient.tipo === 'cliente' && service) {
       const nomeCliente = service.fantasyName || service.responsible;
       if (nomeCliente) {
@@ -819,6 +831,13 @@ export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderPr
   // Garante que (a) só hidratamos uma vez por troca de parada e
   //            (b) edições do usuário após hidratação não são sobrescritas.
   const hydratedRef = useRef<string | null>(null);
+  // Marca que o PRÓXIMO disparo do efeito de autofill de nome (abaixo) veio da
+  // reidratação do draft, não de uma escolha do motorista — a reidratação seta
+  // `tipo` e `nome` NO MESMO `setRecipient`, e sem este guard o efeito lê o
+  // `tipo` recém-restaurado como se fosse uma troca de tipo em uso e zera o
+  // `nome` que acabou de vir do draft. Setado logo antes do `setRecipient` da
+  // hidratação, consumido (e resetado) na primeira execução do efeito depois.
+  const skipNextRecipientAutofillRef = useRef(false);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const SAVE_DEBOUNCE_MS = 800;
 
@@ -870,6 +889,7 @@ export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderPr
 
       if (chosen) {
         if (chosen.recipient) {
+          skipNextRecipientAutofillRef.current = true;
           setRecipient(draftToRecipient(chosen.recipient));
         }
         if (chosen.observation !== undefined) setObservation(chosen.observation);
@@ -1054,8 +1074,16 @@ export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderPr
     const sigUrl = signature && signature.startsWith('http') ? signature : undefined;
     const cents = paymentAmount ? parseBRLToCents(paymentAmount) : null;
 
+    // Deriva de `recipientToDraft` em vez de repetir campo a campo (`!!recipient.nome`
+    // sozinho já perdeu `relationCode`/`relationLabel` uma vez): quando `recipientType`
+    // é a ÚNICA coisa que a empresa pede (ex.: "Ninguém acompanhou", tudo o mais HIDDEN),
+    // o motorista só preenche a relação — sem isto, `hasContent` fica falso e o draft
+    // nunca é gravado, perdendo a única evidência que existe se o app morrer aqui.
+    const recipientDraft = recipientToDraft(recipient);
+    const hasRecipientContent = draftHasAnyValue(recipientDraft);
+
     const hasContent =
-      !!recipient.nome ||
+      hasRecipientContent ||
       !!observation ||
       photoUrls.length > 0 ||
       !!sigUrl ||
@@ -1069,7 +1097,7 @@ export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderPr
     if (!hasContent) return;
 
     const draft: ServiceDraftData = {
-      recipient: recipientToDraft(recipient),
+      recipient: recipientDraft,
       observation: observation || undefined,
       photoUrls: photoUrls.length > 0 ? photoUrls : undefined,
       signatureUrl: sigUrl,

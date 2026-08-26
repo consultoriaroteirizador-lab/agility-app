@@ -203,7 +203,12 @@ export function useServiceCompletion(serviceType: ServiceFlowType) {
                 payload.receivedByDocument = recipient.numeroDocumento.trim();
             }
 
-            if (recipient?.relationCode) {
+            // Gateia nos DOIS campos: `draftToRecipient` le JSON que outro cliente/versao
+            // pode ter escrito com `relationCode` sem `relationLabel` (ex.: draft antigo,
+            // JSON.stringify derruba `undefined` no meio do caminho). Code sem rotulo e
+            // dado incompleto — melhor nao gravar a relacao do que gravar um code que o
+            // comprovante nao consegue imprimir.
+            if (recipient?.relationCode && recipient?.relationLabel) {
                 payload.receivedByRelationCode = recipient.relationCode;
                 // O rotulo vai congelado: a empresa pode renomear a opcao depois, e o
                 // comprovante ja emitido nao pode mudar por causa disso.
@@ -264,7 +269,8 @@ export function useServiceCompletion(serviceType: ServiceFlowType) {
                     payload.pickupCompletion.receivedByDocument = pickupEvidence.receivedByDocument;
                 }
 
-                if (pickupEvidence.receivedByRelationCode) {
+                // Mesmo gate code+label do bloco principal, acima.
+                if (pickupEvidence.receivedByRelationCode && pickupEvidence.receivedByRelationLabel) {
                     payload.pickupCompletion.receivedByRelationCode = pickupEvidence.receivedByRelationCode;
                     // Mesmo congelamento do rotulo, aplicado a perna de coleta.
                     payload.pickupCompletion.receivedByRelationLabel = pickupEvidence.receivedByRelationLabel;

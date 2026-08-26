@@ -52,9 +52,15 @@ function isValidRelation(value: unknown): value is RecipientRelation {
         typeof r === 'object' &&
         r !== null &&
         typeof r.code === 'string' &&
-        r.code.length > 0 &&
+        // `trim()`: um `code`/`label` só de espaço passa em `.length > 0` cru,
+        // sobrevive ao sanitize e vira uma opção tocável na tela. O motorista
+        // seleciona (o `code` bruto é truthy, então a etapa avança de verdade),
+        // mas `validateCompletion` usa `!!v?.trim()` — recusa o `code` só-espaço
+        // e a conclusão trava com a opção já marcada. Mais confuso que a lista
+        // vazia (aquela nem mostra opção): aqui a tela mente que deu certo.
+        r.code.trim().length > 0 &&
         typeof r.label === 'string' &&
-        r.label.length > 0
+        r.label.trim().length > 0
     )
 }
 
@@ -62,7 +68,9 @@ function sanitize(lista: unknown): RecipientRelation[] {
     if (!Array.isArray(lista)) return []
     return lista
         .filter((r): r is RecipientRelation => isValidRelation(r))
-        .map((r) => ({ code: r.code, label: r.label }))
+        // Grava já trimado: o valor que sobrevive ao filtro acima é o mesmo que
+        // deve aparecer na tela e ser gravado como `relationLabel` no comprovante.
+        .map((r) => ({ code: r.code.trim(), label: r.label.trim() }))
 }
 
 function resolveFlow(bruto: unknown, padrao: RecipientRelation[]): RecipientRelation[] {

@@ -222,7 +222,10 @@ export function TransferComprovanteStep({ routingId, onBack, onDone }: { routing
             />
 
             {requirements.recipientIdentity !== 'HIDDEN' && (
-                <DocumentCollectionForm data={doc} onChange={setDoc} />
+                // Handoff CD -> CD: quem assina aqui e o conferente do destino, nao
+                // "o cliente" (o default do componente) — unica superficie do app
+                // que tinha ficado com o rotulo generico.
+                <DocumentCollectionForm data={doc} onChange={setDoc} nameLabel="Nome do conferente" />
             )}
 
             {requirements.photos.mode !== 'HIDDEN' && (

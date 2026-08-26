@@ -11,6 +11,7 @@
  * teste, em vez de sumir silenciosamente depois de um crash/restart.
  */
 import {
+    draftHasAnyValue,
     draftToPickupEvidence,
     draftToRecipient,
     pickupEvidenceToDraft,
@@ -64,6 +65,41 @@ describe('recipientToDraft / draftToRecipient — ciclo salvar/reidratar', () =>
             relationCode: undefined,
             relationLabel: undefined,
         });
+    });
+});
+
+describe('draftHasAnyValue — gate do autosave', () => {
+    // Caso da revisao: "Ninguem acompanhou" (recipientType e a UNICA coisa
+    // exigida, todo o resto HIDDEN) — o motorista so escolhe a relacao, nome
+    // fica vazio. O `hasContent` antigo (`!!recipient.nome || ...`) nao via
+    // isso como conteudo e o draft nunca era gravado.
+    it('so relationCode/relationLabel preenchidos (nome vazio) ja conta como conteudo', () => {
+        const draft = recipientToDraft({
+            tipo: 'ninguem',
+            nome: '',
+            tipoDocumento: 'RG',
+            numeroDocumento: '',
+            relationCode: 'NINGUEM',
+            relationLabel: 'Ninguem acompanhou',
+        });
+
+        expect(draftHasAnyValue(draft)).toBe(true);
+    });
+
+    it('recipient totalmente vazio (RECIPIENT_INITIAL) nao conta como conteudo', () => {
+        const draft = recipientToDraft({
+            tipo: null,
+            nome: '',
+            tipoDocumento: '',
+            numeroDocumento: '',
+        });
+
+        expect(draftHasAnyValue(draft)).toBe(false);
+    });
+
+    it('so nome preenchido (comportamento antigo) continua contando como conteudo', () => {
+        const draft = recipientToDraft({ tipo: null, nome: 'Ana', tipoDocumento: '', numeroDocumento: '' });
+        expect(draftHasAnyValue(draft)).toBe(true);
     });
 });
 
