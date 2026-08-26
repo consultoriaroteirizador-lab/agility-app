@@ -33,6 +33,11 @@ export function SharedEtapaRecebedor({ serviceType = 'servico' }: SharedEtapaRec
     // em campo, mesmo com a etapa REQUIRED — nao ha opcao nenhuma para escolher.
     const nextDisabled = requirements.recipientType === 'REQUIRED' && !recipient.relationCode && options.length > 0;
 
+    // Depende de convencao: so troca pelo nome real do cliente quando o code e
+    // literalmente 'CLIENTE' (o default de fabrica em recipientRelations.ts). Se
+    // a empresa cadastrar a opcao de cliente com outro code (ex.: 'CONTRATANTE'),
+    // esta tela mostra o rotulo cru configurado — cosmetico, sem perda de dado
+    // (mesma dependencia documentada no autofill de nome em ParadaContext.tsx).
     const getLabel = (code: string, label: string) => {
         if (code === 'CLIENTE') return customerName;
         return label;

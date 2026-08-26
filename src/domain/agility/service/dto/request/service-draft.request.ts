@@ -8,6 +8,9 @@ export interface ServiceDraftRecipient {
     nome?: string
     tipoDocumento?: string
     numeroDocumento?: string
+    /** Codigo/rotulo da relacao (opcoes da empresa, spec 2026-08-24) — ver RecipientData. */
+    relationCode?: string
+    relationLabel?: string
 }
 
 export interface ServiceDraftChecklist {
@@ -54,6 +57,11 @@ export interface ServiceDraftData {
     /** TRANSFER: evidência da coleta na origem (snapshot), para retomar após crash. */
     pickupEvidence?: {
         receivedBy?: string
+        /** Documento e relacao de quem entregou na origem — mesmos campos da entrega. */
+        receivedByDocumentType?: string
+        receivedByDocument?: string
+        receivedByRelationCode?: string
+        receivedByRelationLabel?: string
         signatureUrl?: string
         photoUrls?: string[]
         notes?: string

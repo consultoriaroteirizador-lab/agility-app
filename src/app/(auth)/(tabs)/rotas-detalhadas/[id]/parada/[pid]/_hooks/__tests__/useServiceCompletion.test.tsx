@@ -105,6 +105,16 @@ interface ParadaOverrides {
     signature?: string | null;
     photos?: unknown[];
     completionRequirements?: CompletionRequirements;
+    pickupEvidence?: {
+        receivedBy?: string;
+        receivedByDocumentType?: string;
+        receivedByDocument?: string;
+        receivedByRelationCode?: string;
+        receivedByRelationLabel?: string;
+        signatureUrl?: string;
+        photoUrls: string[];
+        notes?: string;
+    } | null;
 }
 
 /** Contexto mínimo que `useServiceCompletion` + `useServiceUpload` precisam. */
@@ -123,7 +133,7 @@ function makeParadaContext(overrides: ParadaOverrides = {}) {
         photos: overrides.photos ?? [],
         paymentAmount: '',
         paymentMethod: null,
-        pickupEvidence: null,
+        pickupEvidence: overrides.pickupEvidence ?? null,
         deliveryCode: '',
         bypassReasonCode: null,
         bypassReasonText: '',
@@ -322,6 +332,35 @@ describe('useServiceCompletion — regra unica de conclusao', () => {
             );
         });
 
+        // Par direto do teste abaixo — mesmo `recipient` (tipo/nome/tipoDocumento),
+        // só o `numeroDocumento` muda (preenchido aqui, em branco lá). Sem este
+        // par, "nao envia campo vazio" passaria mesmo com o bloco inteiro
+        // removido, porque ausência de campo já é o comportamento de baseline.
+        it('documento preenchido: receivedByDocument/Type vao no payload', async () => {
+            mockedUseParada.mockReturnValue(
+                makeParadaContext({
+                    completionRequirements: ALL_HIDDEN,
+                    recipient: { tipo: 'cliente', nome: 'Ana', tipoDocumento: 'RG', numeroDocumento: '123.456.789-00' },
+                    photos: [{ uri: 'a.jpg' }],
+                    signature: 'sig.png',
+                }),
+            );
+
+            const result = runHook('entrega');
+
+            await act(async () => {
+                await result.handleFinalizar();
+            });
+
+            const [payloadArg] = mockCompleteServiceWithDetailsAsync.mock.calls[0];
+            expect(payloadArg.details).toEqual(
+                expect.objectContaining({
+                    receivedByDocumentType: 'RG',
+                    receivedByDocument: '123.456.789-00',
+                }),
+            );
+        });
+
         it('nao envia campo vazio — documento em branco nao vira string vazia no banco', async () => {
             mockedUseParada.mockReturnValue(
                 makeParadaContext({
@@ -341,6 +380,69 @@ describe('useServiceCompletion — regra unica de conclusao', () => {
             const [payloadArg] = mockCompleteServiceWithDetailsAsync.mock.calls[0];
             expect(payloadArg.details).not.toHaveProperty('receivedByDocument');
             expect(payloadArg.details).not.toHaveProperty('receivedByDocumentType');
+        });
+
+        // `pickupCompletion` (perna de coleta do TRANSFER) tinha os 4 campos
+        // acrescentados em useServiceCompletion.ts sem nenhum teste cobrindo —
+        // remover aquele bloco por engano nao quebrava nada. `pickupEvidence`
+        // no harness era sempre `null`; agora e configuravel via override.
+        it('TRANSFER: documento e relacao da perna de coleta vao dentro de pickupCompletion', async () => {
+            mockedUseParada.mockReturnValue(
+                makeParadaContext({
+                    completionRequirements: ALL_HIDDEN,
+                    photos: [],
+                    signature: null,
+                    pickupEvidence: {
+                        receivedBy: 'Joao Estoquista',
+                        receivedByDocumentType: 'RG',
+                        receivedByDocument: '98.765.432-00',
+                        receivedByRelationCode: 'ESTOQUISTA',
+                        receivedByRelationLabel: 'Estoquista',
+                        photoUrls: [],
+                    },
+                }),
+            );
+
+            const result = runHook('entrega');
+
+            await act(async () => {
+                await result.handleFinalizar();
+            });
+
+            const [payloadArg] = mockCompleteServiceWithDetailsAsync.mock.calls[0];
+            expect(payloadArg.details.pickupCompletion).toEqual(
+                expect.objectContaining({
+                    receivedBy: 'Joao Estoquista',
+                    receivedByDocumentType: 'RG',
+                    receivedByDocument: '98.765.432-00',
+                    receivedByRelationCode: 'ESTOQUISTA',
+                    receivedByRelationLabel: 'Estoquista',
+                }),
+            );
+        });
+
+        it('TRANSFER: pickupCompletion sem documento/relacao na origem nao ganha os campos', async () => {
+            mockedUseParada.mockReturnValue(
+                makeParadaContext({
+                    completionRequirements: ALL_HIDDEN,
+                    photos: [],
+                    signature: null,
+                    pickupEvidence: {
+                        receivedBy: 'Joao',
+                        photoUrls: [],
+                    },
+                }),
+            );
+
+            const result = runHook('entrega');
+
+            await act(async () => {
+                await result.handleFinalizar();
+            });
+
+            const [payloadArg] = mockCompleteServiceWithDetailsAsync.mock.calls[0];
+            expect(payloadArg.details.pickupCompletion).not.toHaveProperty('receivedByDocument');
+            expect(payloadArg.details.pickupCompletion).not.toHaveProperty('receivedByRelationCode');
         });
     });
 });

@@ -44,6 +44,12 @@ import { parseBRLToCents } from '@/utils/parseCurrency';
 import { resolveParadaAtendidaElegivel, resolvePedidosDaParada } from '../../../_utils';
 import { useStopStatus } from '../_hooks/useStopStatus';
 import { resolveCompanyRules } from '../_utils/companyRules';
+import {
+  draftToPickupEvidence,
+  draftToRecipient,
+  pickupEvidenceToDraft,
+  recipientToDraft,
+} from '../_utils/paradaDraftMapping';
 
 // Tipos
 // Era uma uniao fixa ('cliente' | 'porteiro' | ...); com as opcoes vindo da
@@ -494,6 +500,15 @@ export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderPr
   }, [service?.materials]);
 
   // Efeito para preencher nome automaticamente quando selecionar "cliente"
+  //
+  // Depende de convencao: `tipo` e o `code` da opcao escolhida em minusculo, e
+  // este autofill so dispara quando esse code e literalmente 'cliente' (ou seja,
+  // a opcao configurada com `code: 'CLIENTE'` — o default de fabrica em
+  // recipientRelations.ts). Se uma empresa cadastrar a opcao de cliente com outro
+  // code (ex.: 'CONTRATANTE'), o autofill simplesmente nao dispara — o motorista
+  // digita o nome na mao, sem perda de dado (mesmo caso documentado no `getLabel`
+  // de SharedEtapaRecebedor.tsx). Nao inventar um mecanismo novo aqui: e um efeito
+  // cosmetico, nao um gate.
   useEffect(() => {
     if (recipient.tipo === 'cliente' && service) {
       const nomeCliente = service.fantasyName || service.responsible;
@@ -855,12 +870,7 @@ export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderPr
 
       if (chosen) {
         if (chosen.recipient) {
-          setRecipient({
-            tipo: (chosen.recipient.tipo as RecipientType | null) ?? null,
-            nome: chosen.recipient.nome ?? '',
-            tipoDocumento: chosen.recipient.tipoDocumento ?? 'RG',
-            numeroDocumento: chosen.recipient.numeroDocumento ?? '',
-          });
+          setRecipient(draftToRecipient(chosen.recipient));
         }
         if (chosen.observation !== undefined) setObservation(chosen.observation);
         if (chosen.checklist) {
@@ -897,13 +907,9 @@ export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderPr
         // TRANSFER: restaura a perna do wizard + snapshot da evidência da origem.
         if (chosen.transferLeg) setTransferLeg(chosen.transferLeg);
         if (chosen.pickupDone) setPickupDone(true);
-        if (chosen.pickupEvidence) {
-          setPickupEvidence({
-            receivedBy: chosen.pickupEvidence.receivedBy,
-            signatureUrl: chosen.pickupEvidence.signatureUrl,
-            photoUrls: chosen.pickupEvidence.photoUrls ?? [],
-            notes: chosen.pickupEvidence.notes,
-          });
+        const restoredPickupEvidence = draftToPickupEvidence(chosen.pickupEvidence);
+        if (restoredPickupEvidence) {
+          setPickupEvidence(restoredPickupEvidence);
         }
       }
 
@@ -1063,12 +1069,7 @@ export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderPr
     if (!hasContent) return;
 
     const draft: ServiceDraftData = {
-      recipient: {
-        tipo: recipient.tipo ?? undefined,
-        nome: recipient.nome || undefined,
-        tipoDocumento: recipient.tipoDocumento || undefined,
-        numeroDocumento: recipient.numeroDocumento || undefined,
-      },
+      recipient: recipientToDraft(recipient),
       observation: observation || undefined,
       photoUrls: photoUrls.length > 0 ? photoUrls : undefined,
       signatureUrl: sigUrl,
@@ -1083,14 +1084,7 @@ export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderPr
         ? {
             transferLeg,
             pickupDone,
-            pickupEvidence: pickupEvidence
-              ? {
-                  receivedBy: pickupEvidence.receivedBy,
-                  signatureUrl: pickupEvidence.signatureUrl,
-                  photoUrls: pickupEvidence.photoUrls,
-                  notes: pickupEvidence.notes,
-                }
-              : undefined,
+            pickupEvidence: pickupEvidence ? pickupEvidenceToDraft(pickupEvidence) : undefined,
           }
         : {}),
     };
