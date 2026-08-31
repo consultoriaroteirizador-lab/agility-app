@@ -244,6 +244,13 @@ export interface ServiceResponse {
     /** Last update timestamp */
     updatedAt: Date | string
 
+    /**
+     * Cubagem do pedido, derivada dos materiais por `computeServiceAmounts` no
+     * backend (`weight`/`volume` UNITÁRIOS × `quantity`) e serializada por
+     * `ServiceEntity.toJson()`. `amountWeight` já vinha na resposta; era este
+     * contrato que não o declarava, e o campo se perdia no caminho.
+     */
+    amountWeight: number | null | undefined
     amountItems: number | undefined
     amountVolume: number | undefined
 
