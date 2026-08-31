@@ -1,9 +1,10 @@
+import { CompletionRequirements } from '@/domain/agility/company/completionRequirements'
+
 import type {
     CollaboratorRole,
     Gender,
     WorkSchedule,
 } from '../types'
-import { CompletionRequirements } from '@/domain/agility/company/completionRequirements'
 
 /**
  * Collaborator response DTO

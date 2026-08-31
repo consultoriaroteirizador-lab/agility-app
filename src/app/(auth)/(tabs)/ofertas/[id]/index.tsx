@@ -13,9 +13,11 @@ import { useFindServicesByRoutingId } from '@/domain/agility/service/useCase';
 import { useAppSafeArea } from '@/hooks';
 import { useToastService } from '@/services/Toast/useToast';
 import { measure } from '@/theme';
+import { formatDateOnly } from '@/utils/formatDate';
 
 import { MapaParadasModal } from '../../rotas-detalhadas/[id]/_components/MapaParadasModal';
 import { useUserLocation } from '../../rotas-detalhadas/[id]/parada/[pid]/_hooks/useUserLocation';
+import { distanciaLinhaReta, resumirCarga } from '../_utils/cargaOferta';
 
 const SERVICE_TYPE_LABEL: Record<ServiceType, string> = {
   [ServiceType.DELIVERY]: 'Entrega',
@@ -41,6 +43,25 @@ function formatarTempo(minutos: number | null | undefined): string {
 function formatarPreco(valor: number | null | undefined): string {
   if (!valor) return 'R$ 0,00';
   return `R$ ${valor.toFixed(2).replace('.', ',')}`;
+}
+
+function formatarPeso(kg: number): string {
+  if (kg >= 1000) return `${(kg / 1000).toFixed(1).replace('.', ',')} t`;
+  // Peso fracionado só ajuda em carga leve; acima de 100 kg o decimal é ruído.
+  return kg >= 100 ? `${Math.round(kg)} kg` : `${kg.toFixed(1).replace('.', ',')} kg`;
+}
+
+function formatarVolume(m3: number): string {
+  return `${m3.toFixed(2).replace('.', ',')} m³`;
+}
+
+/**
+ * Distância até a origem em linha reta. Abaixo de 1 km o número em km vira
+ * "0,3 km" e parece longe; em metros o motorista entende que é ali.
+ */
+function formatarDistanciaAproximada(km: number): string {
+  if (km < 1) return `~${Math.round(km * 1000)} m`;
+  return `~${km.toFixed(1).replace('.', ',')} km`;
 }
 
 export default function OfertaDetalhadaScreen() {
@@ -110,7 +131,25 @@ export default function OfertaDetalhadaScreen() {
     preco: formatarPreco(routing?.totalValue),
     distancia: formatarDistancia(routing?.totalDistanceKm),
     tempoTotal: formatarTempo(routing?.totalDurationMinutes),
+    // `routing.date` é dia-calendário gravado como meia-noite UTC — `formatDateOnly`
+    // extrai o dia sem deslocar pelo fuso (getters locais voltavam 1 dia em UTC-3).
+    data: routing?.date ? formatDateOnly(routing.date) : '',
   }), [routing, paradas]);
+
+  // Peso, cubagem, itens e cobrança na entrega vêm dos serviços: a rota não
+  // carrega totais de carga no seu próprio contrato.
+  const carga = useMemo(() => resumirCarga(services), [services]);
+
+  // Quanto o motorista roda até o ponto de partida, antes mesmo de começar a
+  // ganhar. Linha reta — é estimativa de ordem de grandeza, não rota.
+  const distanciaAteOrigem = useMemo(() => distanciaLinhaReta(
+    userLocation?.coords,
+    { latitude: routing?.originLatitude, longitude: routing?.originLongitude },
+  ), [userLocation, routing?.originLatitude, routing?.originLongitude]);
+
+  const composicaoTexto = useMemo(() => carga.composicao
+    .map(({ tipo, quantidade }) => `${quantidade} ${SERVICE_TYPE_LABEL[tipo] ?? tipo}${quantidade > 1 ? 's' : ''}`)
+    .join(' · '), [carga.composicao]);
 
   const handleAcceptRouting = () => {
     setMostrarPopup(false);
@@ -179,7 +218,26 @@ export default function OfertaDetalhadaScreen() {
           <TagResumo icon={<Icon name="av-timer" />} variant="neutral">
             {resumo.tempoTotal}
           </TagResumo>
+          {!!resumo.data && (
+            <TagResumo icon={<Icon name="event" />} variant="neutral">
+              {resumo.data}
+            </TagResumo>
+          )}
         </Box>
+
+        {/*
+          Card de carga — o que o motorista vai levar. Cada linha só aparece se
+          houver número: rota de serviço em campo não tem peso nem cubagem, e
+          mostrar "0 kg / 0,00 m³" faria a tela afirmar algo falso sobre a carga.
+        */}
+        <CardCarga
+          peso={carga.pesoKg > 0 ? formatarPeso(carga.pesoKg) : null}
+          volume={carga.volumeM3 > 0 ? formatarVolume(carga.volumeM3) : null}
+          itens={carga.itens > 0 ? String(carga.itens) : null}
+          composicao={composicaoTexto || null}
+          valorCarga={carga.valorCarga > 0 ? formatarPreco(carga.valorCarga) : null}
+          cobranca={carga.cobranca.paradas > 0 ? carga.cobranca : null}
+        />
 
         {/* Ver rota no mapa */}
         <Button
@@ -218,6 +276,19 @@ export default function OfertaDetalhadaScreen() {
               <Text preset="text13" color="gray400">
                 {routing.originAddress || 'Ponto de partida'}
               </Text>
+              {/*
+                Só aparece com localização concedida E origem geocodificada. É
+                distância em linha reta: o texto diz isso, porque o motorista não
+                pode confundir com o trajeto que vai de fato dirigir.
+              */}
+              {distanciaAteOrigem !== null && (
+                <Box flexDirection="row" alignItems="center" gap="x4" mt="y8">
+                  <Icon name="near-me" size={12} color="gray400" />
+                  <Text preset="text12" color="gray400">
+                    {formatarDistanciaAproximada(distanciaAteOrigem)} de você, em linha reta
+                  </Text>
+                </Box>
+              )}
             </Box>
           </Box>
 
@@ -309,6 +380,67 @@ export default function OfertaDetalhadaScreen() {
         />
       </Box>
     </ScreenBase>
+  );
+}
+
+// Card de carga — some inteiro quando a rota não tem nada de carga a declarar.
+type CardCargaProps = {
+  peso: string | null;
+  volume: string | null;
+  itens: string | null;
+  composicao: string | null;
+  valorCarga: string | null;
+  cobranca: { valor: number; paradas: number } | null;
+};
+
+function CardCarga({ peso, volume, itens, composicao, valorCarga, cobranca }: CardCargaProps) {
+  const linhas = [
+    { rotulo: 'Peso', valor: peso },
+    { rotulo: 'Cubagem', valor: volume },
+    { rotulo: 'Volumes', valor: itens },
+    { rotulo: 'Composição', valor: composicao },
+    { rotulo: 'Valor da carga', valor: valorCarga },
+  ].filter((linha): linha is { rotulo: string; valor: string } => !!linha.valor);
+
+  if (linhas.length === 0 && !cobranca) return null;
+
+  return (
+    <Box
+      backgroundColor="white"
+      borderRadius="s12"
+      borderWidth={measure.m1}
+      borderColor="gray200"
+      p="y16"
+      mb="y24"
+      gap="y8"
+    >
+      <Text preset="text14" fontWeightPreset="semibold" color="colorTextPrimary" mb="y4">
+        Carga
+      </Text>
+
+      {linhas.map(({ rotulo, valor }) => (
+        <Box key={rotulo} flexDirection="row" justifyContent="space-between" alignItems="center" gap="x12">
+          <Text preset="text13" color="gray400">{rotulo}</Text>
+          <Text preset="text13" fontWeightPreset="semibold" color="colorTextPrimary" textAlign="right" flexShrink={1}>
+            {valor}
+          </Text>
+        </Box>
+      ))}
+
+      {/*
+        COD muda a responsabilidade que o motorista assume ao aceitar — ele vai
+        manusear dinheiro do cliente. Destacado, não como mais uma linha da lista.
+      */}
+      {!!cobranca && (
+        <Box flexDirection="row" alignItems="center" gap="x8" mt="y8" p="y12" backgroundColor="gray50" borderRadius="s8">
+          <Icon name="payments" size={16} color="gray600" />
+          <Text preset="text12" color="gray600" flexShrink={1}>
+            Receber {formatarPreco(cobranca.valor)} do cliente
+            {cobranca.paradas > 1 ? ` em ${cobranca.paradas} paradas` : ' em 1 parada'}
+          </Text>
+        </Box>
+      )}
+    </Box>
   );
 }
 
