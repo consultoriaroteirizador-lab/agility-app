@@ -8,6 +8,7 @@ export enum NotificationType {
     SERVICE_COMPLETED = 'SERVICE_COMPLETED',
     PAYMENT_RECEIVED = 'PAYMENT_RECEIVED',
     SYSTEM_ALERT = 'SYSTEM_ALERT',
+    CHAT_MESSAGE = 'CHAT_MESSAGE',
 }
 
 export enum NotificationStatus {
