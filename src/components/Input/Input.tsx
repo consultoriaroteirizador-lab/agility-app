@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { TextStyle, DimensionValue } from 'react-native'; // Importar DimensionValue
+import { TextStyle, DimensionValue } from 'react-native';
 
 import { useTheme } from '@shopify/restyle';
 
@@ -41,7 +41,7 @@ export function Input({
   style,
   messageError,
   multiline = false,
-  height = measure.y44,
+  height, // NOVO: Removido o valor padrão fixo daqui para calcular dinamicamente abaixo
   width = measure.x330,
   numberOfLines = 1,
   borderType = 'all',
@@ -55,6 +55,10 @@ export function Input({
   const [isFocused, setIsFocused] = useState(false);
 
   const isWidthAuto = width === 'auto';
+
+  // NOVO: Calcula a altura dinamicamente. Se não enviarem 'height' na prop, 
+  // ele usa 120 (ideal para 4 linhas) se for multiline, ou y44 se for linha única.
+  const resolvedHeight = height ? height : (multiline ? 120 : measure.y44);
 
   const inputTextStyle: TextStyle = {
     ...theme.textVariants[textPreset],
@@ -77,7 +81,7 @@ export function Input({
         borderBottomWidth={borderType === 'bottom' ? measure.y1dot5 : undefined}
         borderWidth={borderType === 'all' ? measure.y1dot5 : undefined}
         borderColor={isFocused ? (messageError ? 'redError' : 'primary100') : 'gray400'}
-        height={height}
+        height={resolvedHeight} // NOVO: Usando a nova variável de altura
       >
         {iconName && <Icon
           name={iconName}
@@ -94,8 +98,14 @@ export function Input({
             placeholderTextColor={theme.colors.gray200}
             onFocus={() => setIsFocused(true)}
             onBlur={() => setIsFocused(false)}
-            style={inputTextStyle}
+            style={[
+              inputTextStyle,
+              multiline && { minHeight: resolvedHeight } // NOVO: Ajuda a forçar tamanho na máscara se for multiline
+            ]}
             options={maskOptions}
+            multiline={multiline} // NOVO: Garantir repasse
+            numberOfLines={numberOfLines} // NOVO: Garantir repasse
+            textAlignVertical={multiline ? 'top' : (borderType === 'bottom' ? 'bottom' : 'auto')} // NOVO: Fix para Android
             {...TextInputBoxProps}
           />
         ) : (
@@ -108,12 +118,13 @@ export function Input({
             style={[
               inputTextStyle,
               !multiline && { height: "100%" as DimensionValue },
+              multiline && { minHeight: "100%" as DimensionValue } // NOVO: Garante que o input estique dentro do Box
             ]}
             onFocus={() => setIsFocused(true)}
             onBlur={() => setIsFocused(false)}
             multiline={multiline}
             numberOfLines={numberOfLines}
-            textAlignVertical={borderType === 'bottom' ? 'bottom' : 'auto'}
+            textAlignVertical={multiline ? 'top' : (borderType === 'bottom' ? 'bottom' : 'auto')}
             {...TextInputBoxProps}
           />
         )}
