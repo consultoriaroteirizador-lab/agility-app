@@ -1,6 +1,7 @@
+import { requirementsForServiceType } from '@/domain/agility/company/completionRequirements'
+
 import { resolveCompanyRules } from '../companyRules'
 import { resolveCompletionStep } from '../completionStep'
-import { requirementsForServiceType } from '@/domain/agility/company/completionRequirements'
 
 describe('resolveCompanyRules', () => {
     it('respeita o desligamento EXPLÍCITO vindo do backend', () => {
