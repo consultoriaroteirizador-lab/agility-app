@@ -16,32 +16,60 @@ import { baseResponseAdapter } from './baseResponseAdapter';
  */
 const LOG_HTTP = __DEV__;
 
-/** Campos que não entram no log nem em desenvolvimento. */
+/**
+ * Campos cujo VALOR não entra no log nem em desenvolvimento.
+ *
+ * Os nomes saem dos DTOs reais (`authType.ts`: `password`, o trio de
+ * `ChangePasswordRequest`, `access_token`/`refresh_token` da API e o par
+ * camelCase de `AuthCredentials`) mais o código de retirada/entrega, que o
+ * motorista digita e não pode sobrar no log do aparelho. `token`,
+ * `authorization`, `secret` e `client_secret` cobrem o que um endpoint novo
+ * pode devolver com outro nome.
+ *
+ * Guardadas em minúsculo porque a checagem é case-insensitive — ver
+ * {@link isSensitiveKey}.
+ */
 const SENSITIVE_KEYS = new Set([
   'password',
-  'currentPassword',
-  'newPassword',
-  'newPasswordConfirmation',
-  'accessToken',
-  'refreshToken',
+  'senha',
+  'currentpassword',
+  'newpassword',
+  'newpasswordconfirmation',
+  'accesstoken',
+  'refreshtoken',
   'access_token',
   'refresh_token',
-  'pickupCode',
-  'deliveryCode',
+  'token',
+  'authorization',
+  'x-api-key',
+  'secret',
+  'client_secret',
+  'pickupcode',
+  'deliverycode',
 ]);
+
+/**
+ * Case-insensitive de propósito: o axios 1.x normaliza nome de header para
+ * minúsculo (`authorization`), e um `Password` de um endpoint novo escaparia de
+ * um Set com casing fixo. Comparar por caixa exata faz a proteção depender de o
+ * backend nunca mudar a grafia de um campo.
+ */
+export function isSensitiveKey(key: string): boolean {
+  return SENSITIVE_KEYS.has(key.toLowerCase());
+}
 
 /**
  * Troca o valor de campo sensível por `***`. Recursivo porque o corpo do login e
  * o do refresh aninham os tokens dentro de `result`.
  */
-function redact(value: unknown, depth = 0): unknown {
+export function redact(value: unknown, depth = 0): unknown {
   if (depth > 4 || value === null || typeof value !== 'object') return value;
   if (Array.isArray(value)) return value.map((item) => redact(item, depth + 1));
 
   return Object.fromEntries(
     Object.entries(value as Record<string, unknown>).map(([key, val]) => [
       key,
-      SENSITIVE_KEYS.has(key) ? '***' : redact(val, depth + 1),
+      isSensitiveKey(key) ? '***' : redact(val, depth + 1),
     ])
   );
 }
@@ -128,9 +156,12 @@ function setupRequestInterceptor(apiInstance: ReturnType<typeof axios.create>) {
         Authorization: request.headers?.Authorization ? 'Bearer ***' : 'NOT SET',
         'Content-Type': request.headers?.['Content-Type'],
         ...Object.keys(request.headers || {}).reduce((acc, key) => {
-          // `x-api-key` é credencial de rota pública — nunca vai inteira para o log.
-          if (key === 'Authorization') return acc;
-          acc[key] = key.toLowerCase() === 'x-api-key' ? '***' : request.headers[key];
+          // Já impresso acima como 'Bearer ***'/'NOT SET'. A comparação é por
+          // caixa baixa porque o axios 1.x normaliza o nome do header: com
+          // `key === 'Authorization'`, um `authorization` minúsculo escapava do
+          // filtro e o token ia inteiro para o log.
+          if (key.toLowerCase() === 'authorization') return acc;
+          acc[key] = isSensitiveKey(key) ? '***' : request.headers[key];
           return acc;
         }, {} as Record<string, any>)
       });
