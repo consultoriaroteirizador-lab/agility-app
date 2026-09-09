@@ -35,6 +35,12 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   android: {
     package: 'br.com.agility.agilityapp',
     versionCode: 1,
+    // O Auto Backup do Android sobe o diretório do app para o Google Drive do
+    // usuário. O que está no SecureStore continua ilegível (a chave do Keystore
+    // não é copiada), mas o SDK de Background Geolocation persiste o JWT + refresh
+    // token na config nativa dele, em claro — e essa subiria junto. Default do
+    // Expo é true; aqui é explicitamente false.
+    allowBackup: false,
     adaptiveIcon: {
       foregroundImage: './assets/images/adaptive-icon.png',
       backgroundColor: '#ffffff',

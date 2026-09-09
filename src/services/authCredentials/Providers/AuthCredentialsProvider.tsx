@@ -2,7 +2,6 @@ import { createContext, PropsWithChildren, useCallback, useEffect, useRef, useSt
 
 
 import { apiAgility, apiIdentity } from "@/api";
-import { isDevelopment } from "@/config/environment";
 import { authAdapter } from "@/domain/Auth/authAdapter";
 import { authService } from "@/domain/Auth/authService";
 import { AuthCredentials } from "@/domain/Auth/authType";
@@ -96,8 +95,8 @@ export function AuthCredentialsProvider({ children }: PropsWithChildren) {
         // Sem isto, o _layout troca toda a árvore do app pelo spinner de boot
         // (fundo preto) a cada renovação de token disparada por um 401.
         const silent = options?.silent ?? false;
-        console.log('[saveCredentials] Iniciando...', { silent });
-        console.log('[saveCredentials] ac:', ac ? 'existe' : 'null');
+        if (__DEV__) console.log('[saveCredentials] Iniciando...', { silent });
+        if (__DEV__) console.log('[saveCredentials] ac:', ac ? 'existe' : 'null');
         if (!silent) setIsLoading(true);
         const wasAuthenticated = !!authCredentials;
 
@@ -118,10 +117,10 @@ export function AuthCredentialsProvider({ children }: PropsWithChildren) {
                 failedRequestsAfterRefreshRef.current.clear();
             }
             isRedirectingRef.current = false;
-            console.log('[saveCredentials] Finalizado com sucesso via JWT claims');
+            if (__DEV__) console.log('[saveCredentials] Finalizado com sucesso via JWT claims');
             return userAuth;
         } catch (error: any) {
-            if (isDevelopment) {
+            if (__DEV__) {
                 console.error('[AuthCredentialsProvider] Error decoding JWT:', error);
             }
 
@@ -167,14 +166,14 @@ export function AuthCredentialsProvider({ children }: PropsWithChildren) {
             // If we have authCredentials but no userAuth, decode JWT to populate userAuth
             // This can happen after app restart when credentials are loaded from storage
             if (!userAuth) {
-                if (isDevelopment) console.log('[Auth] Credentials found but no userAuth, decoding JWT...');
+                if (__DEV__) console.log('[Auth] Credentials found but no userAuth, decoding JWT...');
                 try {
                     const claims = decodeJWT(credentials.accessToken);
                     const mappedUserAuth = authAdapter.mapTokenClaimsToUserAuth(claims);
                     setUserAuth(mappedUserAuth);
                     await saveUserAuth(mappedUserAuth);
                 } catch (decodeError) {
-                    if (isDevelopment) console.log('[Auth] Failed to decode JWT on start:', decodeError);
+                    if (__DEV__) console.log('[Auth] Failed to decode JWT on start:', decodeError);
                     // If JWT decode fails (e.g. token corrupted), try to refresh
                 }
             }
@@ -192,22 +191,22 @@ export function AuthCredentialsProvider({ children }: PropsWithChildren) {
 
             if (remainingTimeAccessToken <= 0) {
                 if (remainingTimeRefreshToken > 0 && credentials.refreshToken) {
-                    if (isDevelopment) console.log('[Auth] Access token expirado, tentando refresh...');
+                    if (__DEV__) console.log('[Auth] Access token expirado, tentando refresh...');
                     try {
                         const newAuthCredentials = await authService.refreshToken(
                             credentials.refreshToken,
                             credentials.tenantId,
                         );
-                        if (isDevelopment) console.log('[Auth] Refresh bem sucedido no boot');
+                        if (__DEV__) console.log('[Auth] Refresh bem sucedido no boot');
                         await saveCredentials(newAuthCredentials);
                         return;
                     } catch (refreshError) {
-                        if (isDevelopment) console.log('[Auth] Refresh falhou no boot:', refreshError);
+                        if (__DEV__) console.log('[Auth] Refresh falhou no boot:', refreshError);
                         await removeCredentials();
                         throw new Error('Refresh token falhou, redirecionando para login.');
                     }
                 } else {
-                    if (isDevelopment) console.log('[Auth] Refresh token também expirado ou indisponível');
+                    if (__DEV__) console.log('[Auth] Refresh token também expirado ou indisponível');
                     await removeCredentials();
                     throw new Error('Token expirado, redirecionando para login.');
                 }
@@ -220,7 +219,7 @@ export function AuthCredentialsProvider({ children }: PropsWithChildren) {
                 setAuthCredentials(credentials);
             }
         } catch (error) {
-            if (isDevelopment) console.error("Erro ao iniciar credenciais de autenticação:", error);
+            if (__DEV__) console.error("Erro ao iniciar credenciais de autenticação:", error);
             goLoginScreen();
         } finally {
             setIsLoading(false);
@@ -270,7 +269,7 @@ export function AuthCredentialsProvider({ children }: PropsWithChildren) {
                     const hasApiKey = !!responseError.config?.headers?.['x-api-key'];
                     const hasAuthHeader = !!responseError.config?.headers?.Authorization;
 
-                    if (isDevelopment) {
+                    if (__DEV__) {
                         console.log('[Auth Interceptor] 401 recebido:', {
                             url: failedRequestUrl,
                             method: responseError.config?.method,
@@ -283,11 +282,11 @@ export function AuthCredentialsProvider({ children }: PropsWithChildren) {
 
                     // Rotas públicas (x-api-key sem Authorization) não tentam refresh
                     if (responseError.skipRefreshToken || (hasApiKey && !hasAuthHeader)) {
-                        if (isDevelopment) {
+                        if (__DEV__) {
                             console.log('[Auth Interceptor] 401 em rota pública:', failedRequestUrl);
                         }
                         if (isRefreshRoute && !isRedirectingRef.current) {
-                            if (isDevelopment) console.log('[Auth Interceptor] Refresh token expirou, redirecionando para login');
+                            if (__DEV__) console.log('[Auth Interceptor] Refresh token expirou, redirecionando para login');
                             isRedirectingRef.current = true;
                             await removeCredentials();
                         }
@@ -296,19 +295,19 @@ export function AuthCredentialsProvider({ children }: PropsWithChildren) {
 
                     // Se esta requisição já falhou após refresh token, não tentar novamente
                     if (failedRequestsAfterRefreshRef.current.has(requestKey)) {
-                        if (isDevelopment) console.log('[Auth Interceptor] Requisição já falhou após refresh:', failedRequestUrl);
+                        if (__DEV__) console.log('[Auth Interceptor] Requisição já falhou após refresh:', failedRequestUrl);
                         return Promise.reject(responseError);
                     }
 
                     // Verificar se já está redirecionando
                     if (isRedirectingRef.current) {
-                        if (isDevelopment) console.log('[Auth Interceptor] Já redirecionando, rejeitando');
+                        if (__DEV__) console.log('[Auth Interceptor] Já redirecionando, rejeitando');
                         return Promise.reject(responseError);
                     }
 
                     // Rota autenticada sem Authorization header - não tenta refresh
                     if (!hasAuthHeader) {
-                        if (isDevelopment) console.log('[Auth Interceptor] 401 sem Authorization header');
+                        if (__DEV__) console.log('[Auth Interceptor] 401 sem Authorization header');
                         return Promise.reject(responseError);
                     }
 
@@ -317,7 +316,7 @@ export function AuthCredentialsProvider({ children }: PropsWithChildren) {
 
                     // Se não tem refresh token disponível, vai para login
                     if (!currentCredentials?.refreshToken) {
-                        if (isDevelopment) console.log('[Auth Interceptor] Sem refresh token disponível, redirecionando para login');
+                        if (__DEV__) console.log('[Auth Interceptor] Sem refresh token disponível, redirecionando para login');
                         isRedirectingRef.current = true;
                         await removeCredentials();
                         return Promise.reject(responseError);
@@ -328,7 +327,7 @@ export function AuthCredentialsProvider({ children }: PropsWithChildren) {
                     const isRefreshTokenValid = refreshTokenExpiration.getTime() > Date.now();
 
                     if (!isRefreshTokenValid) {
-                        if (isDevelopment) console.log('[Auth Interceptor] Refresh token expirado, redirecionando para login');
+                        if (__DEV__) console.log('[Auth Interceptor] Refresh token expirado, redirecionando para login');
                         isRedirectingRef.current = true;
                         await removeCredentials();
                         return Promise.reject(responseError);
@@ -336,7 +335,7 @@ export function AuthCredentialsProvider({ children }: PropsWithChildren) {
 
                     // Se já está fazendo refresh token, aguardar a mesma Promise e retentar
                     if (refreshTokenPromiseRef.current) {
-                        if (isDevelopment) console.log('[Auth Interceptor] Refresh já em andamento, aguardando...');
+                        if (__DEV__) console.log('[Auth Interceptor] Refresh já em andamento, aguardando...');
                         try {
                             const newAuthCredentials = await refreshTokenPromiseRef.current;
                             if (newAuthCredentials) {
@@ -352,12 +351,12 @@ export function AuthCredentialsProvider({ children }: PropsWithChildren) {
 
                     const refreshPromise = (async () => {
                         try {
-                            if (isDevelopment) console.log('[Auth Interceptor] Tentando refresh token...');
+                            if (__DEV__) console.log('[Auth Interceptor] Tentando refresh token...');
                             const newAuthCredentials = await authService.refreshToken(
                                 currentCredentials.refreshToken,
                                 currentCredentials.tenantId,
                             );
-                            if (isDevelopment) console.log('[Auth Interceptor] Refresh token bem sucedido');
+                            if (__DEV__) console.log('[Auth Interceptor] Refresh token bem sucedido');
                             // silent: renovação em sessão não pode colapsar o app no spinner de boot
                             await saveCredentials(newAuthCredentials, { silent: true });
                             return newAuthCredentials;
@@ -376,7 +375,7 @@ export function AuthCredentialsProvider({ children }: PropsWithChildren) {
                         newAuthCredentials = await refreshPromise;
                     } catch (refreshError: any) {
                         refreshTokenPromiseRef.current = null;
-                        if (isDevelopment) console.log('[Auth Interceptor] Refresh falhou, redirecionando para login:', refreshError?.message || refreshError);
+                        if (__DEV__) console.log('[Auth Interceptor] Refresh falhou, redirecionando para login:', refreshError?.message || refreshError);
                         isRedirectingRef.current = true;
                         await removeCredentials();
                         return Promise.reject(responseError);
@@ -406,14 +405,14 @@ export function AuthCredentialsProvider({ children }: PropsWithChildren) {
                         const retryStatus = retryError?.response?.status;
 
                         if (retryStatus === 401) {
-                            if (isDevelopment) console.log('[Auth Interceptor] Retentativa falhou com 401, redirecionando para login:', failedRequestUrl);
+                            if (__DEV__) console.log('[Auth Interceptor] Retentativa falhou com 401, redirecionando para login:', failedRequestUrl);
                             isRedirectingRef.current = true;
                             await removeCredentials();
                         } else {
                             // Sessão continua válida — libera o marcador para futuras
                             // tentativas desta rota e propaga o erro real ao chamador.
                             failedRequestsAfterRefreshRef.current.delete(requestKey);
-                            if (isDevelopment) console.log('[Auth Interceptor] Retentativa falhou (não-401), sessão mantida:', retryStatus, failedRequestUrl);
+                            if (__DEV__) console.log('[Auth Interceptor] Retentativa falhou (não-401), sessão mantida:', retryStatus, failedRequestUrl);
                         }
                         return Promise.reject(retryError);
                     }
