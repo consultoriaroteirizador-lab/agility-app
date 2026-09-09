@@ -90,7 +90,15 @@ function setupResponseInterceptor(apiInstance: ReturnType<typeof axios.create>) 
       }
 
       if (LOG_HTTP) {
-        console.error('API Error:', responseAdapterError);
+        // Só a forma do erro. Duas linhas acima o objeto recebeu `config`, que
+        // carrega o header Authorization e o corpo da request que falhou — o do
+        // login inclusive. Logar o objeto inteiro reabria, dentro do `__DEV__`,
+        // exatamente o vazamento que o resto deste arquivo fecha.
+        console.error('API Error:', {
+          url: requestUrl,
+          status,
+          message: (responseAdapterError as { error?: { message?: string } })?.error?.message,
+        });
       }
       return Promise.reject(responseAdapterError);
     }
