@@ -1,11 +1,10 @@
-import { BaseResponse, PaginatedResult } from '@/api'
+import { BaseResponse } from '@/api'
 import { apiService } from '@/api/apiConfig'
 import type { Id } from '@/types/base'
 
 import type {
     CreateDriverRequest,
     UpdateDriverRequest,
-    ListDriversRequest,
     DriverResponse,
     DriverMeResponse,
 } from './dto'
@@ -14,22 +13,17 @@ import type {
 // Export DriverResponse as DriverItem for backward compatibility
 export type DriverItem = DriverResponse
 
-type ListDriversParams = ListDriversRequest
+/**
+ * NÃO reintroduzir `findAll` (GET /drivers) nem `findByLicenseNumber`
+ * (GET /drivers/license/:cnh) aqui. As duas saíram de `@Roles('COLLABORATOR')`
+ * no backend (PR #613) e hoje respondem 403 para motorista — davam a qualquer
+ * motorista a lista de colegas e a busca de cadastro pelo número da CNH.
+ * Nenhuma tela as montava; ficavam vivas só pelo re-export do barrel.
+ * Para o cadastro do próprio motorista, use `getMe` (GET /drivers/me).
+ */
 
 async function create(payload: CreateDriverRequest): Promise<BaseResponse<DriverResponse>> {
     const { data } = await apiService.post<BaseResponse<DriverResponse>>('/drivers', payload)
-    return data
-}
-
-// Sem teamCode o back retorna paginado ({ data, meta }); com teamCode retorna lista.
-async function findAll(params: ListDriversParams = {}): Promise<BaseResponse<PaginatedResult<DriverResponse> | DriverResponse[]>> {
-    const { data } = await apiService.get<BaseResponse<PaginatedResult<DriverResponse> | DriverResponse[]>>('/drivers', {
-        params: {
-            ...(params.teamCode && { teamCode: params.teamCode }),
-            ...(params.page && { page: params.page }),
-            ...(params.limit && { limit: params.limit }),
-        },
-    })
     return data
 }
 
@@ -40,11 +34,6 @@ async function findOne(id: Id): Promise<BaseResponse<DriverResponse>> {
 
 async function findByCollaboratorId(collaboratorId: Id): Promise<BaseResponse<DriverResponse | null>> {
     const { data } = await apiService.get<BaseResponse<DriverResponse | null>>(`/drivers/collaborator/${collaboratorId}`)
-    return data
-}
-
-async function findByLicenseNumber(licenseNumber: string): Promise<BaseResponse<DriverResponse>> {
-    const { data } = await apiService.get<BaseResponse<DriverResponse>>(`/drivers/license/${licenseNumber}`)
     return data
 }
 
@@ -70,10 +59,8 @@ async function remove(id: Id): Promise<BaseResponse<void>> {
 
 export const driverAPI = {
     create,
-    findAll,
     findOne,
     findByCollaboratorId,
-    findByLicenseNumber,
     getMe,
     update,
     remove,

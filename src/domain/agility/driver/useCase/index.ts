@@ -1,7 +1,5 @@
-export { useFindAllDrivers } from './useFindAllDrivers'
 export { useFindOneDriver } from './useFindOneDriver'
 export { useGetMe } from './useGetMe'
-export { useFindDriverByLicenseNumber } from './useFindDriverByLicenseNumber'
 export { useCreateDriver } from './useCreateDriver'
 export { useUpdateDriver } from './useUpdateDriver'
 export { useRemoveDriver } from './useRemoveDriver'
