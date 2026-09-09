@@ -2,6 +2,7 @@ import { useState } from 'react';
 
 import { useRouter, Href } from 'expo-router';
 
+import { isBiometricPendingNextLogin } from '@/app/(public)/LoginScreen/_utils/accountBiometrics';
 import { Box, Text, TouchableOpacityBox, Button, Image, BiometricToggle } from '@/components';
 import Modal from '@/components/Modal/Modal';
 import ProfilePhotoPicker from '@/components/ProfilePhotoPicker';
@@ -94,12 +95,27 @@ export default function MenuScreen() {
   const handleBiometricToggle = async () => {
     if (!userCredentialsCurrent) return;
 
+    const enabling = !userCredentialsCurrent.allowsBiometrics;
+    // A digital reenvia a SENHA para o `/auth/login`, e a senha só fica guardada
+    // enquanto a biometria está ligada. Quem liga aqui depois de reabrir o app
+    // não tem mais a senha em mãos: grava a preferência, mas a digital só passa a
+    // valer no próximo login digitado. Sem este aviso o switch dizia "Ativado" e
+    // a digital nunca aparecia, sem explicação nenhuma.
+    const willWaitForNextLogin = enabling && !userCredentialsCurrent.password;
+
     setIsBiometricLoading(true);
     try {
       await saveUserCredentials({
         ...userCredentialsCurrent,
-        allowsBiometrics: !userCredentialsCurrent.allowsBiometrics,
+        allowsBiometrics: enabling,
       });
+
+      if (willWaitForNextLogin) {
+        showToast({
+          message: 'Biometria ativada. Ela vale a partir do seu próximo login com senha.',
+          type: 'success',
+        });
+      }
     } catch (error) {
       showToast({ message: 'Não foi possível atualizar a configuração de biometria', type: 'error' });
     } finally {
@@ -204,6 +220,7 @@ export default function MenuScreen() {
           isLoading={isBiometricLoading}
           disabled={!userCredentialsCurrent}
           onToggle={handleBiometricToggle}
+          pendingNextLogin={isBiometricPendingNextLogin(userCredentialsCurrent)}
         />
       </Box>
 
