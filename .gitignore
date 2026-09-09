@@ -45,3 +45,13 @@ graphify-out/
 
 # Cursor local config
 .cursor/
+
+# Segredos de build e publicacao. *.p8/*.p12/*.jks/*.key ja estavam cobertos; a
+# service account do Play Console NAO estava, e o eas.json a referencia por
+# caminho relativo na raiz (./google-play-service-account.json). Ela publica
+# versoes do app em nome da empresa — um `git add .` distraido bastava.
+.env
+.env.*
+!.env.example
+google-play-service-account.json
+*-service-account.json

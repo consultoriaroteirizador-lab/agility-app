@@ -1,23 +1,18 @@
-import { BaseResponse, PaginatedResult } from '@/api'
+import { BaseResponse } from '@/api'
 import type { Id } from '@/types/base'
 
 import { driverAPI, type DriverItem } from './driverAPI'
 import type {
     CreateDriverRequest,
     UpdateDriverRequest,
-    ListDriversRequest,
     DriverResponse,
     DriverMeResponse,
 } from './dto'
 
-type ListDriversParams = ListDriversRequest
+// Sobre `findAll`/`findByLicenseNumber`, que saíram daqui: ver driverAPI.ts.
 
 async function create(payload: CreateDriverRequest): Promise<BaseResponse<DriverResponse>> {
     return driverAPI.create(payload)
-}
-
-async function findAll(params: ListDriversParams = {}): Promise<BaseResponse<PaginatedResult<DriverResponse> | DriverResponse[]>> {
-    return driverAPI.findAll(params)
 }
 
 async function findOne(id: Id): Promise<BaseResponse<DriverResponse>> {
@@ -26,10 +21,6 @@ async function findOne(id: Id): Promise<BaseResponse<DriverResponse>> {
 
 async function findByCollaboratorId(collaboratorId: Id): Promise<BaseResponse<DriverResponse | null>> {
     return driverAPI.findByCollaboratorId(collaboratorId)
-}
-
-async function findByLicenseNumber(licenseNumber: string): Promise<BaseResponse<DriverResponse>> {
-    return driverAPI.findByLicenseNumber(licenseNumber)
 }
 
 async function getMe(): Promise<BaseResponse<DriverMeResponse>> {
@@ -50,10 +41,8 @@ async function remove(id: Id): Promise<BaseResponse<void>> {
 export type { DriverItem }
 export const driverService = {
     create,
-    findAll,
     findOne,
     findByCollaboratorId,
-    findByLicenseNumber,
     getMe,
     update,
     remove,

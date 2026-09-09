@@ -1,17 +1,86 @@
 import axios from 'axios';
 
-import { isDevelopment } from '@/config/environment';
 import { urls } from '@/config/urls';
 
 import { baseResponseAdapter } from './baseResponseAdapter';
 
+/**
+ * O portão do log é `__DEV__` PURO — nunca `isDevelopment`.
+ *
+ * `isDevelopment` sai de `Constants.expoConfig.extra.appEnv`, que por sua vez sai
+ * de `process.env.APP_ENV || 'development'`. Um build sem a variável injetada
+ * (era o caso do profile `production` do EAS) liga o log inteiro no app da loja:
+ * corpo de request e response em claro no logcat, senha do login inclusive.
+ * `__DEV__` é resolvido pelo Metro em tempo de build e some por dead-code
+ * elimination no release — nenhuma configuração errada consegue reabrir isso.
+ */
+const LOG_HTTP = __DEV__;
+
+/**
+ * Campos cujo VALOR não entra no log nem em desenvolvimento.
+ *
+ * Os nomes saem dos DTOs reais (`authType.ts`: `password`, o trio de
+ * `ChangePasswordRequest`, `access_token`/`refresh_token` da API e o par
+ * camelCase de `AuthCredentials`) mais o código de retirada/entrega, que o
+ * motorista digita e não pode sobrar no log do aparelho. `token`,
+ * `authorization`, `secret` e `client_secret` cobrem o que um endpoint novo
+ * pode devolver com outro nome.
+ *
+ * Guardadas em minúsculo porque a checagem é case-insensitive — ver
+ * {@link isSensitiveKey}.
+ */
+const SENSITIVE_KEYS = new Set([
+  'password',
+  'senha',
+  'currentpassword',
+  'newpassword',
+  'newpasswordconfirmation',
+  'accesstoken',
+  'refreshtoken',
+  'access_token',
+  'refresh_token',
+  'token',
+  'authorization',
+  'x-api-key',
+  'secret',
+  'client_secret',
+  'pickupcode',
+  'deliverycode',
+]);
+
+/**
+ * Case-insensitive de propósito: o axios 1.x normaliza nome de header para
+ * minúsculo (`authorization`), e um `Password` de um endpoint novo escaparia de
+ * um Set com casing fixo. Comparar por caixa exata faz a proteção depender de o
+ * backend nunca mudar a grafia de um campo.
+ */
+export function isSensitiveKey(key: string): boolean {
+  return SENSITIVE_KEYS.has(key.toLowerCase());
+}
+
+/**
+ * Troca o valor de campo sensível por `***`. Recursivo porque o corpo do login e
+ * o do refresh aninham os tokens dentro de `result`.
+ */
+export function redact(value: unknown, depth = 0): unknown {
+  if (depth > 4 || value === null || typeof value !== 'object') return value;
+  if (Array.isArray(value)) return value.map((item) => redact(item, depth + 1));
+
+  return Object.fromEntries(
+    Object.entries(value as Record<string, unknown>).map(([key, val]) => [
+      key,
+      isSensitiveKey(key) ? '***' : redact(val, depth + 1),
+    ])
+  );
+}
+
 function setupResponseInterceptor(apiInstance: ReturnType<typeof axios.create>) {
   apiInstance.interceptors.response.use(
     (response) => {
-      if (isDevelopment || __DEV__) {
+      if (LOG_HTTP) {
         const apiName = getApiName(response.config.baseURL || '');
         console.log(`[${apiName}] - Response: Status`, response.config.url, response.status);
-        console.log(`[${apiName}] - Response: Data`, response.data);
+        console.log(`[${apiName}] - Response: Data`, redact(response.data));
       }
       return response;
     },
@@ -21,7 +90,7 @@ function setupResponseInterceptor(apiInstance: ReturnType<typeof axios.create>) 
       const hasApiKey = !!error.config?.headers?.['x-api-key'];
       const hasAuthHeader = !!error.config?.headers?.Authorization;
 
-      if ((isDevelopment || __DEV__) && status === 401) {
+      if (LOG_HTTP && status === 401) {
         const apiName = getApiName(error.config?.baseURL || '');
         console.log(`[${apiName}] [API Config] Erro 401 detectado:`, {
           url: requestUrl,
@@ -43,28 +112,26 @@ function setupResponseInterceptor(apiInstance: ReturnType<typeof axios.create>) 
       // Marcar explicitamente para nunca tentar refresh token
       if (hasApiKey && !hasAuthHeader) {
         (responseAdapterError as any).skipRefreshToken = true;
-        if (isDevelopment || __DEV__) {
+        if (LOG_HTTP) {
           console.log('[API Config] Rota pública detectada (x-api-key sem Authorization) - skipRefreshToken marcado:', requestUrl);
         }
       }
 
-      if (isDevelopment || __DEV__) {
-        console.error('API Error:', responseAdapterError);
+      if (LOG_HTTP) {
+        // Só a forma do erro. Duas linhas acima o objeto recebeu `config`, que
+        // carrega o header Authorization e o corpo da request que falhou — o do
+        // login inclusive. Logar o objeto inteiro reabria, dentro do `__DEV__`,
+        // exatamente o vazamento que o resto deste arquivo fecha.
+        console.error('API Error:', {
+          url: requestUrl,
+          status,
+          message: (responseAdapterError as { error?: { message?: string } })?.error?.message,
+        });
       }
       return Promise.reject(responseAdapterError);
     }
   );
 }
-
-// function setupRequestInterceptor(apiInstance: ReturnType<typeof axios.create>) {
-//   apiInstance.interceptors.request.use(async (request) => {
-//     if (isDevelopment) {
-//       console.log('Request:', request.method?.toUpperCase(), request.url);
-//       console.log('Body:', request.method?.toUpperCase(), request.data);
-//     }
-//     return request;
-//   });
-// }
 
 function setupRequestInterceptor(apiInstance: ReturnType<typeof axios.create>) {
   apiInstance.interceptors.request.use(async (request) => {
@@ -81,7 +148,7 @@ function setupRequestInterceptor(apiInstance: ReturnType<typeof axios.create>) {
         delete (request.headers as Record<string, unknown>).Authorization;
       }
     }
-    if (isDevelopment || __DEV__) {
+    if (LOG_HTTP) {
       const apiName = getApiName(request.baseURL || '');
       console.log(`[${apiName}] Request:`, request.method?.toUpperCase(), request.url);
       console.log(`[${apiName}] Full URL:`, `${request.baseURL}${request.url}`);
@@ -89,14 +156,17 @@ function setupRequestInterceptor(apiInstance: ReturnType<typeof axios.create>) {
         Authorization: request.headers?.Authorization ? 'Bearer ***' : 'NOT SET',
         'Content-Type': request.headers?.['Content-Type'],
         ...Object.keys(request.headers || {}).reduce((acc, key) => {
-          if (key !== 'Authorization') {
-            acc[key] = request.headers[key];
-          }
+          // Já impresso acima como 'Bearer ***'/'NOT SET'. A comparação é por
+          // caixa baixa porque o axios 1.x normaliza o nome do header: com
+          // `key === 'Authorization'`, um `authorization` minúsculo escapava do
+          // filtro e o token ia inteiro para o log.
+          if (key.toLowerCase() === 'authorization') return acc;
+          acc[key] = isSensitiveKey(key) ? '***' : request.headers[key];
           return acc;
         }, {} as Record<string, any>)
       });
       if (request.data) {
-        console.log(`[${apiName}] Body:`, request.data);
+        console.log(`[${apiName}] Body:`, redact(request.data));
       }
     }
     return request;

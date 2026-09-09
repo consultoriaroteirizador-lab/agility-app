@@ -23,20 +23,21 @@ export type TokenClaims = {
 export function decodeJWT(token: string): TokenClaims {
     try {
         if (!token || token.trim() === '') {
-            console.error('Token está vazio ou indefinido:', token);
             throw new Error('Invalid token');
         }
 
         const payload = jwtDecode<TokenClaims>(token);
 
         if (!payload.sub) {
-            console.error('Payload inválido - sem sub:', payload);
+            // Só as CHAVES: o payload traz nome, e-mail e company_id do motorista,
+            // e este log não tem portão de ambiente.
+            console.error('Payload de JWT inválido - sem sub. Claims presentes:', Object.keys(payload));
             throw new Error('Invalid token payload structure');
         }
 
         return payload;
-    } catch (error) {
-        console.error('ERRO GERAL AO DECODIFICAR TOKEN:', error);
+    } catch {
+        // O `error` do jwt-decode ecoa o token recebido na mensagem — não logar.
         throw new Error('Invalid token');
     }
 }

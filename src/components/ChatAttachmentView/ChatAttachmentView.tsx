@@ -42,8 +42,14 @@ export default function ChatAttachmentView({
     if (attachments[index].type === 'image') {
       setSelectedImageIndex(index);
     } else {
-      // Abrir link para documentos
-      Linking.openURL(attachments[index].url);
+      // Abrir link para documentos. A URL vem do servidor (anexo enviado por
+      // outra pessoa no chat) — `openURL` cru aceitaria qualquer esquema, e no
+      // Android um `intent://` abre atividade arbitrária do aparelho. Só http(s)
+      // passa; qualquer outra coisa é anexo que não deveria estar ali.
+      const { url } = attachments[index];
+      if (/^https?:\/\//i.test(url)) {
+        Linking.openURL(url);
+      }
     }
   };
 

@@ -42,9 +42,13 @@ export default function PerfilScreen() {
   // tela cheia quando a tela reabre e o staleTime já expirou.
   const { me, isLoading: isLoadingMe } = useGetMe();
   const isLoadingProfileData = isLoadingProfile || isLoadingMe;
-  // PATCH /collaborators/profile tem @Roles('COLLABORATOR') — motorista terceirizado
-  // tomaria 403 ao salvar. Em vez de deixar o usuário tentar e falhar, escondemos a
-  // edição. Enquanto nem `profile` nem `me` carregaram ainda não sabemos o vínculo,
+  // PATCH /collaborators/profile falha para o motorista TERCEIRIZADO, mas não pela
+  // role: `@Roles('COLLABORATOR')` deixa ele passar (provider.service.ts:234 dá a
+  // mesma role base que o colaborador recebe). O handler é que resolve o
+  // Collaborator do usuário via `findByKeycloakUserId` e devolve 404 — o
+  // terceirizado tem vínculo por Provider e não tem registro de Collaborator.
+  // Em vez de deixar o usuário tentar e falhar, escondemos a edição.
+  // Enquanto nem `profile` nem `me` carregaram ainda não sabemos o vínculo,
   // então também não oferecemos edição (mesma postura "na dúvida, não" das regras
   // operacionais). Evidência positiva de QUALQUER uma das duas fontes já basta —
   // ver `resolveCanEditProfile` para o porquê (evita perder edição legítima quando
@@ -221,9 +225,11 @@ export default function PerfilScreen() {
 
           {/* Campos do Formulário */}
           <Box gap="y16">
-            {/* Motorista terceirizado: PATCH /collaborators/profile é exclusiva de
-                colaborador (@Roles('COLLABORATOR')) e daria 403 nele. Em vez de deixar
-                tentar e falhar, avisamos e escondemos a edição. */}
+            {/* Motorista terceirizado: PATCH /collaborators/profile devolve 404 nele
+                — não por role, mas porque o handler resolve o Collaborator do usuário
+                e o terceirizado tem vínculo por Provider. Ver o comentário de
+                `canEditProfile` acima. Em vez de deixar tentar e falhar, avisamos e
+                escondemos a edição. */}
             {!canEditProfile && (
               <Text preset="text14" color="secondaryTextColor">
                 Edição de perfil disponível apenas para colaboradores.

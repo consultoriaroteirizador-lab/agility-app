@@ -56,8 +56,8 @@ export function useLoginController() {
             setErrorTrigger(Date.now());
         },
         onSuccess: async (data, userAuthFromProfile) => {
-            console.log('[LoginController] onSuccess chamado');
-            console.log('[LoginController] userAuthFromProfile:', userAuthFromProfile?.fullname || 'null');
+            if (__DEV__) console.log('[LoginController] onSuccess chamado');
+            if (__DEV__) console.log('[LoginController] userAuthFromProfile:', userAuthFromProfile?.fullname || 'null');
 
             // Salvar tenant info apos login bem-sucedido
             if (tenantCode) {
@@ -69,8 +69,8 @@ export function useLoginController() {
             // Usar password do state ou das credenciais salvas (para login biométrico)
             const userPassword = password || userCredentialsCurrent?.password;
 
-            console.log('[LoginController] userEmail:', userEmail);
-            console.log('[LoginController] userPassword:', userPassword ? 'definida' : 'vazia');
+            if (__DEV__) console.log('[LoginController] userEmail:', userEmail);
+            if (__DEV__) console.log('[LoginController] userPassword:', userPassword ? 'definida' : 'vazia');
 
             if (userEmail && userPassword) {
                 // A preferencia de biometria (e o nome) vem da PROPRIA conta que
@@ -86,8 +86,8 @@ export function useLoginController() {
                     profileAlias: userAuthFromProfile?.nickname,
                 });
 
-                console.log('[LoginController] allowsBiometrics:', credentialsToSave.allowsBiometrics);
-                console.log('[LoginController] userName:', credentialsToSave.name);
+                if (__DEV__) console.log('[LoginController] allowsBiometrics:', credentialsToSave.allowsBiometrics);
+                if (__DEV__) console.log('[LoginController] userName:', credentialsToSave.name);
 
                 await saveUserCredentials(credentialsToSave);
             }
@@ -116,16 +116,16 @@ export function useLoginController() {
             if (!account?.password) return;
 
             setBiometricAttemptedFor(account.username);
-            console.log('[Biometric] Iniciando autenticação biométrica');
+            if (__DEV__) console.log('[Biometric] Iniciando autenticação biométrica');
 
             const compatible = await LocalAuthentication.hasHardwareAsync();
             const isEnrolled = await LocalAuthentication.isEnrolledAsync();
 
-            console.log('[Biometric] compatible:', compatible);
-            console.log('[Biometric] isEnrolled:', isEnrolled);
+            if (__DEV__) console.log('[Biometric] compatible:', compatible);
+            if (__DEV__) console.log('[Biometric] isEnrolled:', isEnrolled);
 
             if (!compatible || !isEnrolled) {
-                console.log('[Biometric] Dispositivo não compatível ou biometria não cadastrada');
+                if (__DEV__) console.log('[Biometric] Dispositivo não compatível ou biometria não cadastrada');
                 return;
             }
 
@@ -135,10 +135,10 @@ export function useLoginController() {
                 cancelLabel: 'Cancelar',
             });
 
-            console.log('[Biometric] result:', result);
+            if (__DEV__) console.log('[Biometric] result:', result);
 
             if (result.success) {
-                console.log('[Biometric] Autenticação bem-sucedida, chamando signIn');
+                if (__DEV__) console.log('[Biometric] Autenticação bem-sucedida, chamando signIn');
                 setPassword(account.password);
                 signIn({
                     emailOrUsername: account.username,
@@ -146,7 +146,7 @@ export function useLoginController() {
                     tenantCode: tenantInfo?.tenantCode,
                 });
             } else {
-                console.log('[Biometric] Autenticação cancelada ou falhou');
+                if (__DEV__) console.log('[Biometric] Autenticação cancelada ou falhou');
             }
         }
         handleAuthenticationBiometric();

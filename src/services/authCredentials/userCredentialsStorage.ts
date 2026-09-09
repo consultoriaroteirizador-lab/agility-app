@@ -6,88 +6,83 @@ import { UserCredentials } from "../userAuthInfo/UserAuthInfoType";
 const USER_CREDENTIALS_KEY = 'UserCredentialsAgilityApp';
 const USER_CREDENTIALS_CURRENT_KEY = 'UserCredentialsCurrentAgilityApp';
 
+/**
+ * A senha só é gravada no aparelho quando o motorista LIGOU a biometria — ela
+ * existe unicamente para ser reenviada ao `/auth/login` depois da digital
+ * (`useLoginController`). Antes, `resolveCredentialsToSave` anexava a senha em
+ * TODO login e ela ficava guardada para sempre mesmo para quem recusou a digital:
+ * credencial primária em repouso sem nenhum uso funcional.
+ *
+ * A poda mora aqui, no ponto de gravação, e não em cada chamador — todo caminho
+ * de escrita (login, tela de escolha, toggle do menu) passa por `setCurrent`/
+ * `setInAll`, então nenhum caller novo consegue esquecer de podar.
+ *
+ * Consequência conhecida: ligar a biometria pelo menu DEPOIS de reabrir o app
+ * não reaproveita uma senha antiga (ela não está mais lá). O próximo login é
+ * digitado e, aí sim, já com `allowsBiometrics: true`, a senha é gravada e a
+ * digital passa a valer do login seguinte em diante.
+ */
+function stripPasswordUnlessBiometric(uc: UserCredentials): UserCredentials {
+    if (uc.allowsBiometrics === true) return uc;
+    const { password: _password, ...withoutPassword } = uc;
+    return withoutPassword;
+}
+
 
 async function setInAll(uc: UserCredentials): Promise<void> {
-    console.log('Iniciando a função set() com as credenciais:', uc);
-
     let existingCredentials = await getAll();
+    const toPersist = stripPasswordUnlessBiometric(uc);
 
     if (existingCredentials) {
         const userIndex = existingCredentials.findIndex((cred) => cred.username === uc.username);
-        console.log('Índice do usuário encontrado:', userIndex);
 
         if (userIndex !== -1) {
-            console.log(`Usuário ${uc.username} encontrado. Atualizando credenciais.`);
-            existingCredentials[userIndex] = uc;
+            existingCredentials[userIndex] = toPersist;
         } else {
-            console.log(`Usuário ${uc.username} não encontrado. Adicionando nova credencial.`);
-            existingCredentials.push(uc);
+            existingCredentials.push(toPersist);
         }
     } else {
-        console.log('Nenhuma credencial encontrada. Criando nova lista.');
-        existingCredentials = [uc];
+        existingCredentials = [toPersist];
     }
 
-    console.log('Salvando credenciais atualizadas:');
     await StorageSecurity.setItem(USER_CREDENTIALS_KEY, existingCredentials);
-
-    console.log('Credenciais salvas com sucesso!');
 }
 
 
 async function setCurrent(uc: UserCredentials): Promise<void> {
-    await StorageSecurity.setItem(USER_CREDENTIALS_CURRENT_KEY, uc)
+    await StorageSecurity.setItem(USER_CREDENTIALS_CURRENT_KEY, stripPasswordUnlessBiometric(uc))
 }
 
 async function getCurrent(): Promise<UserCredentials | null> {
-    console.log('Iniciando a função get() UserCredentials');
     try {
         const userCredentials = await StorageSecurity.getItem<UserCredentials>(USER_CREDENTIALS_CURRENT_KEY);
         return userCredentials;
-    } catch (error) {
-        console.log(`Erro get UserCredentials :: ${error}`)
+    } catch {
         throw Error("Erro ao buscar UserCredentials")
     }
 }
 
 
 async function getAll(): Promise<UserCredentials[] | null> {
-    console.log('Iniciando a função get() UserCredentials');
     try {
         const uc = await StorageSecurity.getItem<UserCredentials[]>(USER_CREDENTIALS_KEY);
         return uc;
-    } catch (error) {
-        console.log(`Erro get UserCredentials :: ${error}`)
+    } catch {
         throw Error("Erro ao buscar UserCredentials")
     }
 }
 
 async function remove(uc: UserCredentials): Promise<void> {
-    console.log('Iniciando a função remove() com as credenciais:', uc);
+    const existingCredentials = await getAll();
 
-    let existingCredentials = await getAll();
-    console.log('Credenciais existentes:', existingCredentials);
+    if (!existingCredentials) return;
 
-    if (existingCredentials) {
-        const userIndex = existingCredentials.findIndex((cred) => cred.username === uc.username);
-        console.log('Índice do usuário encontrado:', userIndex);
+    const userIndex = existingCredentials.findIndex((cred) => cred.username === uc.username);
+    if (userIndex === -1) return;
 
-        if (userIndex !== -1) {
-            console.log(`Usuário ${uc.username} encontrado. Atualizando credenciais.`);
-            existingCredentials.splice(userIndex, 1);
-        } else {
-            console.log(`Usuário ${uc.username} não encontrado`);
-            return
-        }
-    } else {
-        console.log('Nenhuma credencial encontrada.');
-        return;
-    }
+    existingCredentials.splice(userIndex, 1);
 
-    console.log('Salvando credenciais atualizadas:', existingCredentials);
     await StorageSecurity.setItem(USER_CREDENTIALS_KEY, existingCredentials);
-
-    console.log('Credencial removida com sucesso!');
 }
 
 async function removeCurrent(): Promise<void> {
