@@ -5,6 +5,7 @@ import { useRouter } from 'expo-router';
 
 import { ActivityIndicator, Box, Button, ScreenBase, Text, TouchableOpacityBox } from '@/components';
 import { Icon } from '@/components/Icon/Icon';
+import { segundosAteExpirar } from '@/domain/agility/offer/offerExpiry';
 import { useAcceptRouting, useFindBroadcastingRoutings } from '@/domain/agility/routing/useCase';
 import { useToastService } from '@/services/Toast/useToast';
 import { measure } from '@/theme';
@@ -24,29 +25,6 @@ interface OfertaAdaptada {
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-
-/**
- * Segundos até a oferta expirar, ou `null` quando não há um prazo confiável.
- *
- * O único formato confiável é um TIMESTAMP ABSOLUTO de expiração (ISO) — aí sim
- * dá pra contar regressivamente. Enquanto o backend não enviar isso:
- *  - `offerTime` ausente/null  → `null` (sem prazo; NÃO marca "Expirada").
- *  - `offerTime` em `HH:mm`     → `null` (ambíguo — duração? hora do dia? — não dá
- *     pra virar contagem confiável; tratar como "sem prazo" em vez de expirar na hora).
- *  - ISO válido no futuro       → segundos restantes.
- *  - ISO válido no passado      → 0 (genuinamente expirada).
- *
- * ANTES este helper retornava 0 para null/HH:mm, fazendo TODA oferta nascer
- * "Expirada" + Aceitar desabilitado (o front do operador não envia offerTime).
- */
-function calcularTempoExpirar(offerTime: string | null): number | null {
-  if (!offerTime) return null;
-  // HH:mm não é um instante confiável de expiração — ignora (sem prazo).
-  if (/^\d{1,2}:\d{2}$/.test(offerTime.trim())) return null;
-  const ts = new Date(offerTime).getTime();
-  if (Number.isNaN(ts)) return null;
-  return Math.max(0, Math.floor((ts - Date.now()) / 1000));
-}
 
 function formatarDistancia(km: number | null | undefined): string {
   if (!km) return '0 km';
@@ -284,7 +262,7 @@ export default function OfertasScreen() {
       .filter((r) => !ofertasAceitas.includes(r.id))
       .map((routing) => ({
         id: routing.id,
-        tempoExpirarSegundos: calcularTempoExpirar(routing.offerTime),
+        tempoExpirarSegundos: segundosAteExpirar(routing.offerExpiresAt, Date.now()),
         servicosCount: routing.totalServices || 0,
         distancia: formatarDistancia(routing.totalDistanceKm),
         tempo: formatarTempo(routing.totalDurationMinutes),

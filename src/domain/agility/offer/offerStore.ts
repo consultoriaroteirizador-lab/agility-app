@@ -1,18 +1,15 @@
-export type OfferPayload = { id: string; code?: string; offerTime?: string; totalServices?: number; totalDistanceKm?: number; totalDurationMinutes?: number; totalValue?: number; originLat?: number; originLng?: number };
+export type OfferPayload = { id: string; code?: string; offerTime?: string; offerExpiresAt?: string | null; totalServices?: number; totalDistanceKm?: number; totalDurationMinutes?: number; totalValue?: number; originLat?: number; originLng?: number };
 // `silencedAt` marca a oferta que o motorista escolheu ver em detalhe: ela
 // continua na fila (válida, aceitável, visível na aba Ofertas), mas deixa de
 // disparar o alerta global — senão o popup voltaria por cima da própria tela
 // que ele abriu para decidir. Silenciar NÃO é recusar.
 export type PendingOffer = OfferPayload & { receivedAt: number; silencedAt?: number };
 
-// offerTime "HH:mm" = duração (min:seg) da oferta; expira em receivedAt + dur.
-// Quando ausente/vazio/"00:00" (duração zero), assume um fallback de 60s para
-// que a oferta não nasça expirada (dead-on-arrival).
-const FALLBACK_DURATION_MS = 60_000;
+// Prazo = instante absoluto do backend. Sem ele, a oferta não expira no aparelho:
+// quem a tira da fila é `syncWithBroadcasting` (Task 2), quando ela sai da divulgação.
 export function expiresAtOf(o: PendingOffer): number {
-    const [m, s] = (o.offerTime ?? '').trim().split(':').map(Number);
-    const durMs = ((m || 0) * 60 + (s || 0)) * 1000;
-    return o.receivedAt + (durMs > 0 ? durMs : FALLBACK_DURATION_MS);
+    const ts = o.offerExpiresAt ? Date.parse(o.offerExpiresAt) : Number.NaN;
+    return Number.isNaN(ts) ? Number.POSITIVE_INFINITY : ts;
 }
 export function addOffer(list: PendingOffer[], offer: OfferPayload, now: number): PendingOffer[] {
     if (list.some((x) => x.id === offer.id)) return list;

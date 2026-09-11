@@ -6,12 +6,12 @@ import { router } from 'expo-router';
 import { useUserLocation } from '@/app/(auth)/(tabs)/rotas-detalhadas/[id]/parada/[pid]/_hooks/useUserLocation';
 import { Box, Button, Text, TextButton } from '@/components';
 import { useFindOneDriver } from '@/domain/agility/driver/useCase';
+import { segundosAteExpirar } from '@/domain/agility/offer/offerExpiry';
 import {
   activeOffer,
   addOffer,
   applySilenced,
   dropOffer,
-  expiresAtOf,
   forgetSilenced,
   pruneExpired,
   rememberSilenced,
@@ -111,7 +111,7 @@ export function OfferAlertProvider({ children }: { children: React.ReactNode }) 
     (broadcastRoutings ?? []).forEach((r) => pushOffer({
       id: r.id,
       code: r.code ?? undefined,
-      offerTime: r.offerTime ?? undefined,
+      offerExpiresAt: r.offerExpiresAt ?? null,
       totalServices: r.totalServices ?? undefined,
       totalDistanceKm: r.totalDistanceKm ?? undefined,
       totalDurationMinutes: r.totalDurationMinutes ?? undefined,
@@ -155,7 +155,7 @@ export function OfferAlertProvider({ children }: { children: React.ReactNode }) 
   // Fila efetiva: a memória reaplica o silêncio às ofertas que reentraram.
   const fila = useMemo(() => applySilenced(offers, silenced), [offers, silenced]);
   const current = activeOffer(fila);
-  const secondsLeft = current ? Math.max(0, Math.ceil((expiresAtOf(current) - now) / 1000)) : 0;
+  const secondsLeft = current ? segundosAteExpirar(current.offerExpiresAt, now) : null;
 
   // Vibra ao surgir uma nova oferta ativa (som customizado fica para follow-up;
   // o som do sistema já toca via a push em background).
@@ -236,19 +236,21 @@ export function OfferAlertProvider({ children }: { children: React.ReactNode }) 
           >
             {current && (
               <>
-                <Box
-                  alignSelf="flex-start"
-                  borderWidth={measure.m1}
-                  borderColor="primary100"
-                  borderRadius="s20"
-                  px="x12"
-                  py="y4"
-                  mb="y12"
-                >
-                  <Text preset="text13" color={secondsLeft <= 0 ? 'redError' : 'primary100'}>
-                    Oferta sumirá: {formatarTimer(secondsLeft)}
-                  </Text>
-                </Box>
+                {secondsLeft !== null && (
+                  <Box
+                    alignSelf="flex-start"
+                    borderWidth={measure.m1}
+                    borderColor="primary100"
+                    borderRadius="s20"
+                    px="x12"
+                    py="y4"
+                    mb="y12"
+                  >
+                    <Text preset="text13" color={secondsLeft === 0 ? 'redError' : 'primary100'}>
+                      Oferta sumirá: {formatarTimer(secondsLeft)}
+                    </Text>
+                  </Box>
+                )}
 
                 <Text preset="text18" fontWeight="700" color="colorTextPrimary" mb="y4">
                   Nova oferta de rota
@@ -273,7 +275,7 @@ export function OfferAlertProvider({ children }: { children: React.ReactNode }) 
                     title="Aceitar"
                     iconName="check-circle"
                     onPress={onAceitar}
-                    disabled={isLoading || secondsLeft <= 0}
+                    disabled={isLoading || secondsLeft === 0}
                   />
                 </Box>
 
