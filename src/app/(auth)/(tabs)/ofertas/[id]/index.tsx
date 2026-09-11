@@ -218,7 +218,10 @@ export default function OfertaDetalhadaScreen() {
     );
   }
 
-  const encerrada = motivoDeOfertaEncerrada(routing);
+  // Um único instante para as duas checagens deste render — evita que "encerrada"
+  // e o `disabled` do Aceitar leiam relógios ligeiramente diferentes.
+  const agora = Date.now();
+  const encerrada = motivoDeOfertaEncerrada(routing, agora);
 
   return (
     <ScreenBase
@@ -414,7 +417,7 @@ export default function OfertaDetalhadaScreen() {
               title={isAccepting ? 'Aceitando...' : 'Aceitar'}
               onPress={() => setMostrarPopup(true)}
               flex={1}
-              disabled={isAccepting || !ofertaAceitavel(routing, Date.now())}
+              disabled={isAccepting || !ofertaAceitavel(routing, agora)}
             />
           </Box>
         )}

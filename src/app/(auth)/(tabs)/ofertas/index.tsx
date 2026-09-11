@@ -241,10 +241,13 @@ export default function OfertasScreen() {
   const router = useRouter();
   const { userLocation, isLoading: isLoadingLocation, error: erroLocalizacao } = useUserLocation();
 
-  const { routings, isLoading, isError, refetch, isRefetching } = useFindBroadcastingRoutings({
-    driverLatitude: userLocation?.coords.latitude,
-    driverLongitude: userLocation?.coords.longitude,
-  });
+  const { routings, isLoading, isError, refetch, isRefetching } = useFindBroadcastingRoutings(
+    {
+      driverLatitude: userLocation?.coords.latitude,
+      driverLongitude: userLocation?.coords.longitude,
+    },
+    { refetchIntervalMs: 60_000 },
+  );
 
   const { userAuth } = useAuthCredentialsService();
   const { driver } = useFindOneDriver(userAuth?.driverId);
