@@ -6,8 +6,10 @@ import { ActivityIndicator, Box, Text, Button, Image, ScreenBase } from '@/compo
 import { ButtonBack } from '@/components/Button/ButtonBack';
 import { Icon } from '@/components/Icon/Icon';
 import Modal from '@/components/Modal/Modal';
+import { TouchableOpacityBox } from '@/components/RestyleComponent/RestyleComponent';
 import { formatAddress } from '@/domain/agility/address/dto';
 import { useFindOneRouting, useAcceptRouting } from '@/domain/agility/routing/useCase';
+import type { ServiceMaterialResponse } from '@/domain/agility/service/dto';
 import { ServiceType } from '@/domain/agility/service/dto/types';
 import { useFindServicesByRoutingId } from '@/domain/agility/service/useCase';
 import { useAppSafeArea } from '@/hooks';
@@ -16,8 +18,12 @@ import { measure } from '@/theme';
 import { formatDateOnly } from '@/utils/formatDate';
 
 import { MapaParadasModal } from '../../rotas-detalhadas/[id]/_components/MapaParadasModal';
+import { MaterialsModal } from '../../rotas-detalhadas/[id]/parada/[pid]/_components/shared/MaterialsModal';
 import { useUserLocation } from '../../rotas-detalhadas/[id]/parada/[pid]/_hooks/useUserLocation';
-import { distanciaLinhaReta, resumirCarga } from '../_utils/cargaOferta';
+import { distanciaLinhaReta, itensDaParada, resumirCarga, type ItemOferta } from '../_utils/cargaOferta';
+
+/** Quantos itens a parada mostra direto no card; o resto abre a lista completa. */
+const ITENS_VISIVEIS = 3;
 
 const SERVICE_TYPE_LABEL: Record<ServiceType, string> = {
   [ServiceType.DELIVERY]: 'Entrega',
@@ -76,6 +82,7 @@ export default function OfertaDetalhadaScreen() {
   const safeArea = useAppSafeArea();
   const [mostrarPopup, setMostrarPopup] = useState(false);
   const [mostrarMapa, setMostrarMapa] = useState(false);
+  const [materiaisAbertos, setMateriaisAbertos] = useState<ServiceMaterialResponse[] | null>(null);
 
   const { acceptRouting, isLoading: isAccepting } = useAcceptRouting({
     onSuccess: () => {
@@ -113,6 +120,10 @@ export default function OfertaDetalhadaScreen() {
           isTransfer,
           enderecoColeta: isTransfer ? formatAddress(service.pickupAddress) : null,
           enderecoEntrega: isTransfer ? formatAddress(service.deliveryAddress) : null,
+          itens: itensDaParada(service.materials),
+          // Materiais crus para o "ver todos", já no mesmo corte de sentido da lista.
+          materiaisEntrega: (service.materials ?? []).filter((m) => m.direction !== 'PICKUP'),
+          materiaisRetorno: (service.materials ?? []).filter((m) => m.direction === 'PICKUP'),
         };
       });
   }, [services]);
@@ -324,6 +335,16 @@ export default function OfertaDetalhadaScreen() {
                     {parada.endereco}
                   </Text>
                 )}
+                <ItensDaParada
+                  titulo="Itens"
+                  itens={parada.itens.entrega}
+                  onVerTodos={() => setMateriaisAbertos(parada.materiaisEntrega)}
+                />
+                <ItensDaParada
+                  titulo="Recolher no local"
+                  itens={parada.itens.retorno}
+                  onVerTodos={() => setMateriaisAbertos(parada.materiaisRetorno)}
+                />
               </Box>
             </Box>
           ))}
@@ -378,8 +399,55 @@ export default function OfertaDetalhadaScreen() {
           onClose={() => setMostrarMapa(false)}
           routeId={routingId}
         />
+
+        <MaterialsModal
+          isVisible={materiaisAbertos !== null}
+          onClose={() => setMateriaisAbertos(null)}
+          materials={materiaisAbertos ?? []}
+          title="Itens da parada"
+        />
       </Box>
     </ScreenBase>
+  );
+}
+
+// Itens de uma parada, dentro do card da timeline. Some quando a lista está vazia:
+// rota de serviço em campo costuma não ter material, e um "Itens" vazio só ocupa espaço.
+type ItensDaParadaProps = {
+  titulo: string;
+  itens: ItemOferta[];
+  onVerTodos: () => void;
+};
+
+function ItensDaParada({ titulo, itens, onVerTodos }: ItensDaParadaProps) {
+  if (itens.length === 0) return null;
+
+  const visiveis = itens.slice(0, ITENS_VISIVEIS);
+  const restantes = itens.length - visiveis.length;
+
+  return (
+    <Box mt="y12" pt="y12" borderTopWidth={measure.m1} borderColor="gray200" gap="y6">
+      <Text preset="text12" color="gray600">{titulo}</Text>
+      {visiveis.map((item) => (
+        <Box key={item.id} flexDirection="row" alignItems="flex-start" gap="x8">
+          {item.quantidade !== null && (
+            <Text preset="text13" fontWeightPreset="semibold" color="primary100">
+              {item.quantidade}{item.unidade ? ` ${item.unidade}` : 'x'}
+            </Text>
+          )}
+          <Text preset="text13" color="colorTextPrimary" flexShrink={1}>
+            {item.nome}
+          </Text>
+        </Box>
+      ))}
+      {restantes > 0 && (
+        <TouchableOpacityBox onPress={onVerTodos} alignSelf="flex-start" py="y4">
+          <Text preset="text13" fontWeightPreset="semibold" color="primary100">
+            + {restantes} {restantes > 1 ? 'itens' : 'item'} · ver todos
+          </Text>
+        </TouchableOpacityBox>
+      )}
+    </Box>
   );
 }
 
