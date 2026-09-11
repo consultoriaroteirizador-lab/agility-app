@@ -80,6 +80,37 @@ export function forgetSilenced(memory: SilencedOffers, list: PendingOffer[], now
     }
     return mudou ? next : memory;
 }
+// Graça para a corrida WS × poll: uma oferta que chegou pelo WebSocket DEPOIS de
+// o poll ter saído ainda não aparece na resposta dele — não pode ser derrubada.
+const GRACA_SYNC_MS = 30_000;
+
+/**
+ * A lista de broadcasting (poll) é a fonte da verdade do que ainda está em
+ * divulgação. Tira da fila o que saiu (aceita por outro, expirou, cancelada) —
+ * antes a fantasma ficava no popup, com Aceitar ativo, escondendo a próxima — e
+ * esquece a recusa de quem saiu, em vez de esquecê-la por um prazo local (que
+ * fazia a oferta recusada voltar a alertar).
+ */
+export function syncWithBroadcasting(
+    list: PendingOffer[],
+    memory: SilencedOffers,
+    broadcastingIds: ReadonlySet<string>,
+    fetchedAt: number,
+): { list: PendingOffer[]; memory: SilencedOffers } {
+    const saiu = (id: string, desde: number) => !broadcastingIds.has(id) && desde < fetchedAt - GRACA_SYNC_MS;
+
+    const kept = list.filter((o) => !saiu(o.id, o.receivedAt));
+    const nextList = kept.length === list.length ? list : kept;
+
+    let mudou = false;
+    const nextMemory: SilencedOffers = {};
+    for (const [id, entry] of Object.entries(memory)) {
+        if (saiu(id, entry.at)) { mudou = true; continue; }
+        nextMemory[id] = entry;
+    }
+    return { list: nextList, memory: mudou ? nextMemory : memory };
+}
+
 export function isSilenced(offer: PendingOffer): boolean {
     return offer.silencedAt !== undefined;
 }

@@ -15,6 +15,7 @@ import {
   forgetSilenced,
   pruneExpired,
   rememberSilenced,
+  syncWithBroadcasting,
 } from '@/domain/agility/offer/offerStore';
 import type { OfferPayload, PendingOffer, SilencedOffers } from '@/domain/agility/offer/offerStore';
 import { useAcceptRouting, useFindBroadcastingRoutings } from '@/domain/agility/routing/useCase';
@@ -99,7 +100,7 @@ export function OfferAlertProvider({ children }: { children: React.ReactNode }) 
   // Fallback de polling: enquanto o motorista estiver disponível, busca ofertas
   // em broadcasting periodicamente (o hook faz refetchInterval). Complementa o
   // WebSocket (dedup por id em `addOffer` cobre a sobreposição WS+poll).
-  const { routings: broadcastRoutings } = useFindBroadcastingRoutings(
+  const { routings: broadcastRoutings, dataUpdatedAt: broadcastDataUpdatedAt } = useFindBroadcastingRoutings(
     {
       driverLatitude: userLocation?.coords.latitude,
       driverLongitude: userLocation?.coords.longitude,
@@ -118,6 +119,14 @@ export function OfferAlertProvider({ children }: { children: React.ReactNode }) 
       totalValue: r.totalValue ?? undefined,
     }));
   }, [broadcastRoutings, pushOffer]);
+
+  // A divulgação manda: o que saiu do broadcasting sai da fila e da memória.
+  useEffect(() => {
+    if (!broadcastDataUpdatedAt) return;
+    const ids = new Set((broadcastRoutings ?? []).map((r) => r.id));
+    setOffers((list) => syncWithBroadcasting(list, {}, ids, broadcastDataUpdatedAt).list);
+    setSilenced((memory) => syncWithBroadcasting([], memory, ids, broadcastDataUpdatedAt).memory);
+  }, [broadcastRoutings, broadcastDataUpdatedAt]);
 
   // Tick de 1s: expira ofertas vencidas e atualiza o contador regressivo.
   // Só roda enquanto houver o que envelhecer — fila OU memória —, para não

@@ -9,6 +9,7 @@ import {
     expiresAtOf,
     isSilenced,
     silenceOffer,
+    syncWithBroadcasting,
 } from './offerStore';
 import type { SilencedOffers } from './offerStore';
 
@@ -229,4 +230,35 @@ it('a memória de uma oferta não silencia as outras', () => {
     fila = addOffer(fila, o('r2'), 0);
     const memoria = rememberSilenced({}, fila[0], 0);
     expect(activeOffer(applySilenced(fila, memoria))?.id).toBe('r2');
+});
+
+// ─── A divulgação é a fonte da verdade da fila (Task 2) ──────────────────────
+
+it('oferta que saiu da divulgação sai da fila e libera a próxima', () => {
+    let l = addOffer([], { id: 'r1' }, 0);
+    l = addOffer(l, { id: 'r2' }, 0);
+    const { list } = syncWithBroadcasting(l, {}, new Set(['r2']), 60_000);
+    expect(list.map((x) => x.id)).toEqual(['r2']);
+    expect(activeOffer(list)?.id).toBe('r2');
+});
+
+it('não derruba a oferta que chegou pelo WS depois da resposta do poll', () => {
+    const l = addOffer([], { id: 'r3' }, 50_000); // WS em t=50s
+    const { list } = syncWithBroadcasting(l, {}, new Set(), 60_000); // resposta velha em t=60s
+    expect(list.map((x) => x.id)).toEqual(['r3']); // dentro da graça de 30s
+});
+
+it('recusa é lembrada enquanto a oferta seguir em divulgação e esquecida quando sair', () => {
+    const l = addOffer([], { id: 'r1' }, 0);
+    const memoria = rememberSilenced({}, l[0], 0);
+    expect(Object.keys(syncWithBroadcasting(l, memoria, new Set(['r1']), 120_000).memory)).toEqual(['r1']);
+    expect(syncWithBroadcasting(l, memoria, new Set(), 120_000).memory).toEqual({});
+});
+
+it('devolve as mesmas referências quando nada muda', () => {
+    const l = addOffer([], { id: 'r1' }, 0);
+    const memoria = rememberSilenced({}, l[0], 0);
+    const out = syncWithBroadcasting(l, memoria, new Set(['r1']), 120_000);
+    expect(out.list).toBe(l);
+    expect(out.memory).toBe(memoria);
 });

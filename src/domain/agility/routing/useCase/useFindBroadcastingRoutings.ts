@@ -9,7 +9,7 @@ export function useFindBroadcastingRoutings(
     params?: BroadcastingQueryRequest,
     opts?: { pollWhileAvailable?: boolean },
 ) {
-    const { data, isLoading, isError, refetch, isRefetching } = useQuery({
+    const { data, isLoading, isError, refetch, isRefetching, dataUpdatedAt } = useQuery({
         queryKey: [KEY_ROUTINGS, 'broadcasting', params?.driverLatitude, params?.driverLongitude],
         queryFn: () => routingService.findBroadcasting(params),
         retry: 1,
@@ -23,6 +23,7 @@ export function useFindBroadcastingRoutings(
         refetch,
         isRefetching,
         response: data,
+        dataUpdatedAt,
     }
 }
 
