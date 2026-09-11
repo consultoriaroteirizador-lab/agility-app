@@ -78,6 +78,9 @@ export interface RoutingResponse {
     /** Offer time limit */
     offerTime: string | null
 
+    /** Instante (ISO) em que a oferta expira. Null = sem prazo conhecido. */
+    offerExpiresAt?: string | null
+
     /** Total value */
     totalValue: number | null
 

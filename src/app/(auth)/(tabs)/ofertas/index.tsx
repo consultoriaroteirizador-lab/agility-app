@@ -1,11 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
 import { RefreshControl, ScrollView } from 'react-native';
 
+import { useIsFocused } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 
+import { mensagemDaApi } from '@/api/apiErrorMessage';
 import { ActivityIndicator, Box, Button, ScreenBase, Text, TouchableOpacityBox } from '@/components';
 import { Icon } from '@/components/Icon/Icon';
-import { useAcceptRouting, useFindBroadcastingRoutings } from '@/domain/agility/routing/useCase';
+import { useFindOneDriver } from '@/domain/agility/driver/useCase';
+import { segundosAteExpirar } from '@/domain/agility/offer/offerExpiry';
+import { payloadDeAceite, useAcceptRouting, useFindBroadcastingRoutings } from '@/domain/agility/routing/useCase';
+import { useAuthCredentialsService } from '@/services';
 import { useToastService } from '@/services/Toast/useToast';
 import { measure } from '@/theme';
 
@@ -25,29 +30,6 @@ interface OfertaAdaptada {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-/**
- * Segundos até a oferta expirar, ou `null` quando não há um prazo confiável.
- *
- * O único formato confiável é um TIMESTAMP ABSOLUTO de expiração (ISO) — aí sim
- * dá pra contar regressivamente. Enquanto o backend não enviar isso:
- *  - `offerTime` ausente/null  → `null` (sem prazo; NÃO marca "Expirada").
- *  - `offerTime` em `HH:mm`     → `null` (ambíguo — duração? hora do dia? — não dá
- *     pra virar contagem confiável; tratar como "sem prazo" em vez de expirar na hora).
- *  - ISO válido no futuro       → segundos restantes.
- *  - ISO válido no passado      → 0 (genuinamente expirada).
- *
- * ANTES este helper retornava 0 para null/HH:mm, fazendo TODA oferta nascer
- * "Expirada" + Aceitar desabilitado (o front do operador não envia offerTime).
- */
-function calcularTempoExpirar(offerTime: string | null): number | null {
-  if (!offerTime) return null;
-  // HH:mm não é um instante confiável de expiração — ignora (sem prazo).
-  if (/^\d{1,2}:\d{2}$/.test(offerTime.trim())) return null;
-  const ts = new Date(offerTime).getTime();
-  if (Number.isNaN(ts)) return null;
-  return Math.max(0, Math.floor((ts - Date.now()) / 1000));
-}
-
 function formatarDistancia(km: number | null | undefined): string {
   if (!km) return '0 km';
   return `${km.toFixed(1).replace('.', ',')} km`;
@@ -62,7 +44,8 @@ function formatarTempo(minutos: number | null | undefined): string {
 }
 
 function formatarPreco(valor: number | null | undefined): string {
-  if (!valor) return 'R$ 0,00';
+  // null = frete não informado (oferta interna pode não ter). "R$ 0,00" afirmava um valor que não existe.
+  if (valor == null) return 'Não definido';
   return `R$ ${valor.toFixed(2).replace('.', ',')}`;
 }
 
@@ -244,11 +227,8 @@ export default function OfertasScreen() {
       showToast({ message: 'Rota aceita com sucesso', type: 'success' });
       router.push('/(auth)/(tabs)');
     },
-    onError: (error: any) => {
-      // Backend retorna { error: { message } } (ex.: rejeição de capacidade
-      // do veículo) — priorizar essa mensagem sobre um texto genérico.
-      const errorMessage = error?.error?.message || error?.message || 'Erro ao aceitar rota';
-      showToast({ message: errorMessage, type: 'error' });
+    onError: (error: unknown) => {
+      showToast({ message: mensagemDaApi(error, 'Erro ao aceitar rota'), type: 'error' });
     },
   });
 
@@ -260,12 +240,23 @@ export default function OfertasScreen() {
   }, [isAcceptingRoute, acceptingId]);
 
   const router = useRouter();
-  const { userLocation, isLoading: isLoadingLocation } = useUserLocation();
+  const { userLocation, isLoading: isLoadingLocation, error: erroLocalizacao } = useUserLocation();
 
-  const { routings, isLoading, refetch, isRefetching } = useFindBroadcastingRoutings({
-    driverLatitude: userLocation?.coords.latitude,
-    driverLongitude: userLocation?.coords.longitude,
-  });
+  // O polling de 60s só faz sentido com a aba em foco — desfocada, ninguém
+  // está olhando a lista, e o app continuaria batendo em /broadcasting à toa
+  // (o OfferAlertProvider, montado a sessão toda, já cobre o alerta global).
+  const isFocused = useIsFocused();
+  const { routings, isLoading, isError, refetch, isRefetching } = useFindBroadcastingRoutings(
+    {
+      driverLatitude: userLocation?.coords.latitude,
+      driverLongitude: userLocation?.coords.longitude,
+    },
+    { refetchIntervalMs: isFocused ? 60_000 : undefined },
+  );
+
+  const { userAuth } = useAuthCredentialsService();
+  const { driver } = useFindOneDriver(userAuth?.driverId);
+  const motoristaIndisponivel = driver?.isAvailable === false;
 
   const onRefresh = () => {
     refetch();
@@ -284,7 +275,7 @@ export default function OfertasScreen() {
       .filter((r) => !ofertasAceitas.includes(r.id))
       .map((routing) => ({
         id: routing.id,
-        tempoExpirarSegundos: calcularTempoExpirar(routing.offerTime),
+        tempoExpirarSegundos: segundosAteExpirar(routing.offerExpiresAt, Date.now()),
         servicosCount: routing.totalServices || 0,
         distancia: formatarDistancia(routing.totalDistanceKm),
         tempo: formatarTempo(routing.totalDurationMinutes),
@@ -294,12 +285,10 @@ export default function OfertasScreen() {
 
   const handleAceitar = (routingId: string) => {
     setAcceptingId(routingId);
+    const totalValue = routings.find((r) => r.id === routingId)?.totalValue;
     acceptRouting({
       routingId,
-      payload: {
-        driverLatitude: userLocation?.coords.latitude,
-        driverLongitude: userLocation?.coords.longitude,
-      },
+      payload: payloadDeAceite(userLocation, totalValue),
     });
   };
 
@@ -312,18 +301,41 @@ export default function OfertasScreen() {
     );
   }
 
+  // Backend novo devolve `[]` pra motorista indisponível ou CNH vencida — sem esse
+  // aviso a lista vazia parecia "sem ofertas", quando na verdade é "você não está
+  // visível pro sistema de ofertas".
+  const mensagemVazia = motoristaIndisponivel
+    ? 'Você está indisponível. Fique disponível na tela inicial para ver ofertas.'
+    : 'Nenhuma oferta disponível no momento.';
+
   return (
     <ScreenBase title={<Text preset="textTitleScreen">Ofertas de serviços</Text>}>
+      {!!erroLocalizacao && (
+        <Box px="x16" pt="y12">
+          <Text preset="text13" color="gray600">
+            Ative a localização para ver as ofertas perto de você. Sem ela, algumas ofertas podem ser recusadas no aceite.
+          </Text>
+        </Box>
+      )}
+
       <ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={{ paddingTop: 12, paddingBottom: 24 }}
         refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={onRefresh} />}
       >
-        {ofertas.length === 0 ? (
-          <Box py="y32" alignItems="center">
+        {isError ? (
+          <Box py="y32" alignItems="center" px="x16">
             <Icon name="local-shipping" size={measure.m48} color="gray300" />
             <Text preset="text14" color="gray400" textAlign="center" mt="y16">
-              Nenhuma oferta disponível no momento.
+              Não foi possível carregar as ofertas.
+            </Text>
+            <Button title="Tentar novamente" onPress={() => refetch()} mt="y16" />
+          </Box>
+        ) : ofertas.length === 0 ? (
+          <Box py="y32" alignItems="center" px="x16">
+            <Icon name="local-shipping" size={measure.m48} color="gray300" />
+            <Text preset="text14" color="gray400" textAlign="center" mt="y16">
+              {mensagemVazia}
             </Text>
           </Box>
         ) : (

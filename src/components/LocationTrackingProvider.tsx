@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
 
 import { useFindOneDriver } from '@/domain/agility/driver/useCase';
+import type { OfferPayload } from '@/domain/agility/offer/offerStore';
 import { RoutingStatus } from '@/domain/agility/routing/dto/types';
 import { useFindMyRoutings } from '@/domain/agility/routing/useCase';
 import { useTrackingWebSocket } from '@/domain/agility/tracking';
@@ -65,7 +66,7 @@ export function LocationTrackingProvider({ children }: { children: React.ReactNo
   // Popup global de oferta (uberização). Este provider é o DONO do socket
   // global /monitoring (primeiro consumidor de useTrackingWebSocket), então é
   // aqui que `offer.available` chega de forma confiável — não na tela de
-  // ofertas, que só reusa o socket e não tem seus callbacks anexados. O WS
+  // ofertas, que pode desmontar a qualquer momento. O WS
   // entrega o payload; o OfferAlertProvider (montado acima, em
   // (auth)/_layout.tsx) decide exibir.
   const { pushOffer } = useOfferAlert();
@@ -73,11 +74,21 @@ export function LocationTrackingProvider({ children }: { children: React.ReactNo
   // WebSocket de telemetria (canal /monitoring). NÃO é o canal que envia
   // localizações — o SDK faz isso por HTTP direto. Aqui só recebemos updates
   // pro backend ver o motorista em tempo real.
-  const { connect: connectWebSocket, disconnect: disconnectWebSocket } = useTrackingWebSocket({
+  const {
+    connect: connectWebSocket,
+    disconnect: disconnectWebSocket,
+    reconnect: reconnectWebSocket,
+  } = useTrackingWebSocket({
     onDriverLocationUpdate: (data: DriverLocationUpdate) => {
       console.log('[LocationTrackingProvider] Localização confirmada via WebSocket:', data.driverId);
     },
-    onOfferAvailable: pushOffer,
+    onOfferAvailable: (offer: OfferPayload) => {
+      // Único ponto de confirmação, em aparelho, de que o evento do socket
+      // chegou até aqui — ver o log no device é o jeito de checar o item 1 da
+      // "Verificação em aparelho" do plano sem instrumentar o popup.
+      console.log('[LocationTrackingProvider] offer.available', offer?.id);
+      pushOffer(offer);
+    },
     onConnect: () => {
       console.log('[LocationTrackingProvider] WebSocket conectado ao /monitoring');
     },
@@ -232,7 +243,10 @@ export function LocationTrackingProvider({ children }: { children: React.ReactNo
         nextAppState === 'active'
       ) {
         console.log('[LocationTrackingProvider] App voltou ao primeiro plano');
-        connectWebSocket();
+        // Reconecta o socket que já existe (o socket.io retoma as salas no
+        // `connected`). Chamar `connect()` aqui criava um SEGUNDO socket quando o
+        // primeiro estava em backoff, e o órfão sobrevivia ao logout.
+        reconnectWebSocket();
       } else if (
         appState.current === 'active' &&
         nextAppState.match(/inactive|background/)
@@ -244,7 +258,7 @@ export function LocationTrackingProvider({ children }: { children: React.ReactNo
 
     const subscription = AppState.addEventListener('change', handleAppStateChange);
     return () => subscription.remove();
-  }, [driverId, connectWebSocket]);
+  }, [driverId, reconnectWebSocket]);
 
   return <>{children}</>;
 }

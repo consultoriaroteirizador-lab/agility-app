@@ -1,22 +1,34 @@
-export type OfferPayload = { id: string; code?: string; offerTime?: string; totalServices?: number; totalDistanceKm?: number; totalDurationMinutes?: number; totalValue?: number; originLat?: number; originLng?: number };
+export type OfferPayload = { id: string; code?: string; offerTime?: string; offerExpiresAt?: string | null; totalServices?: number; totalDistanceKm?: number; totalDurationMinutes?: number; totalValue?: number; originLat?: number; originLng?: number };
 // `silencedAt` marca a oferta que o motorista escolheu ver em detalhe: ela
 // continua na fila (válida, aceitável, visível na aba Ofertas), mas deixa de
 // disparar o alerta global — senão o popup voltaria por cima da própria tela
 // que ele abriu para decidir. Silenciar NÃO é recusar.
 export type PendingOffer = OfferPayload & { receivedAt: number; silencedAt?: number };
 
-// offerTime "HH:mm" = duração (min:seg) da oferta; expira em receivedAt + dur.
-// Quando ausente/vazio/"00:00" (duração zero), assume um fallback de 60s para
-// que a oferta não nasça expirada (dead-on-arrival).
-const FALLBACK_DURATION_MS = 60_000;
+// Prazo = instante absoluto do backend. Sem ele, a oferta não expira no aparelho:
+// quem a tira da fila é `syncWithBroadcasting` (Task 2), quando ela sai da divulgação.
 export function expiresAtOf(o: PendingOffer): number {
-    const [m, s] = (o.offerTime ?? '').trim().split(':').map(Number);
-    const durMs = ((m || 0) * 60 + (s || 0)) * 1000;
-    return o.receivedAt + (durMs > 0 ? durMs : FALLBACK_DURATION_MS);
+    const ts = o.offerExpiresAt ? Date.parse(o.offerExpiresAt) : Number.NaN;
+    return Number.isNaN(ts) ? Number.POSITIVE_INFINITY : ts;
 }
+// O poll/WS pode reentregar um id já enfileirado com o payload ATUALIZADO
+// (operador editou frete/paradas enquanto a oferta seguia sem prazo local).
+// Compara só as chaves do payload recebido — `receivedAt`/`silencedAt` não
+// entram na comparação nem são tocados.
+function payloadMudou(existente: PendingOffer, offer: OfferPayload): boolean {
+    return (Object.keys(offer) as (keyof OfferPayload)[]).some((key) => existente[key] !== offer[key]);
+}
+
 export function addOffer(list: PendingOffer[], offer: OfferPayload, now: number): PendingOffer[] {
-    if (list.some((x) => x.id === offer.id)) return list;
-    return [...list, { ...offer, receivedAt: now }];
+    const idx = list.findIndex((x) => x.id === offer.id);
+    if (idx === -1) return [...list, { ...offer, receivedAt: now }];
+
+    const existente = list[idx];
+    if (!payloadMudou(existente, offer)) return list; // mesma referência: nada mudou
+
+    const next = [...list];
+    next[idx] = { ...existente, ...offer };
+    return next;
 }
 export function dropOffer(list: PendingOffer[], id: string): PendingOffer[] {
     return list.filter((x) => x.id !== id);
@@ -83,6 +95,47 @@ export function forgetSilenced(memory: SilencedOffers, list: PendingOffer[], now
     }
     return mudou ? next : memory;
 }
+// Graça para a corrida WS × poll: uma oferta que chegou pelo WebSocket DEPOIS de
+// o poll ter saído ainda não aparece na resposta dele — não pode ser derrubada.
+const GRACA_SYNC_MS = 30_000;
+
+/**
+ * A lista de broadcasting (poll) é a fonte da verdade do que ainda está em
+ * divulgação. Tira da fila o que saiu (aceita por outro, expirou, cancelada) —
+ * antes a fantasma ficava no popup, com Aceitar ativo, escondendo a próxima — e
+ * esquece a recusa de quem saiu, em vez de esquecê-la por um prazo local (que
+ * fazia a oferta recusada voltar a alertar).
+ */
+export function syncWithBroadcasting(
+    list: PendingOffer[],
+    memory: SilencedOffers,
+    broadcastingIds: ReadonlySet<string>,
+    fetchedAt: number,
+): { list: PendingOffer[]; memory: SilencedOffers } {
+    const saiu = (id: string, desde: number) => !broadcastingIds.has(id) && desde < fetchedAt - GRACA_SYNC_MS;
+
+    const kept = list.filter((o) => !saiu(o.id, o.receivedAt));
+    const nextList = kept.length === list.length ? list : kept;
+
+    let mudou = false;
+    const nextMemory: SilencedOffers = {};
+    for (const [id, entry] of Object.entries(memory)) {
+        if (saiu(id, entry.at)) { mudou = true; continue; }
+        nextMemory[id] = entry;
+    }
+    return { list: nextList, memory: mudou ? nextMemory : memory };
+}
+
+// Gate do tique de 1s (OfferAlertProvider): sem `offerExpiresAt` (backend
+// atual) `expiresAtOf` é Infinity, e um motorista indisponível não faz poll —
+// nada tira a fila do vazio nem a memória de recusa do `until: Infinity` por
+// conta própria. Sem este gate seletivo, um `setInterval` corria para sempre
+// após o primeiro Recusar/"Ver detalhes" da sessão, mesmo com fila vazia.
+export function precisaDeTique(offers: PendingOffer[], silenced: SilencedOffers): boolean {
+    if (offers.length > 0) return true;
+    return Object.values(silenced).some((entry) => Number.isFinite(entry.until));
+}
+
 export function isSilenced(offer: PendingOffer): boolean {
     return offer.silencedAt !== undefined;
 }

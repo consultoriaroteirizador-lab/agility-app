@@ -1,14 +1,15 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
+import { mensagemDaApi } from '@/api/apiErrorMessage';
 import { ActivityIndicator, Box, Text, Button, Image, ScreenBase } from '@/components';
 import { ButtonBack } from '@/components/Button/ButtonBack';
 import { Icon } from '@/components/Icon/Icon';
 import Modal from '@/components/Modal/Modal';
 import { TouchableOpacityBox } from '@/components/RestyleComponent/RestyleComponent';
 import { formatAddress } from '@/domain/agility/address/dto';
-import { useFindOneRouting, useAcceptRouting } from '@/domain/agility/routing/useCase';
+import { payloadDeAceite, useFindOneRouting, useAcceptRouting } from '@/domain/agility/routing/useCase';
 import type { ServiceMaterialResponse } from '@/domain/agility/service/dto';
 import { ServiceType } from '@/domain/agility/service/dto/types';
 import { useFindServicesByRoutingId } from '@/domain/agility/service/useCase';
@@ -21,6 +22,7 @@ import { MapaParadasModal } from '../../rotas-detalhadas/[id]/_components/MapaPa
 import { MaterialsModal } from '../../rotas-detalhadas/[id]/parada/[pid]/_components/shared/MaterialsModal';
 import { useUserLocation } from '../../rotas-detalhadas/[id]/parada/[pid]/_hooks/useUserLocation';
 import { distanciaLinhaReta, itensDaParada, resumirCarga, type ItemOferta } from '../_utils/cargaOferta';
+import { motivoDeOfertaEncerrada, ofertaAceitavel } from '../_utils/estadoOferta';
 
 /** Quantos itens a parada mostra direto no card; o resto abre a lista completa. */
 const ITENS_VISIVEIS = 3;
@@ -47,7 +49,8 @@ function formatarTempo(minutos: number | null | undefined): string {
 }
 
 function formatarPreco(valor: number | null | undefined): string {
-  if (!valor) return 'R$ 0,00';
+  // null = frete não informado (oferta interna pode não ter). "R$ 0,00" afirmava um valor que não existe.
+  if (valor == null) return 'Não definido';
   return `R$ ${valor.toFixed(2).replace('.', ',')}`;
 }
 
@@ -76,24 +79,44 @@ export default function OfertaDetalhadaScreen() {
   const routingId = id as string;
 
   const { userLocation } = useUserLocation();
-  const { routing, isLoading: isLoadingRouting } = useFindOneRouting(routingId);
-  const { services, isLoading: isLoadingServices } = useFindServicesByRoutingId(routingId);
+  const {
+    routing,
+    isLoading: isLoadingRouting,
+    isError: isErrorRouting,
+    refetch: refetchRouting,
+  } = useFindOneRouting(routingId);
+  const {
+    services,
+    isLoading: isLoadingServices,
+    isError: isErrorServices,
+    refetch: refetchServices,
+  } = useFindServicesByRoutingId(routingId);
   const { showToast } = useToastService();
   const safeArea = useAppSafeArea();
   const [mostrarPopup, setMostrarPopup] = useState(false);
   const [mostrarMapa, setMostrarMapa] = useState(false);
   const [materiaisAbertos, setMateriaisAbertos] = useState<ServiceMaterialResponse[] | null>(null);
 
+  // Bloqueia o segundo toque ANTES do primeiro re-render: `isAccepting`
+  // (estado da mutation) só atualiza depois que o React processa o dispatch,
+  // e o botão do Modal (preset action) não tem `disabled` — dois toques
+  // rápidos mandavam dois POST /accept. Limpo no settle (sucesso ou erro) da
+  // própria mutation, não em `handleAcceptRouting`.
+  const isAcceptingRef = useRef(false);
+
   const { acceptRouting, isLoading: isAccepting } = useAcceptRouting({
     onSuccess: () => {
+      isAcceptingRef.current = false;
       showToast({ message: 'Rota aceita com sucesso', type: 'success' });
-      router.push('/(auth)/(tabs)');
+      // Navega para a aba inicial. Se o motorista voltar ao detalhe pelo
+      // histórico da aba, ele vê "Esta oferta já foi aceita." em vez de poder
+      // tentar aceitar de novo — é isso que evita o duplo aceite, não o
+      // `dismissTo` em si.
+      router.dismissTo('/(auth)/(tabs)');
     },
-    onError: (error: any) => {
-      // Backend retorna { error: { message } } (ex.: rejeição de capacidade
-      // do veículo) — priorizar essa mensagem sobre um texto genérico.
-      const errorMessage = error?.error?.message || error?.message || 'Erro ao aceitar rota';
-      showToast({ message: errorMessage, type: 'error' });
+    onError: (error: unknown) => {
+      isAcceptingRef.current = false;
+      showToast({ message: mensagemDaApi(error, 'Erro ao aceitar rota'), type: 'error' });
     },
   });
 
@@ -163,14 +186,13 @@ export default function OfertaDetalhadaScreen() {
     .join(' · '), [carga.composicao]);
 
   const handleAcceptRouting = () => {
+    // Guard síncrono via ref — ver comentário de `isAcceptingRef` acima. `if
+    // (isAccepting) return` sozinho não bastava: é estado, só reflete a
+    // mutation DEPOIS do próximo render.
+    if (isAcceptingRef.current) return;
+    isAcceptingRef.current = true;
     setMostrarPopup(false);
-    acceptRouting({
-      routingId,
-      payload: {
-        driverLatitude: userLocation?.coords.latitude,
-        driverLongitude: userLocation?.coords.longitude,
-      },
-    });
+    acceptRouting({ routingId, payload: payloadDeAceite(userLocation, routing?.totalValue) });
   };
 
   const isLoading = isLoadingRouting || isLoadingServices;
@@ -184,6 +206,22 @@ export default function OfertaDetalhadaScreen() {
     );
   }
 
+  // Erro nos services também cai aqui: sem os dados de carga a tela não pode
+  // mostrar "0 paradas" como se a rota estivesse vazia.
+  if (isErrorRouting || isErrorServices) {
+    return (
+      <Box flex={1} justifyContent="center" alignItems="center" px="x16" py="y32">
+        <Text preset="text16" color="gray600">Não foi possível carregar a oferta.</Text>
+        <Button
+          title="Tentar novamente"
+          onPress={() => { refetchRouting(); refetchServices(); }}
+          mt="y16"
+        />
+        <Button title="Voltar" preset="outline" onPress={() => router.back()} mt="y12" />
+      </Box>
+    );
+  }
+
   if (!routing) {
     return (
       <Box flex={1} justifyContent="center" alignItems="center" px="x16" py="y32">
@@ -192,6 +230,11 @@ export default function OfertaDetalhadaScreen() {
       </Box>
     );
   }
+
+  // Um único instante para as duas checagens deste render — evita que "encerrada"
+  // e o `disabled` do Aceitar leiam relógios ligeiramente diferentes.
+  const agora = Date.now();
+  const encerrada = motivoDeOfertaEncerrada(routing, agora);
 
   return (
     <ScreenBase
@@ -375,15 +418,22 @@ export default function OfertaDetalhadaScreen() {
         </Box>
 
         {/* Botões */}
-        <Box flexDirection="row" gap="x16" mt="y16">
-          <Button title="Recusar" preset="outline" onPress={() => router.back()} flex={1} />
-          <Button
-            title={isAccepting ? 'Aceitando...' : 'Aceitar'}
-            onPress={() => setMostrarPopup(true)}
-            flex={1}
-            disabled={isAccepting}
-          />
-        </Box>
+        {encerrada ? (
+          <Box gap="y12" mt="y16">
+            <Text preset="text14" color="gray600">{encerrada}</Text>
+            <Button title="Voltar" preset="outline" onPress={() => router.back()} />
+          </Box>
+        ) : (
+          <Box flexDirection="row" gap="x16" mt="y16">
+            <Button title="Recusar" preset="outline" onPress={() => router.back()} flex={1} />
+            <Button
+              title={isAccepting ? 'Aceitando...' : 'Aceitar'}
+              onPress={() => setMostrarPopup(true)}
+              flex={1}
+              disabled={isAccepting || !ofertaAceitavel(routing, agora)}
+            />
+          </Box>
+        )}
 
         <Modal
           preset="action"

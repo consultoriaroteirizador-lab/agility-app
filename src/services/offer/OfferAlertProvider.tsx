@@ -3,21 +3,24 @@ import { Modal, Platform, Vibration } from 'react-native';
 
 import { router } from 'expo-router';
 
+import { erroTransitorio, mensagemDaApi } from '@/api/apiErrorMessage';
 import { useUserLocation } from '@/app/(auth)/(tabs)/rotas-detalhadas/[id]/parada/[pid]/_hooks/useUserLocation';
 import { Box, Button, Text, TextButton } from '@/components';
 import { useFindOneDriver } from '@/domain/agility/driver/useCase';
+import { segundosAteExpirar } from '@/domain/agility/offer/offerExpiry';
 import {
   activeOffer,
   addOffer,
   applySilenced,
   dropOffer,
-  expiresAtOf,
   forgetSilenced,
+  precisaDeTique,
   pruneExpired,
   rememberSilenced,
+  syncWithBroadcasting,
 } from '@/domain/agility/offer/offerStore';
 import type { OfferPayload, PendingOffer, SilencedOffers } from '@/domain/agility/offer/offerStore';
-import { useAcceptRouting, useFindBroadcastingRoutings } from '@/domain/agility/routing/useCase';
+import { payloadDeAceite, useAcceptRouting, useFindBroadcastingRoutings } from '@/domain/agility/routing/useCase';
 import { useAppSafeArea } from '@/hooks';
 import { useAuthCredentialsService } from '@/services/authCredentials/useAuthCredentialsService';
 import { useToastService } from '@/services/Toast/useToast';
@@ -40,7 +43,8 @@ function formatarTempo(minutos: number | null | undefined): string {
 }
 
 function formatarPreco(valor: number | null | undefined): string {
-  if (!valor) return 'R$ 0,00';
+  // null = frete não informado (oferta interna pode não ter). "R$ 0,00" afirmava um valor que não existe.
+  if (valor == null) return 'Não definido';
   return `R$ ${valor.toFixed(2).replace('.', ',')}`;
 }
 
@@ -99,7 +103,7 @@ export function OfferAlertProvider({ children }: { children: React.ReactNode }) 
   // Fallback de polling: enquanto o motorista estiver disponível, busca ofertas
   // em broadcasting periodicamente (o hook faz refetchInterval). Complementa o
   // WebSocket (dedup por id em `addOffer` cobre a sobreposição WS+poll).
-  const { routings: broadcastRoutings } = useFindBroadcastingRoutings(
+  const { routings: broadcastRoutings, dataUpdatedAt: broadcastDataUpdatedAt } = useFindBroadcastingRoutings(
     {
       driverLatitude: userLocation?.coords.latitude,
       driverLongitude: userLocation?.coords.longitude,
@@ -111,7 +115,7 @@ export function OfferAlertProvider({ children }: { children: React.ReactNode }) 
     (broadcastRoutings ?? []).forEach((r) => pushOffer({
       id: r.id,
       code: r.code ?? undefined,
-      offerTime: r.offerTime ?? undefined,
+      offerExpiresAt: r.offerExpiresAt ?? null,
       totalServices: r.totalServices ?? undefined,
       totalDistanceKm: r.totalDistanceKm ?? undefined,
       totalDurationMinutes: r.totalDurationMinutes ?? undefined,
@@ -119,20 +123,30 @@ export function OfferAlertProvider({ children }: { children: React.ReactNode }) 
     }));
   }, [broadcastRoutings, pushOffer]);
 
-  // Tick de 1s: expira ofertas vencidas e atualiza o contador regressivo.
-  // Só roda enquanto houver o que envelhecer — fila OU memória —, para não
-  // churnar em idle. A memória entra no gate porque ela precisa envelhecer
-  // justamente quando a fila está vazia (motorista indisponível).
-  const silencedCount = Object.keys(silenced).length;
+  // A divulgação manda: o que saiu do broadcasting sai da fila e da memória.
   useEffect(() => {
-    if (offers.length === 0 && silencedCount === 0) return;
+    if (!broadcastDataUpdatedAt) return;
+    const ids = new Set((broadcastRoutings ?? []).map((r) => r.id));
+    setOffers((list) => syncWithBroadcasting(list, {}, ids, broadcastDataUpdatedAt).list);
+    setSilenced((memory) => syncWithBroadcasting([], memory, ids, broadcastDataUpdatedAt).memory);
+  }, [broadcastRoutings, broadcastDataUpdatedAt]);
+
+  // Tick de 1s: expira ofertas vencidas e atualiza o contador regressivo.
+  // Só roda enquanto houver o que envelhecer de verdade. Sem `offerExpiresAt`
+  // (backend atual) a fila não expira sozinha (`expiresAtOf` é Infinity) e um
+  // motorista indisponível não faz poll — sem este gate seletivo, o tique
+  // corria a sessão inteira após o primeiro Recusar/"Ver detalhes" (a memória
+  // ficava com `until: Infinity`, que nunca terminava de envelhecer).
+  const tiqueNecessario = precisaDeTique(offers, silenced);
+  useEffect(() => {
+    if (!tiqueNecessario) return;
     const timer = setInterval(() => {
       const t = Date.now();
       setNow(t);
       setOffers((list) => pruneExpired(list, t));
     }, 1000);
     return () => clearInterval(timer);
-  }, [offers.length, silencedCount]);
+  }, [tiqueNecessario]);
 
   // Esquece as ofertas dispensadas cujo prazo passou (e renova o prazo das que
   // seguem na fila), para a memória não crescer sem limite. Não referencia
@@ -155,7 +169,7 @@ export function OfferAlertProvider({ children }: { children: React.ReactNode }) 
   // Fila efetiva: a memória reaplica o silêncio às ofertas que reentraram.
   const fila = useMemo(() => applySilenced(offers, silenced), [offers, silenced]);
   const current = activeOffer(fila);
-  const secondsLeft = current ? Math.max(0, Math.ceil((expiresAtOf(current) - now) / 1000)) : 0;
+  const secondsLeft = current ? segundosAteExpirar(current.offerExpiresAt, now) : null;
 
   // Vibra ao surgir uma nova oferta ativa (som customizado fica para follow-up;
   // o som do sistema já toca via a push em background).
@@ -199,25 +213,28 @@ export function OfferAlertProvider({ children }: { children: React.ReactNode }) 
     try {
       await acceptRoutingAsync({
         routingId: offerId,
-        payload: {
-          driverLatitude: userLocation?.coords.latitude,
-          driverLongitude: userLocation?.coords.longitude,
-        },
+        payload: payloadDeAceite(userLocation, current.totalValue),
       });
       setOffers((list) => dropOffer(list, offerId));
       showToast({ message: 'Rota aceita com sucesso', type: 'success' });
       router.push('/(auth)/(tabs)');
     } catch (error: unknown) {
-      // 409 (já pega por outro motorista) ou qualquer outro erro: a oferta
-      // sai da lista e avisamos o motorista via toast.
-      setOffers((list) => dropOffer(list, offerId));
-      const message = error instanceof Error ? error.message : 'Esta oferta não está mais disponível';
-      showToast({ message, type: 'error' });
+      // Erro transitório (rede OU 5xx do servidor): o estado da oferta não
+      // mudou de verdade — ela continua válida, fica na fila para tentar de
+      // novo. Uma resposta definitiva do servidor (409 tomada, 400 regra): sai
+      // da fila.
+      if (!erroTransitorio(error)) setOffers((list) => dropOffer(list, offerId));
+      showToast({ message: mensagemDaApi(error, 'Esta oferta não está mais disponível'), type: 'error' });
     }
   }, [current, acceptRoutingAsync, userLocation, showToast]);
 
+  // Evita recriar o objeto de contexto a cada render (o tique de 1s, quando
+  // ativo, re-renderiza este provider várias vezes por minuto) — sem isto,
+  // todo consumidor de `useOfferAlert()` re-renderizava junto.
+  const contextValue = useMemo(() => ({ pushOffer }), [pushOffer]);
+
   return (
-    <OfferAlertContext.Provider value={{ pushOffer }}>
+    <OfferAlertContext.Provider value={contextValue}>
       {children}
 
       <Modal
@@ -236,19 +253,21 @@ export function OfferAlertProvider({ children }: { children: React.ReactNode }) 
           >
             {current && (
               <>
-                <Box
-                  alignSelf="flex-start"
-                  borderWidth={measure.m1}
-                  borderColor="primary100"
-                  borderRadius="s20"
-                  px="x12"
-                  py="y4"
-                  mb="y12"
-                >
-                  <Text preset="text13" color={secondsLeft <= 0 ? 'redError' : 'primary100'}>
-                    Oferta sumirá: {formatarTimer(secondsLeft)}
-                  </Text>
-                </Box>
+                {secondsLeft !== null && (
+                  <Box
+                    alignSelf="flex-start"
+                    borderWidth={measure.m1}
+                    borderColor="primary100"
+                    borderRadius="s20"
+                    px="x12"
+                    py="y4"
+                    mb="y12"
+                  >
+                    <Text preset="text13" color={secondsLeft === 0 ? 'redError' : 'primary100'}>
+                      Oferta sumirá: {formatarTimer(secondsLeft)}
+                    </Text>
+                  </Box>
+                )}
 
                 <Text preset="text18" fontWeight="700" color="colorTextPrimary" mb="y4">
                   Nova oferta de rota
@@ -273,7 +292,7 @@ export function OfferAlertProvider({ children }: { children: React.ReactNode }) 
                     title="Aceitar"
                     iconName="check-circle"
                     onPress={onAceitar}
-                    disabled={isLoading || secondsLeft <= 0}
+                    disabled={isLoading || secondsLeft === 0}
                   />
                 </Box>
 

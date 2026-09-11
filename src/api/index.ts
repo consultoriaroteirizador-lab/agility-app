@@ -1,4 +1,5 @@
 export * from './apiConfig'
+export * from './apiErrorMessage'
 export * from './apiTypes'
 export * from './baseResponse'
 export * from './baseResponseAPI'

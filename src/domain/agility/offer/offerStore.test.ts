@@ -3,16 +3,18 @@ import {
     applySilenced,
     dropOffer,
     forgetSilenced,
+    precisaDeTique,
     pruneExpired,
     rememberSilenced,
     activeOffer,
     expiresAtOf,
     isSilenced,
     silenceOffer,
+    syncWithBroadcasting,
 } from './offerStore';
 import type { SilencedOffers } from './offerStore';
 
-const o = (id: string, offerTime = '00:10') => ({ id, offerTime });
+const o = (id: string, offerExpiresAt?: string) => ({ id, offerExpiresAt });
 
 it('dedup por id ao adicionar', () => {
     let l = addOffer([], o('r1'), 0);
@@ -32,31 +34,25 @@ it('dropOffer remove por id', () => {
     expect(l.length).toBe(0);
 });
 
-it('pruneExpired remove ofertas cujo timer passou', () => {
-    // offerTime '00:00' cai no fallback de 60s (ver testes de expiresAtOf abaixo).
-    let l = addOffer([], { id: 'r1', offerTime: '00:00' }, 0);
-    l = pruneExpired(l, 61_000); // 61s depois: já passou do fallback de 60s
+it('expiresAtOf usa o instante absoluto do backend', () => {
+    expect(expiresAtOf({ id: 'r1', offerExpiresAt: '1970-01-01T00:00:10.000Z', receivedAt: 0 })).toBe(10_000);
+});
+
+it('sem offerExpiresAt a oferta não expira localmente', () => {
+    expect(expiresAtOf({ id: 'r1', receivedAt: 0 })).toBe(Number.POSITIVE_INFINITY);
+});
+
+it('pruneExpired remove a oferta cujo instante passou', () => {
+    let l = addOffer([], { id: 'r1', offerExpiresAt: '1970-01-01T00:00:10.000Z' }, 0);
+    l = pruneExpired(l, 11_000);
     expect(l.length).toBe(0);
 });
 
-it('expiresAtOf usa fallback de 60s quando offerTime é "00:00" (duração zero)', () => {
-    const o = { id: 'r1', offerTime: '00:00', receivedAt: 0 };
-    expect(expiresAtOf(o)).toBe(60_000);
-});
-
-it('expiresAtOf usa fallback de 60s quando offerTime está ausente', () => {
-    const o = { id: 'r1', receivedAt: 0 };
-    expect(expiresAtOf(o)).toBe(60_000);
-});
-
-it('expiresAtOf usa fallback de 60s quando offerTime está em branco', () => {
-    const o = { id: 'r1', offerTime: '   ', receivedAt: 0 };
-    expect(expiresAtOf(o)).toBe(60_000);
-});
-
-it('expiresAtOf respeita offerTime válido não-zero (não aplica fallback)', () => {
-    const o = { id: 'r1', offerTime: '00:10', receivedAt: 0 };
-    expect(expiresAtOf(o)).toBe(10_000);
+it('oferta silenciada continua expirando pelo pruneExpired', () => {
+    let l = addOffer([], { id: 'r1', offerExpiresAt: '1970-01-01T00:00:10.000Z' }, 0);
+    l = silenceOffer(l, 'r1', 1);
+    l = pruneExpired(l, 11_000);
+    expect(l.length).toBe(0);
 });
 
 // ─── Silenciar (Ver detalhes) ────────────────────────────────────────────────
@@ -110,13 +106,6 @@ it('silenceOffer com id inexistente devolve a mesma lista', () => {
     expect(silenceOffer(l, 'r404', 1)).toBe(l);
 });
 
-it('oferta silenciada continua expirando pelo pruneExpired', () => {
-    let l = addOffer([], { id: 'r1', offerTime: '00:10' }, 0);
-    l = silenceOffer(l, 'r1', 1);
-    l = pruneExpired(l, 11_000);
-    expect(l.length).toBe(0);
-});
-
 it('oferta silenciada continua podendo ser aceita/recusada por id', () => {
     let l = addOffer([], o('r1'), 0);
     l = silenceOffer(l, 'r1', 1);
@@ -129,11 +118,11 @@ it('pruneExpired preserva a referência quando nada expirou', () => {
     expect(pruneExpired(l, 1_000)).toBe(l);
 });
 
-// ─── Memória de dispensadas: sobrevive ao esvaziamento da fila ───────────────
+// ─── Memória de ofertas dispensadas: sobrevive ao esvaziamento da fila ───────────────
 
 it('o silêncio sobrevive ao ciclo silencia → indisponível → disponível → repovoa', () => {
-    // t=0: oferta de 60s chega e o motorista manda "Ver detalhes".
-    let fila = addOffer([], { id: 'r1', offerTime: '01:00' }, 0);
+    // t=0: oferta com prazo até 60s chega e o motorista manda "Ver detalhes".
+    let fila = addOffer([], { id: 'r1', offerExpiresAt: '1970-01-01T00:01:00.000Z' }, 0);
     let memoria = rememberSilenced({}, fila[0], 0);
     expect(activeOffer(applySilenced(fila, memoria))).toBeUndefined();
 
@@ -143,7 +132,7 @@ it('o silêncio sobrevive ao ciclo silencia → indisponível → disponível �
     expect(Object.keys(memoria)).toEqual(['r1']);
 
     // t=15s: volta a ficar disponível e o poll reempilha A MESMA oferta.
-    fila = addOffer(fila, { id: 'r1', offerTime: '01:00' }, 15_000);
+    fila = addOffer(fila, { id: 'r1', offerExpiresAt: '1970-01-01T00:01:00.000Z' }, 15_000);
     expect(fila.length).toBe(1);
 
     // O alerta NÃO reabre por cima da tela de detalhe que ele está lendo.
@@ -151,11 +140,11 @@ it('o silêncio sobrevive ao ciclo silencia → indisponível → disponível �
 });
 
 it('o prazo da memória é renovado pela oferta que reentrou (não vence antes dela)', () => {
-    let memoria = rememberSilenced({}, { id: 'r1', offerTime: '01:00', receivedAt: 0 }, 0);
+    let memoria = rememberSilenced({}, { id: 'r1', offerExpiresAt: '1970-01-01T00:01:00.000Z', receivedAt: 0 }, 0);
     expect(memoria.r1.until).toBe(60_000);
 
-    // Reentrou em t=50s com um receivedAt novo: expira só em 110s.
-    const fila = [{ id: 'r1', offerTime: '01:00', receivedAt: 50_000 }];
+    // Reentrou em t=50s com um offerExpiresAt novo do backend: expira só em 110s.
+    const fila = [{ id: 'r1', offerExpiresAt: '1970-01-01T00:01:50.000Z', receivedAt: 50_000 }];
     memoria = forgetSilenced(memoria, fila, 50_000);
     expect(memoria.r1.until).toBe(110_000);
 
@@ -165,7 +154,7 @@ it('o prazo da memória é renovado pela oferta que reentrou (não vence antes d
 });
 
 it('a memória é esquecida quando a oferta expira de vez fora da fila', () => {
-    let memoria = rememberSilenced({}, { id: 'r1', offerTime: '01:00', receivedAt: 0 }, 0);
+    let memoria = rememberSilenced({}, { id: 'r1', offerExpiresAt: '1970-01-01T00:01:00.000Z', receivedAt: 0 }, 0);
     memoria = forgetSilenced(memoria, [], 59_000); // ainda dentro do prazo
     expect(Object.keys(memoria)).toEqual(['r1']);
     memoria = forgetSilenced(memoria, [], 61_000); // prazo passou
@@ -173,7 +162,7 @@ it('a memória é esquecida quando a oferta expira de vez fora da fila', () => {
 });
 
 it('rememberSilenced preserva o instante do primeiro silêncio', () => {
-    const oferta = { id: 'r1', offerTime: '01:00', receivedAt: 0 };
+    const oferta = { id: 'r1', offerExpiresAt: '1970-01-01T00:01:00.000Z', receivedAt: 0 };
     let memoria = rememberSilenced({}, oferta, 5);
     memoria = rememberSilenced(memoria, oferta, 99);
     expect(memoria.r1.at).toBe(5);
@@ -194,7 +183,7 @@ it('applySilenced devolve a mesma lista quando não há nada a silenciar', () =>
 });
 
 it('forgetSilenced devolve a mesma memória quando nada muda', () => {
-    const memoria = rememberSilenced({}, { id: 'r1', offerTime: '01:00', receivedAt: 0 }, 0);
+    const memoria = rememberSilenced({}, { id: 'r1', offerExpiresAt: '1970-01-01T00:01:00.000Z', receivedAt: 0 }, 0);
     expect(forgetSilenced(memoria, [], 10_000)).toBe(memoria);
 });
 
@@ -203,12 +192,12 @@ it('forgetSilenced devolve a mesma memória quando nada muda', () => {
 it('recusa → poll reempilha → não alerta de novo', () => {
     // O motorista recusa: a oferta NÃO sai da fila (segue visível/aceitável),
     // só entra na memória de dispensadas.
-    let fila = addOffer([], { id: 'r1', offerTime: '01:00' }, 0);
+    let fila = addOffer([], { id: 'r1', offerExpiresAt: '1970-01-01T00:01:00.000Z' }, 0);
     const memoria = rememberSilenced({}, fila[0], 0);
     expect(activeOffer(applySilenced(fila, memoria))).toBeUndefined();
 
     // 25s depois o poll devolve a mesma rota (segue em broadcasting para todos).
-    fila = addOffer(fila, { id: 'r1', offerTime: '01:00' }, 25_000);
+    fila = addOffer(fila, { id: 'r1', offerExpiresAt: '1970-01-01T00:01:00.000Z' }, 25_000);
     expect(fila.length).toBe(1); // dedup por id
     expect(activeOffer(applySilenced(fila, memoria))).toBeUndefined();
 });
@@ -223,10 +212,10 @@ it('recusar uma oferta não silencia as outras nem tira a recusada da fila', () 
 });
 
 it('a recusa herda a renovação de prazo: a memória não vence antes da oferta', () => {
-    // Recusa em t=0 uma oferta de 60s; como ela NÃO sai da fila, o prazo da
-    // memória é renovado a partir dela a cada tique e não há janela onde a
-    // oferta exista sem a memória.
-    const fila = [{ id: 'r1', offerTime: '01:00', receivedAt: 0 }];
+    // Recusa em t=0 uma oferta com prazo até 60s; como ela NÃO sai da fila, o
+    // prazo da memória segue o mesmo instante absoluto enviado pelo backend, e
+    // não há janela onde a oferta exista sem a memória.
+    const fila = [{ id: 'r1', offerExpiresAt: '1970-01-01T00:01:00.000Z', receivedAt: 0 }];
     let memoria = rememberSilenced({}, fila[0], 0);
     memoria = forgetSilenced(memoria, fila, 59_000);
     expect(activeOffer(applySilenced(fila, memoria))).toBeUndefined();
@@ -242,4 +231,84 @@ it('a memória de uma oferta não silencia as outras', () => {
     fila = addOffer(fila, o('r2'), 0);
     const memoria = rememberSilenced({}, fila[0], 0);
     expect(activeOffer(applySilenced(fila, memoria))?.id).toBe('r2');
+});
+
+// ─── A divulgação é a fonte da verdade da fila (Task 2) ──────────────────────
+
+it('oferta que saiu da divulgação sai da fila e libera a próxima', () => {
+    let l = addOffer([], { id: 'r1' }, 0);
+    l = addOffer(l, { id: 'r2' }, 0);
+    const { list } = syncWithBroadcasting(l, {}, new Set(['r2']), 60_000);
+    expect(list.map((x) => x.id)).toEqual(['r2']);
+    expect(activeOffer(list)?.id).toBe('r2');
+});
+
+it('não derruba a oferta que chegou pelo WS depois da resposta do poll', () => {
+    const l = addOffer([], { id: 'r3' }, 50_000); // WS em t=50s
+    const { list } = syncWithBroadcasting(l, {}, new Set(), 60_000); // resposta velha em t=60s
+    expect(list.map((x) => x.id)).toEqual(['r3']); // dentro da graça de 30s
+});
+
+it('recusa é lembrada enquanto a oferta seguir em divulgação e esquecida quando sair', () => {
+    const l = addOffer([], { id: 'r1' }, 0);
+    const memoria = rememberSilenced({}, l[0], 0);
+    expect(Object.keys(syncWithBroadcasting(l, memoria, new Set(['r1']), 120_000).memory)).toEqual(['r1']);
+    expect(syncWithBroadcasting(l, memoria, new Set(), 120_000).memory).toEqual({});
+});
+
+it('devolve as mesmas referências quando nada muda', () => {
+    const l = addOffer([], { id: 'r1' }, 0);
+    const memoria = rememberSilenced({}, l[0], 0);
+    const out = syncWithBroadcasting(l, memoria, new Set(['r1']), 120_000);
+    expect(out.list).toBe(l);
+    expect(out.memory).toBe(memoria);
+});
+
+// ─── precisaDeTique: gate do tique de 1s (Final fix wave I1) ─────────────────
+// Sem `offerExpiresAt` (backend atual) `expiresAtOf` é Infinity, e um
+// motorista indisponível não faz poll — nada envelhece a memória de recusa
+// por conta própria. Sem este gate seletivo, o tique de 1s corre pra sempre.
+
+it('fila vazia e memória só com prazo infinito não precisa de tique', () => {
+    expect(precisaDeTique([], { r1: { at: 0, until: Number.POSITIVE_INFINITY } })).toBe(false);
+});
+
+it('memória com prazo finito precisa de tique mesmo com fila vazia', () => {
+    expect(precisaDeTique([], { r1: { at: 0, until: 60_000 } })).toBe(true);
+});
+
+it('fila não vazia precisa de tique, mesmo sem memória', () => {
+    expect(precisaDeTique([{ id: 'r1', receivedAt: 0 }], {})).toBe(true);
+});
+
+it('fila e memória vazias não precisam de tique', () => {
+    expect(precisaDeTique([], {})).toBe(false);
+});
+
+// ─── addOffer: reentrada atualiza o payload (Final fix wave I2) ─────────────
+// Sem prazo local, o popup pode ficar aberto minutos: se o operador editar a
+// oferta (frete, paradas) enquanto ela segue na fila, o poll seguinte precisa
+// atualizar o que já está enfileirado — não manter o primeiro payload visto.
+
+it('addOffer com novo totalValue atualiza a entrada já enfileirada', () => {
+    let l = addOffer([], { id: 'r1', totalValue: 100 }, 0);
+    l = addOffer(l, { id: 'r1', totalValue: 150 }, 10_000);
+    expect(l.length).toBe(1);
+    expect(l[0].totalValue).toBe(150);
+});
+
+it('addOffer com o mesmo payload devolve a MESMA referência de lista', () => {
+    let l = addOffer([], { id: 'r1', totalValue: 100, totalServices: 3 }, 0);
+    const antes = l;
+    l = addOffer(l, { id: 'r1', totalValue: 100, totalServices: 3 }, 10_000);
+    expect(l).toBe(antes);
+});
+
+it('addOffer preserva receivedAt e silencedAt ao atualizar o payload', () => {
+    let l = addOffer([], { id: 'r1', totalValue: 100 }, 0);
+    l = silenceOffer(l, 'r1', 5_000);
+    l = addOffer(l, { id: 'r1', totalValue: 200 }, 20_000);
+    expect(l[0].totalValue).toBe(200);
+    expect(l[0].receivedAt).toBe(0);
+    expect(l[0].silencedAt).toBe(5_000);
 });
