@@ -22,6 +22,7 @@ import { MapaParadasModal } from '../../rotas-detalhadas/[id]/_components/MapaPa
 import { MaterialsModal } from '../../rotas-detalhadas/[id]/parada/[pid]/_components/shared/MaterialsModal';
 import { useUserLocation } from '../../rotas-detalhadas/[id]/parada/[pid]/_hooks/useUserLocation';
 import { distanciaLinhaReta, itensDaParada, resumirCarga, type ItemOferta } from '../_utils/cargaOferta';
+import { motivoDeOfertaEncerrada, ofertaAceitavel } from '../_utils/estadoOferta';
 
 /** Quantos itens a parada mostra direto no card; o resto abre a lista completa. */
 const ITENS_VISIVEIS = 3;
@@ -78,8 +79,18 @@ export default function OfertaDetalhadaScreen() {
   const routingId = id as string;
 
   const { userLocation } = useUserLocation();
-  const { routing, isLoading: isLoadingRouting } = useFindOneRouting(routingId);
-  const { services, isLoading: isLoadingServices } = useFindServicesByRoutingId(routingId);
+  const {
+    routing,
+    isLoading: isLoadingRouting,
+    isError: isErrorRouting,
+    refetch: refetchRouting,
+  } = useFindOneRouting(routingId);
+  const {
+    services,
+    isLoading: isLoadingServices,
+    isError: isErrorServices,
+    refetch: refetchServices,
+  } = useFindServicesByRoutingId(routingId);
   const { showToast } = useToastService();
   const safeArea = useAppSafeArea();
   const [mostrarPopup, setMostrarPopup] = useState(false);
@@ -89,7 +100,9 @@ export default function OfertaDetalhadaScreen() {
   const { acceptRouting, isLoading: isAccepting } = useAcceptRouting({
     onSuccess: () => {
       showToast({ message: 'Rota aceita com sucesso', type: 'success' });
-      router.push('/(auth)/(tabs)');
+      // Tira o detalhe aceito de cima da pilha da aba (senão "voltar" reabriria uma
+      // oferta que já foi aceita).
+      router.dismissTo('/(auth)/(tabs)');
     },
     onError: (error: unknown) => {
       showToast({ message: mensagemDaApi(error, 'Erro ao aceitar rota'), type: 'error' });
@@ -180,6 +193,22 @@ export default function OfertaDetalhadaScreen() {
     );
   }
 
+  // Erro nos services também cai aqui: sem os dados de carga a tela não pode
+  // mostrar "0 paradas" como se a rota estivesse vazia.
+  if (isErrorRouting || isErrorServices) {
+    return (
+      <Box flex={1} justifyContent="center" alignItems="center" px="x16" py="y32">
+        <Text preset="text16" color="gray600">Não foi possível carregar a oferta.</Text>
+        <Button
+          title="Tentar novamente"
+          onPress={() => { refetchRouting(); refetchServices(); }}
+          mt="y16"
+        />
+        <Button title="Voltar" preset="outline" onPress={() => router.back()} mt="y12" />
+      </Box>
+    );
+  }
+
   if (!routing) {
     return (
       <Box flex={1} justifyContent="center" alignItems="center" px="x16" py="y32">
@@ -188,6 +217,8 @@ export default function OfertaDetalhadaScreen() {
       </Box>
     );
   }
+
+  const encerrada = motivoDeOfertaEncerrada(routing);
 
   return (
     <ScreenBase
@@ -371,15 +402,22 @@ export default function OfertaDetalhadaScreen() {
         </Box>
 
         {/* Botões */}
-        <Box flexDirection="row" gap="x16" mt="y16">
-          <Button title="Recusar" preset="outline" onPress={() => router.back()} flex={1} />
-          <Button
-            title={isAccepting ? 'Aceitando...' : 'Aceitar'}
-            onPress={() => setMostrarPopup(true)}
-            flex={1}
-            disabled={isAccepting}
-          />
-        </Box>
+        {encerrada ? (
+          <Box gap="y12" mt="y16">
+            <Text preset="text14" color="gray600">{encerrada}</Text>
+            <Button title="Voltar" preset="outline" onPress={() => router.back()} />
+          </Box>
+        ) : (
+          <Box flexDirection="row" gap="x16" mt="y16">
+            <Button title="Recusar" preset="outline" onPress={() => router.back()} flex={1} />
+            <Button
+              title={isAccepting ? 'Aceitando...' : 'Aceitar'}
+              onPress={() => setMostrarPopup(true)}
+              flex={1}
+              disabled={isAccepting || !ofertaAceitavel(routing, Date.now())}
+            />
+          </Box>
+        )}
 
         <Modal
           preset="action"

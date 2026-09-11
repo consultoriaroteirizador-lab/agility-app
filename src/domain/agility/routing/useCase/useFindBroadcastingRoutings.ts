@@ -10,10 +10,17 @@ export function useFindBroadcastingRoutings(
     opts?: { pollWhileAvailable?: boolean },
 ) {
     const { data, isLoading, isError, refetch, isRefetching, dataUpdatedAt } = useQuery({
-        queryKey: [KEY_ROUTINGS, 'broadcasting', params?.driverLatitude, params?.driverLongitude],
+        // toFixed(2) ~ 1 km de precisão: GPS oscilando não cria chave nova a cada fix.
+        queryKey: [
+            KEY_ROUTINGS,
+            'broadcasting',
+            params?.driverLatitude?.toFixed(2),
+            params?.driverLongitude?.toFixed(2),
+        ],
         queryFn: () => routingService.findBroadcasting(params),
         retry: 1,
-        refetchInterval: opts?.pollWhileAvailable ? 25_000 : false,
+        refetchOnWindowFocus: true,
+        refetchInterval: opts?.pollWhileAvailable ? 25_000 : 60_000,
     })
 
     return {

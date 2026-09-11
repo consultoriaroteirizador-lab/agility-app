@@ -6,8 +6,10 @@ import { useRouter } from 'expo-router';
 import { mensagemDaApi } from '@/api/apiErrorMessage';
 import { ActivityIndicator, Box, Button, ScreenBase, Text, TouchableOpacityBox } from '@/components';
 import { Icon } from '@/components/Icon/Icon';
+import { useFindOneDriver } from '@/domain/agility/driver/useCase';
 import { segundosAteExpirar } from '@/domain/agility/offer/offerExpiry';
 import { payloadDeAceite, useAcceptRouting, useFindBroadcastingRoutings } from '@/domain/agility/routing/useCase';
+import { useAuthCredentialsService } from '@/services';
 import { useToastService } from '@/services/Toast/useToast';
 import { measure } from '@/theme';
 
@@ -237,12 +239,16 @@ export default function OfertasScreen() {
   }, [isAcceptingRoute, acceptingId]);
 
   const router = useRouter();
-  const { userLocation, isLoading: isLoadingLocation } = useUserLocation();
+  const { userLocation, isLoading: isLoadingLocation, error: erroLocalizacao } = useUserLocation();
 
-  const { routings, isLoading, refetch, isRefetching } = useFindBroadcastingRoutings({
+  const { routings, isLoading, isError, refetch, isRefetching } = useFindBroadcastingRoutings({
     driverLatitude: userLocation?.coords.latitude,
     driverLongitude: userLocation?.coords.longitude,
   });
+
+  const { userAuth } = useAuthCredentialsService();
+  const { driver } = useFindOneDriver(userAuth?.driverId);
+  const motoristaIndisponivel = driver?.isAvailable === false;
 
   const onRefresh = () => {
     refetch();
@@ -287,18 +293,41 @@ export default function OfertasScreen() {
     );
   }
 
+  // Backend novo devolve `[]` pra motorista indisponível ou CNH vencida — sem esse
+  // aviso a lista vazia parecia "sem ofertas", quando na verdade é "você não está
+  // visível pro sistema de ofertas".
+  const mensagemVazia = motoristaIndisponivel
+    ? 'Você está indisponível. Fique disponível na tela inicial para ver ofertas.'
+    : 'Nenhuma oferta disponível no momento.';
+
   return (
     <ScreenBase title={<Text preset="textTitleScreen">Ofertas de serviços</Text>}>
+      {!!erroLocalizacao && (
+        <Box px="x16" pt="y12">
+          <Text preset="text13" color="gray600">
+            Ative a localização para ver as ofertas perto de você. Sem ela, algumas ofertas podem ser recusadas no aceite.
+          </Text>
+        </Box>
+      )}
+
       <ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={{ paddingTop: 12, paddingBottom: 24 }}
         refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={onRefresh} />}
       >
-        {ofertas.length === 0 ? (
-          <Box py="y32" alignItems="center">
+        {isError ? (
+          <Box py="y32" alignItems="center" px="x16">
             <Icon name="local-shipping" size={measure.m48} color="gray300" />
             <Text preset="text14" color="gray400" textAlign="center" mt="y16">
-              Nenhuma oferta disponível no momento.
+              Não foi possível carregar as ofertas.
+            </Text>
+            <Button title="Tentar novamente" onPress={() => refetch()} mt="y16" />
+          </Box>
+        ) : ofertas.length === 0 ? (
+          <Box py="y32" alignItems="center" px="x16">
+            <Icon name="local-shipping" size={measure.m48} color="gray300" />
+            <Text preset="text14" color="gray400" textAlign="center" mt="y16">
+              {mensagemVazia}
             </Text>
           </Box>
         ) : (
