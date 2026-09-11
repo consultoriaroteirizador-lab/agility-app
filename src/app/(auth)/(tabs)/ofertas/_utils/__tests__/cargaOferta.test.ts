@@ -6,14 +6,57 @@
  * carga, ou se a soma engolir um campo nulo virando `NaN`, a tela mostra número
  * errado em silêncio. Aqui a derivação é pura e coberta.
  */
-import type { ServiceResponse } from '@/domain/agility/service/dto'
+import type { ServiceMaterialResponse, ServiceResponse } from '@/domain/agility/service/dto'
 import { ServiceType } from '@/domain/agility/service/dto/types'
 
-import { distanciaLinhaReta, resumirCarga } from '../cargaOferta'
+import { distanciaLinhaReta, itensDaParada, resumirCarga } from '../cargaOferta'
 
 function servico(over: Partial<ServiceResponse>): ServiceResponse {
     return { requiresPayment: false, ...over } as unknown as ServiceResponse
 }
+
+function material(over: Partial<ServiceMaterialResponse>): ServiceMaterialResponse {
+    return { id: 'm', material: 'Item', quantity: 1, status: 'PENDING', ...over } as ServiceMaterialResponse
+}
+
+describe('itensDaParada', () => {
+    it('lista os itens entregues com nome, quantidade e unidade', () => {
+        const itens = itensDaParada([
+            material({ id: 'a', material: 'Geladeira', quantity: 2 }),
+            material({ id: 'b', material: 'Cimento', quantity: 10, unit: 'SC' }),
+        ])
+
+        expect(itens.entrega).toEqual([
+            { id: 'a', nome: 'Geladeira', quantidade: 2, unidade: null },
+            { id: 'b', nome: 'Cimento', quantidade: 10, unidade: 'SC' },
+        ])
+        expect(itens.retorno).toEqual([])
+    })
+
+    it('separa o que volta com o motorista (PICKUP) do que ele entrega', () => {
+        const itens = itensDaParada([
+            material({ id: 'a', material: 'Botijão cheio', direction: 'DELIVERY' }),
+            material({ id: 'b', material: 'Botijão vazio', direction: 'PICKUP' }),
+            material({ id: 'c', material: 'Sem direção' }),
+        ])
+
+        expect(itens.entrega.map((i) => i.nome)).toEqual(['Botijão cheio', 'Sem direção'])
+        expect(itens.retorno.map((i) => i.nome)).toEqual(['Botijão vazio'])
+    })
+
+    it('não inventa nome nem quantidade quando o cadastro vem incompleto', () => {
+        const itens = itensDaParada([
+            material({ id: 'a', material: '  ', quantity: null as unknown as number }),
+        ])
+
+        expect(itens.entrega).toEqual([{ id: 'a', nome: 'Item sem descrição', quantidade: null, unidade: null }])
+    })
+
+    it('devolve listas vazias para parada sem material', () => {
+        expect(itensDaParada(undefined)).toEqual({ entrega: [], retorno: [] })
+        expect(itensDaParada([])).toEqual({ entrega: [], retorno: [] })
+    })
+})
 
 describe('resumirCarga', () => {
     it('soma peso, cubagem e itens dos serviços da rota', () => {
