@@ -3,6 +3,7 @@ import {
     applySilenced,
     dropOffer,
     forgetSilenced,
+    precisaDeTique,
     pruneExpired,
     rememberSilenced,
     activeOffer,
@@ -261,4 +262,53 @@ it('devolve as mesmas referências quando nada muda', () => {
     const out = syncWithBroadcasting(l, memoria, new Set(['r1']), 120_000);
     expect(out.list).toBe(l);
     expect(out.memory).toBe(memoria);
+});
+
+// ─── precisaDeTique: gate do tique de 1s (Final fix wave I1) ─────────────────
+// Sem `offerExpiresAt` (backend atual) `expiresAtOf` é Infinity, e um
+// motorista indisponível não faz poll — nada envelhece a memória de recusa
+// por conta própria. Sem este gate seletivo, o tique de 1s corre pra sempre.
+
+it('fila vazia e memória só com prazo infinito não precisa de tique', () => {
+    expect(precisaDeTique([], { r1: { at: 0, until: Number.POSITIVE_INFINITY } })).toBe(false);
+});
+
+it('memória com prazo finito precisa de tique mesmo com fila vazia', () => {
+    expect(precisaDeTique([], { r1: { at: 0, until: 60_000 } })).toBe(true);
+});
+
+it('fila não vazia precisa de tique, mesmo sem memória', () => {
+    expect(precisaDeTique([{ id: 'r1', receivedAt: 0 }], {})).toBe(true);
+});
+
+it('fila e memória vazias não precisam de tique', () => {
+    expect(precisaDeTique([], {})).toBe(false);
+});
+
+// ─── addOffer: reentrada atualiza o payload (Final fix wave I2) ─────────────
+// Sem prazo local, o popup pode ficar aberto minutos: se o operador editar a
+// oferta (frete, paradas) enquanto ela segue na fila, o poll seguinte precisa
+// atualizar o que já está enfileirado — não manter o primeiro payload visto.
+
+it('addOffer com novo totalValue atualiza a entrada já enfileirada', () => {
+    let l = addOffer([], { id: 'r1', totalValue: 100 }, 0);
+    l = addOffer(l, { id: 'r1', totalValue: 150 }, 10_000);
+    expect(l.length).toBe(1);
+    expect(l[0].totalValue).toBe(150);
+});
+
+it('addOffer com o mesmo payload devolve a MESMA referência de lista', () => {
+    let l = addOffer([], { id: 'r1', totalValue: 100, totalServices: 3 }, 0);
+    const antes = l;
+    l = addOffer(l, { id: 'r1', totalValue: 100, totalServices: 3 }, 10_000);
+    expect(l).toBe(antes);
+});
+
+it('addOffer preserva receivedAt e silencedAt ao atualizar o payload', () => {
+    let l = addOffer([], { id: 'r1', totalValue: 100 }, 0);
+    l = silenceOffer(l, 'r1', 5_000);
+    l = addOffer(l, { id: 'r1', totalValue: 200 }, 20_000);
+    expect(l[0].totalValue).toBe(200);
+    expect(l[0].receivedAt).toBe(0);
+    expect(l[0].silencedAt).toBe(5_000);
 });

@@ -11,9 +11,24 @@ export function expiresAtOf(o: PendingOffer): number {
     const ts = o.offerExpiresAt ? Date.parse(o.offerExpiresAt) : Number.NaN;
     return Number.isNaN(ts) ? Number.POSITIVE_INFINITY : ts;
 }
+// O poll/WS pode reentregar um id já enfileirado com o payload ATUALIZADO
+// (operador editou frete/paradas enquanto a oferta seguia sem prazo local).
+// Compara só as chaves do payload recebido — `receivedAt`/`silencedAt` não
+// entram na comparação nem são tocados.
+function payloadMudou(existente: PendingOffer, offer: OfferPayload): boolean {
+    return (Object.keys(offer) as (keyof OfferPayload)[]).some((key) => existente[key] !== offer[key]);
+}
+
 export function addOffer(list: PendingOffer[], offer: OfferPayload, now: number): PendingOffer[] {
-    if (list.some((x) => x.id === offer.id)) return list;
-    return [...list, { ...offer, receivedAt: now }];
+    const idx = list.findIndex((x) => x.id === offer.id);
+    if (idx === -1) return [...list, { ...offer, receivedAt: now }];
+
+    const existente = list[idx];
+    if (!payloadMudou(existente, offer)) return list; // mesma referência: nada mudou
+
+    const next = [...list];
+    next[idx] = { ...existente, ...offer };
+    return next;
 }
 export function dropOffer(list: PendingOffer[], id: string): PendingOffer[] {
     return list.filter((x) => x.id !== id);
@@ -109,6 +124,16 @@ export function syncWithBroadcasting(
         nextMemory[id] = entry;
     }
     return { list: nextList, memory: mudou ? nextMemory : memory };
+}
+
+// Gate do tique de 1s (OfferAlertProvider): sem `offerExpiresAt` (backend
+// atual) `expiresAtOf` é Infinity, e um motorista indisponível não faz poll —
+// nada tira a fila do vazio nem a memória de recusa do `until: Infinity` por
+// conta própria. Sem este gate seletivo, um `setInterval` corria para sempre
+// após o primeiro Recusar/"Ver detalhes" da sessão, mesmo com fila vazia.
+export function precisaDeTique(offers: PendingOffer[], silenced: SilencedOffers): boolean {
+    if (offers.length > 0) return true;
+    return Object.values(silenced).some((entry) => Number.isFinite(entry.until));
 }
 
 export function isSilenced(offer: PendingOffer): boolean {

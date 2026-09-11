@@ -46,6 +46,12 @@ export function useAcceptRouting(options?: UseAcceptRoutingOptions) {
             options?.onSuccess?.(data)
         },
         onError: (error: BaseResponse<any>) => {
+            // Um 409 (tomada por outro motorista) ou um timeout que na verdade
+            // aplicou no servidor pode significar que o estado mudou mesmo com o
+            // aceite falhando aqui — invalida para a lista/tela não seguirem
+            // mostrando a oferta como se ainda estivesse disponível.
+            queryClient.invalidateQueries({ queryKey: [KEY_ROUTINGS, 'broadcasting'] })
+            queryClient.invalidateQueries({ queryKey: [KEY_ROUTINGS, 'my-routings'] })
             options?.onError?.(error)
         },
     })

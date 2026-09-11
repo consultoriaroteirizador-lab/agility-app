@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
 
 import { useFindOneDriver } from '@/domain/agility/driver/useCase';
+import type { OfferPayload } from '@/domain/agility/offer/offerStore';
 import { RoutingStatus } from '@/domain/agility/routing/dto/types';
 import { useFindMyRoutings } from '@/domain/agility/routing/useCase';
 import { useTrackingWebSocket } from '@/domain/agility/tracking';
@@ -81,7 +82,13 @@ export function LocationTrackingProvider({ children }: { children: React.ReactNo
     onDriverLocationUpdate: (data: DriverLocationUpdate) => {
       console.log('[LocationTrackingProvider] Localização confirmada via WebSocket:', data.driverId);
     },
-    onOfferAvailable: pushOffer,
+    onOfferAvailable: (offer: OfferPayload) => {
+      // Único ponto de confirmação, em aparelho, de que o evento do socket
+      // chegou até aqui — ver o log no device é o jeito de checar o item 1 da
+      // "Verificação em aparelho" do plano sem instrumentar o popup.
+      console.log('[LocationTrackingProvider] offer.available', offer?.id);
+      pushOffer(offer);
+    },
     onConnect: () => {
       console.log('[LocationTrackingProvider] WebSocket conectado ao /monitoring');
     },

@@ -3,7 +3,7 @@ import { Modal, Platform, Vibration } from 'react-native';
 
 import { router } from 'expo-router';
 
-import { erroDeRede, mensagemDaApi } from '@/api/apiErrorMessage';
+import { erroTransitorio, mensagemDaApi } from '@/api/apiErrorMessage';
 import { useUserLocation } from '@/app/(auth)/(tabs)/rotas-detalhadas/[id]/parada/[pid]/_hooks/useUserLocation';
 import { Box, Button, Text, TextButton } from '@/components';
 import { useFindOneDriver } from '@/domain/agility/driver/useCase';
@@ -14,6 +14,7 @@ import {
   applySilenced,
   dropOffer,
   forgetSilenced,
+  precisaDeTique,
   pruneExpired,
   rememberSilenced,
   syncWithBroadcasting,
@@ -131,19 +132,21 @@ export function OfferAlertProvider({ children }: { children: React.ReactNode }) 
   }, [broadcastRoutings, broadcastDataUpdatedAt]);
 
   // Tick de 1s: expira ofertas vencidas e atualiza o contador regressivo.
-  // Só roda enquanto houver o que envelhecer — fila OU memória —, para não
-  // churnar em idle. A memória entra no gate porque ela precisa envelhecer
-  // justamente quando a fila está vazia (motorista indisponível).
-  const silencedCount = Object.keys(silenced).length;
+  // Só roda enquanto houver o que envelhecer de verdade. Sem `offerExpiresAt`
+  // (backend atual) a fila não expira sozinha (`expiresAtOf` é Infinity) e um
+  // motorista indisponível não faz poll — sem este gate seletivo, o tique
+  // corria a sessão inteira após o primeiro Recusar/"Ver detalhes" (a memória
+  // ficava com `until: Infinity`, que nunca terminava de envelhecer).
+  const tiqueNecessario = precisaDeTique(offers, silenced);
   useEffect(() => {
-    if (offers.length === 0 && silencedCount === 0) return;
+    if (!tiqueNecessario) return;
     const timer = setInterval(() => {
       const t = Date.now();
       setNow(t);
       setOffers((list) => pruneExpired(list, t));
     }, 1000);
     return () => clearInterval(timer);
-  }, [offers.length, silencedCount]);
+  }, [tiqueNecessario]);
 
   // Esquece as ofertas dispensadas cujo prazo passou (e renova o prazo das que
   // seguem na fila), para a memória não crescer sem limite. Não referencia
@@ -216,15 +219,22 @@ export function OfferAlertProvider({ children }: { children: React.ReactNode }) 
       showToast({ message: 'Rota aceita com sucesso', type: 'success' });
       router.push('/(auth)/(tabs)');
     } catch (error: unknown) {
-      // Erro de rede: a oferta continua válida — fica na fila para tentar de novo.
-      // Qualquer resposta do servidor (409 tomada, 400 regra): sai da fila.
-      if (!erroDeRede(error)) setOffers((list) => dropOffer(list, offerId));
+      // Erro transitório (rede OU 5xx do servidor): o estado da oferta não
+      // mudou de verdade — ela continua válida, fica na fila para tentar de
+      // novo. Uma resposta definitiva do servidor (409 tomada, 400 regra): sai
+      // da fila.
+      if (!erroTransitorio(error)) setOffers((list) => dropOffer(list, offerId));
       showToast({ message: mensagemDaApi(error, 'Esta oferta não está mais disponível'), type: 'error' });
     }
   }, [current, acceptRoutingAsync, userLocation, showToast]);
 
+  // Evita recriar o objeto de contexto a cada render (o tique de 1s, quando
+  // ativo, re-renderiza este provider várias vezes por minuto) — sem isto,
+  // todo consumidor de `useOfferAlert()` re-renderizava junto.
+  const contextValue = useMemo(() => ({ pushOffer }), [pushOffer]);
+
   return (
-    <OfferAlertContext.Provider value={{ pushOffer }}>
+    <OfferAlertContext.Provider value={contextValue}>
       {children}
 
       <Modal

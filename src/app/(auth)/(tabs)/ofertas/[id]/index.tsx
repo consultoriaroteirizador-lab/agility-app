@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
@@ -97,14 +97,25 @@ export default function OfertaDetalhadaScreen() {
   const [mostrarMapa, setMostrarMapa] = useState(false);
   const [materiaisAbertos, setMateriaisAbertos] = useState<ServiceMaterialResponse[] | null>(null);
 
+  // Bloqueia o segundo toque ANTES do primeiro re-render: `isAccepting`
+  // (estado da mutation) só atualiza depois que o React processa o dispatch,
+  // e o botão do Modal (preset action) não tem `disabled` — dois toques
+  // rápidos mandavam dois POST /accept. Limpo no settle (sucesso ou erro) da
+  // própria mutation, não em `handleAcceptRouting`.
+  const isAcceptingRef = useRef(false);
+
   const { acceptRouting, isLoading: isAccepting } = useAcceptRouting({
     onSuccess: () => {
+      isAcceptingRef.current = false;
       showToast({ message: 'Rota aceita com sucesso', type: 'success' });
-      // Tira o detalhe aceito de cima da pilha da aba (senão "voltar" reabriria uma
-      // oferta que já foi aceita).
+      // Navega para a aba inicial. Se o motorista voltar ao detalhe pelo
+      // histórico da aba, ele vê "Esta oferta já foi aceita." em vez de poder
+      // tentar aceitar de novo — é isso que evita o duplo aceite, não o
+      // `dismissTo` em si.
       router.dismissTo('/(auth)/(tabs)');
     },
     onError: (error: unknown) => {
+      isAcceptingRef.current = false;
       showToast({ message: mensagemDaApi(error, 'Erro ao aceitar rota'), type: 'error' });
     },
   });
@@ -175,9 +186,11 @@ export default function OfertaDetalhadaScreen() {
     .join(' · '), [carga.composicao]);
 
   const handleAcceptRouting = () => {
-    // O botão do Modal (preset action) não tem `disabled`: dois toques antes do
-    // re-render mandavam dois POST /accept (toast de sucesso + toast de erro).
-    if (isAccepting) return;
+    // Guard síncrono via ref — ver comentário de `isAcceptingRef` acima. `if
+    // (isAccepting) return` sozinho não bastava: é estado, só reflete a
+    // mutation DEPOIS do próximo render.
+    if (isAcceptingRef.current) return;
+    isAcceptingRef.current = true;
     setMostrarPopup(false);
     acceptRouting({ routingId, payload: payloadDeAceite(userLocation, routing?.totalValue) });
   };

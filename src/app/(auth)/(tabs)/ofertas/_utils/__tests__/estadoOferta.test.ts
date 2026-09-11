@@ -23,3 +23,15 @@ it('BROADCASTING com o prazo já zerado também conta como encerrada, mesmo ante
         motivoDeOfertaEncerrada({ status: RoutingStatus.BROADCASTING, offerExpiresAt: '2026-09-11T11:00:00Z' }, agora),
     ).toBe('Esta oferta expirou.');
 });
+
+// ─── Final fix wave M5: "já foi aceita" só para quem foi de fato aceita ──────
+
+it('IN_PROGRESS e COMPLETED também contam como "já foi aceita"', () => {
+    expect(motivoDeOfertaEncerrada({ status: RoutingStatus.IN_PROGRESS }, agora)).toBe('Esta oferta já foi aceita.');
+    expect(motivoDeOfertaEncerrada({ status: RoutingStatus.COMPLETED }, agora)).toBe('Esta oferta já foi aceita.');
+});
+
+it('status anterior à divulgação (DRAFT/OPTIMIZED) não é "já foi aceita"', () => {
+    expect(motivoDeOfertaEncerrada({ status: RoutingStatus.DRAFT }, agora)).toBe('Esta oferta não está mais disponível.');
+    expect(motivoDeOfertaEncerrada({ status: RoutingStatus.OPTIMIZED }, agora)).toBe('Esta oferta não está mais disponível.');
+});

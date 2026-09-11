@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { RefreshControl, ScrollView } from 'react-native';
 
+import { useIsFocused } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 
 import { mensagemDaApi } from '@/api/apiErrorMessage';
@@ -241,12 +242,16 @@ export default function OfertasScreen() {
   const router = useRouter();
   const { userLocation, isLoading: isLoadingLocation, error: erroLocalizacao } = useUserLocation();
 
+  // O polling de 60s só faz sentido com a aba em foco — desfocada, ninguém
+  // está olhando a lista, e o app continuaria batendo em /broadcasting à toa
+  // (o OfferAlertProvider, montado a sessão toda, já cobre o alerta global).
+  const isFocused = useIsFocused();
   const { routings, isLoading, isError, refetch, isRefetching } = useFindBroadcastingRoutings(
     {
       driverLatitude: userLocation?.coords.latitude,
       driverLongitude: userLocation?.coords.longitude,
     },
-    { refetchIntervalMs: 60_000 },
+    { refetchIntervalMs: isFocused ? 60_000 : undefined },
   );
 
   const { userAuth } = useAuthCredentialsService();

@@ -23,5 +23,12 @@ export function motivoDeOfertaEncerrada(
     }
     if (routing.status === RoutingStatus.PENDING_ASSIGNMENT) return 'Esta oferta expirou.';
     if (routing.status === RoutingStatus.CANCELLED) return 'Esta oferta foi cancelada.';
-    return 'Esta oferta já foi aceita.';
+    if (
+        routing.status === RoutingStatus.ASSIGNED
+        || routing.status === RoutingStatus.IN_PROGRESS
+        || routing.status === RoutingStatus.COMPLETED
+    ) return 'Esta oferta já foi aceita.';
+    // DRAFT, OPTIMIZED ou qualquer status futuro: não passou por nenhum destes
+    // motivos conhecidos — "já foi aceita" seria uma afirmação falsa aqui.
+    return 'Esta oferta não está mais disponível.';
 }
