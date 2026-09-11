@@ -3,6 +3,7 @@ import { Modal, Platform, Vibration } from 'react-native';
 
 import { router } from 'expo-router';
 
+import { erroDeRede, mensagemDaApi } from '@/api/apiErrorMessage';
 import { useUserLocation } from '@/app/(auth)/(tabs)/rotas-detalhadas/[id]/parada/[pid]/_hooks/useUserLocation';
 import { Box, Button, Text, TextButton } from '@/components';
 import { useFindOneDriver } from '@/domain/agility/driver/useCase';
@@ -18,7 +19,7 @@ import {
   syncWithBroadcasting,
 } from '@/domain/agility/offer/offerStore';
 import type { OfferPayload, PendingOffer, SilencedOffers } from '@/domain/agility/offer/offerStore';
-import { useAcceptRouting, useFindBroadcastingRoutings } from '@/domain/agility/routing/useCase';
+import { payloadDeAceite, useAcceptRouting, useFindBroadcastingRoutings } from '@/domain/agility/routing/useCase';
 import { useAppSafeArea } from '@/hooks';
 import { useAuthCredentialsService } from '@/services/authCredentials/useAuthCredentialsService';
 import { useToastService } from '@/services/Toast/useToast';
@@ -41,7 +42,8 @@ function formatarTempo(minutos: number | null | undefined): string {
 }
 
 function formatarPreco(valor: number | null | undefined): string {
-  if (!valor) return 'R$ 0,00';
+  // null = frete não informado (oferta interna pode não ter). "R$ 0,00" afirmava um valor que não existe.
+  if (valor == null) return 'Não definido';
   return `R$ ${valor.toFixed(2).replace('.', ',')}`;
 }
 
@@ -208,20 +210,16 @@ export function OfferAlertProvider({ children }: { children: React.ReactNode }) 
     try {
       await acceptRoutingAsync({
         routingId: offerId,
-        payload: {
-          driverLatitude: userLocation?.coords.latitude,
-          driverLongitude: userLocation?.coords.longitude,
-        },
+        payload: payloadDeAceite(userLocation, current.totalValue),
       });
       setOffers((list) => dropOffer(list, offerId));
       showToast({ message: 'Rota aceita com sucesso', type: 'success' });
       router.push('/(auth)/(tabs)');
     } catch (error: unknown) {
-      // 409 (já pega por outro motorista) ou qualquer outro erro: a oferta
-      // sai da lista e avisamos o motorista via toast.
-      setOffers((list) => dropOffer(list, offerId));
-      const message = error instanceof Error ? error.message : 'Esta oferta não está mais disponível';
-      showToast({ message, type: 'error' });
+      // Erro de rede: a oferta continua válida — fica na fila para tentar de novo.
+      // Qualquer resposta do servidor (409 tomada, 400 regra): sai da fila.
+      if (!erroDeRede(error)) setOffers((list) => dropOffer(list, offerId));
+      showToast({ message: mensagemDaApi(error, 'Esta oferta não está mais disponível'), type: 'error' });
     }
   }, [current, acceptRoutingAsync, userLocation, showToast]);
 

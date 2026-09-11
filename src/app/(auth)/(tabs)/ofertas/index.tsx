@@ -3,10 +3,11 @@ import { RefreshControl, ScrollView } from 'react-native';
 
 import { useRouter } from 'expo-router';
 
+import { mensagemDaApi } from '@/api/apiErrorMessage';
 import { ActivityIndicator, Box, Button, ScreenBase, Text, TouchableOpacityBox } from '@/components';
 import { Icon } from '@/components/Icon/Icon';
 import { segundosAteExpirar } from '@/domain/agility/offer/offerExpiry';
-import { useAcceptRouting, useFindBroadcastingRoutings } from '@/domain/agility/routing/useCase';
+import { payloadDeAceite, useAcceptRouting, useFindBroadcastingRoutings } from '@/domain/agility/routing/useCase';
 import { useToastService } from '@/services/Toast/useToast';
 import { measure } from '@/theme';
 
@@ -40,7 +41,8 @@ function formatarTempo(minutos: number | null | undefined): string {
 }
 
 function formatarPreco(valor: number | null | undefined): string {
-  if (!valor) return 'R$ 0,00';
+  // null = frete não informado (oferta interna pode não ter). "R$ 0,00" afirmava um valor que não existe.
+  if (valor == null) return 'Não definido';
   return `R$ ${valor.toFixed(2).replace('.', ',')}`;
 }
 
@@ -222,11 +224,8 @@ export default function OfertasScreen() {
       showToast({ message: 'Rota aceita com sucesso', type: 'success' });
       router.push('/(auth)/(tabs)');
     },
-    onError: (error: any) => {
-      // Backend retorna { error: { message } } (ex.: rejeição de capacidade
-      // do veículo) — priorizar essa mensagem sobre um texto genérico.
-      const errorMessage = error?.error?.message || error?.message || 'Erro ao aceitar rota';
-      showToast({ message: errorMessage, type: 'error' });
+    onError: (error: unknown) => {
+      showToast({ message: mensagemDaApi(error, 'Erro ao aceitar rota'), type: 'error' });
     },
   });
 
@@ -272,12 +271,10 @@ export default function OfertasScreen() {
 
   const handleAceitar = (routingId: string) => {
     setAcceptingId(routingId);
+    const totalValue = routings.find((r) => r.id === routingId)?.totalValue;
     acceptRouting({
       routingId,
-      payload: {
-        driverLatitude: userLocation?.coords.latitude,
-        driverLongitude: userLocation?.coords.longitude,
-      },
+      payload: payloadDeAceite(userLocation, totalValue),
     });
   };
 

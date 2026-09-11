@@ -2,13 +2,14 @@ import { useMemo, useState } from 'react';
 
 import { useLocalSearchParams, useRouter } from 'expo-router';
 
+import { mensagemDaApi } from '@/api/apiErrorMessage';
 import { ActivityIndicator, Box, Text, Button, Image, ScreenBase } from '@/components';
 import { ButtonBack } from '@/components/Button/ButtonBack';
 import { Icon } from '@/components/Icon/Icon';
 import Modal from '@/components/Modal/Modal';
 import { TouchableOpacityBox } from '@/components/RestyleComponent/RestyleComponent';
 import { formatAddress } from '@/domain/agility/address/dto';
-import { useFindOneRouting, useAcceptRouting } from '@/domain/agility/routing/useCase';
+import { payloadDeAceite, useFindOneRouting, useAcceptRouting } from '@/domain/agility/routing/useCase';
 import type { ServiceMaterialResponse } from '@/domain/agility/service/dto';
 import { ServiceType } from '@/domain/agility/service/dto/types';
 import { useFindServicesByRoutingId } from '@/domain/agility/service/useCase';
@@ -47,7 +48,8 @@ function formatarTempo(minutos: number | null | undefined): string {
 }
 
 function formatarPreco(valor: number | null | undefined): string {
-  if (!valor) return 'R$ 0,00';
+  // null = frete não informado (oferta interna pode não ter). "R$ 0,00" afirmava um valor que não existe.
+  if (valor == null) return 'Não definido';
   return `R$ ${valor.toFixed(2).replace('.', ',')}`;
 }
 
@@ -89,11 +91,8 @@ export default function OfertaDetalhadaScreen() {
       showToast({ message: 'Rota aceita com sucesso', type: 'success' });
       router.push('/(auth)/(tabs)');
     },
-    onError: (error: any) => {
-      // Backend retorna { error: { message } } (ex.: rejeição de capacidade
-      // do veículo) — priorizar essa mensagem sobre um texto genérico.
-      const errorMessage = error?.error?.message || error?.message || 'Erro ao aceitar rota';
-      showToast({ message: errorMessage, type: 'error' });
+    onError: (error: unknown) => {
+      showToast({ message: mensagemDaApi(error, 'Erro ao aceitar rota'), type: 'error' });
     },
   });
 
@@ -163,14 +162,11 @@ export default function OfertaDetalhadaScreen() {
     .join(' · '), [carga.composicao]);
 
   const handleAcceptRouting = () => {
+    // O botão do Modal (preset action) não tem `disabled`: dois toques antes do
+    // re-render mandavam dois POST /accept (toast de sucesso + toast de erro).
+    if (isAccepting) return;
     setMostrarPopup(false);
-    acceptRouting({
-      routingId,
-      payload: {
-        driverLatitude: userLocation?.coords.latitude,
-        driverLongitude: userLocation?.coords.longitude,
-      },
-    });
+    acceptRouting({ routingId, payload: payloadDeAceite(userLocation, routing?.totalValue) });
   };
 
   const isLoading = isLoadingRouting || isLoadingServices;
