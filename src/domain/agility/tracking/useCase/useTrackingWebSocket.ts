@@ -36,6 +36,17 @@ let connectionCount = 0;
 // Guardamos o token usado na conexão atual para detectar refresh e forçar
 // reconexão com credenciais novas.
 let connectedAccessToken: string | null = null;
+// Geração do socket global: sobe a cada socket criado. `connectionCount` conta
+// referências AO SOCKET ATUAL; quem segurava um socket já descartado (troca de
+// token) não pode descontar do contador do novo.
+let socketGeneration = 0;
+
+/** Só para testes: zera o estado de módulo entre casos. */
+export function __resetTrackingSocketForTests() {
+  globalSocket = null;
+  connectionCount = 0;
+  connectedAccessToken = null;
+}
 
 /**
  * Hook para conexão WebSocket com o namespace /monitoring
@@ -50,6 +61,40 @@ export function useTrackingWebSocket(options: TrackingWebSocketOptions = {}) {
     optionsRef.current = options;
   }, [options]);
 
+  // Esta instância segura no máximo UMA referência ao socket global. Antes o
+  // consumidor decrementava duas vezes (o próprio disconnect + o cleanup
+  // interno), e sair do detalhe da rota zerava o contador e derrubava o socket
+  // que entregava `offer.available`. Guarda a GERAÇÃO do socket segurado (ou
+  // null): depois de uma troca de token, a referência ao socket velho não
+  // conta mais.
+  const holdsRef = useRef<number | null>(null);
+  const detachRef = useRef<(() => void) | null>(null);
+
+  /** Soma a referência desta instância ao socket atual, uma vez só. */
+  const hold = useCallback(() => {
+    if (holdsRef.current === socketGeneration) return;
+    holdsRef.current = socketGeneration;
+    connectionCount++;
+  }, []);
+
+  /** Listeners DESTA instância, anexados a qualquer socket (novo ou reusado). */
+  const attach = useCallback((socket: Socket) => {
+    detachRef.current?.();
+    const on = <T,>(ev: string, fn: (d: T) => void) => {
+      socket.on(ev, fn);
+      return () => { socket.off(ev, fn); };
+    };
+    const offs = [
+      on('driver_location_updated', (d: DriverLocationUpdate) => optionsRef.current.onDriverLocationUpdate?.(d)),
+      on('routing_updated', (d: { id?: string }) => optionsRef.current.onRoutingUpdated?.(d)),
+      on('service_updated', (d: { id?: string; routingId?: string }) => optionsRef.current.onServiceUpdated?.(d)),
+      on('offer.available', (o: OfferPayload) => optionsRef.current.onOfferAvailable?.(o)),
+      on('disconnect', () => optionsRef.current.onDisconnect?.()),
+      on('connect_error', (e: Error) => optionsRef.current.onError?.(e)),
+    ];
+    detachRef.current = () => { offs.forEach((off) => off()); detachRef.current = null; };
+  }, []);
+
   /**
    * Conectar ao WebSocket
    */
@@ -59,18 +104,28 @@ export function useTrackingWebSocket(options: TrackingWebSocketOptions = {}) {
     // Se o socket global já existe mas o token mudou (refresh), derruba para
     // que o handshake aconteça com o token novo. Sem isso, o socket continua
     // autenticado com o token velho e cai em loop de reconnect quando expira.
+    // O contador volta a zero: as instâncias vivas se registram de novo ao
+    // reconectar (o efeito de cada consumidor depende do token).
     if (globalSocket && connectedAccessToken !== currentToken) {
       console.log('[TrackingWebSocket] Token mudou, recriando conexão');
+      connectionCount = 0;
       globalSocket.removeAllListeners();
       globalSocket.disconnect();
       globalSocket = null;
       connectedAccessToken = null;
     }
 
-    // Reutilizar conexão global se existir (e token coincide)
-    if (globalSocket?.connected) {
+    // Reutilizar o socket global se existir (e o token coincide), MESMO que
+    // ainda não esteja conectado: em handshake ou em backoff de reconexão, o
+    // socket.io retoma sozinho. Exigir `connected` aqui criava um segundo
+    // socket e o primeiro virava órfão, vivo depois do logout. `connect()` no
+    // socket existente é inócuo em handshake/backoff e reabre o socket que
+    // esgotou as tentativas de reconexão.
+    if (globalSocket) {
+      if (!globalSocket.connected) globalSocket.connect();
       socketRef.current = globalSocket;
-      connectionCount++;
+      attach(globalSocket);
+      hold();
       console.log('[TrackingWebSocket] Reutilizando conexão existente');
       return;
     }
@@ -116,8 +171,8 @@ export function useTrackingWebSocket(options: TrackingWebSocketOptions = {}) {
     // entre a anexação do listener e o fire do evento (ex: refresh de token
     // durante o handshake).
     const socket = globalSocket;
+    socketGeneration++;
     socketRef.current = socket;
-    connectionCount++;
     connectedAccessToken = authCredentials?.accessToken ?? null;
 
     // Eventos de conexão. `subscribe_routings` precisa ser re-emitido a cada
@@ -138,38 +193,14 @@ export function useTrackingWebSocket(options: TrackingWebSocketOptions = {}) {
       optionsRef.current.onConnect?.();
     });
 
+    // Só log: os callbacks de cada consumidor (disconnect, connect_error,
+    // localização, rota, serviço, oferta) são anexados por `attach`.
     socket.on('disconnect', (reason) => {
       console.log('[TrackingWebSocket] Desconectado:', reason);
-      optionsRef.current.onDisconnect?.();
     });
 
     socket.on('connect_error', (error) => {
       console.error('[TrackingWebSocket] Erro de conexão:', error.message);
-      optionsRef.current.onError?.(error);
-    });
-
-    // Escutar atualizações de localização dos motoristas
-    socket.on('driver_location_updated', (data: DriverLocationUpdate) => {
-      console.log('[TrackingWebSocket] Location update:', data.driverId);
-      optionsRef.current.onDriverLocationUpdate?.(data);
-    });
-
-    // Rota atualizada (replan / re-projeção de ETA por atraso).
-    socket.on('routing_updated', (data: { id?: string }) => {
-      console.log('[TrackingWebSocket] Routing update:', data?.id);
-      optionsRef.current.onRoutingUpdated?.(data);
-    });
-
-    // Serviço/parada atualizado (status, ETA re-projetada).
-    socket.on('service_updated', (data: { id?: string; routingId?: string }) => {
-      console.log('[TrackingWebSocket] Service update:', data?.id);
-      optionsRef.current.onServiceUpdated?.(data);
-    });
-
-    // Nova oferta disponível (uberização): backend emite na sala do usuário.
-    socket.on('offer.available', (offer: OfferPayload) => {
-      console.log('[TrackingWebSocket] Offer available:', offer?.id);
-      optionsRef.current.onOfferAvailable?.(offer);
     });
 
     // Escutar erros
@@ -177,26 +208,41 @@ export function useTrackingWebSocket(options: TrackingWebSocketOptions = {}) {
       console.error('[TrackingWebSocket] Erro do servidor:', error.message);
     });
 
-  }, [userAuth?.id, authCredentials?.tenantId, authCredentials?.accessToken]);
+    attach(socket);
+    hold();
+  }, [userAuth?.id, authCredentials?.tenantId, authCredentials?.accessToken, attach, hold]);
 
   /**
    * Desconectar do WebSocket
    */
   const disconnect = useCallback(() => {
-    connectionCount--;
+    detachRef.current?.();
+    socketRef.current = null;
+    if (holdsRef.current === null) return; // idempotente por instância
+    const heldCurrent = holdsRef.current === socketGeneration;
+    holdsRef.current = null;
+    // Referência a um socket já descartado (troca de token) não desconta do atual.
+    if (!heldCurrent) return;
+    connectionCount = Math.max(0, connectionCount - 1);
 
     // Só desconectar se for a última referência
-    if (connectionCount <= 0 && globalSocket) {
+    if (connectionCount === 0 && globalSocket) {
       console.log('[TrackingWebSocket] Desconectando socket global');
       globalSocket.removeAllListeners();
       globalSocket.disconnect();
       globalSocket = null;
-      connectionCount = 0;
       connectedAccessToken = null;
     }
-
-    socketRef.current = null;
   }, []);
+
+  /**
+   * Reconectar ao voltar do background: acorda o socket que já existe em vez
+   * de criar outro. Só cria (via `connect`) se não houver socket nenhum.
+   */
+  const reconnect = useCallback(() => {
+    if (globalSocket && !globalSocket.connected) globalSocket.connect();
+    else if (!globalSocket) connect();
+  }, [connect]);
 
   /**
    * Enviar evento de localização (se necessário)
@@ -220,6 +266,7 @@ export function useTrackingWebSocket(options: TrackingWebSocketOptions = {}) {
   return {
     connect,
     disconnect,
+    reconnect,
     emitLocation,
     isConnected: socketRef.current?.connected ?? false,
     socket: socketRef.current,
