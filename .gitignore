@@ -27,6 +27,8 @@ expo-env.d.ts
 # @end expo-cli
 
 plans/
+# Planos de implementação versionados (os 12 anteriores entraram com add -f)
+!project-docs/superpowers/plans/
 
 # Claude Code local config
 .claude/settings*
