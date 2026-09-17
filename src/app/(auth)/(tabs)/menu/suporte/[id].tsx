@@ -31,6 +31,7 @@ import { getChatService, markChatReadService } from '@/domain/agility/chat/chatS
 import type { AttachmentType, ChatSendOutcome, OutgoingAttachment } from '@/domain/agility/chat/dto/types';
 import { upsertMessagesInCache } from '@/domain/agility/chat/useCase/messagesCache';
 import { runChatSends, type ChatSendStep } from '@/domain/agility/chat/useCase/sendChatBatch';
+import { useDisconnectedNotice } from '@/domain/agility/chat/useCase/useDisconnectedNotice';
 import { CHAT_OFFLINE_POLL_MS } from '@/domain/agility/chat/useCase/useGetChatMessages';
 import { generateTempId, isRemoteUrl, toChatMessage } from '@/domain/agility/chat/utils/messageUtils';
 import { useGetTicketByChatId } from '@/domain/agility/ticket/useCase';
@@ -436,6 +437,7 @@ export default function SuporteChatPage() {
       setPeerDeliveredAt(data.deliveredAt || new Date().toISOString());
     },
   });
+  const showOfflineNotice = useDisconnectedNotice(isConnected) && !isChatClosed;
 
   // Emite o "read" do motorista via WS quando há mensagens e estamos conectados.
   // O backend repassa 'messages_read' ao operador (em tempo real), além do REST já existente.
@@ -726,6 +728,15 @@ export default function SuporteChatPage() {
           <Box px="x16" py="y8" backgroundColor="gray50">
             <Text preset="text12" color="gray500">
               {typingIndicatorText}
+            </Text>
+          </Box>
+        )}
+
+        {/* Sem tempo real: avisa e segue pelo polling REST */}
+        {showOfflineNotice && (
+          <Box backgroundColor="gray100" px="x16" py="y8" accessibilityRole="alert">
+            <Text preset="text13" color="gray700" textAlign="center">
+              {`Sem conexão em tempo real. Atualizando a cada ${CHAT_OFFLINE_POLL_MS / 1000} segundos.`}
             </Text>
           </Box>
         )}
