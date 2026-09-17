@@ -109,6 +109,7 @@ export default function ChatInput({
 
         <Box flex={1} backgroundColor="primary10" borderRadius="s16" paddingHorizontal="x12" paddingVertical="y8">
           <TextInput
+            testID="chat-input-message"
             ref={inputRef}
             placeholder={placeholder}
             placeholderTextColor="black"
