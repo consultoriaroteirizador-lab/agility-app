@@ -7,6 +7,7 @@ import {
     mergeAndSortMessages,
     generateTempId,
     isOptimisticMessage,
+    pendingOptimisticMessages,
 } from '../utils/messageUtils';
 
 /**
@@ -112,48 +113,12 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         [storeRemoveOptimistic]
     );
 
-    // Merge server messages with optimistic messages
+    // Mescla as mensagens do servidor com as bolhas otimistas ainda não confirmadas.
+    // A regra de confirmação mora em `pendingOptimisticMessages` (coberta por teste).
     const getMergedMessages = useCallback(
         (chatId: string, serverMessages: ChatMessage[]): ChatMessage[] => {
             const optimistic = optimisticMessages[chatId] || [];
-
-            // ✅ CORREÇÃO: Comparar por conteúdo + remetente + timestamp (não por ID)
-            // IDs otimísticos (temp-xxx) nunca vão bater com UUIDs do servidor
-            const isConfirmedByServer = (optimisticMsg: ChatMessage): boolean => {
-                const optIsAttachment = !!optimisticMsg.attachmentUrl;
-                return serverMessages.some(serverMsg => {
-                    // Mesmo remetente. A otimística guarda o keycloakUserId em senderId; o servidor
-                    // usa senderId interno + senderKeycloakUserId. Casar pelos dois evita duplicação.
-                    const sameSender =
-                        String(serverMsg.senderId) === String(optimisticMsg.senderId) ||
-                        (!!serverMsg.senderKeycloakUserId &&
-                            String(serverMsg.senderKeycloakUserId) === String(optimisticMsg.senderId));
-                    if (!sameSender) return false;
-
-                    // Janela de 60s tolera diferença de relógio cliente/servidor
-                    const timeDiff = Math.abs(
-                        new Date(serverMsg.createdAt).getTime() -
-                        new Date(optimisticMsg.createdAt).getTime()
-                    );
-                    if (timeDiff >= 60000) return false;
-
-                    // Anexo: a URL muda (local -> S3), então NÃO comparar URL/conteúdo.
-                    // Casar por ser um anexo do mesmo tipo do mesmo remetente na janela.
-                    if (optIsAttachment) {
-                        const sameType =
-                            (serverMsg.attachmentType ?? null) === (optimisticMsg.attachmentType ?? null);
-                        return !!serverMsg.attachmentUrl && sameType;
-                    }
-
-                    // Texto: casar por conteúdo
-                    return serverMsg.content === optimisticMsg.content;
-                });
-            };
-
-            // Keep only unconfirmed optimistic messages
-            const pendingOptimistic = optimistic.filter(msg => !isConfirmedByServer(msg));
-
-            return mergeAndSortMessages(serverMessages, pendingOptimistic);
+            return mergeAndSortMessages(serverMessages, pendingOptimisticMessages(optimistic, serverMessages));
         },
         [optimisticMessages]
     );
