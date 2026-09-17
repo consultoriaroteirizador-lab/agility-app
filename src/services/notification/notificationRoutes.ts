@@ -80,8 +80,8 @@ export const notificationRoutes: Record<string, (params?: any) => void> = {
 
     // Menu
     menu: () => router.navigate('/(auth)/(tabs)/menu' as Href),
-    // `menu/chat` é uma tela legada (chatId fixo, sem backend): notificação de chat NUNCA
-    // deve cair lá. Este nome só sobrevive para pushes antigos ainda em trânsito.
+    // Nome antigo de push de mensagem: a tela `menu/chat` foi removida, e este handler
+    // só sobrevive para pushes ainda em trânsito. Leva sempre à conversa de suporte.
     chat: (params?: any) => goToSupportChat(params),
     // Chat de suporte (abre a conversa específica via param `id` = chatId)
     suporte: (params?: any) => goToSupportChat(params),

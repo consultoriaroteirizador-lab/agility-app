@@ -12,7 +12,6 @@ type MenuRoutes =
     | '/(auth)/(tabs)/menu/protocolos'
     | '/(auth)/(tabs)/menu/jornada'
     | '/(auth)/(tabs)/menu/perfil'
-    | '/(auth)/(tabs)/menu/chat'
     | '/(auth)/menu/termos'
     | '/(auth)/menu/privacidade';
 

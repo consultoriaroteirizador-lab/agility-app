@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Linking } from 'react-native';
 
 import { useQueryClient } from '@tanstack/react-query';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, usePathname, useRouter } from 'expo-router';
 
 import { ActivityIndicator, Box, Button, Text, TouchableOpacityBox, LocalIcon, ScreenBase, NavigationPopup, ServiceFlowTheme } from '@/components';
 import { ButtonBack } from '@/components/Button/ButtonBack';
@@ -44,6 +44,7 @@ import { isValidCoordinate } from './_utils/mapUtils';
  */
 function StopDetailContent() {
   const router = useRouter();
+  const pathname = usePathname();
   const params = useLocalSearchParams<{ id: string; pid: string }>();
   const routeId = params.id as string;
   const serviceId = params.pid as string;
@@ -519,8 +520,13 @@ function StopDetailContent() {
             borderWidth={1}
             borderColor="primary20"
             onPress={() => {
-              router.push('/(auth)/(tabs)/menu/chat');
+              // Mesmo destino das etapas de confirmação: o suporte real, voltando para esta parada.
+              router.push({
+                pathname: '/(auth)/(tabs)/menu/suporte',
+                params: { returnTo: pathname },
+              });
             }}
+            accessibilityLabel="Falar com o suporte"
           >
             <LocalIcon iconName="chat" size={measure.m20} color="primary100" />
           </TouchableOpacityBox>
