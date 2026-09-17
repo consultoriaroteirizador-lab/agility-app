@@ -12,9 +12,11 @@ export function chatMessagesKey(chatId: string) {
 }
 
 /**
- * Grava mensagens do servidor no cache da conversa. Todas as fontes passam por aqui
- * (resposta do REST e `chat_history` do socket): o cache é a fonte única do que o
- * servidor já confirmou.
+ * Mescla mensagens do servidor no cache da conversa, sem apagar as que já estão lá.
+ * Passam por aqui a resposta do envio (REST, `usePostMessage`) e o `chat_history` do socket.
+ * Nem tudo passa: o GET (`useGetChatMessages`) substitui a lista inteira do cache, e o
+ * `new_message` do socket fica no estado local da tela de conversa (`wsMessages` em
+ * `menu/suporte/[id].tsx`), não aqui.
  */
 export function upsertMessagesInCache(queryClient: QueryClient, chatId: string, incoming: ChatMessage[]): void {
     queryClient.setQueryData<BaseResponse<MessageItem[]>>(chatMessagesKey(chatId), (old) => ({

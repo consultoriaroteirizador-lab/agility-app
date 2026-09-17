@@ -31,7 +31,9 @@ function TentativaEntregaScreenContent() {
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
   // Guard síncrono contra duplo-tap: o `loadingAction` só vira 'torre' depois
   // que o handler inicia, deixando uma janela onde um 2º toque no mesmo frame
-  // passa sem bloqueio e cria dois chats.
+  // passa sem bloqueio. Não nasce um segundo chat: o find-or-create do backend
+  // roda sob trava no Redis (SET NX) e a 2ª chamada concorrente recebe 400. Sem
+  // o guard, o motorista veria um toast de erro falso enquanto o 1º toque navega.
   const isSendingTorreRef = useRef(false);
 
   // Endereço do serviço
