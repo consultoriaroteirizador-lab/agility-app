@@ -25,6 +25,7 @@ import { Map, MapPoint } from '../_components/shared/Map';
 import { useStopActions, useUserLocation } from '../_hooks';
 import { getCurrentCoords } from '../_hooks/getCurrentCoords';
 import { montarReturnChecklist } from '../_utils/returnChecklist';
+import { othersConcluidos } from '../_utils/returnGate';
 
 /**
  * Tela da parada de RETORNO (CD/origem).
@@ -37,25 +38,6 @@ import { montarReturnChecklist } from '../_utils/returnChecklist';
  * O retorno costuma ter só lat/long (sem Address cadastrado), então o endereço e
  * o mapa vêm do ponto de retorno do map-data (mapData.return / origin).
  */
-/** Status terminal de parada (concluída/falha/cancelada). */
-function isTerminalStatus(st?: string | null): boolean {
-  return ['COMPLETED', 'FAILED', 'CANCELED', 'CANCELLED'].includes(String(st ?? '').toUpperCase());
-}
-
-/**
- * Fases de custódia (cross-docking) em que o pedido JÁ foi entregue no CD de
- * destino (handoff feito) — passou a ser responsabilidade do CD, não do
- * motorista. Conta como "concluído p/ o trecho" no gate do retorno MESMO com
- * status ainda PENDING (o pedido recebido segue no last-mile, então nunca vira
- * COMPLETED na transferência). AT_ORIGIN/IN_TRANSIT são pré-handoff (ainda com o
- * motorista) e EXCEPTION é desvio — nenhum conta como entregue, então o gate
- * segue bloqueando se o handoff não terminou.
- */
-const HANDED_OFF_PHASES = new Set(['AT_HUB', 'OUT_FOR_DELIVERY', 'DELIVERED']);
-function isHandedOff(phase?: string | null): boolean {
-  return HANDED_OFF_PHASES.has(String(phase ?? '').toUpperCase());
-}
-
 /** Rótulo do motivo do retorno (separado da quantidade). Vazio quando não há. */
 function reasonLabel(reason?: string | null): string {
   switch (String(reason ?? '').toUpperCase()) {
@@ -120,34 +102,34 @@ function RetornoContent() {
 
   const hasArrived = !!(service?.isInAttendance || service?.status === 'IN_ATTENDANCE');
 
-  // Trava do retorno: por ser a ÚLTIMA parada, o check-in ("Cheguei no retorno")
-  // só libera quando todas as demais paradas estão terminais. Espelha a trava
-  // das paradas normais. (Se já chegou, mantém liberado para concluir.)
-  const othersDone = useMemo(() => {
-    const others = (services ?? []).filter(
-      (s) => String(s.serviceType ?? '').toUpperCase() !== 'RETURN',
-    );
-    // Pedido "concluído p/ o trecho" = terminal (COMPLETED/FAILED/CANCELED — inclui
-    // os NÃO recebidos, que voltam) OU já entregue no CD (custódia AT_HUB+). Assim o
-    // retorno libera pós-handoff, sem confundir "recebido no CD" (PENDING/AT_HUB) com
-    // "ainda pendente com o motorista".
-    return others.every((s) => isTerminalStatus(s.status) || isHandedOff(s.custodyPhase));
-  }, [services]);
-  const canCheckIn = hasArrived || othersDone;
-
-  // Foto(s) opcional(is) da carga descarregada no CD.
-  const [photos, setPhotos] = useState<ImagePicker.ImagePickerAsset[]>([]);
-  const [submitting, setSubmitting] = useState(false);
-
   // CD da devolução e quem recebeu: o CD de retorno da rota vem sugerido, mas o
   // motorista pode ter deixado a carga em OUTRO CD (ex.: falhou numa cidade que
   // tem CD próprio). Os dois são opcionais — sem CD o backend fecha a tentativa
   // sem gravar custódia, e sem recebedor ele usa o nome do motorista.
+  // A rota é lida aqui (e não mais abaixo) porque o `othersDone` depende do
+  // `legType` dela.
   const { routing } = useFindOneRouting(routeId || '');
   const { distributionCenters } = useFindAllDistributionCenters({ activeOnly: true });
   const [cdEscolhido, setCdEscolhido] = useState<string | null>(null);
   const [recebedor, setRecebedor] = useState('');
   const cdDaDevolucao = cdEscolhido ?? routing?.returnFacilityId ?? null;
+
+  // Trava do retorno: por ser a ÚLTIMA parada, o check-in ("Cheguei no retorno")
+  // só libera quando todas as demais paradas estão terminais. Espelha a trava
+  // das paradas normais. (Se já chegou, mantém liberado para concluir.)
+  // Pedido "concluído p/ o trecho" = terminal (COMPLETED/FAILED/CANCELED — inclui
+  // os NÃO recebidos, que voltam) OU já entregue no CD. A fase AT_HUB só vale como
+  // entregue em perna de MALHA: em rota comum ela agora marca também o pedido
+  // devolvido, que não pode liberar o retorno sozinho.
+  const othersDone = useMemo(
+    () => othersConcluidos(services, routing?.legType),
+    [services, routing?.legType],
+  );
+  const canCheckIn = hasArrived || othersDone;
+
+  // Foto(s) opcional(is) da carga descarregada no CD.
+  const [photos, setPhotos] = useState<ImagePicker.ImagePickerAsset[]>([]);
+  const [submitting, setSubmitting] = useState(false);
 
   // Ponto de retorno: quando volta à origem, usa a origem; senão o return.
   const returnPoint = useMemo(() => {
