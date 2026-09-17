@@ -67,16 +67,11 @@ export function useChatAttachmentUpload(
     uploadAttachments: async (
       params: UploadChatAttachmentsParams,
     ): Promise<BaseResponse<{ urls: string[] }>> => {
-      return new Promise((resolve, reject) => {
-        mutation.mutate(params, {
-          onSuccess: (data: { urls: string[] }) => {
-            resolve({ success: true, result: data } as BaseResponse<{ urls: string[] }>);
-          },
-          onError: (error: Error) => {
-            reject(error);
-          },
-        });
-      });
+      // mutateAsync, e não os callbacks por chamada do mutate: esses só disparam enquanto
+      // o componente está montado. Se a tela desmontasse no meio do upload, a promessa
+      // nunca terminava e a fila de envio ficava parada. O erro chega igual (rejeição).
+      const data = await mutation.mutateAsync(params);
+      return { success: true, result: data } as BaseResponse<{ urls: string[] }>;
     },
     isLoading: mutation.isPending,
     isSuccess: mutation.isSuccess,

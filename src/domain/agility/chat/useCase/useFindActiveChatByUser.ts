@@ -11,6 +11,9 @@ export function useFindActiveChatByUser(userId: Id | undefined) {
         queryFn: () => getActiveChatByUserService(userId as Id, 'DRIVER'),
         enabled: !!userId,
         retry: false,
+        // Decide entre "Continuar chamado" e "Nova conversa": nunca servir do cache velho.
+        staleTime: 0,
+        refetchOnMount: 'always',
     })
 
     return {

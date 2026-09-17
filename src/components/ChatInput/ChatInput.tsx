@@ -1,14 +1,22 @@
 import React, { useState, useCallback, useRef } from 'react';
 import { TextInput as TextInputRN, type TextInput as TextInputRef } from 'react-native';
-const TextInput = TextInputRN;
 
 import { Box, Text, TouchableOpacityBox } from '@/components';
+import type { ChatSendOutcome } from '@/domain/agility/chat/dto/types';
+import { appendAttachments, MAX_CHAT_ATTACHMENTS } from '@/domain/agility/chat/useCase/sendChatBatch';
+import { useToastService } from '@/services/Toast/useToast';
 import { measure } from '@/theme';
 
 import ChatAttachmentButton, { type Attachment } from '../ChatAttachmentButton';
 
+const TextInput = TextInputRN;
+
 interface ChatInputProps {
-  onSendMessage: (content: string, attachments?: Attachment[]) => void;
+  /**
+   * Devolve o que NÃO foi enviado; o campo fica só com isso.
+   * Promessa rejeitada = erro inesperado: nada é apagado.
+   */
+  onSendMessage: (content: string, attachments?: Attachment[]) => Promise<ChatSendOutcome>;
   onTyping: (isTyping: boolean) => void;
   disabled?: boolean;
   placeholder?: string;
@@ -30,6 +38,7 @@ export default function ChatInput({
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [sending, setSending] = useState(false);
   const inputRef = useRef<TextInputRef>(null);
+  const { showToast } = useToastService();
 
   const hasAttachments = attachments.length > 0;
   const hasContent = message.trim().length > 0 || hasAttachments;
@@ -44,16 +53,17 @@ export default function ChatInput({
   const handleSend = useCallback(async () => {
     if (!canSend) return;
 
-    const trimmed = message.trim();
     setSending(true);
-
     try {
-      await onSendMessage(trimmed, hasAttachments ? attachments : undefined);
-      setMessage('');
-      setAttachments([]);
-      onTyping(false);
-      inputRef.current?.focus();
+      const outcome = await onSendMessage(message.trim(), hasAttachments ? attachments : undefined);
+      setMessage(outcome.unsentText);
+      setAttachments(outcome.unsentAttachments);
+      if (!outcome.unsentText && outcome.unsentAttachments.length === 0) {
+        onTyping(false);
+        inputRef.current?.focus();
+      }
     } catch (error) {
+      // Erro inesperado: mantém texto e anexos para o motorista tentar de novo.
       console.error('Erro ao enviar mensagem:', error);
     } finally {
       setSending(false);
@@ -61,8 +71,12 @@ export default function ChatInput({
   }, [canSend, message, attachments, hasAttachments, onSendMessage, onTyping]);
 
   const handleAttachmentsSelected = useCallback((selected: Attachment[]) => {
-    setAttachments(prev => [...prev, ...selected]);
-  }, []);
+    const { list, truncated } = appendAttachments(attachments, selected);
+    setAttachments(list);
+    if (truncated) {
+      showToast({ message: `Envie no máximo ${MAX_CHAT_ATTACHMENTS} anexos por vez.`, type: 'error' });
+    }
+  }, [attachments, showToast]);
 
   const removeAttachment = useCallback((index: number) => {
     setAttachments(prev => prev.filter((_, i) => i !== index));
@@ -95,6 +109,7 @@ export default function ChatInput({
 
         <Box flex={1} backgroundColor="primary10" borderRadius="s16" paddingHorizontal="x12" paddingVertical="y8">
           <TextInput
+            testID="chat-input-message"
             ref={inputRef}
             placeholder={placeholder}
             placeholderTextColor="black"
@@ -110,6 +125,8 @@ export default function ChatInput({
         </Box>
 
         <TouchableOpacityBox
+          testID="chat-input-send"
+          accessibilityLabel="Enviar mensagem"
           onPress={handleSend}
           disabled={!canSend}
           backgroundColor="primary100"

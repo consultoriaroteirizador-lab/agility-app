@@ -27,8 +27,6 @@ export * from './jornada';
 export { default as ProfilePhotoPicker } from './ProfilePhotoPicker';
 export * from './ChatAttachmentButton/ChatAttachmentButton';
 export { default as ChatInput } from './ChatInput';
-export { default as ChatAttachmentView } from './ChatAttachmentView';
-export type { Attachment as ChatViewAttachment } from './ChatAttachmentView';
 export * from './RecipientTypeSelector';
 export * from './ChecklistItem';
 export * from './RotaCard';

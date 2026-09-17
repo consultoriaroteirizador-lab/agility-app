@@ -5,7 +5,7 @@ import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { useTheme } from '@shopify/restyle';
 
 import { Box, Text, TouchableOpacityBox } from '@/components';
-import { useTotalUnreadCount } from '@/domain/agility/chat';
+import { useSupportUnreadCount } from '@/domain/agility/chat/useCase/useSupportUnreadCount';
 import { useGetUnreadCount } from '@/domain/agility/notification/useCase';
 import { measure } from '@/theme';
 import { Theme } from '@/theme/theme';
@@ -13,7 +13,7 @@ import { Theme } from '@/theme/theme';
 export function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const theme = useTheme<Theme>();
   const { unreadCount: notificationUnreadCount } = useGetUnreadCount();
-  const chatUnreadCount = useTotalUnreadCount();
+  const chatUnreadCount = useSupportUnreadCount();
 
   // Filtrar rotas aninhadas (contêm "/") e rotas específicas que não devem aparecer na tab bar
   // Isso resolve o problema de tabs extras sendo geradas no build EAS

@@ -4,17 +4,13 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 
 import { Box, Text, TouchableOpacityBox } from '@/components';
+import type { OutgoingAttachment } from '@/domain/agility/chat/dto/types';
 import { useToastService } from '@/services/Toast/useToast';
 import { measure } from '@/theme';
 
 import Modal from '../Modal/Modal';
 
-export interface Attachment {
-  uri: string;
-  type: 'image' | 'document';
-  name?: string;
-  size?: number;
-}
+export type Attachment = OutgoingAttachment;
 
 interface ChatAttachmentButtonProps {
   disabled?: boolean;

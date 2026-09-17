@@ -127,3 +127,21 @@ export interface SendMessagePayload {
   attachmentUrl?: string
   attachmentType?: AttachmentType
 }
+
+/** Anexo escolhido no aparelho e ainda não enviado. */
+export interface OutgoingAttachment {
+  uri: string
+  type: 'image' | 'document'
+  name?: string
+  size?: number
+}
+
+/**
+ * Resultado de um envio pelo ChatInput: o que NÃO foi enviado volta para o campo.
+ * Sucesso total = texto vazio e lista vazia.
+ */
+export interface ChatSendOutcome {
+  unsentText: string
+  unsentAttachments: OutgoingAttachment[]
+  error?: unknown
+}

@@ -18,6 +18,12 @@ export const KEY_OCCURRENCE_REASONS = 'order-occurrence-reasons'
 export const KEY_TEAMS = 'teams'
 
 /**
+ * Chaves invalidadas a cada push recebido ou tocado (ver `NotificationContext`).
+ * Invalidar só refaz as queries com observador ativo, então o custo é baixo.
+ */
+export const PUSH_INVALIDATED_KEYS: readonly string[] = [KEY_ROUTINGS, KEY_NOTIFICATIONS, KEY_CHATS, KEY_TICKETS]
+
+/**
  * Chaves a invalidar quando o STATUS de uma parada muda (conclusão, insucesso,
  * chegada) — o conjunto único usado por todos os fluxos que mexem em parada.
  *

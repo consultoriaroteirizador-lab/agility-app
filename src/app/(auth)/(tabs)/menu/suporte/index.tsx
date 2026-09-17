@@ -1,16 +1,22 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useRef } from 'react';
 
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useQueryClient } from '@tanstack/react-query';
+import { useFocusEffect, useRouter, useLocalSearchParams } from 'expo-router';
 
 import { ActivityIndicator, Box, Button, Input, ScreenBase, Text, TouchableOpacityBox } from '@/components';
 import { ButtonBack } from '@/components/Button/ButtonBack';
 import { Dropdown } from '@/components/DropDown/DropDown';
 import { MyItemTypeDropDown } from '@/components/RestyleComponent/RestyleComponent';
-import { createDriverSupportChatService } from '@/domain/agility/chat/chatService';
 import { ChatStatus } from '@/domain/agility/chat/dto/types';
 import { useFindActiveChatByUser } from '@/domain/agility/chat/useCase';
+import {
+  findOrCreateSupportChatId,
+  supportChatHref,
+  supportSubjectForService,
+} from '@/domain/agility/chat/useCase/openSupportChat';
 import { ServiceStatus } from '@/domain/agility/service/dto/types';
 import { useFindPendingServices } from '@/domain/agility/service/useCase';
+import { KEY_CHATS } from '@/domain/queryKeys';
 import { useAuthCredentialsService } from '@/services';
 import { useToastService } from '@/services/Toast/useToast';
 import { measure } from '@/theme';
@@ -23,6 +29,11 @@ export default function SuporteScreen() {
   const { userAuth } = useAuthCredentialsService();
   const { showToast } = useToastService();
   const [isCreatingChat, setIsCreatingChat] = useState(false);
+  // Guard síncrono contra duplo-tap em "Continuar chamado"/"Nova conversa": o
+  // `isCreatingChat` só desabilita o botão no próximo render. Um 2º toque não cria outro
+  // chat (o find-or-create do backend roda sob trava no Redis), mas a chamada concorrente
+  // recebe 400 e mostraria um toast de erro falso enquanto o 1º toque navega.
+  const isCreatingChatRef = useRef(false);
   const [selectedSubject, setSelectedSubject] = useState<MyItemTypeDropDown>();
   const [customSubject, setCustomSubject] = useState('');
 
@@ -37,6 +48,15 @@ export default function SuporteScreen() {
     isError,
     refetch
   } = useFindActiveChatByUser(userId);
+  const queryClient = useQueryClient();
+
+  // A tela fica montada embaixo da conversa: ao voltar, busca de novo para o botão
+  // não dizer "Continuar chamado" de um atendimento que já foi encerrado.
+  useFocusEffect(
+    useCallback(() => {
+      refetch();
+    }, [refetch]),
+  );
 
   // Buscar serviços pendentes para verificar se há algum em andamento
   const { services: pendingServices } = useFindPendingServices();
@@ -65,59 +85,47 @@ export default function SuporteScreen() {
   }, [serviceInProgress]);
 
   async function handleNovaConversa() {
-    // Se já existe chat ativo (status === ACTIVE), navegar para ele
-    // Defesa extra: verificar status mesmo que o backend já deva filtrar
-    if (chatAberto && chatAberto.status === ChatStatus.ACTIVE) {
-      const chatId = chatAberto.id;
-      if (chatId) {
-        router.push(`/(auth)/(tabs)/menu/suporte/${chatId}`);
-        return;
-      }
-    }
-
+    if (isCreatingChatRef.current) return;
     if (!userAuth?.id) {
       showToast({ message: 'Usuário não identificado', type: 'error' });
       return;
     }
 
-    // Determinar assunto e serviceId com base na seleção
+    const hasActive = chatAberto?.status === ChatStatus.ACTIVE;
     let finalSubject = '';
-    let serviceId = undefined;
+    let serviceId: string | undefined;
 
-    if (selectedSubject?.value === 'custom') {
-      finalSubject = customSubject.trim();
-    } else if (selectedSubject?.value?.startsWith('service:')) {
-      serviceId = selectedSubject.value.split(':')[1];
-      finalSubject = `Problema no serviço #${serviceId}`;
-    } else if (selectedSubject?.value) {
-      finalSubject = selectedSubject.value;
+    // Com chamado aberto o assunto fica oculto: o backend devolve o chat existente.
+    if (!hasActive) {
+      if (selectedSubject?.value === 'custom') {
+        finalSubject = customSubject.trim();
+      } else if (selectedSubject?.value?.startsWith('service:')) {
+        const id = String(selectedSubject.value).slice('service:'.length);
+        serviceId = id;
+        finalSubject = supportSubjectForService(id);
+      } else if (selectedSubject?.value) {
+        finalSubject = selectedSubject.value;
+      }
     }
 
+    isCreatingChatRef.current = true;
     try {
       setIsCreatingChat(true);
-
-      // Criar chat de suporte com o driver
-      const result = await createDriverSupportChatService({
+      // "Continuar" e "Nova conversa" passam pelo find-or-create: se o chamado foi
+      // encerrado, o backend abre outro em vez de devolver o fechado (F4).
+      const chatId = await findOrCreateSupportChatId({
         driverId: userAuth.id,
-        subject: finalSubject || undefined,
-        serviceId: serviceId,
+        subject: finalSubject,
+        serviceId,
       });
-
-      if (result.success && result.result) {
-        const chatId = result.result.id;
-        // Limpar seleção
-        setSelectedSubject(undefined);
-        setCustomSubject('');
-        // Navegar para a tela de chat individual
-        router.push(`/(auth)/(tabs)/menu/suporte/${chatId}`);
-        // Refetch para atualizar a lista
-        await refetch();
-      } else {
-        showToast({ message: 'Não foi possível criar a conversa de suporte', type: 'error' });
-      }
-    } catch (error) {
-      showToast({ message: 'Não foi possível criar a conversa de suporte', type: 'error' });
+      setSelectedSubject(undefined);
+      setCustomSubject('');
+      queryClient.invalidateQueries({ queryKey: [KEY_CHATS] });
+      router.push(supportChatHref(chatId));
+    } catch {
+      showToast({ message: 'Não foi possível abrir a conversa de suporte', type: 'error' });
     } finally {
+      isCreatingChatRef.current = false;
       setIsCreatingChat(false);
     }
   }

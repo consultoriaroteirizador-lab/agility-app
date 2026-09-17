@@ -16,7 +16,7 @@ import { router } from "expo-router";
 
 import { isDevelopment } from "@/config/environment";
 import { useRegisterUserNotification } from "@/domain/notificationService/useCase/useRegisterUserNotification";
-import { KEY_NOTIFICATIONS, KEY_ROUTINGS } from "@/domain/queryKeys";
+import { PUSH_INVALIDATED_KEYS } from "@/domain/queryKeys";
 import { getDeviceFingerprint } from "@/functions/getDeviceFingerprint";
 
 import { useAuthCredentialsService } from "../authCredentials/useAuthCredentialsService";
@@ -125,19 +125,21 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
   const queryClient = useQueryClient();
 
   /**
-   * Marca as rotas do motorista como desatualizadas quando chega um push.
+   * Marca como desatualizado o que um push pode ter mudado: rotas, notificações,
+   * conversas e protocolos (lista em `PUSH_INVALIDATED_KEYS`).
    *
    * Não filtra por `type` de propósito: NÃO existe um tipo "rota atribuída" —
-   * a atribuição chega hoje como ROUTE_REPLANNED ou SERVICE_ADDED, e um filtro
-   * por tipo quebraria em silêncio no dia em que o backend mandar outro. A
-   * invalidação é barata e tem o efeito que se quer nos dois cenários: com a
-   * Home montada ela refaz a busca na hora; com a Home fora de tela a query
-   * fica stale e busca de novo quando o motorista voltar para ela — sem
-   * depender do pull-to-refresh nem do `staleTime` de 5min expirar.
+   * a atribuição chega hoje como ROUTE_REPLANNED ou SERVICE_ADDED — e um filtro
+   * por tipo quebraria em silêncio no dia em que o backend mandar outro. Com a
+   * tela montada, a busca é refeita na hora; fora de tela, a query fica stale e
+   * busca de novo quando o motorista voltar. Chats entraram por causa do F3: a
+   * resposta do operador chega por push, e a conversa aberta pelo toque (ou já
+   * aberta) precisa buscar de novo.
    */
   const invalidateAfterPush = useCallback(() => {
-    queryClient.invalidateQueries({ queryKey: [KEY_ROUTINGS] });
-    queryClient.invalidateQueries({ queryKey: [KEY_NOTIFICATIONS] });
+    for (const key of PUSH_INVALIDATED_KEYS) {
+      queryClient.invalidateQueries({ queryKey: [key] });
+    }
   }, [queryClient]);
 
   // Seu hook de registro

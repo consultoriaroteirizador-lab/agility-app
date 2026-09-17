@@ -2,11 +2,12 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { FlatList, Image, Linking } from 'react-native';
 
 import { useQueryClient } from '@tanstack/react-query';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import {
   ActivityIndicator,
   Box,
+  Button,
   Text,
   TouchableOpacityBox,
   ChatInput,
@@ -28,12 +29,21 @@ import {
   useChatStore,
 } from '@/domain/agility/chat';
 import { getChatService, markChatReadService } from '@/domain/agility/chat/chatService';
-import { isOpenableAttachmentUrl } from '@/domain/agility/chat/utils/attachmentUtils';
-import { generateTempId } from '@/domain/agility/chat/utils/messageUtils';
+import type { AttachmentType, ChatSendOutcome, OutgoingAttachment } from '@/domain/agility/chat/dto/types';
+import { upsertMessagesInCache } from '@/domain/agility/chat/useCase/messagesCache';
+import { findOrCreateSupportChatId, supportChatHref } from '@/domain/agility/chat/useCase/openSupportChat';
+import { runChatSends, type ChatSendStep } from '@/domain/agility/chat/useCase/sendChatBatch';
+import { useDisconnectedNotice } from '@/domain/agility/chat/useCase/useDisconnectedNotice';
+import { CHAT_OFFLINE_POLL_MS } from '@/domain/agility/chat/useCase/useGetChatMessages';
+import { supportUnreadKey } from '@/domain/agility/chat/useCase/useSupportUnreadCount';
+import { generateTempId, isRemoteUrl, toChatMessage } from '@/domain/agility/chat/utils/messageUtils';
 import { useGetTicketByChatId } from '@/domain/agility/ticket/useCase';
+import { KEY_CHATS, KEY_TICKETS } from '@/domain/queryKeys';
 import { useAuthCredentialsService } from '@/services';
 import { useToastService } from '@/services/Toast/useToast';
 import { measure } from '@/theme';
+
+import { resolveChatBodyState } from './_utils/chatBodyState';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -62,23 +72,6 @@ function formatChatDate(date: Date | string): string {
 function formatChatTime(date: Date | string): string {
   const d = typeof date === 'string' ? new Date(date) : date;
   return d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-}
-
-function convertToChatMessage(msg: any, chatId: string): ChatMessage {
-  return {
-    id: String(msg.id || ''),
-    chatId: String(msg.chatId || chatId),
-    senderId: String(msg.senderId || ''),
-    senderType: msg.senderType as ParticipantType || ParticipantType.DRIVER,
-    content: String(msg.content || ''),
-    attachmentUrl: msg.attachmentUrl,
-    attachmentType: msg.attachmentType,
-    status: msg.status as MessageStatus || MessageStatus.SENT,
-    readAt: msg.readAt,
-    deliveredAt: msg.deliveredAt,
-    createdAt: String(msg.createdAt || new Date().toISOString()),
-    updatedAt: msg.updatedAt,
-  };
 }
 
 // ─── MessageItem component ────────────────────────────────────────────────────
@@ -128,9 +121,9 @@ function MessageItem({ item, prevItem, isOwnMessage, peerReadAt, peerDeliveredAt
   const isImage =
     msg.attachmentType?.toLowerCase() === 'image' ||
     (msg.attachmentUrl && IMAGE_EXTENSION_REGEX.test(msg.attachmentUrl));
-  // Só a URL assinada abre; a chave crua e a URI local da bolha em envio não.
-  const canOpenAttachment = isOpenableAttachmentUrl(msg.attachmentUrl);
   const isOptimistic = msg.id.startsWith('temp-');
+  // Só URL http(s) do servidor abre. URI local (bolha ainda enviando) e chave do storage não.
+  const canOpenAttachment = isRemoteUrl(msg.attachmentUrl);
 
   // Debug log para anexos
   useEffect(() => {
@@ -207,12 +200,16 @@ function MessageItem({ item, prevItem, isOwnMessage, peerReadAt, peerDeliveredAt
             alignItems="center"
             gap="x8"
             disabled={!canOpenAttachment}
+            onPress={() => {
+              if (msg.attachmentUrl) onOpenAttachment(msg.attachmentUrl);
+            }}
+            accessibilityRole="link"
+            accessibilityLabel="Abrir anexo"
             opacity={canOpenAttachment ? 1 : 0.6}
-            onPress={() => onOpenAttachment(msg.attachmentUrl!)}
           >
             <Text preset="text20">📄</Text>
             <Text preset="text13" color={isOwn ? 'white' : 'primary100'} fontWeightPreset='semibold'>
-              {canOpenAttachment ? 'Ver anexo' : 'Enviando anexo…'}
+              Ver anexo
             </Text>
           </TouchableOpacityBox>
         )}
@@ -257,17 +254,18 @@ function MessageItem({ item, prevItem, isOwnMessage, peerReadAt, peerDeliveredAt
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function SuporteChatPage() {
-  const { id } = useLocalSearchParams();
+  const { id, returnTo } = useLocalSearchParams<{ id?: string; returnTo?: string }>();
   const chatId = id ? String(id) : undefined;
-  const queryClient = useQueryClient();
+  const router = useRouter();
 
   const { userAuth, authCredentials } = useAuthCredentialsService();
   const { showToast } = useToastService();
+  const queryClient = useQueryClient();
   const handleOpenAttachment = useCallback(
     (url: string) => {
-      // Defesa extra: o card já desabilita o toque quando a URL não é remota,
-      // mas o Linking não deve depender só disso.
-      if (!isOpenableAttachmentUrl(url)) return;
+      // Defesa extra: só abre URL remota (http/https). Hoje o card já desabilita o toque
+      // quando não é, mas o Linking não deve depender só disso.
+      if (!isRemoteUrl(url)) return;
       Linking.openURL(url).catch(() => {
         showToast({ message: 'Não foi possível abrir o anexo', type: 'error' });
       });
@@ -277,17 +275,21 @@ export default function SuporteChatPage() {
   const [currentUserSenderId, setCurrentUserSenderId] = useState<string | null>(null);
   const [chatInfo, setChatInfo] = useState<ChatWithParticipants | null>(null);
   const [chatStatus, setChatStatus] = useState<ChatStatus>(ChatStatus.ACTIVE);
+  const isChatClosed = chatStatus === ChatStatus.CLOSED || chatInfo?.status === ChatStatus.CLOSED;
   const messagesEndRef = useRef<FlatList>(null);
 
   const { getMergedMessages, clearUnread } = useChatContext();
   const { optimisticMessages, addOptimisticMessage, removeOptimisticMessage } = useChatStore();
   const typingUsers = useTypingUsers(chatId);
 
+  // O socket da conversa publica o estado no store; enquanto ele está fora, o REST faz polling.
+  const socketConnected = useChatStore((s) => s.isConnected);
   const {
     messages: messagesFromAPI,
     isLoading: isLoadingMessages,
+    isError: isMessagesError,
     refetch: refetchMessages,
-  } = useGetChatMessages(chatId);
+  } = useGetChatMessages(chatId, { refetchIntervalMs: socketConnected ? false : CHAT_OFFLINE_POLL_MS });
 
   const { ticket } = useGetTicketByChatId(chatId);
 
@@ -299,7 +301,7 @@ export default function SuporteChatPage() {
   const [peerDeliveredAt, setPeerDeliveredAt] = useState<string | null>(null);
 
   const convertedApiMessages = useMemo(
-    () => (messagesFromAPI || []).map(msg => convertToChatMessage(msg, chatId || '')),
+    () => (messagesFromAPI || []).map(msg => toChatMessage(msg, chatId || '')),
     [messagesFromAPI, chatId],
   );
 
@@ -331,45 +333,42 @@ export default function SuporteChatPage() {
     return result;
   }, [messages]);
 
-  const { mutate: sendMessageMutation, isPending: isSending } = usePostMessage();
+  const { mutateAsync: postMessage, isPending: isSending } = usePostMessage();
+  // Sem onError aqui: o aviso de falha sai uma vez só, pelo resultado da fila.
+  const { uploadAttachments, isLoading: uploadingAttachment } = useChatAttachmentUpload();
 
-  const { uploadAttachments, isLoading: uploadingAttachment } = useChatAttachmentUpload({
-    onError: (error) => {
-      console.error('Erro ao fazer upload:', error);
-      showToast({ message: 'Não foi possível enviar o anexo', type: 'error' });
-    },
-  });
+  // Busca info do chat apenas para status e subject (mais leve)
+  const loadChatInfo = useCallback(() => {
+    if (!chatId) return;
+    getChatService(chatId)
+      .then((result) => {
+        if (result.success && result.result) {
+          const chat = result.result as unknown as ChatWithParticipants;
+          setChatInfo(chat);
+          setChatStatus(chat.status || ChatStatus.ACTIVE);
+        }
+      })
+      .catch((error) => {
+        console.error('[SuporteChatPage] Error loading chat info:', error);
+      });
+  }, [chatId]);
 
   // userAuth.id = keycloakUserId (JWT sub). O backend converte para ID interno automaticamente.
   useEffect(() => {
     if (!userAuth?.id) return;
-
-    const senderId = userAuth.id;
-    setCurrentUserSenderId(senderId);
-
-    // Buscar info do chat apenas para status e subject (mais leve)
-    if (chatId) {
-      getChatService(chatId)
-        .then((result) => {
-          if (result.success && result.result) {
-            const chat = result.result as unknown as ChatWithParticipants;
-            setChatInfo(chat);
-            setChatStatus(chat.status || ChatStatus.ACTIVE);
-          }
-        })
-        .catch((error) => {
-          console.error('[SuporteChatPage] Error loading chat info:', error);
-        });
-    }
-  }, [chatId, userAuth?.id]);
+    setCurrentUserSenderId(userAuth.id);
+    loadChatInfo();
+  }, [userAuth?.id, loadChatInfo]);
 
   // Marcar como lida quando carregar mensagens
   useEffect(() => {
     if (messagesFromAPI && messagesFromAPI.length > 0 && chatId && userAuth?.id) {
-      markChatReadService(chatId, userAuth.id).catch(console.error);
+      markChatReadService(chatId, userAuth.id)
+        .then(() => queryClient.invalidateQueries({ queryKey: supportUnreadKey(chatId, userAuth.id) }))
+        .catch(console.error);
       clearUnread(chatId);
     }
-  }, [messagesFromAPI, chatId, userAuth?.id, clearUnread]);
+  }, [messagesFromAPI, chatId, userAuth?.id, clearUnread, queryClient]);
 
   // Handler para mensagens recebidas via WebSocket
   const handleNewMessage = useCallback(
@@ -400,7 +399,9 @@ export default function SuporteChatPage() {
       });
 
       if (userAuth?.id && chatId) {
-        markChatReadService(chatId, userAuth.id).catch(console.error);
+        markChatReadService(chatId, userAuth.id)
+          .then(() => queryClient.invalidateQueries({ queryKey: supportUnreadKey(chatId, userAuth.id) }))
+          .catch(console.error);
         clearUnread(chatId);
       }
 
@@ -408,23 +409,39 @@ export default function SuporteChatPage() {
         messagesEndRef.current?.scrollToEnd({ animated: true });
       }, 100);
     },
-    [chatId, userAuth?.id, clearUnread, currentUserSenderId],
+    [chatId, userAuth?.id, clearUnread, currentUserSenderId, queryClient],
   );
 
-  // Handler para quando o chat for fechado pelo operador
+  // Encerramento (evento do operador ou envio recusado): além de travar a tela,
+  // invalida a lista/chat ativo e os protocolos. Sem isso, "Continuar chamado"
+  // levava de volta a esta conversa fechada (F4). Invalidar KEY_CHATS também
+  // refaz as mensagens desta conversa (a chave delas começa com KEY_CHATS).
+  const markClosedLocally = useCallback(() => {
+    setChatStatus(ChatStatus.CLOSED);
+    queryClient.invalidateQueries({ queryKey: [KEY_CHATS] });
+    queryClient.invalidateQueries({ queryKey: [KEY_TICKETS] });
+  }, [queryClient]);
+
   const handleChatClosed = useCallback(
     (closedChatId: string) => {
-      if (closedChatId === chatId) {
-        setChatStatus(ChatStatus.CLOSED);
-        refetchMessages();
-      }
+      if (closedChatId === chatId) markClosedLocally();
     },
-    [chatId, refetchMessages],
+    [chatId, markClosedLocally],
+  );
+
+  // Histórico enviado a cada join (inclusive depois de uma queda): vai para o mesmo cache.
+  const handleHistory = useCallback(
+    (data: { chatId: string; messages: ChatMessage[] }) => {
+      if (!chatId || data.chatId !== chatId) return;
+      upsertMessagesInCache(queryClient, chatId, data.messages.map((m) => toChatMessage(m, chatId)));
+    },
+    [chatId, queryClient],
   );
 
   const { isConnected, emitTypingStart, emitTypingStop, markAsRead: markAsReadWS } = useChatWebSocket({
     enabled: !!chatId,
     chatId: chatId,
+    onHistory: handleHistory,
     onMessage: handleNewMessage,
     onChatClosed: handleChatClosed,
     onError: (error) => {
@@ -441,6 +458,7 @@ export default function SuporteChatPage() {
       setPeerDeliveredAt(data.deliveredAt || new Date().toISOString());
     },
   });
+  const showOfflineNotice = useDisconnectedNotice(isConnected) && !isChatClosed;
 
   // Emite o "read" do motorista via WS quando há mensagens e estamos conectados.
   // O backend repassa 'messages_read' ao operador (em tempo real), além do REST já existente.
@@ -453,8 +471,6 @@ export default function SuporteChatPage() {
   // ✅ OTIMIZAÇÃO: Removido useEffect de scroll duplicado
   // O scroll já é feito no onContentSizeChange da FlatList (mais eficiente)
 
-  // ✅ PERFORMANCE: Upload não-bloqueante
-  // Mensagem aparece imediatamente com URI local, upload roda em background
   // Trata falha de envio: se o backend recusou por chat encerrado, trava a tela
   // (input desabilitado + banner de finalizado) — cobre o caso de o app não ter
   // recebido o chat_closed em tempo real.
@@ -463,111 +479,126 @@ export default function SuporteChatPage() {
       const raw = (error as any)?.response?.data?.message ?? (error as any)?.message ?? '';
       const text = Array.isArray(raw) ? raw.join(' ') : String(raw);
       if (/encerrad|fechad|closed/i.test(text)) {
-        setChatStatus(ChatStatus.CLOSED);
-        refetchMessages();
+        markClosedLocally();
         showToast({ message: 'Este atendimento foi finalizado pelo operador.', type: 'error' });
         return;
       }
       showToast({ message: fallbackMsg, type: 'error' });
     },
-    [refetchMessages, showToast],
+    [markClosedLocally, showToast],
+  );
+
+  const handleBack = useCallback(() => {
+    if (returnTo) {
+      // Mesma regra de suporte/index.tsx: volta para a tela de origem em outra aba.
+      router.navigate(returnTo as never);
+      return;
+    }
+    router.back();
+  }, [returnTo, router]);
+
+  const [isStartingNew, setIsStartingNew] = useState(false);
+  // Guard síncrono contra duplo-tap: `isStartingNew` só desabilita o botão no próximo
+  // render. Um 2º toque não cria outro chat (o find-or-create do backend roda sob trava
+  // no Redis), mas a chamada concorrente recebe 400 e mostraria um toast de erro falso.
+  const isStartingNewRef = useRef(false);
+
+  const handleNovoAtendimento = useCallback(async () => {
+    if (isStartingNewRef.current) return;
+    if (!userAuth?.id) {
+      showToast({ message: 'Usuário não identificado', type: 'error' });
+      return;
+    }
+    isStartingNewRef.current = true;
+    setIsStartingNew(true);
+    try {
+      const newChatId = await findOrCreateSupportChatId({ driverId: userAuth.id });
+      await queryClient.invalidateQueries({ queryKey: [KEY_CHATS] });
+      if (newChatId === chatId) {
+        // O backend reaproveitou esta conversa (protocolo reaberto): destrava a tela.
+        setChatStatus(ChatStatus.ACTIVE);
+        // chatInfo também: se o loadChatInfo falhar, o aviso de encerrado não fica preso.
+        setChatInfo((prev) => (prev ? { ...prev, status: ChatStatus.ACTIVE } : prev));
+        loadChatInfo();
+        return;
+      }
+      // replace: a conversa encerrada não fica na pilha; returnTo segue valendo.
+      router.replace(supportChatHref(newChatId, returnTo));
+    } catch {
+      showToast({ message: 'Não foi possível abrir um novo atendimento', type: 'error' });
+    } finally {
+      isStartingNewRef.current = false;
+      setIsStartingNew(false);
+    }
+  }, [userAuth?.id, chatId, queryClient, loadChatInfo, router, returnTo, showToast]);
+
+  // Um passo da fila: texto puro, ou um anexo (bolha local -> upload -> mensagem com a chave).
+  const sendStep = useCallback(
+    async (step: ChatSendStep) => {
+      if (!chatId) throw new Error('CHAT_ID_MISSING');
+      const senderId = currentUserSenderId ?? undefined;
+
+      if (!step.attachment) {
+        await postMessage({ chatId, content: step.content, senderId });
+        return;
+      }
+
+      const attachment = step.attachment;
+      const tempId = generateTempId();
+      addOptimisticMessage(chatId, {
+        id: tempId,
+        chatId,
+        senderId: currentUserSenderId || '',
+        senderType: ParticipantType.DRIVER,
+        content: step.content,
+        attachmentUrl: attachment.uri, // URI local: aparece na hora
+        attachmentType: attachment.type as unknown as AttachmentType,
+        status: MessageStatus.SENT,
+        createdAt: new Date().toISOString(),
+      });
+
+      try {
+        const upload = await uploadAttachments({ files: [attachment.uri], chatId });
+        const key = upload.result?.urls?.[0];
+        if (!key) throw new Error('UPLOAD_WITHOUT_KEY');
+        // Contrato C5: a chave devolvida pelo /chats/upload vai exatamente como veio.
+        await postMessage({
+          chatId,
+          content: step.content,
+          senderId,
+          attachmentUrl: key,
+          attachmentType: attachment.type,
+          tempId,
+        });
+      } catch (error) {
+        removeOptimisticMessage(chatId, tempId);
+        throw error;
+      }
+    },
+    [chatId, currentUserSenderId, postMessage, uploadAttachments, addOptimisticMessage, removeOptimisticMessage],
   );
 
   const handleSendMessage = useCallback(
-    (content: string, tempAttachments?: any[]) => {
-      if (!chatId || isSending || chatStatus === ChatStatus.CLOSED) return;
-      if (!content.trim() && !tempAttachments?.length) return;
-
-      const attachmentType = tempAttachments?.[0]?.type === 'image' ? 'image' : 'document';
-
-      // Se tem anexos, criar mensagem otimística IMEDIATAMENTE com URI local
-      if (tempAttachments && tempAttachments.length > 0) {
-        const tempId = generateTempId();
-        const localUri = tempAttachments[0].uri;
-
-        // Criar mensagem otimística com URI local (aparece instantaneamente)
-        const optimisticMsg: ChatMessage = {
-          id: tempId,
-          chatId: String(chatId),
-          senderId: currentUserSenderId || '',
-          senderType: ParticipantType.DRIVER,
-          content: content.trim() || (attachmentType === 'image' ? 'Imagem' : 'Anexo'),
-          attachmentUrl: localUri, // URI local para exibição imediata
-          attachmentType: attachmentType as any,
-          status: MessageStatus.SENT,
-          createdAt: new Date().toISOString(),
-        };
-
-        // Adicionar mensagem otimística (aparece na tela IMEDIATAMENTE)
-        addOptimisticMessage(chatId, optimisticMsg);
-
-        // Fazer upload em BACKGROUND (não bloqueia)
-        const uris = tempAttachments.map(a => a.uri);
-        console.log('[handleSendMessage] Iniciando upload em background:', {
-          tempId,
-          attachmentsCount: tempAttachments.length,
-        });
-
-        uploadAttachments({ files: uris, chatId })
-          .then((uploadResult) => {
-            console.log('[handleSendMessage] Upload concluído:', {
-              success: uploadResult.success,
-              urls: uploadResult.result?.urls,
-            });
-
-            if (uploadResult.success && uploadResult.result?.urls?.[0]) {
-              // Enviar mensagem com URL do S3
-              const payload: any = {
-                chatId,
-                content: content.trim() || (attachmentType === 'image' ? 'Imagem' : 'Anexo'),
-                senderId: currentUserSenderId,
-                attachmentUrl: uploadResult.result.urls[0],
-                attachmentType,
-              };
-
-              sendMessageMutation(payload, {
-                onSuccess: () => {
-                  // Remover mensagem otimística (a real já foi adicionada ao cache)
-                  removeOptimisticMessage(chatId, tempId);
-                  // ✅ PERFORMANCE: Não invalidar aqui - usePostMessage já gerencia o cache
-                },
-                onError: (error) => {
-                  console.error('[handleSendMessage] Erro ao enviar:', error);
-                  removeOptimisticMessage(chatId, tempId);
-                  handleSendFailure(error);
-                },
-              });
-            } else {
-              console.error('[handleSendMessage] Upload falhou - sem URLs');
-              removeOptimisticMessage(chatId, tempId);
-              showToast({ message: 'Não foi possível fazer upload dos anexos', type: 'error' });
-            }
-          })
-          .catch((error: any) => {
-            console.error('[handleSendMessage] Erro no upload:', error?.message);
-            removeOptimisticMessage(chatId, tempId);
-            showToast({ message: `Falha no upload: ${error?.message || 'Erro desconhecido'}`, type: 'error' });
-          });
-
-        return; // Não bloqueia - mensagem já aparece como otimística
+    async (content: string, attachments?: OutgoingAttachment[]): Promise<ChatSendOutcome> => {
+      const pending = attachments ?? [];
+      if (!chatId || isChatClosed) {
+        return { unsentText: content, unsentAttachments: pending };
       }
 
-      // Mensagem sem anexo - comportamento normal
-      const payload: any = {
-        chatId,
-        content: content.trim(),
-        senderId: currentUserSenderId,
-      };
+      const outcome = await runChatSends(content, pending, sendStep);
 
-      sendMessageMutation(payload, {
-        // ✅ PERFORMANCE: Não invalidar aqui - usePostMessage já gerencia o cache
-        onError: (error) => {
-          console.error('Erro ao enviar mensagem:', error);
-          handleSendFailure(error);
-        },
-      });
+      if (outcome.error) {
+        const sentCount = pending.length - outcome.unsentAttachments.length;
+        handleSendFailure(
+          outcome.error,
+          sentCount > 0
+            ? `${outcome.unsentAttachments.length} de ${pending.length} anexos não foram enviados. Toque em enviar para tentar de novo.`
+            : undefined,
+        );
+      }
+      return outcome;
     },
-    [chatId, isSending, chatStatus, uploadAttachments, sendMessageMutation, queryClient, currentUserSenderId, addOptimisticMessage, removeOptimisticMessage, handleSendFailure],
+    [chatId, isChatClosed, sendStep, handleSendFailure],
   );
 
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -580,7 +611,7 @@ export default function SuporteChatPage() {
         emitTypingStart(chatId);
 
         if (typingTimeoutRef.current) {
-          clearTimeout(typingTimeoutRef.current as number);
+          clearTimeout(typingTimeoutRef.current);
         }
 
         typingTimeoutRef.current = setTimeout(() => {
@@ -588,7 +619,7 @@ export default function SuporteChatPage() {
         }, 3000);
       } else {
         if (typingTimeoutRef.current) {
-          clearTimeout(typingTimeoutRef.current as number);
+          clearTimeout(typingTimeoutRef.current);
         }
         emitTypingStop(chatId);
       }
@@ -648,8 +679,6 @@ export default function SuporteChatPage() {
     [],
   );
 
-  const isChatClosed = chatStatus === 'CLOSED' || chatInfo?.status === 'CLOSED';
-
   const headerTitle = chatInfo?.routeId
     ? `Rota ${chatInfo.routeId}`
     : chatInfo?.subject || 'Suporte';
@@ -669,20 +698,15 @@ export default function SuporteChatPage() {
         : `${typingUsers.length} pessoas digitando...`
       : null;
 
-  if (isLoadingMessages) {
-    return (
-      <Box flex={1} backgroundColor="white" alignItems="center" justifyContent="center">
-        <ActivityIndicator />
-        <Text preset="text14" color="gray500" mt="y16">
-          Carregando conversa...
-        </Text>
-      </Box>
-    );
-  }
+  const bodyState = resolveChatBodyState({
+    isLoading: isLoadingMessages,
+    isError: isMessagesError,
+    hasMessages: flatData.length > 0,
+  });
 
   return (
     <ScreenBase
-      buttonLeft={<ButtonBack />}
+      buttonLeft={<ButtonBack onPress={handleBack} />}
       title={
         <Text preset="text16" fontWeightPreset='bold' color="colorTextPrimary">
           {headerTitle}
@@ -750,10 +774,39 @@ export default function SuporteChatPage() {
           // ✅ REMOVIDO: getItemLayout com altura fixa incorreta causava bugs de scroll
           // Mensagens têm alturas variáveis (texto, imagens, documentos)
           ListEmptyComponent={
-            <Box flex={1} py="y32" alignItems="center" justifyContent="center">
-              <Text preset="text14" color="gray400" textAlign="center">
-                Nenhuma mensagem ainda. Envie a primeira mensagem!
-              </Text>
+            <Box flex={1} py="y32" alignItems="center" justifyContent="center" px="x16">
+              {bodyState === 'loading' && (
+                <>
+                  <ActivityIndicator />
+                  <Text preset="text14" color="gray500" mt="y16">
+                    Carregando conversa...
+                  </Text>
+                </>
+              )}
+              {bodyState === 'error' && (
+                <>
+                  <Text preset="text14" color="colorTextError" textAlign="center" mb="y16">
+                    Não foi possível carregar a conversa. Verifique sua conexão.
+                  </Text>
+                  <TouchableOpacityBox
+                    backgroundColor="primary100"
+                    px="x24"
+                    py="y12"
+                    borderRadius="s8"
+                    onPress={() => refetchMessages()}
+                    accessibilityRole="button"
+                  >
+                    <Text preset="text14" fontWeightPreset="bold" color="white">
+                      Tentar novamente
+                    </Text>
+                  </TouchableOpacityBox>
+                </>
+              )}
+              {bodyState === 'ready' && (
+                <Text preset="text14" color="gray400" textAlign="center">
+                  Nenhuma mensagem ainda. Envie a primeira mensagem!
+                </Text>
+              )}
             </Box>
           }
         />
@@ -767,12 +820,28 @@ export default function SuporteChatPage() {
           </Box>
         )}
 
+        {/* Sem tempo real: avisa e segue pelo polling REST */}
+        {showOfflineNotice && (
+          <Box backgroundColor="gray100" px="x16" py="y8" accessibilityRole="alert">
+            <Text preset="text13" color="gray700" textAlign="center">
+              {`Sem conexão em tempo real. Atualizando a cada ${CHAT_OFFLINE_POLL_MS / 1000} segundos.`}
+            </Text>
+          </Box>
+        )}
+
         {/* Chat finalizado */}
         {isChatClosed && (
-          <Box backgroundColor="gray100" px="x16" py="y8">
+          <Box backgroundColor="gray100" px="x16" py="y12" alignItems="center" gap="y8">
             <Text preset="text13" color="gray600" textAlign="center">
               Atendimento finalizado pelo operador.
             </Text>
+            <Button
+              title={isStartingNew ? 'Abrindo...' : 'Novo atendimento'}
+              preset="outline"
+              onPress={handleNovoAtendimento}
+              disabled={isStartingNew}
+              width={measure.x300}
+            />
           </Box>
         )}
 
