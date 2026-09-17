@@ -263,6 +263,9 @@ export default function SuporteChatPage() {
   const queryClient = useQueryClient();
   const handleOpenAttachment = useCallback(
     (url: string) => {
+      // Defesa extra: só abre URL remota (http/https). Hoje o card já desabilita o toque
+      // quando não é, mas o Linking não deve depender só disso.
+      if (!isRemoteUrl(url)) return;
       Linking.openURL(url).catch(() => {
         showToast({ message: 'Não foi possível abrir o anexo', type: 'error' });
       });
@@ -495,12 +498,18 @@ export default function SuporteChatPage() {
   }, [returnTo, router]);
 
   const [isStartingNew, setIsStartingNew] = useState(false);
+  // Guard síncrono contra duplo-tap: `isStartingNew` só desabilita o botão no próximo
+  // render. Um 2º toque não cria outro chat (o find-or-create do backend roda sob trava
+  // no Redis), mas a chamada concorrente recebe 400 e mostraria um toast de erro falso.
+  const isStartingNewRef = useRef(false);
 
   const handleNovoAtendimento = useCallback(async () => {
+    if (isStartingNewRef.current) return;
     if (!userAuth?.id) {
       showToast({ message: 'Usuário não identificado', type: 'error' });
       return;
     }
+    isStartingNewRef.current = true;
     setIsStartingNew(true);
     try {
       const newChatId = await findOrCreateSupportChatId({ driverId: userAuth.id });
@@ -508,6 +517,8 @@ export default function SuporteChatPage() {
       if (newChatId === chatId) {
         // O backend reaproveitou esta conversa (protocolo reaberto): destrava a tela.
         setChatStatus(ChatStatus.ACTIVE);
+        // chatInfo também: se o loadChatInfo falhar, o aviso de encerrado não fica preso.
+        setChatInfo((prev) => (prev ? { ...prev, status: ChatStatus.ACTIVE } : prev));
         loadChatInfo();
         return;
       }
@@ -516,6 +527,7 @@ export default function SuporteChatPage() {
     } catch {
       showToast({ message: 'Não foi possível abrir um novo atendimento', type: 'error' });
     } finally {
+      isStartingNewRef.current = false;
       setIsStartingNew(false);
     }
   }, [userAuth?.id, chatId, queryClient, loadChatInfo, router, returnTo, showToast]);

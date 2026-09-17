@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useRef } from 'react';
 
 import { useQueryClient } from '@tanstack/react-query';
 import { useFocusEffect, useRouter, useLocalSearchParams } from 'expo-router';
@@ -29,6 +29,11 @@ export default function SuporteScreen() {
   const { userAuth } = useAuthCredentialsService();
   const { showToast } = useToastService();
   const [isCreatingChat, setIsCreatingChat] = useState(false);
+  // Guard síncrono contra duplo-tap em "Continuar chamado"/"Nova conversa": o
+  // `isCreatingChat` só desabilita o botão no próximo render. Um 2º toque não cria outro
+  // chat (o find-or-create do backend roda sob trava no Redis), mas a chamada concorrente
+  // recebe 400 e mostraria um toast de erro falso enquanto o 1º toque navega.
+  const isCreatingChatRef = useRef(false);
   const [selectedSubject, setSelectedSubject] = useState<MyItemTypeDropDown>();
   const [customSubject, setCustomSubject] = useState('');
 
@@ -80,6 +85,7 @@ export default function SuporteScreen() {
   }, [serviceInProgress]);
 
   async function handleNovaConversa() {
+    if (isCreatingChatRef.current) return;
     if (!userAuth?.id) {
       showToast({ message: 'Usuário não identificado', type: 'error' });
       return;
@@ -102,6 +108,7 @@ export default function SuporteScreen() {
       }
     }
 
+    isCreatingChatRef.current = true;
     try {
       setIsCreatingChat(true);
       // "Continuar" e "Nova conversa" passam pelo find-or-create: se o chamado foi
@@ -118,6 +125,7 @@ export default function SuporteScreen() {
     } catch {
       showToast({ message: 'Não foi possível abrir a conversa de suporte', type: 'error' });
     } finally {
+      isCreatingChatRef.current = false;
       setIsCreatingChat(false);
     }
   }
