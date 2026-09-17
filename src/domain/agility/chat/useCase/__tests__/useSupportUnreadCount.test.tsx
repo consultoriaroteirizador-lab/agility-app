@@ -48,6 +48,21 @@ async function renderAndFlush() {
     return queryClient;
 }
 
+// A resolucao da query mockada passa por mais de um encadeamento de promise dentro do
+// react-query (fetch -> dispatch -> notifyManager, cada um agendado em microtask) antes de
+// comitar no estado do React. Um unico flush de microtask (como o renderAndFlush faz) as
+// vezes nao e suficiente e o teste lia o valor antigo (flaky). Em vez de aumentar um numero
+// fixo de flushes (mesma fragilidade, so com folga maior), espera pela condicao de verdade,
+// com um teto para nunca travar o jest se o comportamento quebrar de verdade.
+async function waitForCondition(predicate: () => boolean, maxTries = 50) {
+    for (let i = 0; i < maxTries && !predicate(); i += 1) {
+        // eslint-disable-next-line no-await-in-loop
+        await act(async () => {
+            await Promise.resolve();
+        });
+    }
+}
+
 beforeEach(() => {
     mockUnread.mockReset();
     mockActiveChat = { id: 'chat-1' };
@@ -62,6 +77,7 @@ describe('useSupportUnreadCount', () => {
     it('conta as nao lidas do chat ativo do motorista', async () => {
         mockUnread.mockResolvedValue({ success: true, result: { unreadCount: 3 } });
         await renderAndFlush();
+        await waitForCondition(() => count === 3);
         expect(mockUnread).toHaveBeenCalledWith('chat-1', 'kc-1');
         expect(count).toBe(3);
     });
