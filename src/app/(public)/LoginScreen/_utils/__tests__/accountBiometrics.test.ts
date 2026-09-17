@@ -1,6 +1,6 @@
 import { UserCredentials } from '@/services/userAuthInfo/UserAuthInfoType';
 
-import { resolveCredentialsToSave, shouldPromptBiometric } from '../accountBiometrics';
+import { isBiometricPendingNextLogin, resolveCredentialsToSave, shouldPromptBiometric } from '../accountBiometrics';
 
 const contaA: UserCredentials = {
   username: 'ana@transportadora.com',
@@ -129,5 +129,43 @@ describe('shouldPromptBiometric — oferta da digital', () => {
     expect(shouldPromptBiometric({ ...base, deviceId: null })).toBe(false);
     expect(shouldPromptBiometric({ ...base, isLoadingCredentials: true })).toBe(false);
     expect(shouldPromptBiometric({ ...base, current: null })).toBe(false);
+  });
+});
+
+describe('isBiometricPendingNextLogin', () => {
+  it('acusa pendencia quando a conta ligou a digital mas nao tem senha guardada', () => {
+    // O caso real: a senha e podada do storage enquanto a biometria esta
+    // desligada, entao ao REABRIR o app a conta chega sem ela. Ligar o toggle
+    // nesse momento grava so a preferencia — e antes disto a tela dizia
+    // "Ativado" e a digital nunca era oferecida, sem explicacao.
+    expect(isBiometricPendingNextLogin({ ...contaA, password: undefined })).toBe(true);
+  });
+
+  it('nao acusa pendencia quando a senha esta guardada', () => {
+    expect(isBiometricPendingNextLogin(contaA)).toBe(false);
+  });
+
+  it('nao acusa pendencia para conta com a digital desligada ou indecisa', () => {
+    expect(isBiometricPendingNextLogin({ ...contaA, allowsBiometrics: false, password: undefined })).toBe(false);
+    expect(isBiometricPendingNextLogin({ ...contaA, allowsBiometrics: undefined, password: undefined })).toBe(false);
+  });
+
+  it('nao acusa pendencia sem conta', () => {
+    expect(isBiometricPendingNextLogin(null)).toBe(false);
+    expect(isBiometricPendingNextLogin(undefined)).toBe(false);
+  });
+
+  it('e o complemento exato de shouldPromptBiometric no que depende da senha', () => {
+    // As duas leem o mesmo par (allowsBiometrics + password). Conta ligada e SEM
+    // senha: a digital nao e oferecida E a tela precisa avisar. Travar as duas
+    // juntas evita que uma mude sem a outra e a tela volte a mentir.
+    const ligadaSemSenha = { ...contaA, password: undefined };
+    const base = { isLoadingCredentials: false, deviceId: 'device-1', attemptedFor: null };
+
+    expect(shouldPromptBiometric({ ...base, current: ligadaSemSenha })).toBe(false);
+    expect(isBiometricPendingNextLogin(ligadaSemSenha)).toBe(true);
+
+    expect(shouldPromptBiometric({ ...base, current: contaA })).toBe(true);
+    expect(isBiometricPendingNextLogin(contaA)).toBe(false);
   });
 });

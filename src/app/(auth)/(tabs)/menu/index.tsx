@@ -2,12 +2,15 @@ import { useState } from 'react';
 
 import { useRouter, Href } from 'expo-router';
 
+import { isBiometricPendingNextLogin } from '@/app/(public)/LoginScreen/_utils/accountBiometrics';
 import { Box, Text, TouchableOpacityBox, Button, Image, BiometricToggle } from '@/components';
 import Modal from '@/components/Modal/Modal';
 import ProfilePhotoPicker from '@/components/ProfilePhotoPicker';
 import { useAuthCredentialsService } from '@/services';
-import { useToastService } from '@/services/Toast/useToast';
 import { measure } from '@/theme';
+
+import { BiometricPasswordPrompt } from './_components/BiometricPasswordPrompt';
+import { useBiometricActivation } from './_hooks/useBiometricActivation';
 
 interface MenuItem {
   label: string;
@@ -18,7 +21,6 @@ interface MenuItem {
 export default function MenuScreen() {
   const router = useRouter();
   const { userAuth, removeCredentials } = useAuthCredentialsService();
-  const { showToast } = useToastService();
   const [popupSair, setPopupSair] = useState(false);
 
   const userName = userAuth?.fullname || userAuth?.nickname || 'Usuário';
@@ -89,23 +91,10 @@ export default function MenuScreen() {
     removeCredentials();
     // router.replace será chamado automaticamente pelo removeCredentials
   }
-  const { userCredentialsCurrent, saveUserCredentials } = useAuthCredentialsService();
-  const [isBiometricLoading, setIsBiometricLoading] = useState(false);
-  const handleBiometricToggle = async () => {
-    if (!userCredentialsCurrent) return;
-
-    setIsBiometricLoading(true);
-    try {
-      await saveUserCredentials({
-        ...userCredentialsCurrent,
-        allowsBiometrics: !userCredentialsCurrent.allowsBiometrics,
-      });
-    } catch (error) {
-      showToast({ message: 'Não foi possível atualizar a configuração de biometria', type: 'error' });
-    } finally {
-      setIsBiometricLoading(false);
-    }
-  };
+  const { userCredentialsCurrent } = useAuthCredentialsService();
+  // Ligar a digital sem a senha em mãos (o caso de quem reabriu o app) abre um
+  // pedido de confirmação em vez de gravar só a preferência — ver o hook.
+  const biometrics = useBiometricActivation();
 
 
 
@@ -201,11 +190,25 @@ export default function MenuScreen() {
       <Box mb="y24">
         <BiometricToggle
           isEnabled={userCredentialsCurrent?.allowsBiometrics ?? false}
-          isLoading={isBiometricLoading}
+          isLoading={biometrics.isSaving}
           disabled={!userCredentialsCurrent}
-          onToggle={handleBiometricToggle}
+          onToggle={biometrics.toggle}
+          // Continua valendo para quem JÁ tem `allowsBiometrics: true` gravado sem
+          // senha (instalações anteriores ao pedido de confirmação): a digital
+          // volta sozinha no próximo login digitado, e a tela diz isso.
+          pendingNextLogin={isBiometricPendingNextLogin(userCredentialsCurrent)}
         />
       </Box>
+
+      <BiometricPasswordPrompt
+        visible={biometrics.isPrompting}
+        password={biometrics.password}
+        setPassword={biometrics.setPassword}
+        errorMessage={biometrics.errorMessage}
+        isLoading={biometrics.isSaving}
+        onConfirm={biometrics.confirmPassword}
+        onCancel={biometrics.cancelPrompt}
+      />
 
       {/* Modal de Confirmação de Saída */}
       {popupSair && (

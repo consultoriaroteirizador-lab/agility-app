@@ -10,6 +10,13 @@ interface BiometricToggleProps {
     isLoading: boolean;
     disabled: boolean;
     onToggle: () => void;
+    /**
+     * Ligado, mas ainda sem a senha necessária para a digital rodar — só vale a
+     * partir do próximo login digitado. Ver `isBiometricPendingNextLogin`.
+     * Sem isto o subtítulo dizia "Ativado" e o motorista esperava a digital que
+     * nunca vinha.
+     */
+    pendingNextLogin?: boolean;
 }
 
 function BiometricToggleComponent({
@@ -17,6 +24,7 @@ function BiometricToggleComponent({
     isLoading,
     disabled,
     onToggle,
+    pendingNextLogin = false,
 }: BiometricToggleProps) {
     const { colors } = useAppTheme();
 
@@ -52,7 +60,11 @@ function BiometricToggleComponent({
                         color="secondaryTextColor"
                         mt="y4"
                     >
-                        {isEnabled ? 'Ativado' : 'Desativado'}
+                        {!isEnabled
+                            ? 'Desativado'
+                            : pendingNextLogin
+                                ? 'Ativado — vale a partir do próximo login com senha'
+                                : 'Ativado'}
                     </Text>
                 </Box>
                 {isLoading ? (

@@ -72,3 +72,22 @@ export function shouldPromptBiometric({
 
     return true;
 }
+
+/**
+ * A conta LIGOU a biometria, mas ainda não dá para oferecê-la: falta a senha
+ * que `shouldPromptBiometric` exige para reenviar ao `/auth/login`.
+ *
+ * Não é erro, é consequência da poda: com a biometria desligada a senha não fica
+ * no storage, então ao REABRIR o app `userCredentialsCurrent` chega sem ela.
+ * Quem liga a digital pelo menu nesse momento grava só a preferência. A digital
+ * passa a valer no próximo login digitado — aí `resolveCredentialsToSave` grava
+ * a senha já com `allowsBiometrics: true`.
+ *
+ * Existe para a tela poder DIZER isso. Sem essa distinção o toggle mostrava
+ * "Ativado", a digital nunca era oferecida, e o motorista não tinha como
+ * descobrir por quê.
+ */
+export function isBiometricPendingNextLogin(current?: UserCredentials | null): boolean {
+    if (!current?.allowsBiometrics) return false;
+    return !current.password;
+}
