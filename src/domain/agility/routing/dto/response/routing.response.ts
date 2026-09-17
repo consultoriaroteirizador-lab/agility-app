@@ -193,6 +193,9 @@ export interface RoutingResponse {
     /** Cross-docking: id do CD de destino do trecho (resolve coords via distribution-centers). */
     destinationFacilityId?: string | null
 
+    /** CD para onde a rota volta. É a sugestão de CD na devolução da parada de retorno. */
+    returnFacilityId?: string | null
+
     /** Ajudantes da viagem. Só o `GET /routings/:id` embute; o payload leve das
      *  listagens não traz. Ausente também enquanto o backend não subir. */
     helpers?: RoutingHelperResponse[]

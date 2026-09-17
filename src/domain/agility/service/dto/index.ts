@@ -23,6 +23,7 @@ export type {
 
 // Response DTOs
 export type { ServiceResponse } from './response/service.response'
+export type { DeliveryAttemptResponse } from './response/delivery-attempt.response'
 export type { ServiceMaterialResponse, MaterialStatus, MaterialCheckRequest, MaterialCheckResponse, BatchMaterialCheckRequest, BatchMaterialCheckResponse } from './response/service-material.response'
 
 // Draft (in-progress evidence)

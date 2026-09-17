@@ -33,6 +33,7 @@ import {
 import { EquipmentList, StopActions, StopTabs } from './_components';
 import { Map } from './_components/shared/Map';
 import { StopArrivalView } from './_components/shared/StopArrivalView';
+import { TentativasAnteriores } from './_components/shared/TentativasAnteriores';
 import { useStopActions, useStopStatus, useUserLocation } from './_hooks';
 import { TabType } from './_types/stop.types';
 import { resolveCompanyRules } from './_utils/companyRules';
@@ -549,6 +550,9 @@ function StopDetailContent() {
           ) : null}
         </Box>
       </Box>
+
+      {/* Tentativas anteriores: só aparece quando o pedido já falhou antes. */}
+      <TentativasAnteriores serviceId={service.id} attemptCount={service.attemptCount ?? 0} />
 
       {/* Service Information */}
       <Box backgroundColor="gray50" p="y12" borderRadius="s12">

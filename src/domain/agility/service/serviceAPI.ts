@@ -18,6 +18,7 @@ import type {
     GetServiceDraftResponse,
     ApplyOccurrenceRequest,
     OccurrenceOutcome,
+    DeliveryAttemptResponse,
 } from './dto'
 import type {
     ServiceMaterialResponse,
@@ -177,6 +178,12 @@ async function applyOccurrence(
     return data
 }
 
+/** Tentativas de entrega do pedido, em ordem (falhas, devolução e desfecho). */
+async function findAttempts(id: Id): Promise<BaseResponse<DeliveryAttemptResponse[]>> {
+    const { data } = await apiAgility.get<BaseResponse<DeliveryAttemptResponse[]>>(`/services/${id}/attempts`)
+    return data
+}
+
 async function changeStatus(
     id: Id,
     payload: ChangeServiceStatusRequest,
@@ -280,6 +287,7 @@ export const serviceAPI = {
     completeWithDetails,
     fail,
     applyOccurrence,
+    findAttempts,
     changeStatus,
     remove,
     removeBatch,

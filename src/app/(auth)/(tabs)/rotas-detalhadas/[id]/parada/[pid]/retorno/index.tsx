@@ -9,8 +9,8 @@ import { ActivityIndicator, Box, Button, LocalIcon, ScreenBase, Text, TouchableO
 import { ButtonBack } from '@/components/Button/ButtonBack';
 import { Icon } from '@/components/Icon/Icon';
 import { MultiPhotoPicker } from '@/components/MultiPhotoPicker';
-import { useCompleteRouting, useGetRoutingMapData, useReturnManifest } from '@/domain/agility/routing/useCase';
-import type { ReturnChecklistItem } from '@/domain/agility/service/dto/request/service-completion-details.request';
+import { useFindAllDistributionCenters } from '@/domain/agility/distribution-center/useCase';
+import { useCompleteRouting, useFindOneRouting, useGetRoutingMapData, useReturnManifest } from '@/domain/agility/routing/useCase';
 import { uploadMultipleServicePhotos } from '@/domain/agility/service/serviceUploadUtils';
 import { useCompleteServiceWithDetails, useFindOneService } from '@/domain/agility/service/useCase';
 import { useRouteDirections } from '@/domain/ors/useRouteDirections';
@@ -24,6 +24,8 @@ import { splitRouteAtLastStop } from '../_components/shared/geo';
 import { Map, MapPoint } from '../_components/shared/Map';
 import { useStopActions, useUserLocation } from '../_hooks';
 import { getCurrentCoords } from '../_hooks/getCurrentCoords';
+import { montarReturnChecklist } from '../_utils/returnChecklist';
+import { othersConcluidos } from '../_utils/returnGate';
 
 /**
  * Tela da parada de RETORNO (CD/origem).
@@ -36,25 +38,6 @@ import { getCurrentCoords } from '../_hooks/getCurrentCoords';
  * O retorno costuma ter só lat/long (sem Address cadastrado), então o endereço e
  * o mapa vêm do ponto de retorno do map-data (mapData.return / origin).
  */
-/** Status terminal de parada (concluída/falha/cancelada). */
-function isTerminalStatus(st?: string | null): boolean {
-  return ['COMPLETED', 'FAILED', 'CANCELED', 'CANCELLED'].includes(String(st ?? '').toUpperCase());
-}
-
-/**
- * Fases de custódia (cross-docking) em que o pedido JÁ foi entregue no CD de
- * destino (handoff feito) — passou a ser responsabilidade do CD, não do
- * motorista. Conta como "concluído p/ o trecho" no gate do retorno MESMO com
- * status ainda PENDING (o pedido recebido segue no last-mile, então nunca vira
- * COMPLETED na transferência). AT_ORIGIN/IN_TRANSIT são pré-handoff (ainda com o
- * motorista) e EXCEPTION é desvio — nenhum conta como entregue, então o gate
- * segue bloqueando se o handoff não terminou.
- */
-const HANDED_OFF_PHASES = new Set(['AT_HUB', 'OUT_FOR_DELIVERY', 'DELIVERED']);
-function isHandedOff(phase?: string | null): boolean {
-  return HANDED_OFF_PHASES.has(String(phase ?? '').toUpperCase());
-}
-
 /** Rótulo do motivo do retorno (separado da quantidade). Vazio quando não há. */
 function reasonLabel(reason?: string | null): string {
   switch (String(reason ?? '').toUpperCase()) {
@@ -119,19 +102,29 @@ function RetornoContent() {
 
   const hasArrived = !!(service?.isInAttendance || service?.status === 'IN_ATTENDANCE');
 
+  // CD da devolução e quem recebeu: o CD de retorno da rota vem sugerido, mas o
+  // motorista pode ter deixado a carga em OUTRO CD (ex.: falhou numa cidade que
+  // tem CD próprio). Os dois são opcionais — sem CD o backend fecha a tentativa
+  // sem gravar custódia, e sem recebedor ele usa o nome do motorista.
+  // A rota é lida aqui (e não mais abaixo) porque o `othersDone` depende do
+  // `legType` dela.
+  const { routing } = useFindOneRouting(routeId || '');
+  const { distributionCenters } = useFindAllDistributionCenters({ activeOnly: true });
+  const [cdEscolhido, setCdEscolhido] = useState<string | null>(null);
+  const [recebedor, setRecebedor] = useState('');
+  const cdDaDevolucao = cdEscolhido ?? routing?.returnFacilityId ?? null;
+
   // Trava do retorno: por ser a ÚLTIMA parada, o check-in ("Cheguei no retorno")
   // só libera quando todas as demais paradas estão terminais. Espelha a trava
   // das paradas normais. (Se já chegou, mantém liberado para concluir.)
-  const othersDone = useMemo(() => {
-    const others = (services ?? []).filter(
-      (s) => String(s.serviceType ?? '').toUpperCase() !== 'RETURN',
-    );
-    // Pedido "concluído p/ o trecho" = terminal (COMPLETED/FAILED/CANCELED — inclui
-    // os NÃO recebidos, que voltam) OU já entregue no CD (custódia AT_HUB+). Assim o
-    // retorno libera pós-handoff, sem confundir "recebido no CD" (PENDING/AT_HUB) com
-    // "ainda pendente com o motorista".
-    return others.every((s) => isTerminalStatus(s.status) || isHandedOff(s.custodyPhase));
-  }, [services]);
+  // Pedido "concluído p/ o trecho" = terminal (COMPLETED/FAILED/CANCELED — inclui
+  // os NÃO recebidos, que voltam) OU já entregue no CD. A fase AT_HUB só vale como
+  // entregue em perna de MALHA: em rota comum ela agora marca também o pedido
+  // devolvido, que não pode liberar o retorno sozinho.
+  const othersDone = useMemo(
+    () => othersConcluidos(services, routing?.legType),
+    [services, routing?.legType],
+  );
   const canCheckIn = hasArrived || othersDone;
 
   // Foto(s) opcional(is) da carga descarregada no CD.
@@ -254,17 +247,13 @@ function RetornoContent() {
     if (submitting || isCompleting) return;
     setSubmitting(true);
     try {
-      const returnChecklist: ReturnChecklistItem[] = items.map((item, idx) => ({
-        material: item.material,
-        serviceId: item.serviceId,
-        serviceCode: item.serviceCode,
-        quantity: item.quantity,
-        unit: item.unit,
-        origin: item.origin,
-        reason: item.reason,
-        received: receivedQty(idx, Number(item.quantity ?? 0)),
-        checked: !!conferred[idx],
-      }));
+      const returnChecklist = montarReturnChecklist({
+        items,
+        conferred,
+        receivedQty,
+        pedidosVolta,
+        pedidoConferred,
+      });
 
       let photoProof: string | undefined;
       if (photos.length > 0) {
@@ -279,6 +268,10 @@ function RetornoContent() {
         id: serviceId,
         details: {
           returnChecklist,
+          // Spread condicional, não `?? null`: `returnFacilityId` é @IsUUID() no
+          // backend, então null ou string vazia derrubaria a conclusão com 400.
+          ...(cdDaDevolucao ? { returnFacilityId: cdDaDevolucao } : {}),
+          ...(recebedor.trim() ? { receivedBy: recebedor.trim() } : {}),
           ...(photoProof ? { photoProof } : {}),
           ...(coords ? { latitude: coords.latitude, longitude: coords.longitude, accuracy: coords.accuracy } : {}),
         },
@@ -297,7 +290,7 @@ function RetornoContent() {
     } finally {
       setSubmitting(false);
     }
-  }, [submitting, isCompleting, items, conferred, receivedQty, photos, serviceId, othersDone, routeId, completeServiceWithDetailsAsync, completeRouting, router, showToast]);
+  }, [submitting, isCompleting, items, conferred, receivedQty, pedidosVolta, pedidoConferred, cdDaDevolucao, recebedor, photos, serviceId, othersDone, routeId, completeServiceWithDetailsAsync, completeRouting, router, showToast]);
 
   // Endereço do retorno: do ponto de retorno (quando cadastrado); senão um
   // rótulo padrão. NUNCA mostra lat/long cru no cabeçalho.
@@ -528,6 +521,57 @@ function RetornoContent() {
             </>
           )}
         </Box>
+
+        {/* Onde a carga ficou: CD da devolução (sugerido = CD de retorno da rota)
+            e quem recebeu. Os dois são opcionais — sem CD o backend fecha a
+            tentativa sem custódia; sem recebedor, assina o nome do motorista. */}
+        {hasArrived ? (
+          <Box gap="y8">
+            <Text preset="text14" fontWeightPreset="bold" color="gray600">
+              Onde a carga foi deixada
+            </Text>
+            {distributionCenters.length > 0 ? (
+              <Box flexDirection="row" flexWrap="wrap" gap="x8">
+                {distributionCenters.map((cd) => {
+                  const selecionado = cdDaDevolucao === cd.id;
+                  return (
+                    <TouchableOpacityBox
+                      key={cd.id}
+                      paddingHorizontal="x12"
+                      paddingVertical="y8"
+                      borderRadius="s8"
+                      borderWidth={1}
+                      borderColor={selecionado ? 'primary100' : 'gray200'}
+                      backgroundColor={selecionado ? 'primary10' : 'white'}
+                      onPress={() => setCdEscolhido(cd.id)}
+                    >
+                      <Text preset="text12" color={selecionado ? 'primary100' : 'gray600'}>
+                        {cd.name}
+                      </Text>
+                    </TouchableOpacityBox>
+                  );
+                })}
+              </Box>
+            ) : null}
+            <Text preset="text12" color="gray500">
+              Quem recebeu no CD (opcional)
+            </Text>
+            <Box
+              borderWidth={1}
+              borderColor="gray200"
+              borderRadius="s8"
+              paddingHorizontal="x12"
+              backgroundColor="white"
+            >
+              <TextInput
+                value={recebedor}
+                onChangeText={setRecebedor}
+                placeholder="Nome de quem recebeu"
+                style={{ paddingVertical: 10, color: '#111827' }}
+              />
+            </Box>
+          </Box>
+        ) : null}
 
         {/* Comprovante (opcional): mesmo componente de anexo do fluxo de entrega */}
         {hasArrived ? (
