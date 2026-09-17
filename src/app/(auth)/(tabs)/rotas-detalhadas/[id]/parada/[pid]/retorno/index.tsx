@@ -10,7 +10,6 @@ import { ButtonBack } from '@/components/Button/ButtonBack';
 import { Icon } from '@/components/Icon/Icon';
 import { MultiPhotoPicker } from '@/components/MultiPhotoPicker';
 import { useCompleteRouting, useGetRoutingMapData, useReturnManifest } from '@/domain/agility/routing/useCase';
-import type { ReturnChecklistItem } from '@/domain/agility/service/dto/request/service-completion-details.request';
 import { uploadMultipleServicePhotos } from '@/domain/agility/service/serviceUploadUtils';
 import { useCompleteServiceWithDetails, useFindOneService } from '@/domain/agility/service/useCase';
 import { useRouteDirections } from '@/domain/ors/useRouteDirections';
@@ -24,6 +23,7 @@ import { splitRouteAtLastStop } from '../_components/shared/geo';
 import { Map, MapPoint } from '../_components/shared/Map';
 import { useStopActions, useUserLocation } from '../_hooks';
 import { getCurrentCoords } from '../_hooks/getCurrentCoords';
+import { montarReturnChecklist } from '../_utils/returnChecklist';
 
 /**
  * Tela da parada de RETORNO (CD/origem).
@@ -254,17 +254,13 @@ function RetornoContent() {
     if (submitting || isCompleting) return;
     setSubmitting(true);
     try {
-      const returnChecklist: ReturnChecklistItem[] = items.map((item, idx) => ({
-        material: item.material,
-        serviceId: item.serviceId,
-        serviceCode: item.serviceCode,
-        quantity: item.quantity,
-        unit: item.unit,
-        origin: item.origin,
-        reason: item.reason,
-        received: receivedQty(idx, Number(item.quantity ?? 0)),
-        checked: !!conferred[idx],
-      }));
+      const returnChecklist = montarReturnChecklist({
+        items,
+        conferred,
+        receivedQty,
+        pedidosVolta,
+        pedidoConferred,
+      });
 
       let photoProof: string | undefined;
       if (photos.length > 0) {
@@ -297,7 +293,7 @@ function RetornoContent() {
     } finally {
       setSubmitting(false);
     }
-  }, [submitting, isCompleting, items, conferred, receivedQty, photos, serviceId, othersDone, routeId, completeServiceWithDetailsAsync, completeRouting, router, showToast]);
+  }, [submitting, isCompleting, items, conferred, receivedQty, pedidosVolta, pedidoConferred, photos, serviceId, othersDone, routeId, completeServiceWithDetailsAsync, completeRouting, router, showToast]);
 
   // Endereço do retorno: do ponto de retorno (quando cadastrado); senão um
   // rótulo padrão. NUNCA mostra lat/long cru no cabeçalho.
