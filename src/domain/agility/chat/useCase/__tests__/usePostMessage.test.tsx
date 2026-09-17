@@ -15,21 +15,31 @@ jest.mock('../../chatService', () => ({
 
 type Hook = ReturnType<typeof usePostMessage>;
 
+// Desmonta e limpa ao fim de cada teste. O `queryClient.clear()` nao cancela o timer de gc
+// de uma mutation (5 min por padrao), que segura o jest: por isso `gcTime: Infinity`
+// (sem timer) nas mutations.
+const cleanups: (() => void)[] = [];
+
 function setup() {
     const queryClient = new QueryClient({
-        defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+        defaultOptions: { queries: { retry: false }, mutations: { retry: false, gcTime: Infinity } },
     });
     let hook!: Hook;
     function Probe() {
         hook = usePostMessage();
         return null;
     }
+    let renderer!: TestRenderer.ReactTestRenderer;
     act(() => {
-        TestRenderer.create(
+        renderer = TestRenderer.create(
             <QueryClientProvider client={queryClient}>
                 <Probe />
             </QueryClientProvider>,
         );
+    });
+    cleanups.push(() => {
+        act(() => renderer.unmount());
+        queryClient.clear();
     });
     return { queryClient, getHook: () => hook };
 }
@@ -55,6 +65,10 @@ function cachedIds(queryClient: QueryClient) {
 beforeEach(() => {
     mockPostMessageService.mockReset();
     useChatStore.setState({ optimisticMessages: {} });
+});
+
+afterEach(() => {
+    cleanups.splice(0).forEach((cleanup) => cleanup());
 });
 
 describe('usePostMessage', () => {
