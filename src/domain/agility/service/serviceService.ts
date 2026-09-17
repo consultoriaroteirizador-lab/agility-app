@@ -16,6 +16,7 @@ import type {
     GetServiceDraftResponse,
     ApplyOccurrenceRequest,
     OccurrenceOutcome,
+    DeliveryAttemptResponse,
 } from './dto'
 import type {
     ServiceMaterialResponse,
@@ -107,6 +108,10 @@ async function applyOccurrence(
     return serviceAPI.applyOccurrence(id, payload)
 }
 
+async function findAttempts(id: Id): Promise<BaseResponse<DeliveryAttemptResponse[]>> {
+    return serviceAPI.findAttempts(id)
+}
+
 async function changeStatus(
     id: Id,
     payload: ChangeServiceStatusRequest,
@@ -173,6 +178,7 @@ export const serviceService = {
     completeWithDetails,
     fail,
     applyOccurrence,
+    findAttempts,
     changeStatus,
     remove,
     removeBatch,
