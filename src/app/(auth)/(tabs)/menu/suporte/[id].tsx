@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { FlatList, Image } from 'react-native';
+import { FlatList, Image, Linking } from 'react-native';
 
-import { useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams } from 'expo-router';
 
 import {
@@ -28,7 +27,9 @@ import {
   useChatStore,
 } from '@/domain/agility/chat';
 import { getChatService, markChatReadService } from '@/domain/agility/chat/chatService';
-import { generateTempId } from '@/domain/agility/chat/utils/messageUtils';
+import type { AttachmentType, ChatSendOutcome, OutgoingAttachment } from '@/domain/agility/chat/dto/types';
+import { runChatSends, type ChatSendStep } from '@/domain/agility/chat/useCase/sendChatBatch';
+import { generateTempId, isRemoteUrl, toChatMessage } from '@/domain/agility/chat/utils/messageUtils';
 import { useGetTicketByChatId } from '@/domain/agility/ticket/useCase';
 import { useAuthCredentialsService } from '@/services';
 import { useToastService } from '@/services/Toast/useToast';
@@ -63,23 +64,6 @@ function formatChatTime(date: Date | string): string {
   return d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 }
 
-function convertToChatMessage(msg: any, chatId: string): ChatMessage {
-  return {
-    id: String(msg.id || ''),
-    chatId: String(msg.chatId || chatId),
-    senderId: String(msg.senderId || ''),
-    senderType: msg.senderType as ParticipantType || ParticipantType.DRIVER,
-    content: String(msg.content || ''),
-    attachmentUrl: msg.attachmentUrl,
-    attachmentType: msg.attachmentType,
-    status: msg.status as MessageStatus || MessageStatus.SENT,
-    readAt: msg.readAt,
-    deliveredAt: msg.deliveredAt,
-    createdAt: String(msg.createdAt || new Date().toISOString()),
-    updatedAt: msg.updatedAt,
-  };
-}
-
 // ─── MessageItem component ────────────────────────────────────────────────────
 
 interface MessageItemProps {
@@ -88,6 +72,7 @@ interface MessageItemProps {
   isOwnMessage: (msg: ChatMessage) => boolean;
   peerReadAt: string | null;
   peerDeliveredAt: string | null;
+  onOpenAttachment: (url: string) => void;
 }
 
 // Estado de entrega/leitura de uma mensagem própria (estilo WhatsApp)
@@ -116,7 +101,7 @@ function getReadState(
   return 'sent';
 }
 
-function MessageItem({ item, prevItem, isOwnMessage, peerReadAt, peerDeliveredAt }: MessageItemProps) {
+function MessageItem({ item, prevItem, isOwnMessage, peerReadAt, peerDeliveredAt, onOpenAttachment }: MessageItemProps) {
   const { msg, isLast } = item;
   const prevMsg = prevItem?.type === 'message' ? prevItem.msg : null;
   const isOwn = isOwnMessage(msg);
@@ -127,6 +112,8 @@ function MessageItem({ item, prevItem, isOwnMessage, peerReadAt, peerDeliveredAt
     msg.attachmentType?.toLowerCase() === 'image' ||
     (msg.attachmentUrl && IMAGE_EXTENSION_REGEX.test(msg.attachmentUrl));
   const isOptimistic = msg.id.startsWith('temp-');
+  // Só URL http(s) do servidor abre. URI local (bolha ainda enviando) e chave do storage não.
+  const canOpenAttachment = isRemoteUrl(msg.attachmentUrl);
 
   // Debug log para anexos
   useEffect(() => {
@@ -202,6 +189,13 @@ function MessageItem({ item, prevItem, isOwnMessage, peerReadAt, peerDeliveredAt
             flexDirection="row"
             alignItems="center"
             gap="x8"
+            disabled={!canOpenAttachment}
+            onPress={() => {
+              if (msg.attachmentUrl) onOpenAttachment(msg.attachmentUrl);
+            }}
+            accessibilityRole="link"
+            accessibilityLabel="Abrir anexo"
+            opacity={canOpenAttachment ? 1 : 0.6}
           >
             <Text preset="text20">📄</Text>
             <Text preset="text13" color={isOwn ? 'white' : 'primary100'} fontWeightPreset='semibold'>
@@ -252,13 +246,21 @@ function MessageItem({ item, prevItem, isOwnMessage, peerReadAt, peerDeliveredAt
 export default function SuporteChatPage() {
   const { id } = useLocalSearchParams();
   const chatId = id ? String(id) : undefined;
-  const queryClient = useQueryClient();
 
   const { userAuth, authCredentials } = useAuthCredentialsService();
   const { showToast } = useToastService();
+  const handleOpenAttachment = useCallback(
+    (url: string) => {
+      Linking.openURL(url).catch(() => {
+        showToast({ message: 'Não foi possível abrir o anexo', type: 'error' });
+      });
+    },
+    [showToast],
+  );
   const [currentUserSenderId, setCurrentUserSenderId] = useState<string | null>(null);
   const [chatInfo, setChatInfo] = useState<ChatWithParticipants | null>(null);
   const [chatStatus, setChatStatus] = useState<ChatStatus>(ChatStatus.ACTIVE);
+  const isChatClosed = chatStatus === ChatStatus.CLOSED || chatInfo?.status === ChatStatus.CLOSED;
   const messagesEndRef = useRef<FlatList>(null);
 
   const { getMergedMessages, clearUnread } = useChatContext();
@@ -281,7 +283,7 @@ export default function SuporteChatPage() {
   const [peerDeliveredAt, setPeerDeliveredAt] = useState<string | null>(null);
 
   const convertedApiMessages = useMemo(
-    () => (messagesFromAPI || []).map(msg => convertToChatMessage(msg, chatId || '')),
+    () => (messagesFromAPI || []).map(msg => toChatMessage(msg, chatId || '')),
     [messagesFromAPI, chatId],
   );
 
@@ -313,14 +315,9 @@ export default function SuporteChatPage() {
     return result;
   }, [messages]);
 
-  const { mutate: sendMessageMutation, isPending: isSending } = usePostMessage();
-
-  const { uploadAttachments, isLoading: uploadingAttachment } = useChatAttachmentUpload({
-    onError: (error) => {
-      console.error('Erro ao fazer upload:', error);
-      showToast({ message: 'Não foi possível enviar o anexo', type: 'error' });
-    },
-  });
+  const { mutateAsync: postMessage, isPending: isSending } = usePostMessage();
+  // Sem onError aqui: o aviso de falha sai uma vez só, pelo resultado da fila.
+  const { uploadAttachments, isLoading: uploadingAttachment } = useChatAttachmentUpload();
 
   // userAuth.id = keycloakUserId (JWT sub). O backend converte para ID interno automaticamente.
   useEffect(() => {
@@ -435,8 +432,6 @@ export default function SuporteChatPage() {
   // ✅ OTIMIZAÇÃO: Removido useEffect de scroll duplicado
   // O scroll já é feito no onContentSizeChange da FlatList (mais eficiente)
 
-  // ✅ PERFORMANCE: Upload não-bloqueante
-  // Mensagem aparece imediatamente com URI local, upload roda em background
   // Trata falha de envio: se o backend recusou por chat encerrado, trava a tela
   // (input desabilitado + banner de finalizado) — cobre o caso de o app não ter
   // recebido o chat_closed em tempo real.
@@ -455,101 +450,73 @@ export default function SuporteChatPage() {
     [refetchMessages, showToast],
   );
 
-  const handleSendMessage = useCallback(
-    (content: string, tempAttachments?: any[]) => {
-      if (!chatId || isSending || chatStatus === ChatStatus.CLOSED) return;
-      if (!content.trim() && !tempAttachments?.length) return;
+  // Um passo da fila: texto puro, ou um anexo (bolha local -> upload -> mensagem com a chave).
+  const sendStep = useCallback(
+    async (step: ChatSendStep) => {
+      if (!chatId) throw new Error('CHAT_ID_MISSING');
+      const senderId = currentUserSenderId ?? undefined;
 
-      const attachmentType = tempAttachments?.[0]?.type === 'image' ? 'image' : 'document';
-
-      // Se tem anexos, criar mensagem otimística IMEDIATAMENTE com URI local
-      if (tempAttachments && tempAttachments.length > 0) {
-        const tempId = generateTempId();
-        const localUri = tempAttachments[0].uri;
-
-        // Criar mensagem otimística com URI local (aparece instantaneamente)
-        const optimisticMsg: ChatMessage = {
-          id: tempId,
-          chatId: String(chatId),
-          senderId: currentUserSenderId || '',
-          senderType: ParticipantType.DRIVER,
-          content: content.trim() || (attachmentType === 'image' ? 'Imagem' : 'Anexo'),
-          attachmentUrl: localUri, // URI local para exibição imediata
-          attachmentType: attachmentType as any,
-          status: MessageStatus.SENT,
-          createdAt: new Date().toISOString(),
-        };
-
-        // Adicionar mensagem otimística (aparece na tela IMEDIATAMENTE)
-        addOptimisticMessage(chatId, optimisticMsg);
-
-        // Fazer upload em BACKGROUND (não bloqueia)
-        const uris = tempAttachments.map(a => a.uri);
-        console.log('[handleSendMessage] Iniciando upload em background:', {
-          tempId,
-          attachmentsCount: tempAttachments.length,
-        });
-
-        uploadAttachments({ files: uris, chatId })
-          .then((uploadResult) => {
-            console.log('[handleSendMessage] Upload concluído:', {
-              success: uploadResult.success,
-              urls: uploadResult.result?.urls,
-            });
-
-            if (uploadResult.success && uploadResult.result?.urls?.[0]) {
-              // Enviar mensagem com URL do S3
-              const payload: any = {
-                chatId,
-                content: content.trim() || (attachmentType === 'image' ? 'Imagem' : 'Anexo'),
-                senderId: currentUserSenderId,
-                attachmentUrl: uploadResult.result.urls[0],
-                attachmentType,
-              };
-
-              sendMessageMutation(payload, {
-                onSuccess: () => {
-                  // Remover mensagem otimística (a real já foi adicionada ao cache)
-                  removeOptimisticMessage(chatId, tempId);
-                  // ✅ PERFORMANCE: Não invalidar aqui - usePostMessage já gerencia o cache
-                },
-                onError: (error) => {
-                  console.error('[handleSendMessage] Erro ao enviar:', error);
-                  removeOptimisticMessage(chatId, tempId);
-                  handleSendFailure(error);
-                },
-              });
-            } else {
-              console.error('[handleSendMessage] Upload falhou - sem URLs');
-              removeOptimisticMessage(chatId, tempId);
-              showToast({ message: 'Não foi possível fazer upload dos anexos', type: 'error' });
-            }
-          })
-          .catch((error: any) => {
-            console.error('[handleSendMessage] Erro no upload:', error?.message);
-            removeOptimisticMessage(chatId, tempId);
-            showToast({ message: `Falha no upload: ${error?.message || 'Erro desconhecido'}`, type: 'error' });
-          });
-
-        return; // Não bloqueia - mensagem já aparece como otimística
+      if (!step.attachment) {
+        await postMessage({ chatId, content: step.content, senderId });
+        return;
       }
 
-      // Mensagem sem anexo - comportamento normal
-      const payload: any = {
+      const attachment = step.attachment;
+      const tempId = generateTempId();
+      addOptimisticMessage(chatId, {
+        id: tempId,
         chatId,
-        content: content.trim(),
-        senderId: currentUserSenderId,
-      };
-
-      sendMessageMutation(payload, {
-        // ✅ PERFORMANCE: Não invalidar aqui - usePostMessage já gerencia o cache
-        onError: (error) => {
-          console.error('Erro ao enviar mensagem:', error);
-          handleSendFailure(error);
-        },
+        senderId: currentUserSenderId || '',
+        senderType: ParticipantType.DRIVER,
+        content: step.content,
+        attachmentUrl: attachment.uri, // URI local: aparece na hora
+        attachmentType: attachment.type as unknown as AttachmentType,
+        status: MessageStatus.SENT,
+        createdAt: new Date().toISOString(),
       });
+
+      try {
+        const upload = await uploadAttachments({ files: [attachment.uri], chatId });
+        const key = upload.result?.urls?.[0];
+        if (!key) throw new Error('UPLOAD_WITHOUT_KEY');
+        // Contrato C5: a chave devolvida pelo /chats/upload vai exatamente como veio.
+        await postMessage({
+          chatId,
+          content: step.content,
+          senderId,
+          attachmentUrl: key,
+          attachmentType: attachment.type,
+          tempId,
+        });
+      } catch (error) {
+        removeOptimisticMessage(chatId, tempId);
+        throw error;
+      }
     },
-    [chatId, isSending, chatStatus, uploadAttachments, sendMessageMutation, queryClient, currentUserSenderId, addOptimisticMessage, removeOptimisticMessage, handleSendFailure],
+    [chatId, currentUserSenderId, postMessage, uploadAttachments, addOptimisticMessage, removeOptimisticMessage],
+  );
+
+  const handleSendMessage = useCallback(
+    async (content: string, attachments?: OutgoingAttachment[]): Promise<ChatSendOutcome> => {
+      const pending = attachments ?? [];
+      if (!chatId || isChatClosed) {
+        return { unsentText: content, unsentAttachments: pending };
+      }
+
+      const outcome = await runChatSends(content, pending, sendStep);
+
+      if (outcome.error) {
+        const sentCount = pending.length - outcome.unsentAttachments.length;
+        handleSendFailure(
+          outcome.error,
+          sentCount > 0
+            ? `${outcome.unsentAttachments.length} de ${pending.length} anexos não foram enviados. Toque em enviar para tentar de novo.`
+            : undefined,
+        );
+      }
+      return outcome;
+    },
+    [chatId, isChatClosed, sendStep, handleSendFailure],
   );
 
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -562,7 +529,7 @@ export default function SuporteChatPage() {
         emitTypingStart(chatId);
 
         if (typingTimeoutRef.current) {
-          clearTimeout(typingTimeoutRef.current as number);
+          clearTimeout(typingTimeoutRef.current);
         }
 
         typingTimeoutRef.current = setTimeout(() => {
@@ -570,7 +537,7 @@ export default function SuporteChatPage() {
         }, 3000);
       } else {
         if (typingTimeoutRef.current) {
-          clearTimeout(typingTimeoutRef.current as number);
+          clearTimeout(typingTimeoutRef.current);
         }
         emitTypingStop(chatId);
       }
@@ -615,10 +582,11 @@ export default function SuporteChatPage() {
           isOwnMessage={isOwnMessage}
           peerReadAt={peerReadAt}
           peerDeliveredAt={peerDeliveredAt}
+          onOpenAttachment={handleOpenAttachment}
         />
       );
     },
-    [flatData, isOwnMessage, peerReadAt, peerDeliveredAt],
+    [flatData, isOwnMessage, peerReadAt, peerDeliveredAt, handleOpenAttachment],
   );
 
   const keyExtractor = useCallback(
@@ -628,8 +596,6 @@ export default function SuporteChatPage() {
         : `msg-${item.msg.id}-${index}`,
     [],
   );
-
-  const isChatClosed = chatStatus === 'CLOSED' || chatInfo?.status === 'CLOSED';
 
   const headerTitle = chatInfo?.routeId
     ? `Rota ${chatInfo.routeId}`
