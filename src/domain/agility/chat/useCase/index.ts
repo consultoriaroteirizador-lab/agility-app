@@ -8,3 +8,4 @@ export type { UseChatWebSocketOptions } from './useChatWebSocket';
 export type { PostMessagePayload } from './usePostMessage';
 export { useChatAttachmentUpload } from './useChatAttachmentUpload';
 export { findOrCreateSupportChatId, supportChatHref, supportSubjectForService } from './openSupportChat';
+export { useSupportUnreadCount, supportUnreadKey, SUPPORT_UNREAD_POLL_MS } from './useSupportUnreadCount';

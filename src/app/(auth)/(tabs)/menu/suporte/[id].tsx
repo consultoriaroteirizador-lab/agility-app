@@ -35,6 +35,7 @@ import { findOrCreateSupportChatId, supportChatHref } from '@/domain/agility/cha
 import { runChatSends, type ChatSendStep } from '@/domain/agility/chat/useCase/sendChatBatch';
 import { useDisconnectedNotice } from '@/domain/agility/chat/useCase/useDisconnectedNotice';
 import { CHAT_OFFLINE_POLL_MS } from '@/domain/agility/chat/useCase/useGetChatMessages';
+import { supportUnreadKey } from '@/domain/agility/chat/useCase/useSupportUnreadCount';
 import { generateTempId, isRemoteUrl, toChatMessage } from '@/domain/agility/chat/utils/messageUtils';
 import { useGetTicketByChatId } from '@/domain/agility/ticket/useCase';
 import { KEY_CHATS, KEY_TICKETS } from '@/domain/queryKeys';
@@ -355,10 +356,12 @@ export default function SuporteChatPage() {
   // Marcar como lida quando carregar mensagens
   useEffect(() => {
     if (messagesFromAPI && messagesFromAPI.length > 0 && chatId && userAuth?.id) {
-      markChatReadService(chatId, userAuth.id).catch(console.error);
+      markChatReadService(chatId, userAuth.id)
+        .then(() => queryClient.invalidateQueries({ queryKey: supportUnreadKey(chatId, userAuth.id) }))
+        .catch(console.error);
       clearUnread(chatId);
     }
-  }, [messagesFromAPI, chatId, userAuth?.id, clearUnread]);
+  }, [messagesFromAPI, chatId, userAuth?.id, clearUnread, queryClient]);
 
   // Handler para mensagens recebidas via WebSocket
   const handleNewMessage = useCallback(
@@ -389,7 +392,9 @@ export default function SuporteChatPage() {
       });
 
       if (userAuth?.id && chatId) {
-        markChatReadService(chatId, userAuth.id).catch(console.error);
+        markChatReadService(chatId, userAuth.id)
+          .then(() => queryClient.invalidateQueries({ queryKey: supportUnreadKey(chatId, userAuth.id) }))
+          .catch(console.error);
         clearUnread(chatId);
       }
 
@@ -397,7 +402,7 @@ export default function SuporteChatPage() {
         messagesEndRef.current?.scrollToEnd({ animated: true });
       }, 100);
     },
-    [chatId, userAuth?.id, clearUnread, currentUserSenderId],
+    [chatId, userAuth?.id, clearUnread, currentUserSenderId, queryClient],
   );
 
   // Encerramento (evento do operador ou envio recusado): além de travar a tela,
