@@ -1,12 +1,18 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Linking, Platform } from 'react-native';
 
+import { useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams, usePathname, useRouter } from 'expo-router';
 
 import { Box, Button, ScreenBase, Text, TouchableOpacityBox, ServiceFlowTheme } from '@/components';
 import { ButtonBack } from '@/components/Button/ButtonBack';
-import { createDriverSupportChatService, createDriverCustomerChatService } from '@/domain/agility/chat/chatService';
+import {
+  findOrCreateSupportChatId,
+  supportChatHref,
+  supportSubjectForService,
+} from '@/domain/agility/chat/useCase/openSupportChat';
 import { useFindOneService } from '@/domain/agility/service/useCase';
+import { KEY_CHATS } from '@/domain/queryKeys';
 import { useAuthCredentialsService } from '@/services';
 import { useToastService } from '@/services/Toast/useToast';
 import { measure } from '@/theme';
@@ -19,9 +25,14 @@ function TentativaEntregaScreenContent() {
   const serviceId = pid as string;
   const { userAuth } = useAuthCredentialsService();
   const { showToast } = useToastService();
+  const queryClient = useQueryClient();
 
   const { service, isLoading } = useFindOneService(serviceId || '');
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
+  // Guard síncrono contra duplo-tap: o `loadingAction` só vira 'torre' depois
+  // que o handler inicia, deixando uma janela onde um 2º toque no mesmo frame
+  // passa sem bloqueio e cria dois chats.
+  const isSendingTorreRef = useRef(false);
 
   // Endereço do serviço
   const endereco = service?.address?.formattedAddress
@@ -30,59 +41,33 @@ function TentativaEntregaScreenContent() {
   const longitude = service?.address?.longitude;
 
   const handleEnviarMensagemTorre = async () => {
+    if (isSendingTorreRef.current) {
+      return;
+    }
     if (!userAuth?.id) {
       showToast({ message: 'Usuário não identificado', type: 'error' });
       return;
     }
 
+    isSendingTorreRef.current = true;
     try {
       setLoadingAction('torre');
-      // Criar ou encontrar chat com suporte (torre de controle)
-      const result = await createDriverSupportChatService({
+      // A conversa já nasce ligada a este serviço. Se houver chamado aberto, o backend
+      // devolve o mesmo chat (o assunto só vale para chat novo).
+      const chatId = await findOrCreateSupportChatId({
         driverId: userAuth.id,
+        subject: supportSubjectForService(serviceId),
+        serviceId,
       });
-
-      if (result.success && result.result) {
-        // Navegar para tela de suporte onde o chat será exibido
-        router.push({ pathname: '/(auth)/(tabs)/menu/suporte', params: { returnTo: pathname } });
-      } else {
-        showToast({ message: 'Não foi possível abrir o chat com a torre de controle', type: 'error' });
-      }
+      queryClient.invalidateQueries({ queryKey: [KEY_CHATS] });
+      // Direto para a conversa; o voltar retorna para esta tela (returnTo).
+      router.push(supportChatHref(chatId, pathname));
     } catch (error) {
-      console.error('Erro ao criar chat com torre:', error);
+      console.error('Erro ao abrir chat com a torre:', error);
       showToast({ message: 'Não foi possível abrir o chat com a torre de controle', type: 'error' });
     } finally {
       setLoadingAction(null);
-    }
-  };
-
-  const handleEnviarMensagemDestinatario = async () => {
-    if (!userAuth?.id || !service?.customerId) {
-      showToast({ message: 'Cliente não identificado para este serviço', type: 'error' });
-      return;
-    }
-
-    try {
-      setLoadingAction('destinatario');
-      // Criar ou encontrar chat com cliente (destinatário)
-      const result = await createDriverCustomerChatService({
-        driverId: userAuth.id,
-        customerId: service.customerId,
-        referenceId: serviceId, // Referência ao serviço
-      });
-
-      if (result.success && result.result) {
-        // Navegar para tela de suporte onde o chat será exibido
-        // (ou criar uma tela específica de chat com destinatário se necessário)
-        router.push({ pathname: '/(auth)/(tabs)/menu/suporte', params: { returnTo: pathname } });
-      } else {
-        showToast({ message: 'Não foi possível abrir o chat com o destinatário', type: 'error' });
-      }
-    } catch (error) {
-      console.error('Erro ao criar chat com destinatário:', error);
-      showToast({ message: 'Não foi possível abrir o chat com o destinatário', type: 'error' });
-    } finally {
-      setLoadingAction(null);
+      isSendingTorreRef.current = false;
     }
   };
 
