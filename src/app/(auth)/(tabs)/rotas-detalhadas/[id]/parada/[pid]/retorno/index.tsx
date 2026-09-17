@@ -9,7 +9,8 @@ import { ActivityIndicator, Box, Button, LocalIcon, ScreenBase, Text, TouchableO
 import { ButtonBack } from '@/components/Button/ButtonBack';
 import { Icon } from '@/components/Icon/Icon';
 import { MultiPhotoPicker } from '@/components/MultiPhotoPicker';
-import { useCompleteRouting, useGetRoutingMapData, useReturnManifest } from '@/domain/agility/routing/useCase';
+import { useFindAllDistributionCenters } from '@/domain/agility/distribution-center/useCase';
+import { useCompleteRouting, useFindOneRouting, useGetRoutingMapData, useReturnManifest } from '@/domain/agility/routing/useCase';
 import { uploadMultipleServicePhotos } from '@/domain/agility/service/serviceUploadUtils';
 import { useCompleteServiceWithDetails, useFindOneService } from '@/domain/agility/service/useCase';
 import { useRouteDirections } from '@/domain/ors/useRouteDirections';
@@ -137,6 +138,16 @@ function RetornoContent() {
   // Foto(s) opcional(is) da carga descarregada no CD.
   const [photos, setPhotos] = useState<ImagePicker.ImagePickerAsset[]>([]);
   const [submitting, setSubmitting] = useState(false);
+
+  // CD da devolução e quem recebeu: o CD de retorno da rota vem sugerido, mas o
+  // motorista pode ter deixado a carga em OUTRO CD (ex.: falhou numa cidade que
+  // tem CD próprio). Os dois são opcionais — sem CD o backend fecha a tentativa
+  // sem gravar custódia, e sem recebedor ele usa o nome do motorista.
+  const { routing } = useFindOneRouting(routeId || '');
+  const { distributionCenters } = useFindAllDistributionCenters({ activeOnly: true });
+  const [cdEscolhido, setCdEscolhido] = useState<string | null>(null);
+  const [recebedor, setRecebedor] = useState('');
+  const cdDaDevolucao = cdEscolhido ?? routing?.returnFacilityId ?? null;
 
   // Ponto de retorno: quando volta à origem, usa a origem; senão o return.
   const returnPoint = useMemo(() => {
@@ -275,6 +286,10 @@ function RetornoContent() {
         id: serviceId,
         details: {
           returnChecklist,
+          // Spread condicional, não `?? null`: `returnFacilityId` é @IsUUID() no
+          // backend, então null ou string vazia derrubaria a conclusão com 400.
+          ...(cdDaDevolucao ? { returnFacilityId: cdDaDevolucao } : {}),
+          ...(recebedor.trim() ? { receivedBy: recebedor.trim() } : {}),
           ...(photoProof ? { photoProof } : {}),
           ...(coords ? { latitude: coords.latitude, longitude: coords.longitude, accuracy: coords.accuracy } : {}),
         },
@@ -293,7 +308,7 @@ function RetornoContent() {
     } finally {
       setSubmitting(false);
     }
-  }, [submitting, isCompleting, items, conferred, receivedQty, pedidosVolta, pedidoConferred, photos, serviceId, othersDone, routeId, completeServiceWithDetailsAsync, completeRouting, router, showToast]);
+  }, [submitting, isCompleting, items, conferred, receivedQty, pedidosVolta, pedidoConferred, cdDaDevolucao, recebedor, photos, serviceId, othersDone, routeId, completeServiceWithDetailsAsync, completeRouting, router, showToast]);
 
   // Endereço do retorno: do ponto de retorno (quando cadastrado); senão um
   // rótulo padrão. NUNCA mostra lat/long cru no cabeçalho.
@@ -524,6 +539,57 @@ function RetornoContent() {
             </>
           )}
         </Box>
+
+        {/* Onde a carga ficou: CD da devolução (sugerido = CD de retorno da rota)
+            e quem recebeu. Os dois são opcionais — sem CD o backend fecha a
+            tentativa sem custódia; sem recebedor, assina o nome do motorista. */}
+        {hasArrived ? (
+          <Box gap="y8">
+            <Text preset="text14" fontWeightPreset="bold" color="gray600">
+              Onde a carga foi deixada
+            </Text>
+            {distributionCenters.length > 0 ? (
+              <Box flexDirection="row" flexWrap="wrap" gap="x8">
+                {distributionCenters.map((cd) => {
+                  const selecionado = cdDaDevolucao === cd.id;
+                  return (
+                    <TouchableOpacityBox
+                      key={cd.id}
+                      paddingHorizontal="x12"
+                      paddingVertical="y8"
+                      borderRadius="s8"
+                      borderWidth={1}
+                      borderColor={selecionado ? 'primary100' : 'gray200'}
+                      backgroundColor={selecionado ? 'primary10' : 'white'}
+                      onPress={() => setCdEscolhido(cd.id)}
+                    >
+                      <Text preset="text12" color={selecionado ? 'primary100' : 'gray600'}>
+                        {cd.name}
+                      </Text>
+                    </TouchableOpacityBox>
+                  );
+                })}
+              </Box>
+            ) : null}
+            <Text preset="text12" color="gray500">
+              Quem recebeu no CD (opcional)
+            </Text>
+            <Box
+              borderWidth={1}
+              borderColor="gray200"
+              borderRadius="s8"
+              paddingHorizontal="x12"
+              backgroundColor="white"
+            >
+              <TextInput
+                value={recebedor}
+                onChangeText={setRecebedor}
+                placeholder="Nome de quem recebeu"
+                style={{ paddingVertical: 10, color: '#111827' }}
+              />
+            </Box>
+          </Box>
+        ) : null}
 
         {/* Comprovante (opcional): mesmo componente de anexo do fluxo de entrega */}
         {hasArrived ? (
