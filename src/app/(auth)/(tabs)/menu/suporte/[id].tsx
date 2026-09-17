@@ -43,6 +43,8 @@ import { useAuthCredentialsService } from '@/services';
 import { useToastService } from '@/services/Toast/useToast';
 import { measure } from '@/theme';
 
+import { resolveChatBodyState } from './_utils/chatBodyState';
+
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const IMAGE_EXTENSION_REGEX = new RegExp('\\.(jpg|jpeg|png|gif|webp)$', 'i');
@@ -282,6 +284,8 @@ export default function SuporteChatPage() {
   const {
     messages: messagesFromAPI,
     isLoading: isLoadingMessages,
+    isError: isMessagesError,
+    refetch: refetchMessages,
   } = useGetChatMessages(chatId, { refetchIntervalMs: socketConnected ? false : CHAT_OFFLINE_POLL_MS });
 
   const { ticket } = useGetTicketByChatId(chatId);
@@ -682,16 +686,11 @@ export default function SuporteChatPage() {
         : `${typingUsers.length} pessoas digitando...`
       : null;
 
-  if (isLoadingMessages) {
-    return (
-      <Box flex={1} backgroundColor="white" alignItems="center" justifyContent="center">
-        <ActivityIndicator />
-        <Text preset="text14" color="gray500" mt="y16">
-          Carregando conversa...
-        </Text>
-      </Box>
-    );
-  }
+  const bodyState = resolveChatBodyState({
+    isLoading: isLoadingMessages,
+    isError: isMessagesError,
+    hasMessages: flatData.length > 0,
+  });
 
   return (
     <ScreenBase
@@ -763,10 +762,39 @@ export default function SuporteChatPage() {
           // ✅ REMOVIDO: getItemLayout com altura fixa incorreta causava bugs de scroll
           // Mensagens têm alturas variáveis (texto, imagens, documentos)
           ListEmptyComponent={
-            <Box flex={1} py="y32" alignItems="center" justifyContent="center">
-              <Text preset="text14" color="gray400" textAlign="center">
-                Nenhuma mensagem ainda. Envie a primeira mensagem!
-              </Text>
+            <Box flex={1} py="y32" alignItems="center" justifyContent="center" px="x16">
+              {bodyState === 'loading' && (
+                <>
+                  <ActivityIndicator />
+                  <Text preset="text14" color="gray500" mt="y16">
+                    Carregando conversa...
+                  </Text>
+                </>
+              )}
+              {bodyState === 'error' && (
+                <>
+                  <Text preset="text14" color="colorTextError" textAlign="center" mb="y16">
+                    Não foi possível carregar a conversa. Verifique sua conexão.
+                  </Text>
+                  <TouchableOpacityBox
+                    backgroundColor="primary100"
+                    px="x24"
+                    py="y12"
+                    borderRadius="s8"
+                    onPress={() => refetchMessages()}
+                    accessibilityRole="button"
+                  >
+                    <Text preset="text14" fontWeightPreset="bold" color="white">
+                      Tentar novamente
+                    </Text>
+                  </TouchableOpacityBox>
+                </>
+              )}
+              {bodyState === 'ready' && (
+                <Text preset="text14" color="gray400" textAlign="center">
+                  Nenhuma mensagem ainda. Envie a primeira mensagem!
+                </Text>
+              )}
             </Box>
           }
         />
