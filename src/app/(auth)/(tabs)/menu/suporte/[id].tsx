@@ -2,11 +2,12 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { FlatList, Image, Linking } from 'react-native';
 
 import { useQueryClient } from '@tanstack/react-query';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 
 import {
   ActivityIndicator,
   Box,
+  Button,
   Text,
   TouchableOpacityBox,
   ChatInput,
@@ -30,11 +31,13 @@ import {
 import { getChatService, markChatReadService } from '@/domain/agility/chat/chatService';
 import type { AttachmentType, ChatSendOutcome, OutgoingAttachment } from '@/domain/agility/chat/dto/types';
 import { upsertMessagesInCache } from '@/domain/agility/chat/useCase/messagesCache';
+import { findOrCreateSupportChatId, supportChatHref } from '@/domain/agility/chat/useCase/openSupportChat';
 import { runChatSends, type ChatSendStep } from '@/domain/agility/chat/useCase/sendChatBatch';
 import { useDisconnectedNotice } from '@/domain/agility/chat/useCase/useDisconnectedNotice';
 import { CHAT_OFFLINE_POLL_MS } from '@/domain/agility/chat/useCase/useGetChatMessages';
 import { generateTempId, isRemoteUrl, toChatMessage } from '@/domain/agility/chat/utils/messageUtils';
 import { useGetTicketByChatId } from '@/domain/agility/ticket/useCase';
+import { KEY_CHATS, KEY_TICKETS } from '@/domain/queryKeys';
 import { useAuthCredentialsService } from '@/services';
 import { useToastService } from '@/services/Toast/useToast';
 import { measure } from '@/theme';
@@ -248,8 +251,9 @@ function MessageItem({ item, prevItem, isOwnMessage, peerReadAt, peerDeliveredAt
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function SuporteChatPage() {
-  const { id } = useLocalSearchParams();
+  const { id, returnTo } = useLocalSearchParams<{ id?: string; returnTo?: string }>();
   const chatId = id ? String(id) : undefined;
+  const router = useRouter();
 
   const { userAuth, authCredentials } = useAuthCredentialsService();
   const { showToast } = useToastService();
@@ -277,7 +281,6 @@ export default function SuporteChatPage() {
   const {
     messages: messagesFromAPI,
     isLoading: isLoadingMessages,
-    refetch: refetchMessages,
   } = useGetChatMessages(chatId, { refetchIntervalMs: socketConnected ? false : CHAT_OFFLINE_POLL_MS });
 
   const { ticket } = useGetTicketByChatId(chatId);
@@ -326,28 +329,28 @@ export default function SuporteChatPage() {
   // Sem onError aqui: o aviso de falha sai uma vez só, pelo resultado da fila.
   const { uploadAttachments, isLoading: uploadingAttachment } = useChatAttachmentUpload();
 
+  // Busca info do chat apenas para status e subject (mais leve)
+  const loadChatInfo = useCallback(() => {
+    if (!chatId) return;
+    getChatService(chatId)
+      .then((result) => {
+        if (result.success && result.result) {
+          const chat = result.result as unknown as ChatWithParticipants;
+          setChatInfo(chat);
+          setChatStatus(chat.status || ChatStatus.ACTIVE);
+        }
+      })
+      .catch((error) => {
+        console.error('[SuporteChatPage] Error loading chat info:', error);
+      });
+  }, [chatId]);
+
   // userAuth.id = keycloakUserId (JWT sub). O backend converte para ID interno automaticamente.
   useEffect(() => {
     if (!userAuth?.id) return;
-
-    const senderId = userAuth.id;
-    setCurrentUserSenderId(senderId);
-
-    // Buscar info do chat apenas para status e subject (mais leve)
-    if (chatId) {
-      getChatService(chatId)
-        .then((result) => {
-          if (result.success && result.result) {
-            const chat = result.result as unknown as ChatWithParticipants;
-            setChatInfo(chat);
-            setChatStatus(chat.status || ChatStatus.ACTIVE);
-          }
-        })
-        .catch((error) => {
-          console.error('[SuporteChatPage] Error loading chat info:', error);
-        });
-    }
-  }, [chatId, userAuth?.id]);
+    setCurrentUserSenderId(userAuth.id);
+    loadChatInfo();
+  }, [userAuth?.id, loadChatInfo]);
 
   // Marcar como lida quando carregar mensagens
   useEffect(() => {
@@ -397,15 +400,21 @@ export default function SuporteChatPage() {
     [chatId, userAuth?.id, clearUnread, currentUserSenderId],
   );
 
-  // Handler para quando o chat for fechado pelo operador
+  // Encerramento (evento do operador ou envio recusado): além de travar a tela,
+  // invalida a lista/chat ativo e os protocolos. Sem isso, "Continuar chamado"
+  // levava de volta a esta conversa fechada (F4). Invalidar KEY_CHATS também
+  // refaz as mensagens desta conversa (a chave delas começa com KEY_CHATS).
+  const markClosedLocally = useCallback(() => {
+    setChatStatus(ChatStatus.CLOSED);
+    queryClient.invalidateQueries({ queryKey: [KEY_CHATS] });
+    queryClient.invalidateQueries({ queryKey: [KEY_TICKETS] });
+  }, [queryClient]);
+
   const handleChatClosed = useCallback(
     (closedChatId: string) => {
-      if (closedChatId === chatId) {
-        setChatStatus(ChatStatus.CLOSED);
-        refetchMessages();
-      }
+      if (closedChatId === chatId) markClosedLocally();
     },
-    [chatId, refetchMessages],
+    [chatId, markClosedLocally],
   );
 
   // Histórico enviado a cada join (inclusive depois de uma queda): vai para o mesmo cache.
@@ -458,15 +467,49 @@ export default function SuporteChatPage() {
       const raw = (error as any)?.response?.data?.message ?? (error as any)?.message ?? '';
       const text = Array.isArray(raw) ? raw.join(' ') : String(raw);
       if (/encerrad|fechad|closed/i.test(text)) {
-        setChatStatus(ChatStatus.CLOSED);
-        refetchMessages();
+        markClosedLocally();
         showToast({ message: 'Este atendimento foi finalizado pelo operador.', type: 'error' });
         return;
       }
       showToast({ message: fallbackMsg, type: 'error' });
     },
-    [refetchMessages, showToast],
+    [markClosedLocally, showToast],
   );
+
+  const handleBack = useCallback(() => {
+    if (returnTo) {
+      // Mesma regra de suporte/index.tsx: volta para a tela de origem em outra aba.
+      router.navigate(returnTo as never);
+      return;
+    }
+    router.back();
+  }, [returnTo, router]);
+
+  const [isStartingNew, setIsStartingNew] = useState(false);
+
+  const handleNovoAtendimento = useCallback(async () => {
+    if (!userAuth?.id) {
+      showToast({ message: 'Usuário não identificado', type: 'error' });
+      return;
+    }
+    setIsStartingNew(true);
+    try {
+      const newChatId = await findOrCreateSupportChatId({ driverId: userAuth.id });
+      await queryClient.invalidateQueries({ queryKey: [KEY_CHATS] });
+      if (newChatId === chatId) {
+        // O backend reaproveitou esta conversa (protocolo reaberto): destrava a tela.
+        setChatStatus(ChatStatus.ACTIVE);
+        loadChatInfo();
+        return;
+      }
+      // replace: a conversa encerrada não fica na pilha; returnTo segue valendo.
+      router.replace(supportChatHref(newChatId, returnTo));
+    } catch {
+      showToast({ message: 'Não foi possível abrir um novo atendimento', type: 'error' });
+    } finally {
+      setIsStartingNew(false);
+    }
+  }, [userAuth?.id, chatId, queryClient, loadChatInfo, router, returnTo, showToast]);
 
   // Um passo da fila: texto puro, ou um anexo (bolha local -> upload -> mensagem com a chave).
   const sendStep = useCallback(
@@ -647,7 +690,7 @@ export default function SuporteChatPage() {
 
   return (
     <ScreenBase
-      buttonLeft={<ButtonBack />}
+      buttonLeft={<ButtonBack onPress={handleBack} />}
       title={
         <Text preset="text16" fontWeightPreset='bold' color="colorTextPrimary">
           {headerTitle}
@@ -743,10 +786,17 @@ export default function SuporteChatPage() {
 
         {/* Chat finalizado */}
         {isChatClosed && (
-          <Box backgroundColor="gray100" px="x16" py="y8">
+          <Box backgroundColor="gray100" px="x16" py="y12" alignItems="center" gap="y8">
             <Text preset="text13" color="gray600" textAlign="center">
               Atendimento finalizado pelo operador.
             </Text>
+            <Button
+              title={isStartingNew ? 'Abrindo...' : 'Novo atendimento'}
+              preset="outline"
+              onPress={handleNovoAtendimento}
+              disabled={isStartingNew}
+              width={measure.x300}
+            />
           </Box>
         )}
 

@@ -7,3 +7,4 @@ export { postMessageService, createChatService, getChatService, listChatsByUserS
 export type { UseChatWebSocketOptions } from './useChatWebSocket';
 export type { PostMessagePayload } from './usePostMessage';
 export { useChatAttachmentUpload } from './useChatAttachmentUpload';
+export { findOrCreateSupportChatId, supportChatHref, supportSubjectForService } from './openSupportChat';
