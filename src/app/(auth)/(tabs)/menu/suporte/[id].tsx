@@ -9,6 +9,7 @@ import {
   Box,
   Button,
   Text,
+  TextButton,
   TouchableOpacityBox,
   ChatInput,
   ScreenBase
@@ -37,12 +38,14 @@ import { useDisconnectedNotice } from '@/domain/agility/chat/useCase/useDisconne
 import { CHAT_OFFLINE_POLL_MS } from '@/domain/agility/chat/useCase/useGetChatMessages';
 import { supportUnreadKey } from '@/domain/agility/chat/useCase/useSupportUnreadCount';
 import { generateTempId, isRemoteUrl, toChatMessage } from '@/domain/agility/chat/utils/messageUtils';
-import { useGetTicketByChatId } from '@/domain/agility/ticket/useCase';
+import { useGetTicketByChatId, useResolveByRequester } from '@/domain/agility/ticket/useCase';
+import { podeEncerrarComoSolicitante } from '@/domain/agility/ticket/utils/requesterResolve';
 import { KEY_CHATS, KEY_TICKETS } from '@/domain/queryKeys';
 import { useAuthCredentialsService } from '@/services';
 import { useToastService } from '@/services/Toast/useToast';
 import { measure } from '@/theme';
 
+import { EncerrarAtendimentoPrompt } from './_components/EncerrarAtendimentoPrompt';
 import { resolveChatBodyState } from './_utils/chatBodyState';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -429,6 +432,38 @@ export default function SuporteChatPage() {
     [chatId, markClosedLocally],
   );
 
+  // Encerrar o próprio atendimento: o backend resolve o protocolo e fecha o chat.
+  const [isEncerrarVisible, setIsEncerrarVisible] = useState(false);
+  const [motivoEncerrar, setMotivoEncerrar] = useState('');
+  const [erroEncerrar, setErroEncerrar] = useState<string | undefined>(undefined);
+  const resolveByRequester = useResolveByRequester();
+  const podeEncerrar = podeEncerrarComoSolicitante(ticket?.status, isChatClosed);
+
+  const handleConfirmarEncerrar = useCallback(() => {
+    if (!ticket?.id) return;
+    setErroEncerrar(undefined);
+    resolveByRequester.mutate(
+      { id: ticket.id, resolution: motivoEncerrar.trim() || undefined },
+      {
+        onSuccess: () => {
+          setIsEncerrarVisible(false);
+          setMotivoEncerrar('');
+          // markClosedLocally já invalida chats e protocolos; o `chat_closed` do
+          // socket chega em seguida e cai no mesmo estado.
+          markClosedLocally();
+          showToast({ message: 'Atendimento encerrado.', type: 'success' });
+        },
+        onError: (error) => {
+          // Mesmo caminho de `handleSendFailure`: a mensagem do backend vem em
+          // `response.data.message` e pode ser array (ValidationPipe).
+          const raw = (error as any)?.response?.data?.message ?? (error as any)?.message ?? '';
+          const texto = Array.isArray(raw) ? raw.join(' ') : String(raw);
+          setErroEncerrar(texto.trim() || 'Não foi possível encerrar agora. Tente de novo.');
+        },
+      },
+    );
+  }, [ticket?.id, motivoEncerrar, resolveByRequester, markClosedLocally, showToast]);
+
   // Histórico enviado a cada join (inclusive depois de uma queda): vai para o mesmo cache.
   const handleHistory = useCallback(
     (data: { chatId: string; messages: ChatMessage[] }) => {
@@ -758,6 +793,16 @@ export default function SuporteChatPage() {
                 </Text>
               </Box>
             )}
+
+            {podeEncerrar && (
+              <Box flex={1} alignItems="flex-end">
+                <TextButton
+                  title="Encerrar"
+                  preset="textPrimaryUnderline"
+                  onPress={() => setIsEncerrarVisible(true)}
+                />
+              </Box>
+            )}
           </Box>
         </Box>
 
@@ -854,6 +899,19 @@ export default function SuporteChatPage() {
           disableAttachments={isChatClosed}
         />
       </Box>
+
+      <EncerrarAtendimentoPrompt
+        visible={isEncerrarVisible}
+        motivo={motivoEncerrar}
+        setMotivo={setMotivoEncerrar}
+        errorMessage={erroEncerrar}
+        isLoading={resolveByRequester.isPending}
+        onConfirm={handleConfirmarEncerrar}
+        onCancel={() => {
+          setIsEncerrarVisible(false);
+          setErroEncerrar(undefined);
+        }}
+      />
     </ScreenBase>
   );
 }

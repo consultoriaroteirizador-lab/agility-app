@@ -15,6 +15,7 @@ import {
   assign,
   start,
   resolve,
+  resolveByRequester,
   close,
   reopen,
   update,
@@ -67,6 +68,10 @@ export async function startTicketService(id: Id): Promise<BaseResponse<TicketIte
 
 export async function resolveTicketService(id: Id, resolution?: string): Promise<BaseResponse<TicketItem>> {
   return resolve(id, resolution)
+}
+
+export async function resolveByRequesterService(id: Id, resolution?: string): Promise<BaseResponse<TicketItem>> {
+  return resolveByRequester(id, resolution)
 }
 
 export async function closeTicketService(id: Id): Promise<BaseResponse<TicketItem>> {

@@ -100,6 +100,21 @@ export async function resolve(id: Id, resolution?: string): Promise<BaseResponse
   return data
 }
 
+/**
+ * Encerrar o PRÓPRIO atendimento (motorista solicitante).
+ *
+ * Rota separada da `/resolve`, que é do operador: o backend barra o motorista lá
+ * e, aqui, confere se ele é o solicitante do protocolo. O protocolo fica
+ * RESOLVIDO e o operador dá o fechamento final.
+ */
+export async function resolveByRequester(id: Id, resolution?: string): Promise<BaseResponse<TicketItem>> {
+  const { data } = await apiAgility.patch<BaseResponse<TicketItem>>(
+    `/tickets/${id}/resolve-by-requester`,
+    { resolutionDescription: resolution },
+  )
+  return data
+}
+
 // Reabrir ticket
 export async function reopen(id: Id): Promise<BaseResponse<TicketItem>> {
   const { data } = await apiAgility.patch<BaseResponse<TicketItem>>(`/tickets/${id}/reopen`)
