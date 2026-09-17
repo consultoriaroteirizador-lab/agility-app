@@ -1,97 +1,93 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 import type { BaseResponse } from '@/api/baseResponse';
-import { KEY_CHATS } from '@/domain/queryKeys';
 import type { Id } from '@/types/base';
 
 import { postMessageService } from '../chatService';
-import type { MessageItem } from '../dto/types';
-import type { ChatMessage, AttachmentType, SendMessagePayload } from '../dto/types';
+import type { AttachmentType, ChatMessage, MessageItem, SendMessagePayload } from '../dto/types';
 import { MessageStatus, ParticipantType } from '../dto/types';
 import { useChatStore } from '../store/useChatStore';
-import { generateTempId } from '../utils/messageUtils';
+import { generateTempId, toChatMessage, withDisplayableAttachment } from '../utils/messageUtils';
+
+import { chatMessagesKey, upsertMessagesInCache } from './messagesCache';
 
 export interface PostMessagePayload {
     chatId: Id;
     content: string;
     attachmentUrl?: string;
     attachmentType?: string;
+    /** keycloakUserId do motorista. Continua no corpo (contrato C1: o backend ignora, mas aceita). */
     senderId?: string;
     /** ID of the message being replied to */
     replyToId?: string;
+    /** Bolha otimista já criada pela tela (anexo com URI local). NUNCA vai para a API. */
+    tempId?: string;
 }
 
 interface MutationContext {
-    optimisticMessage: ChatMessage;
+    optimisticMessage: ChatMessage | null;
 }
 
 export function usePostMessage(senderType: string = 'DRIVER') {
     const queryClient = useQueryClient();
-    const { addOptimisticMessage, removeOptimisticMessage } =
-        useChatStore();
 
-    return useMutation({
-        mutationFn: (payload: PostMessagePayload) =>
-            postMessageService(
-                payload as unknown as SendMessagePayload,
-                senderType
-            ),
+    return useMutation<BaseResponse<MessageItem>, Error, PostMessagePayload, MutationContext>({
+        mutationFn: (payload) => {
+            // O backend recusa campo desconhecido (forbidNonWhitelisted): o tempId não pode ir.
+            const body = { ...payload };
+            delete body.tempId;
+            return postMessageService(body as unknown as SendMessagePayload, senderType);
+        },
 
-        onMutate: async (payload): Promise<MutationContext> => {
-            // Cancel any outgoing refetches
-            await queryClient.cancelQueries({
-                queryKey: [KEY_CHATS, payload.chatId, 'messages'],
-            });
+        onMutate: async (payload) => {
+            const chatId = String(payload.chatId);
+            await queryClient.cancelQueries({ queryKey: chatMessagesKey(chatId) });
 
-            // Create optimistic message
-            const tempId = generateTempId();
+            if (payload.tempId) {
+                const existing =
+                    useChatStore.getState().optimisticMessages[chatId]?.find((m) => m.id === payload.tempId) ?? null;
+                return { optimisticMessage: existing };
+            }
+
             const optimisticMessage: ChatMessage = {
-                id: tempId,
-                chatId: String(payload.chatId),
+                id: generateTempId(),
+                chatId,
                 senderId: payload.senderId || '',
-                senderType:
-                    senderType === 'DRIVER'
-                        ? ParticipantType.DRIVER
-                        : ParticipantType.SUPPORT,
+                senderType: senderType === 'DRIVER' ? ParticipantType.DRIVER : ParticipantType.SUPPORT,
                 content: payload.content,
                 attachmentUrl: payload.attachmentUrl,
                 attachmentType: payload.attachmentType as AttachmentType | undefined,
                 status: MessageStatus.SENT,
                 createdAt: new Date().toISOString(),
             };
-
-            // Add optimistic message to store
-            addOptimisticMessage(String(payload.chatId), optimisticMessage);
-
+            useChatStore.getState().addOptimisticMessage(chatId, optimisticMessage);
             return { optimisticMessage };
         },
 
-        onSuccess: (data: BaseResponse<MessageItem>, variables, context) => {
-            // ✅ UX: Não fazer NADA aqui!
-            //
-            // A mensagem otimística está no Zustand store, NÃO no React Query cache.
-            // Quando o WebSocket entregar a mensagem real, o getMergedMessages fará:
-            // 1. Verificar que a mensagem real chegou (tem ID real)
-            // 2. Filtrar a mensagem otimística (que ainda tem temp-xxx)
-            // 3. Mostrar apenas a mensagem real
-            //
-            // Isso garante que a mensagem nunca desapareça da tela!
-
-            console.log('[usePostMessage] Mensagem confirmada:', {
-                tempId: context?.optimisticMessage?.id,
-                realId: data?.result?.id,
-            });
+        onSuccess: (data, variables, context) => {
+            const chatId = String(variables.chatId);
+            const raw = data?.result;
+            if (raw?.id) {
+                // A mensagem real entra no cache ANTES de a bolha sair: nada pisca nem
+                // some, com ou sem socket.
+                const server = withDisplayableAttachment(
+                    toChatMessage(raw, chatId),
+                    context?.optimisticMessage?.attachmentUrl,
+                );
+                upsertMessagesInCache(queryClient, chatId, [server]);
+            } else {
+                queryClient.invalidateQueries({ queryKey: chatMessagesKey(chatId) });
+            }
+            if (context?.optimisticMessage) {
+                useChatStore.getState().removeOptimisticMessage(chatId, context.optimisticMessage.id);
+            }
         },
 
-        onError: (error, variables, context) => {
-            console.error('[usePostMessage] Error sending message:', error);
-
-            // Remove optimistic message on error
+        onError: (_error, variables, context) => {
             if (context?.optimisticMessage) {
-                removeOptimisticMessage(
-                    String(variables.chatId),
-                    context.optimisticMessage.id
-                );
+                useChatStore
+                    .getState()
+                    .removeOptimisticMessage(String(variables.chatId), context.optimisticMessage.id);
             }
         },
     });
