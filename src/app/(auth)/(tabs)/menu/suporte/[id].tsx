@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { FlatList, Image } from 'react-native';
+import { FlatList, Image, Linking } from 'react-native';
 
 import { useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams } from 'expo-router';
@@ -28,6 +28,7 @@ import {
   useChatStore,
 } from '@/domain/agility/chat';
 import { getChatService, markChatReadService } from '@/domain/agility/chat/chatService';
+import { isOpenableAttachmentUrl } from '@/domain/agility/chat/utils/attachmentUtils';
 import { generateTempId } from '@/domain/agility/chat/utils/messageUtils';
 import { useGetTicketByChatId } from '@/domain/agility/ticket/useCase';
 import { useAuthCredentialsService } from '@/services';
@@ -88,6 +89,7 @@ interface MessageItemProps {
   isOwnMessage: (msg: ChatMessage) => boolean;
   peerReadAt: string | null;
   peerDeliveredAt: string | null;
+  onOpenAttachment: (url: string) => void;
 }
 
 // Estado de entrega/leitura de uma mensagem própria (estilo WhatsApp)
@@ -116,7 +118,7 @@ function getReadState(
   return 'sent';
 }
 
-function MessageItem({ item, prevItem, isOwnMessage, peerReadAt, peerDeliveredAt }: MessageItemProps) {
+function MessageItem({ item, prevItem, isOwnMessage, peerReadAt, peerDeliveredAt, onOpenAttachment }: MessageItemProps) {
   const { msg, isLast } = item;
   const prevMsg = prevItem?.type === 'message' ? prevItem.msg : null;
   const isOwn = isOwnMessage(msg);
@@ -126,6 +128,8 @@ function MessageItem({ item, prevItem, isOwnMessage, peerReadAt, peerDeliveredAt
   const isImage =
     msg.attachmentType?.toLowerCase() === 'image' ||
     (msg.attachmentUrl && IMAGE_EXTENSION_REGEX.test(msg.attachmentUrl));
+  // Só a URL assinada abre; a chave crua e a URI local da bolha em envio não.
+  const canOpenAttachment = isOpenableAttachmentUrl(msg.attachmentUrl);
   const isOptimistic = msg.id.startsWith('temp-');
 
   // Debug log para anexos
@@ -202,10 +206,13 @@ function MessageItem({ item, prevItem, isOwnMessage, peerReadAt, peerDeliveredAt
             flexDirection="row"
             alignItems="center"
             gap="x8"
+            disabled={!canOpenAttachment}
+            opacity={canOpenAttachment ? 1 : 0.6}
+            onPress={() => onOpenAttachment(msg.attachmentUrl!)}
           >
             <Text preset="text20">📄</Text>
             <Text preset="text13" color={isOwn ? 'white' : 'primary100'} fontWeightPreset='semibold'>
-              Ver anexo
+              {canOpenAttachment ? 'Ver anexo' : 'Enviando anexo…'}
             </Text>
           </TouchableOpacityBox>
         )}
@@ -256,6 +263,17 @@ export default function SuporteChatPage() {
 
   const { userAuth, authCredentials } = useAuthCredentialsService();
   const { showToast } = useToastService();
+  const handleOpenAttachment = useCallback(
+    (url: string) => {
+      // Defesa extra: o card já desabilita o toque quando a URL não é remota,
+      // mas o Linking não deve depender só disso.
+      if (!isOpenableAttachmentUrl(url)) return;
+      Linking.openURL(url).catch(() => {
+        showToast({ message: 'Não foi possível abrir o anexo', type: 'error' });
+      });
+    },
+    [showToast],
+  );
   const [currentUserSenderId, setCurrentUserSenderId] = useState<string | null>(null);
   const [chatInfo, setChatInfo] = useState<ChatWithParticipants | null>(null);
   const [chatStatus, setChatStatus] = useState<ChatStatus>(ChatStatus.ACTIVE);
@@ -615,10 +633,11 @@ export default function SuporteChatPage() {
           isOwnMessage={isOwnMessage}
           peerReadAt={peerReadAt}
           peerDeliveredAt={peerDeliveredAt}
+          onOpenAttachment={handleOpenAttachment}
         />
       );
     },
-    [flatData, isOwnMessage, peerReadAt, peerDeliveredAt],
+    [flatData, isOwnMessage, peerReadAt, peerDeliveredAt, handleOpenAttachment],
   );
 
   const keyExtractor = useCallback(
