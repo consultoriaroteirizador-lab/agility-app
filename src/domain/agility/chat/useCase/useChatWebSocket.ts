@@ -25,6 +25,8 @@ export interface UseChatWebSocketOptions {
     onTypingStop?: (data: { chatId: string; userId: string }) => void;
     onMessagesRead?: (data: { chatId: string; readBy: string; messageId?: string }) => void;
     onMessagesDelivered?: (data: { chatId: string; messageIds: string[]; deliveredTo: string; deliveredAt: string }) => void;
+    /** Histórico recente que o servidor manda a cada `join_chat` (inclusive depois de reconectar). */
+    onHistory?: (data: { chatId: string; messages: ChatMessage[] }) => void;
 }
 
 export function useChatWebSocket(options: UseChatWebSocketOptions = {}) {
@@ -38,6 +40,7 @@ export function useChatWebSocket(options: UseChatWebSocketOptions = {}) {
         onTypingStop,
         onMessagesRead,
         onMessagesDelivered,
+        onHistory,
     } = options;
     const { authCredentials, userAuth } = useAuthCredentialsService();
     const [isConnected, setIsConnected] = useState(false);
@@ -55,6 +58,7 @@ export function useChatWebSocket(options: UseChatWebSocketOptions = {}) {
     const onTypingStopRef = useRef(onTypingStop);
     const onMessagesReadRef = useRef(onMessagesRead);
     const onMessagesDeliveredRef = useRef(onMessagesDelivered);
+    const onHistoryRef = useRef(onHistory);
 
     const setConnectedRef = useRef(useChatStore.getState().setConnected);
     const addTypingUserRef = useRef(useChatStore.getState().addTypingUser);
@@ -69,7 +73,8 @@ export function useChatWebSocket(options: UseChatWebSocketOptions = {}) {
         onTypingStopRef.current = onTypingStop;
         onMessagesReadRef.current = onMessagesRead;
         onMessagesDeliveredRef.current = onMessagesDelivered;
-    }, [onMessage, onChatClosed, onError, onTypingStart, onTypingStop, onMessagesRead, onMessagesDelivered]);
+        onHistoryRef.current = onHistory;
+    }, [onMessage, onChatClosed, onError, onTypingStart, onTypingStop, onMessagesRead, onMessagesDelivered, onHistory]);
 
     useEffect(() => {
         isMountedRef.current = true;
@@ -227,7 +232,10 @@ export function useChatWebSocket(options: UseChatWebSocketOptions = {}) {
         });
 
         socket.on('chat_history', (data: { chatId: string; messages: ChatMessage[] }) => {
-            console.log('[useChatWebSocket] Chat history received:', data.chatId, data.messages.length, 'messages');
+            console.log('[useChatWebSocket] Chat history received:', data?.chatId, data?.messages?.length, 'messages');
+            if (data?.chatId && Array.isArray(data.messages)) {
+                onHistoryRef.current?.(data);
+            }
         });
 
         socket.on('notification', (event: { type: string; chatId: string; message?: ChatMessage }) => {

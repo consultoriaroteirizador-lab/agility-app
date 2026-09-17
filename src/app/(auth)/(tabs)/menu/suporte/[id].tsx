@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { FlatList, Image, Linking } from 'react-native';
 
+import { useQueryClient } from '@tanstack/react-query';
 import { useLocalSearchParams } from 'expo-router';
 
 import {
@@ -28,7 +29,9 @@ import {
 } from '@/domain/agility/chat';
 import { getChatService, markChatReadService } from '@/domain/agility/chat/chatService';
 import type { AttachmentType, ChatSendOutcome, OutgoingAttachment } from '@/domain/agility/chat/dto/types';
+import { upsertMessagesInCache } from '@/domain/agility/chat/useCase/messagesCache';
 import { runChatSends, type ChatSendStep } from '@/domain/agility/chat/useCase/sendChatBatch';
+import { CHAT_OFFLINE_POLL_MS } from '@/domain/agility/chat/useCase/useGetChatMessages';
 import { generateTempId, isRemoteUrl, toChatMessage } from '@/domain/agility/chat/utils/messageUtils';
 import { useGetTicketByChatId } from '@/domain/agility/ticket/useCase';
 import { useAuthCredentialsService } from '@/services';
@@ -249,6 +252,7 @@ export default function SuporteChatPage() {
 
   const { userAuth, authCredentials } = useAuthCredentialsService();
   const { showToast } = useToastService();
+  const queryClient = useQueryClient();
   const handleOpenAttachment = useCallback(
     (url: string) => {
       Linking.openURL(url).catch(() => {
@@ -267,11 +271,13 @@ export default function SuporteChatPage() {
   const { optimisticMessages, addOptimisticMessage, removeOptimisticMessage } = useChatStore();
   const typingUsers = useTypingUsers(chatId);
 
+  // O socket da conversa publica o estado no store; enquanto ele está fora, o REST faz polling.
+  const socketConnected = useChatStore((s) => s.isConnected);
   const {
     messages: messagesFromAPI,
     isLoading: isLoadingMessages,
     refetch: refetchMessages,
-  } = useGetChatMessages(chatId);
+  } = useGetChatMessages(chatId, { refetchIntervalMs: socketConnected ? false : CHAT_OFFLINE_POLL_MS });
 
   const { ticket } = useGetTicketByChatId(chatId);
 
@@ -401,9 +407,19 @@ export default function SuporteChatPage() {
     [chatId, refetchMessages],
   );
 
+  // Histórico enviado a cada join (inclusive depois de uma queda): vai para o mesmo cache.
+  const handleHistory = useCallback(
+    (data: { chatId: string; messages: ChatMessage[] }) => {
+      if (!chatId || data.chatId !== chatId) return;
+      upsertMessagesInCache(queryClient, chatId, data.messages.map((m) => toChatMessage(m, chatId)));
+    },
+    [chatId, queryClient],
+  );
+
   const { isConnected, emitTypingStart, emitTypingStop, markAsRead: markAsReadWS } = useChatWebSocket({
     enabled: !!chatId,
     chatId: chatId,
+    onHistory: handleHistory,
     onMessage: handleNewMessage,
     onChatClosed: handleChatClosed,
     onError: (error) => {
