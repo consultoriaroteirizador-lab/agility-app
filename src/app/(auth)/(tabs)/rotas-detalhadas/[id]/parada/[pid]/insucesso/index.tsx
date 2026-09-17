@@ -17,9 +17,11 @@ import { useToastService } from '@/services/Toast/useToast';
 import { measure } from '@/theme';
 
 import { resolvePedidosDaParada } from '../../../_utils';
+import { getCurrentCoords } from '../_hooks/getCurrentCoords';
 import { useDestinoAposNota } from '../_hooks/useDestinoAposNota';
 import { useInsucessoDraft } from '../_hooks/useInsucessoDraft';
 
+import { coordsParaOcorrencia } from './occurrenceLocation';
 import { occurrenceOutcomeMessage } from './occurrenceOutcome';
 
 function FalhaScreenContent() {
@@ -222,6 +224,14 @@ function FalhaScreenContent() {
 
     if (photoUrls.length > 0) {
       payload.photoProof = photoUrls;
+    }
+
+    // GPS de onde a falha foi anotada — vira a localização da tentativa. É
+    // best-effort: `getCurrentCoords` nunca lança e desiste em 5s, então a nota
+    // segue sem localização quando a permissão é negada ou o sinal não vem.
+    const localizacao = coordsParaOcorrencia(await getCurrentCoords());
+    if (localizacao) {
+      Object.assign(payload, localizacao);
     }
 
     registerOccurrence({
