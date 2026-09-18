@@ -10,7 +10,7 @@ import { ButtonBack } from '@/components/Button/ButtonBack';
 import { Icon } from '@/components/Icon/Icon';
 import { MultiPhotoPicker } from '@/components/MultiPhotoPicker';
 import { useFindAllDistributionCenters } from '@/domain/agility/distribution-center/useCase';
-import { useCompleteRouting, useFindOneRouting, useGetRoutingMapData, useReturnManifest } from '@/domain/agility/routing/useCase';
+import { useCompleteRouting, useFindOneRouting, useGetRoutingMapData, usePendingReturns, useReturnManifest } from '@/domain/agility/routing/useCase';
 import { uploadMultipleServicePhotos } from '@/domain/agility/service/serviceUploadUtils';
 import { useCompleteServiceWithDetails, useFindOneService } from '@/domain/agility/service/useCase';
 import { useRouteDirections } from '@/domain/ors/useRouteDirections';
@@ -199,18 +199,16 @@ function RetornoContent() {
     returnPoint ? { latitude: returnPoint.latitude, longitude: returnPoint.longitude } : null,
   );
 
-  // Pedidos que voltam (transferência de malha): serviços FAILED do trecho que
-  // NÃO têm material no manifesto. Regra dedupe: se o serviço já aparece como
-  // material (last-mile), NÃO vira card de pedido — evita duplicar. No transfer,
-  // o pedido falho não tem material → aparece aqui.
-  const pedidosVolta = useMemo(() => {
-    return (services ?? []).filter((s) => {
-      const st = String(s.status ?? '').toUpperCase();
-      const isReturn = String(s.serviceType ?? '').toUpperCase() === 'RETURN';
-      const jaNoManifesto = items.some((it) => it.serviceId === s.id);
-      return st === 'FAILED' && !isReturn && !jaNoManifesto;
-    });
-  }, [services, items]);
+  // Pedidos que voltam: quem diz é o BACKEND, pelas tentativas de devolução
+  // pendentes da rota. Antes isto era deduzido aqui ("FAILED ainda na rota"), e
+  // o pedido CANCELADO devolvido nunca aparecia — ele sai da rota no mesmo gesto
+  // do cancelamento. Regra de dedupe mantida: se o serviço já aparece como
+  // material do manifesto (last-mile), NÃO vira card de pedido.
+  const { pendentes: pendentesDoBackend } = usePendingReturns(routeId || '');
+  const pedidosVolta = useMemo(
+    () => pendentesDoBackend.filter((p) => !items.some((it) => it.serviceId === p.serviceId)),
+    [pendentesDoBackend, items],
+  );
   const [pedidoConferred, setPedidoConferred] = useState<Record<string, boolean>>({});
   const togglePedido = useCallback((id: string) => {
     setPedidoConferred((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -225,7 +223,7 @@ function RetornoContent() {
   const allConferred = useMemo(
     () =>
       (items.length === 0 || items.every((_, idx) => conferred[idx])) &&
-      pedidosVolta.every((p) => pedidoConferred[p.id]),
+      pedidosVolta.every((p) => pedidoConferred[p.serviceId]),
     [items, conferred, pedidosVolta, pedidoConferred],
   );
 
@@ -251,7 +249,7 @@ function RetornoContent() {
         items,
         conferred,
         receivedQty,
-        pedidosVolta,
+        pendentes: pedidosVolta,
         pedidoConferred,
       });
 
@@ -411,12 +409,12 @@ function RetornoContent() {
             </Box>
           ) : (
             <>
-              {/* Pedidos falhos (transferência de malha): card check-only, sem quantidade. */}
+              {/* Pendências de devolução da rota: card check-only, sem quantidade. */}
               {pedidosVolta.map((p) => {
-                const pedidoChecked = !!pedidoConferred[p.id];
+                const pedidoChecked = !!pedidoConferred[p.serviceId];
                 return (
                   <TouchableOpacityBox
-                    key={p.id}
+                    key={p.serviceId}
                     flexDirection="row"
                     alignItems="center"
                     gap="x12"
@@ -427,7 +425,7 @@ function RetornoContent() {
                     borderColor={pedidoChecked ? 'primary100' : 'gray100'}
                     opacity={hasArrived ? 1 : 0.5}
                     disabled={!hasArrived}
-                    onPress={() => togglePedido(p.id)}
+                    onPress={() => togglePedido(p.serviceId)}
                   >
                     <Icon
                       name={pedidoChecked ? 'check-circle' : 'inventory-2'}
@@ -436,10 +434,10 @@ function RetornoContent() {
                     />
                     <Box flex={1}>
                       <Text preset="text14" fontWeightPreset="semibold" color="colorTextPrimary">
-                        {p.title || 'Pedido'}
+                        {p.serviceCode || p.title || 'Pedido'}
                       </Text>
                       <Text preset="text12" color="colorTextError">
-                        Não recebido no CD
+                        {p.sideEffect === 'CANCEL_ORDER' ? 'Cancelado — devolver ao CD' : 'Não recebido no CD'}
                       </Text>
                     </Box>
                   </TouchableOpacityBox>

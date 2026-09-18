@@ -190,6 +190,30 @@ async function getReturnManifest(id: Id): Promise<BaseResponse<ReturnManifestRes
     return data
 }
 
+/**
+ * O que ainda falta devolver ao CD nesta rota, direto das tentativas de entrega.
+ *
+ * Complementa o manifesto (que é de MATERIAL) e substitui a dedução que a tela
+ * fazia por status de pedido: o pedido CANCELADO devolvido sai da rota no mesmo
+ * gesto do cancelamento, então nunca apareceria naquela lista.
+ */
+export interface PendingReturnResponse {
+    serviceId: string
+    serviceCode: string | null
+    title: string | null
+    /** Status atual do pedido: `CANCELED` é o cartão de cancelado devolvido. */
+    serviceStatus: string | null
+    reasonName: string | null
+    sideEffect: string
+    attemptNumber: number
+    maxAttempts: number
+}
+
+async function findPendingReturns(id: Id): Promise<BaseResponse<PendingReturnResponse[]>> {
+    const { data } = await apiAgility.get<BaseResponse<PendingReturnResponse[]>>(`/routings/${id}/pending-returns`)
+    return data
+}
+
 async function handoff(id: Id, payload: RoutingHandoffRequest): Promise<BaseResponse<RoutingHandoffResult>> {
     const { data } = await apiAgility.post<BaseResponse<RoutingHandoffResult>>(`/routings/${id}/handoff`, payload)
     return data
@@ -235,6 +259,7 @@ export const routingAPI = {
     acceptRouting,
     getAggregatedSummary,
     getReturnManifest,
+    findPendingReturns,
     handoff,
     findNonDelivered,
 }

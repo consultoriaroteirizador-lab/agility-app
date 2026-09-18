@@ -90,7 +90,7 @@ function FalhaScreenContent() {
       const outcome = resp?.result?.occurrenceOutcome;
       if (outcome) {
         showToast({
-          message: occurrenceOutcomeMessage(outcome),
+          message: occurrenceOutcomeMessage(outcome, !!resp?.result?.awaitingReturn),
           type: ['FAILED_LIMIT', 'FAILED'].includes(outcome) ? 'error' : 'success',
         });
       }

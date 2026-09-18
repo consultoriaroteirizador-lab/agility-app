@@ -1,5 +1,4 @@
-import type { ServicePointResponse } from '@/domain/agility/routing/dto'
-import type { ReturnManifestItem } from '@/domain/agility/routing/routingAPI'
+import type { PendingReturnResponse, ReturnManifestItem } from '@/domain/agility/routing/routingAPI'
 
 import { montarReturnChecklist } from '../returnChecklist'
 
@@ -16,16 +15,17 @@ function makeItem(over: Partial<ReturnManifestItem> & { serviceId: string }): Re
     }
 }
 
-function makePedido(over: Partial<ServicePointResponse> & { id: string }): ServicePointResponse {
+function makePendencia(over: Partial<PendingReturnResponse> & { serviceId: string }): PendingReturnResponse {
     return {
-        sequenceOrder: 1,
-        latitude: -23.5,
-        longitude: -46.6,
+        serviceCode: null,
         title: 'Pedido TRA-1',
-        serviceType: 'DELIVERY',
-        status: 'FAILED',
+        serviceStatus: 'FAILED',
+        reasonName: 'Cliente ausente',
+        sideEffect: 'FAIL_ORDER',
+        attemptNumber: 1,
+        maxAttempts: 3,
         ...over,
-    } as ServicePointResponse
+    }
 }
 
 describe('montarReturnChecklist', () => {
@@ -34,7 +34,7 @@ describe('montarReturnChecklist', () => {
             items: [makeItem({ serviceId: 's-1' })],
             conferred: { 0: true },
             receivedQty: () => 2,
-            pedidosVolta: [],
+            pendentes: [],
             pedidoConferred: {},
         })
 
@@ -58,7 +58,7 @@ describe('montarReturnChecklist', () => {
             items: [],
             conferred: {},
             receivedQty: () => 0,
-            pedidosVolta: [makePedido({ id: 's-2' })],
+            pendentes: [makePendencia({ serviceId: 's-2' })],
             pedidoConferred: { 's-2': true },
         })
 
@@ -82,7 +82,7 @@ describe('montarReturnChecklist', () => {
             items: [],
             conferred: {},
             receivedQty: () => 0,
-            pedidosVolta: [makePedido({ id: 's-3', title: null })],
+            pendentes: [makePendencia({ serviceId: 's-3', title: null })],
             pedidoConferred: {},
         })
 
@@ -94,7 +94,7 @@ describe('montarReturnChecklist', () => {
             items: [],
             conferred: {},
             receivedQty: () => 0,
-            pedidosVolta: [makePedido({ id: 's-4' })],
+            pendentes: [makePendencia({ serviceId: 's-4' })],
             pedidoConferred: {},
         })
 
@@ -106,11 +106,54 @@ describe('montarReturnChecklist', () => {
             items: [makeItem({ serviceId: 's-5' })],
             conferred: { 0: true },
             receivedQty: () => 3,
-            pedidosVolta: [makePedido({ id: 's-5' })],
+            pendentes: [makePendencia({ serviceId: 's-5' })],
             pedidoConferred: { 's-5': true },
         })
 
         expect(result).toHaveLength(1)
         expect(result[0].material).toBe('Caixa 10kg')
+    })
+
+    it('cartao de pedido cancelado entra igual, com o rotulo proprio', () => {
+        const result = montarReturnChecklist({
+            items: [],
+            conferred: {},
+            receivedQty: () => 0,
+            pendentes: [makePendencia({
+                serviceId: 's-9', serviceCode: 'ABC-9', title: 'Entrega 9', serviceStatus: 'CANCELED',
+                reasonName: 'Recusado', sideEffect: 'CANCEL_ORDER',
+            })],
+            pedidoConferred: { 's-9': true },
+        })
+
+        expect(result).toEqual([{
+            material: 'ABC-9',
+            serviceId: 's-9',
+            serviceCode: 'ABC-9',
+            quantity: 0,
+            unit: null,
+            origin: 'UNDELIVERED',
+            reason: 'FAILED',
+            received: 0,
+            checked: true,
+        }])
+    })
+
+    // O `material` prefere o CÓDIGO: a pendência traz o que o manifesto mostra na
+    // etiqueta, e é o que o motorista lê na caixa.
+    it('sem codigo cai no titulo, e sem titulo no rotulo padrao', () => {
+        const semCodigo = montarReturnChecklist({
+            items: [], conferred: {}, receivedQty: () => 0,
+            pendentes: [makePendencia({ serviceId: 's-6', serviceCode: null, title: 'Entrega 6' })],
+            pedidoConferred: {},
+        })
+        expect(semCodigo[0].material).toBe('Entrega 6')
+
+        const semNada = montarReturnChecklist({
+            items: [], conferred: {}, receivedQty: () => 0,
+            pendentes: [makePendencia({ serviceId: 's-7', serviceCode: null, title: null })],
+            pedidoConferred: {},
+        })
+        expect(semNada[0].material).toBe('Pedido devolvido')
     })
 })

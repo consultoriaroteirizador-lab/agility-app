@@ -17,7 +17,7 @@ import type {
     RoutingHandoffResult,
     RouteNonDeliveredItemResponse,
 } from './dto'
-import { routingAPI, type ReturnManifestResponse } from './routingAPI'
+import { routingAPI, type PendingReturnResponse, type ReturnManifestResponse } from './routingAPI'
 
 async function create(payload: CreateRoutingRequest): Promise<BaseResponse<RoutingResponse>> {
     return routingAPI.create(payload)
@@ -113,6 +113,10 @@ async function getReturnManifest(id: Id): Promise<BaseResponse<ReturnManifestRes
     return routingAPI.getReturnManifest(id)
 }
 
+async function findPendingReturns(id: Id): Promise<BaseResponse<PendingReturnResponse[]>> {
+    return routingAPI.findPendingReturns(id)
+}
+
 async function handoff(id: Id, payload: RoutingHandoffRequest): Promise<BaseResponse<RoutingHandoffResult>> {
     return routingAPI.handoff(id, payload)
 }
@@ -144,6 +148,7 @@ export const routingService = {
     getMapData,
     acceptRouting,
     getReturnManifest,
+    findPendingReturns,
     handoff,
     findNonDelivered,
 }
