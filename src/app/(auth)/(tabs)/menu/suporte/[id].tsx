@@ -37,6 +37,7 @@ import { runChatSends, type ChatSendStep } from '@/domain/agility/chat/useCase/s
 import { useDisconnectedNotice } from '@/domain/agility/chat/useCase/useDisconnectedNotice';
 import { CHAT_OFFLINE_POLL_MS } from '@/domain/agility/chat/useCase/useGetChatMessages';
 import { supportUnreadKey } from '@/domain/agility/chat/useCase/useSupportUnreadCount';
+import { tituloDaConversa } from '@/domain/agility/chat/utils/chatSubject';
 import { generateTempId, isRemoteUrl, toChatMessage } from '@/domain/agility/chat/utils/messageUtils';
 import { useGetTicketByChatId, useResolveByRequester } from '@/domain/agility/ticket/useCase';
 import { podeEncerrarComoSolicitante } from '@/domain/agility/ticket/utils/requesterResolve';
@@ -716,7 +717,7 @@ export default function SuporteChatPage() {
 
   const headerTitle = chatInfo?.routeId
     ? `Rota ${chatInfo.routeId}`
-    : chatInfo?.subject || 'Suporte';
+    : tituloDaConversa(chatInfo?.subject);
 
   const headerSubtitle = chatInfo?.serviceId
     ? `Servico #${chatInfo.serviceId}`

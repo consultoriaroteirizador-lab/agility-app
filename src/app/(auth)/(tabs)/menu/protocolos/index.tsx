@@ -12,6 +12,7 @@ import {
 
 } from '@/components';
 import { ButtonBack } from '@/components/Button/ButtonBack';
+import { tituloDaConversa } from '@/domain/agility/chat/utils/chatSubject';
 import { TicketStatus } from '@/domain/agility/ticket/dto/types';
 import { useFindTicketsByDriver } from '@/domain/agility/ticket/useCase';
 import { useAuthCredentialsService } from '@/services';
@@ -216,7 +217,7 @@ export default function HistoricoProtocolosScreen() {
                         </Text>
                         {ticket.subject && (
                           <Text preset="text14" color="gray600" numberOfLines={1}>
-                            {ticket.subject}
+                            {tituloDaConversa(ticket.subject)}
                           </Text>
                         )}
                       </Box>
