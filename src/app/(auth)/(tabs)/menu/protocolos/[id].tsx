@@ -4,6 +4,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 
 import { ActivityIndicator, Box, Text, Button, ScreenBase } from '@/components';
 import { ButtonBack } from '@/components/Button/ButtonBack';
+import { tituloDaConversa } from '@/domain/agility/chat/utils/chatSubject';
 import { TicketStatus } from '@/domain/agility/ticket/dto/types';
 import { useGetTicket } from '@/domain/agility/ticket/useCase';
 import { measure } from '@/theme';
@@ -142,7 +143,7 @@ export default function ProtocoloDetalhesScreen() {
                   Assunto:
                 </Text>
                 <Text preset="text15" color="colorTextPrimary" fontWeightPreset='semibold'>
-                  {ticket.subject}
+                  {tituloDaConversa(ticket.subject)}
                 </Text>
               </Box>
             )}
