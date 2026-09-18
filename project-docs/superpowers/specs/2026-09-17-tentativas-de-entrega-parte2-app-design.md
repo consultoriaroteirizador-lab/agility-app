@@ -20,6 +20,18 @@ nunca dispara, porque o app não manda ao backend os pedidos que ele mesmo exibe
 devolvidos. Enquanto isso não muda, toda falha vira trabalho manual da central e o
 pedido fica preso na rota (cinco gestos respondem 409 até a devolução ser confirmada).
 
+> **CORREÇÃO (18/09/2026, medida no teste de campo).** O parágrafo acima está **errado na
+> consequência**, e a §4 (F2) explica por quê. O `RETURN_STOP` **já disparava** pelos itens
+> do manifesto: `getReturnManifest` inclui todo serviço da rota que não é a parada de
+> retorno e, desde 14/07 (`3242e709`), emite uma linha "pedido inteiro"
+> (`quantity = amountItems`) para o serviço `FAILED` que não gerou material. Como o
+> checklist do manifesto sempre foi enviado com `serviceId`, o fechamento pelo motorista
+> funcionava para pedido falhado em rota comum. O que a F2 conserta é a lista paralela de
+> cartões do app, que de fato não era enviada — mas que quase nunca é renderizada, porque
+> o pedido já está no manifesto. **A F2 é uma guarda, não o destravamento do fluxo.**
+> A causa do erro: escrevi a spec lendo o app e o consumidor no backend, sem ler a origem
+> da lista (`getReturnManifest`).
+
 Esta spec cobre o app e os dois retoques de backend que ele encosta.
 
 ## 2. O que o backend já aceita (medido em `origin/development`, 17/09/2026)
@@ -63,6 +75,20 @@ motorista não alcança esse dado, é projeção nova no backend; fica em §9.
 sem linha de manifesto) são exibidos, entram no gate `allConferred` (linha 232) e
 **nunca são enviados**. Resultado: o motorista confere, o botão libera, e a tentativa
 desses pedidos segue `AWAITING_RETURN` esperando a central.
+
+> **CORREÇÃO (18/09/2026, teste de campo na rota `U4LDZAB`).** O defeito acima é real, mas o
+> alcance é muito menor do que esta spec afirmou. `getReturnManifest` consulta
+> `{ routingId, companyId, serviceType: { not: 'RETURN' } }` — **todo** serviço da rota — e
+> tem fallback desde 14/07 (`3242e709`): serviço `FAILED` que não gerou linha de material
+> entra como "pedido inteiro", com `quantity = amountItems`. Na tela do motorista, os dois
+> pedidos falhados do teste (`SEED-260716-0316` e `0326`, **zero** linhas em
+> `service_materials`) apareceram como itens de manifesto `16/16` e `8/8`. Ou seja:
+> `jaNoManifesto` é verdadeiro para pedido falhado em rota comum, `pedidosVolta` fica vazio,
+> e o checklist já levava esses pedidos com `serviceId`. **A F2 continua correta** — sem ela
+> um cartão renderizado seria silenciosamente descartado —, mas ela é uma guarda para o caso
+> em que o manifesto não cobre (malha, ou mudança futura na consulta), não o conserto do
+> caminho principal. A ordem de entrega da §7, que a colocou em primeiro por ser "o buraco
+> funcional", foi decidida com essa premissa errada.
 
 **Mudança:** extrair a montagem para uma função pura
 `_utils/returnChecklist.ts` → `montarReturnChecklist({ items, conferred, receivedQty, pedidosVolta, pedidoConferred })`
@@ -240,3 +266,19 @@ entregar em PRs empilhadas ou aceitar o conflito de merge — não paralelizar.
 - As três decisões de produto abertas do épico: motorista lendo tentativas de outros
   motoristas (D1 resolve só a exibição), `returnSource` do cancelamento de rota, e
   pedido atribuído direto (sem rota) fechando na hora.
+
+## 10. Achados do teste de campo (18/09/2026, rota `U4LDZAB`)
+
+1. **O alcance da F2 era menor do que a spec dizia** — ver as duas correções acima.
+2. **O seletor de CD não escala.** Com os 10 CDs da empresa de teste, os chips viram um
+   paredão que empurra "Quem recebeu no CD" para fora da dobra. Com essa quantidade o
+   controle certo é uma busca, não chips; e o CD pré-selecionado deveria aparecer primeiro,
+   não no fim da lista. Ajuste de UI pendente, não bloqueante.
+3. **O GPS da ocorrência não chegou** nas duas tentativas registradas pelo app
+   (`latitude`/`longitude` nulos), enquanto as duas de 17/09, enviadas por API, têm
+   coordenada. Três causas possíveis, ainda não separadas: permissão negada, timeout de 5s
+   do `getCurrentCoords` (típico de emulador sem posição) ou bundle antigo servido por um
+   Metro que não reiniciou depois do pull. O log em `__DEV__` do `getCurrentCoords`
+   distingue as três.
+4. **O `CANCEL_ORDER` não devolve a mercadoria** — achado que virou adendo próprio
+   (`agility-services#678`).
