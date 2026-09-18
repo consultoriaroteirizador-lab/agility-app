@@ -894,9 +894,11 @@ export default function SuporteChatPage() {
         <ChatInput
           onSendMessage={handleSendMessage}
           onTyping={handleTyping}
-          disabled={isSending || uploadingAttachment || isChatClosed}
+          // Só o encerramento trava o campo. Travar durante o envio derrubava o teclado
+          // e ele reabria logo depois; o ChatInput já bloqueia o botão enquanto envia.
+          disabled={isChatClosed}
           placeholder={isChatClosed ? 'Chat finalizado' : 'Digite uma mensagem...'}
-          disableAttachments={isChatClosed}
+          disableAttachments={isChatClosed || isSending || uploadingAttachment}
         />
       </Box>
 

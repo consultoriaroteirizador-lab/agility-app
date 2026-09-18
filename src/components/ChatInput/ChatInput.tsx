@@ -53,14 +53,17 @@ export default function ChatInput({
   const handleSend = useCallback(async () => {
     if (!canSend) return;
 
+    // O que estava escrito quando o envio começou. Como o campo continua editável,
+    // o motorista pode digitar durante o envio — e aí o texto novo é dele, não pode
+    // ser substituído pelo resultado do envio anterior.
+    const textoEnviado = message;
     setSending(true);
     try {
       const outcome = await onSendMessage(message.trim(), hasAttachments ? attachments : undefined);
-      setMessage(outcome.unsentText);
+      setMessage(atual => (atual === textoEnviado ? outcome.unsentText : atual));
       setAttachments(outcome.unsentAttachments);
       if (!outcome.unsentText && outcome.unsentAttachments.length === 0) {
         onTyping(false);
-        inputRef.current?.focus();
       }
     } catch (error) {
       // Erro inesperado: mantém texto e anexos para o motorista tentar de novo.
@@ -116,7 +119,10 @@ export default function ChatInput({
             value={message}
             onChangeText={handleInputChange}
             onSubmitEditing={handleSend}
-            editable={!isDisabled}
+            // NÃO usar `isDisabled` aqui: travar o campo durante o envio derrubava o
+            // teclado e ele reabria em seguida, piscando por cima da conversa. Só o
+            // `disabled` da tela (atendimento encerrado) trava de verdade.
+            editable={!disabled}
             multiline
             maxLength={maxLength}
             textAlignVertical="top"
