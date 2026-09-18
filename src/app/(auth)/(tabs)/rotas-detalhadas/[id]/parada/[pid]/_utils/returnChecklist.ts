@@ -3,9 +3,12 @@
  *
  * A lista tem DUAS origens e o backend fecha a tentativa de devolução por ela
  * (`returnedServiceIds` → `resolveReturnedAttempts`, com `returnSource = RETURN_STOP`):
- * os itens do manifesto (materiais) e os pedidos FALHADOS que não têm linha de
- * manifesto — estes últimos a tela já exibia e travava, mas nunca enviava, e por
- * isso a tentativa deles ficava aguardando a central.
+ * os itens do manifesto (materiais) e as PENDÊNCIAS de devolução da rota que não
+ * têm linha de manifesto.
+ *
+ * As pendências vêm de `GET /routings/:id/pending-returns`, não mais da dedução
+ * "pedido FALHADO ainda na rota": o pedido CANCELADO devolvido sai da rota no
+ * mesmo gesto do cancelamento e por isso nunca aparecia aqui.
  *
  * O pedido sem manifesto vai com `quantity: 0` e `received: 0`: é exatamente o
  * caso que `isReturnedChecklistItem` trata como devolvido quando `checked` é
@@ -15,8 +18,7 @@
  * @module rotas-detalhadas/parada/utils/returnChecklist
  */
 
-import type { ServicePointResponse } from '@/domain/agility/routing/dto'
-import type { ReturnManifestItem } from '@/domain/agility/routing/routingAPI'
+import type { PendingReturnResponse, ReturnManifestItem } from '@/domain/agility/routing/routingAPI'
 import type { ReturnChecklistItem } from '@/domain/agility/service/dto/request/service-completion-details.request'
 
 export interface MontarReturnChecklistParams {
@@ -26,20 +28,20 @@ export interface MontarReturnChecklistParams {
     conferred: Record<number, boolean>
     /** Quantidade recebida já clampada em [0, esperado]. */
     receivedQty: (idx: number, expected: number) => number
-    /** Pedidos FALHADOS da rota sem linha de manifesto. */
-    pedidosVolta: ServicePointResponse[]
+    /** O que falta devolver na rota, vindo do backend. */
+    pendentes: PendingReturnResponse[]
     /** Check dos cartões de pedido, por id do pedido. */
     pedidoConferred: Record<string, boolean>
 }
 
-/** Rótulo do cartão sem manifesto. `ServicePointResponse` não traz código. */
+/** Último recurso: a pendência sem código nem título. */
 const ROTULO_PEDIDO_SEM_MANIFESTO = 'Pedido devolvido'
 
 export function montarReturnChecklist({
     items,
     conferred,
     receivedQty,
-    pedidosVolta,
+    pendentes,
     pedidoConferred,
 }: MontarReturnChecklistParams): ReturnChecklistItem[] {
     const checklist: ReturnChecklistItem[] = items.map((item, idx) => ({
@@ -56,19 +58,21 @@ export function montarReturnChecklist({
 
     const jaNoChecklist = new Set(checklist.map((i) => i.serviceId))
 
-    for (const pedido of pedidosVolta) {
-        if (!pedido?.id || jaNoChecklist.has(pedido.id)) continue
-        jaNoChecklist.add(pedido.id)
+    for (const pendente of pendentes) {
+        if (!pendente?.serviceId || jaNoChecklist.has(pendente.serviceId)) continue
+        jaNoChecklist.add(pendente.serviceId)
         checklist.push({
-            material: pedido.title || ROTULO_PEDIDO_SEM_MANIFESTO,
-            serviceId: pedido.id,
-            serviceCode: null,
+            // O código vem primeiro: é o que está na etiqueta da caixa, e é o que
+            // a pendência traz e o `ServicePointResponse` da dedução antiga não tinha.
+            material: pendente.serviceCode || pendente.title || ROTULO_PEDIDO_SEM_MANIFESTO,
+            serviceId: pendente.serviceId,
+            serviceCode: pendente.serviceCode ?? null,
             quantity: 0,
             unit: null,
             origin: 'UNDELIVERED',
             reason: 'FAILED',
             received: 0,
-            checked: !!pedidoConferred[pedido.id],
+            checked: !!pedidoConferred[pendente.serviceId],
         })
     }
 

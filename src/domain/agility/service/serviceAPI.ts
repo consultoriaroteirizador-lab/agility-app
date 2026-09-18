@@ -157,7 +157,7 @@ async function fail(id: Id, payload: ServiceFailRequest): Promise<BaseResponse<S
 async function applyOccurrence(
     id: Id,
     payload: ApplyOccurrenceRequest,
-): Promise<BaseResponse<ServiceResponse & { occurrenceOutcome: OccurrenceOutcome }>> {
+): Promise<BaseResponse<ServiceResponse & { occurrenceOutcome: OccurrenceOutcome; awaitingReturn?: boolean }>> {
     // Remover campos undefined do payload
     const cleanPayload = Object.entries(payload).reduce((acc, [key, value]) => {
         if (value !== undefined && value !== null) {
@@ -166,7 +166,7 @@ async function applyOccurrence(
         return acc;
     }, {} as Record<string, any>);
 
-    const { data } = await apiAgility.post<BaseResponse<ServiceResponse & { occurrenceOutcome: OccurrenceOutcome }>>(
+    const { data } = await apiAgility.post<BaseResponse<ServiceResponse & { occurrenceOutcome: OccurrenceOutcome; awaitingReturn?: boolean }>>(
         `/services/${id}/occurrence`,
         cleanPayload,
         {

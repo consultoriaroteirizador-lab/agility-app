@@ -7,6 +7,14 @@ describe('occurrenceOutcomeMessage', () => {
         expect(occurrenceOutcomeMessage('CANCELED')).toBe('Pedido cancelado.')
     })
 
+    it('avisa que a carga volta ao CD quando o cancelamento gerou devolucao', () => {
+        expect(occurrenceOutcomeMessage('CANCELED', true)).toBe('Pedido cancelado. Leve a mercadoria de volta ao CD.')
+    })
+
+    it('cancelamento sem devolucao nao manda o motorista levar nada', () => {
+        expect(occurrenceOutcomeMessage('CANCELED', false)).toBe('Pedido cancelado.')
+    })
+
     it('returns the retry message for PENDING', () => {
         expect(occurrenceOutcomeMessage('PENDING')).toBe('Será reenviado para nova tentativa.')
     })
@@ -23,6 +31,7 @@ describe('occurrenceOutcomeMessage', () => {
         const outcomes: OccurrenceOutcome[] = ['CANCELED', 'PENDING', 'FAILED_LIMIT', 'FAILED']
         outcomes.forEach(outcome => {
             expect(typeof occurrenceOutcomeMessage(outcome)).toBe('string')
+            expect(typeof occurrenceOutcomeMessage(outcome, true)).toBe('string')
         })
     })
 })

@@ -104,7 +104,7 @@ async function fail(
 async function applyOccurrence(
     id: Id,
     payload: ApplyOccurrenceRequest,
-): Promise<BaseResponse<ServiceResponse & { occurrenceOutcome: OccurrenceOutcome }>> {
+): Promise<BaseResponse<ServiceResponse & { occurrenceOutcome: OccurrenceOutcome; awaitingReturn?: boolean }>> {
     return serviceAPI.applyOccurrence(id, payload)
 }
 
