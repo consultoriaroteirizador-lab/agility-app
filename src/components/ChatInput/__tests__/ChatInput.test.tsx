@@ -50,6 +50,45 @@ async function digitarEEnviar(tree: TestRenderer.ReactTestRenderer, texto: strin
 }
 
 describe('ChatInput', () => {
+    // O campo virava `editable={false}` durante o envio: o teclado caía e o `focus()`
+    // seguinte reabria, piscando por cima da conversa. Enviar não trava mais o campo.
+    it('campo continua editável enquanto a mensagem é enviada', async () => {
+        let liberar!: (outcome: ChatSendOutcome) => void;
+        const tree = render(() => new Promise<ChatSendOutcome>((resolve) => { liberar = resolve; }));
+
+        act(() => { findTextInput(tree).props.onChangeText('oi'); });
+        act(() => { tree.root.findAllByProps({ testID: 'chat-input-send' })[0].props.onPress(); });
+
+        expect(findTextInput(tree).props.editable).toBe(true);
+
+        await act(async () => { liberar({ unsentText: '', unsentAttachments: [] }); });
+    });
+
+    it('o que o motorista digitou durante o envio não é apagado', async () => {
+        let liberar!: (outcome: ChatSendOutcome) => void;
+        const tree = render(() => new Promise<ChatSendOutcome>((resolve) => { liberar = resolve; }));
+
+        act(() => { findTextInput(tree).props.onChangeText('primeira'); });
+        act(() => { tree.root.findAllByProps({ testID: 'chat-input-send' })[0].props.onPress(); });
+        act(() => { findTextInput(tree).props.onChangeText('segunda, digitada durante o envio'); });
+
+        await act(async () => { liberar({ unsentText: '', unsentAttachments: [] }); });
+
+        expect(findTextInput(tree).props.value).toBe('segunda, digitada durante o envio');
+    });
+
+    it('campo fica travado quando a tela desabilita (atendimento encerrado)', () => {
+        let tree!: TestRenderer.ReactTestRenderer;
+        act(() => {
+            tree = TestRenderer.create(
+                <ThemeProvider theme={theme}>
+                    <ChatInput onSendMessage={jest.fn()} onTyping={jest.fn()} disabled />
+                </ThemeProvider>,
+            );
+        });
+        expect(findTextInput(tree).props.editable).toBe(false);
+    });
+
     it('envio que falha devolve o texto ao campo', async () => {
         const tree = render(async () => ({ unsentText: 'oi', unsentAttachments: [], error: new Error('x') }));
         await digitarEEnviar(tree, 'oi');
