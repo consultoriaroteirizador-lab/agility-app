@@ -35,6 +35,7 @@ export function TransferEtapaFinalizarColeta() {
         signature,
         commitPickupLeg,
         completionRequirements,
+        hasFormGroups,
     } = useParada();
     const { showToast } = useToastService();
 
@@ -64,8 +65,9 @@ export function TransferEtapaFinalizarColeta() {
                 documento: recipient?.numeroDocumento,
                 hasSignature: !!signature,
                 photoCount: photos?.length ?? 0,
+                hasLinkedForm: hasFormGroups,
             }),
-        [requirements, recipient?.tipo, recipient?.nome, recipient?.numeroDocumento, signature, photos?.length],
+        [requirements, recipient?.tipo, recipient?.nome, recipient?.numeroDocumento, signature, photos?.length, hasFormGroups],
     );
 
     const canCommit = completion.canProceed;

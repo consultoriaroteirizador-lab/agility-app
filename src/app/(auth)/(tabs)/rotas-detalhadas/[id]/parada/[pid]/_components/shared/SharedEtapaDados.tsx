@@ -59,6 +59,7 @@ export function SharedEtapaDados({ serviceType }: SharedEtapaDadosProps) {
     setSignature,
     setPhotos,
     completionRequirements,
+    hasFormGroups,
   } = useParada();
 
   const documentData: DocumentData = {
@@ -94,8 +95,9 @@ export function SharedEtapaDados({ serviceType }: SharedEtapaDadosProps) {
         documento: recipient?.numeroDocumento,
         hasSignature: !!signature,
         photoCount: photos.length,
+        hasLinkedForm: hasFormGroups,
       }),
-    [requirements, recipient?.tipo, recipient?.nome, recipient?.numeroDocumento, signature, photos.length],
+    [requirements, recipient?.tipo, recipient?.nome, recipient?.numeroDocumento, signature, photos.length, hasFormGroups],
   );
 
   const handleNext = () => {

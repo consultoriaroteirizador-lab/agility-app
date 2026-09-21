@@ -115,6 +115,8 @@ interface ParadaOverrides {
         photoUrls: string[];
         notes?: string;
     } | null;
+    /** O pedido tem formulario proprio vinculado (`service.formGroupIds`). */
+    hasFormGroups?: boolean;
 }
 
 /** Contexto mínimo que `useServiceCompletion` + `useServiceUpload` precisam. */
@@ -138,6 +140,10 @@ function makeParadaContext(overrides: ParadaOverrides = {}) {
         bypassReasonCode: null,
         bypassReasonText: '',
         completionRequirements: overrides.completionRequirements ?? ALL_REQUIRED,
+        // Default false: pedido SEM formulario proprio, o caso comum. Os testes que
+        // usam tudo-oculto e ainda assim esperam conclusao precisam ligar isto — e
+        // exatamente essa a regra nova.
+        hasFormGroups: overrides.hasFormGroups ?? false,
         signature: overrides.signature ?? null,
         setPhotos: jest.fn(),
         setSignature: jest.fn(),
@@ -198,13 +204,30 @@ describe('useServiceCompletion — regra unica de conclusao', () => {
         expect(result.missing).toEqual([]);
     });
 
-    it('tudo HIDDEN e estado vazio: canFinalize VERDADEIRO (servico sem ninguem para acompanhar)', () => {
+    // Regra do dono (21/09/2026): nao da para finalizar um servico sem NENHUMA
+    // evidencia. Tudo oculto so libera quando o pedido tem formulario proprio —
+    // antes disso, esta combinacao concluia com absolutamente nada.
+    it('tudo HIDDEN, sem formulario e estado vazio: BLOQUEIA com mensagem propria', () => {
         mockedUseParada.mockReturnValue(makeParadaContext({ completionRequirements: ALL_HIDDEN }));
+
+        const result = runHook('servico');
+
+        expect(result.canFinalize).toBe(false);
+        // Nao ha campo a citar (a tela de dados nem existe): a mensagem vem inteira.
+        expect(result.missing).toEqual([]);
+        expect(result.blockMessage).toContain('formulário');
+    });
+
+    it('tudo HIDDEN COM formulario vinculado: canFinalize VERDADEIRO', () => {
+        mockedUseParada.mockReturnValue(
+            makeParadaContext({ completionRequirements: ALL_HIDDEN, hasFormGroups: true }),
+        );
 
         const result = runHook('servico');
 
         expect(result.canFinalize).toBe(true);
         expect(result.missing).toEqual([]);
+        expect(result.blockMessage).toBeUndefined();
     });
 
     it('signature HIDDEN com foto faltando: missing cita foto e NAO cita assinatura (prova que o rodape nao mente)', () => {
@@ -266,8 +289,13 @@ describe('useServiceCompletion — regra unica de conclusao', () => {
             expect(result.missing).toEqual(['quem recebeu', 'nome e documento', 'assinatura', 'foto']);
         });
 
+        // Com formulario vinculado para isolar o teste no MAPEAMENTO de bucket: sem
+        // ele a trava de evidencia bloquearia por outro motivo (ver bloco acima) e o
+        // teste passaria a verde sem provar que 'coleta' leu 'pickup'.
         it("'coleta' le 'pickup' (tudo oculto, libera mesmo com estado vazio)", () => {
-            mockedUseParada.mockReturnValue(makeParadaContext({ completionRequirements: requirements }));
+            mockedUseParada.mockReturnValue(
+                makeParadaContext({ completionRequirements: requirements, hasFormGroups: true }),
+            );
 
             const result = runHook('coleta');
 
@@ -296,10 +324,13 @@ describe('useServiceCompletion — regra unica de conclusao', () => {
         // Gate de conclusao (canFinalize) ja e coberto pelos blocos acima — aqui
         // o requirements e ALL_HIDDEN de proposito, para isolar o teste no que
         // `handleFinalizar` monta no payload, sem a exigencia de campo interferir.
+        // `hasFormGroups: true` pelo mesmo motivo: sem formulario, ALL_HIDDEN cai na
+        // trava de evidencia e `handleFinalizar` sai antes de montar payload nenhum.
         it('envia documento e relacao de quem recebeu no payload de conclusao', async () => {
             mockedUseParada.mockReturnValue(
                 makeParadaContext({
                     completionRequirements: ALL_HIDDEN,
+                    hasFormGroups: true,
                     recipient: {
                         tipo: 'porteiro',
                         nome: 'Elaine Rocha',
@@ -340,6 +371,7 @@ describe('useServiceCompletion — regra unica de conclusao', () => {
             mockedUseParada.mockReturnValue(
                 makeParadaContext({
                     completionRequirements: ALL_HIDDEN,
+                    hasFormGroups: true,
                     recipient: { tipo: 'cliente', nome: 'Ana', tipoDocumento: 'RG', numeroDocumento: '123.456.789-00' },
                     photos: [{ uri: 'a.jpg' }],
                     signature: 'sig.png',
@@ -365,6 +397,7 @@ describe('useServiceCompletion — regra unica de conclusao', () => {
             mockedUseParada.mockReturnValue(
                 makeParadaContext({
                     completionRequirements: ALL_HIDDEN,
+                    hasFormGroups: true,
                     recipient: { tipo: 'cliente', nome: 'Ana', tipoDocumento: 'RG', numeroDocumento: '   ' },
                     photos: [{ uri: 'a.jpg' }],
                     signature: 'sig.png',
@@ -390,6 +423,7 @@ describe('useServiceCompletion — regra unica de conclusao', () => {
             mockedUseParada.mockReturnValue(
                 makeParadaContext({
                     completionRequirements: ALL_HIDDEN,
+                    hasFormGroups: true,
                     recipient: {
                         tipo: 'porteiro',
                         nome: 'Elaine Rocha',
@@ -420,6 +454,7 @@ describe('useServiceCompletion — regra unica de conclusao', () => {
             mockedUseParada.mockReturnValue(
                 makeParadaContext({
                     completionRequirements: ALL_HIDDEN,
+                    hasFormGroups: true,
                     photos: [],
                     signature: null,
                     pickupEvidence: {
@@ -455,6 +490,7 @@ describe('useServiceCompletion — regra unica de conclusao', () => {
             mockedUseParada.mockReturnValue(
                 makeParadaContext({
                     completionRequirements: ALL_HIDDEN,
+                    hasFormGroups: true,
                     photos: [],
                     signature: null,
                     pickupEvidence: {
@@ -479,6 +515,7 @@ describe('useServiceCompletion — regra unica de conclusao', () => {
             mockedUseParada.mockReturnValue(
                 makeParadaContext({
                     completionRequirements: ALL_HIDDEN,
+                    hasFormGroups: true,
                     photos: [],
                     signature: null,
                     pickupEvidence: {
