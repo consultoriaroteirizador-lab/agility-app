@@ -1,7 +1,8 @@
 import { format, formatDistanceToNowStrict, isToday, isTomorrow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
-import { parseCalendarDay } from '@/functions/dateFunctions';
+import type { RoutingResponse } from '@/domain/agility/routing/dto';
+import { appDayKey, formatHHmm, parseCalendarDay } from '@/functions/dateFunctions';
 
 type DateInput = Date | string | null | undefined;
 
@@ -38,6 +39,38 @@ export function formatRouteDate(value: DateInput): string | null {
     // 'EEE' devolve o nome cheio ("quarta").
     const weekday = capitalize(format(date, 'EEEEEE', { locale: ptBR }));
     return `${weekday}, ${format(date, 'dd/MM')}`;
+}
+
+/**
+ * Rótulo de quando a rota começa — o MESMO campo pelo qual a lista é ordenada
+ * (ver `routeOrder.ts`). Lista ordenada por um campo e rótulo mostrando outro é
+ * pior que a bagunça original: o motorista via dois cards "Hoje" em uma ordem
+ * sem explicação na tela.
+ *
+ *  - com `plannedStartAt` (instante) → "Hoje · 07:30", "Sex, 22/07 · 14:00";
+ *  - sem ele, cai no dia-calendário `date` → "Hoje" (sem hora: não existe hora
+ *    a mostrar, e a antiga "· 09:00" era a meia-noite-UTC lida no fuso do
+ *    aparelho).
+ *
+ * O DIA vem do MESMO campo que a hora: para `plannedStartAt` ele é extraído no
+ * fuso da operação via [appDayKey] (ler o instante com getters locais devolveria
+ * o dia errado em aparelho fora de UTC-3).
+ *
+ * `startedAt` fica de fora de propósito — a rota já iniciada mostra "Iniciada há
+ * X" no rodapé do card, e repetir a hora real aqui só duplicaria a informação.
+ */
+export function formatRouteSchedule(
+    route: Pick<RoutingResponse, 'date'> & Partial<Pick<RoutingResponse, 'plannedStartAt'>>
+): string | null {
+    const plannedDay = appDayKey(route.plannedStartAt);
+    if (plannedDay) {
+        const dayLabel = formatRouteDate(plannedDay);
+        const time = formatHHmm(route.plannedStartAt, '');
+        if (dayLabel && time) return `${dayLabel} · ${time}`;
+        return dayLabel;
+    }
+
+    return formatRouteDate(route.date);
 }
 
 /** Tempo decorrido desde um instante: "há 25 min". null quando a data é inválida. */
