@@ -1,15 +1,17 @@
 // src/app/(auth)/(tabs)/menu/carteira/extrato.tsx
 
-import React, { useState, useMemo } from 'react';
-import { FlatList, RefreshControl } from 'react-native';
+import React, { useCallback, useState, useMemo } from 'react';
+import { FlatList, Linking, RefreshControl } from 'react-native';
 
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 
 import { ActivityIndicator, Box, ButtonBack, ScreenBase, Text, TouchableOpacityBox } from '@/components';
+import { isRemoteUrl } from '@/domain/agility/chat/utils/messageUtils';
 import { useGetTransactions } from '@/domain/agility/wallet';
 import { TransactionResponse } from '@/domain/agility/wallet/dto';
 import { TransactionType } from '@/domain/agility/wallet/dto/types';
+import { useToastService } from '@/services/Toast/useToast';
 import { measure } from '@/theme';
 import { formatCurrency } from '@/utils/formatCurrency';
 import { formatDate } from '@/utils/formatDate';
@@ -102,49 +104,88 @@ const FILTER_OPTIONS: { value: FilterType; label: string }[] = [
 function TransactionItem({ item }: { item: TransactionResponse }) {
     const config = TRANSACTION_CONFIG[item.type] || TRANSACTION_CONFIG[TransactionType.CREDIT];
     const isCredit = item.isCredit;
+    const { showToast } = useToastService();
+
+    // So URL http(s) abre. O backend assina a URL na listagem; se vier a CHAVE
+    // crua (storage fora, falha ao assinar), o link nao aparece — melhor nao ter
+    // botao do que ter um botao que da erro na cara do motorista.
+    const comprovantes = (item.proofUrls ?? []).filter(isRemoteUrl);
+
+    const abrirComprovante = useCallback(
+        (url: string) => {
+            Linking.openURL(url).catch(() => {
+                showToast({ message: 'Nao foi possivel abrir o comprovante', type: 'error' });
+            });
+        },
+        [showToast],
+    );
 
     return (
-        <Box
-            flexDirection="row"
-            alignItems="center"
-            py="y12"
-            borderRadius="s12"
-            mb="b8"
-        >
+        <Box py="y12" borderRadius="s12" mb="b8">
             <Box
-                width={measure.x40}
-                height={measure.y40}
-                borderRadius="s20"
-                backgroundColor="background"
+                flexDirection="row"
                 alignItems="center"
-                justifyContent="center"
-                style={{ backgroundColor: config.bgColor }}
             >
-                <Ionicons
-                    name={config.icon}
-                    size={measure.m20}
-                    color={config.iconColor}
-                />
-            </Box>
-
-            <Box flex={1} ml="l12">
-                <Text fontSize={measure.m14} fontWeightPreset='semibold' numberOfLines={1}>
-                    {item.description}
-                </Text>
-                <Text fontSize={measure.m12} color="colorTextSecondary" mt="t2">
-                    {config.label} • {formatDate(item.createdAt)}
-                </Text>
-            </Box>
-
-            <Box alignItems="flex-end">
-                <Text
-                    fontSize={measure.m16}
-                    fontWeightPreset='bold'
-                    color={isCredit ? 'colorTextSuccess' : 'colorTextError'}
+                <Box
+                    width={measure.x40}
+                    height={measure.y40}
+                    borderRadius="s20"
+                    backgroundColor="background"
+                    alignItems="center"
+                    justifyContent="center"
+                    style={{ backgroundColor: config.bgColor }}
                 >
-                    {isCredit ? '+' : '-'}{formatCurrency(item.amount)}
-                </Text>
+                    <Ionicons
+                        name={config.icon}
+                        size={measure.m20}
+                        color={config.iconColor}
+                    />
+                </Box>
+
+                <Box flex={1} ml="l12">
+                    <Text fontSize={measure.m14} fontWeightPreset='semibold' numberOfLines={1}>
+                        {item.description}
+                    </Text>
+                    <Text fontSize={measure.m12} color="colorTextSecondary" mt="t2">
+                        {config.label} • {formatDate(item.createdAt)}
+                    </Text>
+                </Box>
+
+                <Box alignItems="flex-end">
+                    <Text
+                        fontSize={measure.m16}
+                        fontWeightPreset='bold'
+                        color={isCredit ? 'colorTextSuccess' : 'colorTextError'}
+                    >
+                        {isCredit ? '+' : '-'}{formatCurrency(item.amount)}
+                    </Text>
+                </Box>
             </Box>
+
+            {comprovantes.length > 0 && (
+                <Box flexDirection="row" flexWrap="wrap" gap="x8" mt="t8" ml="l12">
+                    {comprovantes.map((url, indice) => (
+                        <TouchableOpacityBox
+                            key={url}
+                            testID={`comprovante-${item.id}-${indice}`}
+                            flexDirection="row"
+                            alignItems="center"
+                            px="m12"
+                            py="y8"
+                            borderRadius="s12"
+                            backgroundColor="gray50"
+                            accessibilityRole="link"
+                            accessibilityLabel="Abrir comprovante"
+                            onPress={() => abrirComprovante(url)}
+                        >
+                            <Ionicons name="receipt-outline" size={measure.m16} color="#666" />
+                            <Text fontSize={measure.m12} color="colorTextSecondary" ml="l8">
+                                {comprovantes.length === 1 ? 'Ver comprovante' : `Comprovante ${indice + 1}`}
+                            </Text>
+                        </TouchableOpacityBox>
+                    ))}
+                </Box>
+            )}
         </Box>
     );
 }

@@ -33,6 +33,12 @@ export interface TransactionResponse {
     serviceId?: string;
     paymentId?: string;
     withdrawalId?: string;
+    /**
+     * Comprovante do gesto do escritorio, ja com URL ASSINADA pelo backend (a
+     * chave crua do storage nao abre). Na transacao de saque, o backend resolve
+     * a partir do saque ligado por `withdrawalId`. Vazio = sem comprovante.
+     */
+    proofUrls?: string[];
     advanceId?: string;
     createdAt: string;
 }
