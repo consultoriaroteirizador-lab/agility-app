@@ -8,8 +8,8 @@ import { DEFAULT_FLOW_REQUIREMENTS, FlowCompletionRequirements } from '@/domain/
 
 import { validateCompletion } from '../completionValidation'
 
-const VAZIO = { recipientTipo: null, nome: '', documento: '', hasSignature: false, photoCount: 0 }
-const CHEIO = { recipientTipo: 'cliente', nome: 'Maria', documento: '123', hasSignature: true, photoCount: 1 }
+const VAZIO = { recipientTipo: null, nome: '', documento: '', hasSignature: false, photoCount: 0, hasLinkedForm: false }
+const CHEIO = { recipientTipo: 'cliente', nome: 'Maria', documento: '123', hasSignature: true, photoCount: 1, hasLinkedForm: false }
 
 const todosOcultos: FlowCompletionRequirements = {
     recipientType: 'HIDDEN',
@@ -37,8 +37,41 @@ describe('validateCompletion', () => {
         expect(r.missing).toEqual(['nome e documento'])
     })
 
-    it('tudo HIDDEN libera com o estado vazio', () => {
-        expect(validateCompletion(todosOcultos, VAZIO)).toEqual({ canProceed: true, missing: [] })
+    // Regra do dono (21/09/2026): nao da para finalizar um servico sem NENHUMA
+    // evidencia. Com os quatro itens ocultos a tela de dados nem existe, entao a
+    // unica saida e o formulario proprio do pedido.
+    describe('tudo HIDDEN: precisa de formulario ou de alguma evidencia', () => {
+        it('sem formulario e sem nada registrado: BLOQUEIA com mensagem inteira', () => {
+            const r = validateCompletion(todosOcultos, VAZIO)
+
+            expect(r.canProceed).toBe(false)
+            // nao ha campo a citar — a tela esta vazia
+            expect(r.missing).toEqual([])
+            expect(r.blockMessage).toContain('formulário')
+            expect(r.blockMessage).toContain('evidência')
+        })
+
+        it('com formulario vinculado ao pedido: libera (o formulario e a evidencia)', () => {
+            expect(validateCompletion(todosOcultos, { ...VAZIO, hasLinkedForm: true })).toEqual({
+                canProceed: true,
+                missing: [],
+            })
+        })
+
+        // Rascunho anterior a mudanca de config: o dado ja existe, nao faz sentido
+        // travar o motorista por causa dele.
+        it('evidencia sobrevivente de rascunho libera mesmo sem formulario', () => {
+            expect(validateCompletion(todosOcultos, { ...VAZIO, photoCount: 1 }).canProceed).toBe(true)
+            expect(validateCompletion(todosOcultos, { ...VAZIO, hasSignature: true }).canProceed).toBe(true)
+            expect(validateCompletion(todosOcultos, { ...VAZIO, nome: 'Maria' }).canProceed).toBe(true)
+            expect(validateCompletion(todosOcultos, { ...VAZIO, recipientTipo: 'cliente' }).canProceed).toBe(true)
+        })
+
+        // Um item visivel ja basta: a tela tem onde registrar algo.
+        it('um unico item OPTIONAL desfaz o oco e libera vazio', () => {
+            const r = validateCompletion({ ...todosOcultos, signature: 'OPTIONAL' }, VAZIO)
+            expect(r).toEqual({ canProceed: true, missing: [] })
+        })
     })
 
     it('OPTIONAL nao bloqueia mesmo vazio', () => {
@@ -72,5 +105,14 @@ describe('validateCompletion', () => {
 
         expect(validateCompletion(req, { ...VAZIO, photoCount: 1 }).missing).toEqual(['2 fotos'])
         expect(validateCompletion(req, { ...VAZIO, photoCount: 2 }).canProceed).toBe(true)
+    })
+
+    // Item obrigatorio faltando continua sendo o caso comum: a mensagem tem que
+    // citar o campo, nao a mensagem generica do caso oco.
+    it('faltando obrigatorio nao usa a mensagem do caso oco', () => {
+        const r = validateCompletion(DEFAULT_FLOW_REQUIREMENTS, VAZIO)
+
+        expect(r.blockMessage).toBeUndefined()
+        expect(r.missing.length).toBeGreaterThan(0)
     })
 })

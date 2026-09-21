@@ -52,6 +52,7 @@ export function useServiceCompletion(serviceType: ServiceFlowType) {
         bypassReasonCode,
         bypassReasonText,
         completionRequirements,
+        hasFormGroups,
     } = useParada();
     const { showToast } = useToastService();
 
@@ -67,8 +68,9 @@ export function useServiceCompletion(serviceType: ServiceFlowType) {
                 documento: recipient?.numeroDocumento,
                 hasSignature: !!signature,
                 photoCount: photos?.length ?? 0,
+                hasLinkedForm: hasFormGroups,
             }),
-        [requirements, recipient?.tipo, recipient?.nome, recipient?.numeroDocumento, signature, photos?.length],
+        [requirements, recipient?.tipo, recipient?.nome, recipient?.numeroDocumento, signature, photos?.length, hasFormGroups],
     );
 
     // Ref para rastrear se o componente está montado (evitar memory leaks)
@@ -140,7 +142,10 @@ export function useServiceCompletion(serviceType: ServiceFlowType) {
 
             if (!completion.canProceed) {
                 showToast({
-                    message: `Preencha antes de finalizar: ${completion.missing.join(', ')}`,
+                    // Caso oco (tudo oculto, sem formulario e sem evidencia): `missing`
+                    // vem vazio de proposito — nao ha campo a citar — e a mensagem
+                    // inteira vem pronta em `blockMessage`.
+                    message: completion.blockMessage ?? `Preencha antes de finalizar: ${completion.missing.join(', ')}`,
                     type: 'error',
                 });
                 finalizingRef.current = false;
@@ -366,6 +371,9 @@ export function useServiceCompletion(serviceType: ServiceFlowType) {
         // Rotulos do que falta, na ordem da tela — a tela usa isto no rodape em vez
         // de uma string fixa que pode citar campo que a config nem exige mais.
         missing: completion.missing,
+        // Mensagem pronta do caso oco (tudo oculto, sem formulario, sem evidencia).
+        // Quando vem preenchida, `missing` esta vazio: a tela mostra esta no lugar.
+        blockMessage: completion.blockMessage,
 
         // Checklist
         checklist,

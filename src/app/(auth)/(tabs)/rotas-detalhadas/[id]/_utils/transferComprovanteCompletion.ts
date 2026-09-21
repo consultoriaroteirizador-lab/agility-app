@@ -56,6 +56,11 @@ export function resolveTransferComprovanteCompletion(
         documento: state.documentNumber,
         hasSignature: state.hasSignature,
         photoCount: state.photoCount,
+        // Este wizard NAO conclui um Service (dispara POST /routings/:id/handoff),
+        // entao a trava "finalizar sem nenhuma evidencia" nao se aplica aqui — e
+        // `recipientTipo` acima, sempre preenchido, ja a mantem desarmada. Formulario
+        // proprio e vinculo do PEDIDO e nao existe no contexto deste handoff.
+        hasLinkedForm: false,
     })
 
     return { requirements, validation }

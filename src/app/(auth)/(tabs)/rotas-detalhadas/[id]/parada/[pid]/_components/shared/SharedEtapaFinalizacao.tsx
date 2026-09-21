@@ -113,7 +113,7 @@ export function SharedEtapaFinalizacao({ serviceType }: SharedEtapaFinalizacaoPr
 
   console.log('[SharedEtapaFinalizacao] safeChecklist', safeChecklist);
 
-  const { handleFinalizar, isCompleting, canFinalize, missing } = useServiceCompletion(serviceType);
+  const { handleFinalizar, isCompleting, canFinalize, missing, blockMessage } = useServiceCompletion(serviceType);
 
   console.log('[SharedEtapaFinalizacao] useServiceCompletion()', {
     isCompleting,
@@ -501,7 +501,16 @@ export function SharedEtapaFinalizacao({ serviceType }: SharedEtapaFinalizacaoPr
                 disabled={isCompleting || !canFinalize || paymentPending || deliveryCodePending}
                 width={measure.x330}
               />
-              {!canFinalize && (
+              {/* Caso oco: a empresa ocultou os quatro itens, o pedido nao tem
+                  formulario proprio e nada foi registrado. Nao ha campo a citar
+                  (a tela acima esta vazia), entao a mensagem vem inteira do
+                  validador em vez da lista de obrigatorios. */}
+              {!canFinalize && blockMessage && (
+                <Text preset="text12" color="primary100" textAlign="center" marginTop="y8">
+                  * {blockMessage}
+                </Text>
+              )}
+              {!canFinalize && !blockMessage && (
                 <Text preset="text12" color="primary100" textAlign="center" marginTop="y8">
                   * Obrigatório: {missing.join(', ')}
                 </Text>
