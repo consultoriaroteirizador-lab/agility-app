@@ -13,7 +13,7 @@ import {
     formatDistance,
     formatDuration,
     formatRelativeSince,
-    formatRouteDate,
+    formatRouteSchedule,
 } from '../utils/format';
 import { isFieldServiceRoute } from '../utils/routeKind';
 
@@ -120,7 +120,9 @@ function RouteItemComponent({ route, onPress }: RouteItemProps) {
 
     const badge = getLegBadge(route.legType) ?? getRoutingTypeBadge(route);
     const facilityLine = getFacilityLine(route);
-    const dateText = formatRouteDate(route.date);
+    // Mesmo campo pelo qual a lista é ordenada (`routeOrder.ts`): com hora
+    // planejada, o rótulo mostra a hora — é o que explica a ordem na tela.
+    const dateText = formatRouteSchedule(route);
     const price = formatCurrency(route.totalValue);
 
     // Rota em andamento mostra "Iniciada há X"; as demais mostram o rótulo.

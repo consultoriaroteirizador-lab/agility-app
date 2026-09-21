@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { useQueryClient } from '@tanstack/react-query';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -9,6 +9,8 @@ import { useFindMyRoutings, useStartRouting } from '@/domain/agility/routing/use
 import { KEY_DRIVER } from '@/domain/queryKeys';
 import { useAuthCredentialsService } from '@/services';
 import { resolveDisplayedAvailability } from '@/services/location/trackingGate';
+
+import { sortRoutesForDriver } from '../utils/routeOrder';
 
 import { useRoutesModals } from './useRoutesModals';
 
@@ -71,19 +73,20 @@ function useRoutesList() {
     const { routings, isLoading, isError, refetch } = useFindMyRoutings();
     const [refreshing, setRefreshing] = useState(false);
 
-    const filteredRoutes = routings
-        .filter(
-            (r) => r.status === RoutingStatus.ASSIGNED || r.status === RoutingStatus.IN_PROGRESS
-        )
-        .sort((a, b) => {
-            if (a.status === RoutingStatus.IN_PROGRESS && b.status !== RoutingStatus.IN_PROGRESS) {
-                return -1;
-            }
-            if (a.status !== RoutingStatus.IN_PROGRESS && b.status === RoutingStatus.IN_PROGRESS) {
-                return 1;
-            }
-            return 0;
-        });
+    // A ordem mora em `sortRoutesForDriver` (função pura, testada): rota em
+    // andamento no topo e o resto pelo início previsto, do mais próximo para o
+    // mais distante. Aqui sobra só o filtro de status.
+    const filteredRoutes = useMemo(
+        () =>
+            sortRoutesForDriver(
+                routings.filter(
+                    (r) =>
+                        r.status === RoutingStatus.ASSIGNED ||
+                        r.status === RoutingStatus.IN_PROGRESS
+                )
+            ),
+        [routings]
+    );
 
     const onRefresh = useCallback(async () => {
         setRefreshing(true);

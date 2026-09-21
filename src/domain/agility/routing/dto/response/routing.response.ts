@@ -47,6 +47,20 @@ export interface RoutingResponse {
     /** Routing date */
     date: Date | string
 
+    /**
+     * Hora planejada de partida da rota — INSTANTE real (`timestamptz`), não
+     * dia-calendário. Veio do épico de data/hora de início (17–18/09/2026) e é
+     * a fonte 1 da regra de partida no backend (`route-departure.ts`).
+     *
+     * Diferente de `date`, que é só o DIA (o backend grava meia-noite UTC e ler
+     * isso como instante devolve o dia anterior em UTC-3 — use
+     * [parseCalendarDay] para `date`, e nunca para este campo).
+     *
+     * Null/ausente quando o operador não escolheu hora, e ausente também
+     * enquanto o backend do épico não estiver deployado.
+     */
+    plannedStartAt?: Date | string | null
+
     /** Status */
     status: RoutingStatus
 
