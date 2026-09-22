@@ -9,11 +9,12 @@
 
 import { useMemo } from 'react'
 
-import { useFindOneRouting, useRouteNonDelivered } from '@/domain/agility/routing/useCase'
+import { useFindOneRouting, usePendingReturns, useRouteNonDelivered } from '@/domain/agility/routing/useCase'
 import { useFindServicesByRoutingId } from '@/domain/agility/service/useCase'
 
 import type { Parada, Rota, RotaStatus } from '../_types/rota.types'
 import {
+    buildDevolucaoList,
     buildInsucessoList,
     calculateProgress,
     collectLiveServiceIds,
@@ -29,6 +30,7 @@ import {
     isNenhumAndamento,
     mapServicesToParadas,
     withLedgerNonDelivered,
+    type DevolucaoRow,
     type InsucessoRow,
     type ParadaCountResult,
 } from '../_utils'
@@ -91,6 +93,17 @@ export interface UseRouteDetailsResult {
      * quando o endpoint do ledger falha.
      */
     insucessoRows: InsucessoRow[]
+
+    /**
+     * "Devolver ao CD": o que o motorista ainda carrega e tem de entregar de
+     * volta, direto das tentativas de devolução pendentes da rota.
+     *
+     * NÃO sai de `paradas` nem do ledger: o pedido cancelado com a carga na rua
+     * perde a rota no mesmo gesto do cancelamento (some das paradas) e, no
+     * ledger, quem vence o merge é a trilha do cancelamento, que traz
+     * `awaitingReturn` fixo em falso. Lista vazia quando o endpoint falha.
+     */
+    devolucaoRows: DevolucaoRow[]
 
     /** Todas as paradas concluídas */
     paradasConcluidas: Parada[]
@@ -236,6 +249,24 @@ export function useRouteDetails(rotaId: string | null | undefined): UseRouteDeta
         return buildInsucessoList(paradasConcluidasInsucesso, nonDeliveredItems)
     }, [paradasConcluidasInsucesso, nonDeliveredItems])
 
+    // O que falta devolver ao CD. Mesma fonte que a parada de RETORNO confere
+    // (`returnChecklist.ts`), para as duas telas não discordarem sobre quantas
+    // caixas voltam. Em erro, `pendentes` = [] e a seção some — nunca inventa.
+    const { pendentes } = usePendingReturns(rotaId ?? '', !!rotaId)
+
+    /**
+     * Linhas do "Devolver ao CD".
+     *
+     * O "ainda está na rota" vem de `collectLiveServiceIds` (ids por NOTA, de
+     * todas as paradas), não do `serviceId` das paradas: com agrupamento aquele
+     * campo é só o representante, e uma nota devolvida numa porta de cinco seria
+     * marcada como "saiu da rota" estando ali na tela. Mesma escolha do
+     * `ledgerOnlyCount`.
+     */
+    const devolucaoRows = useMemo(() => {
+        return buildDevolucaoList(pendentes, collectLiveServiceIds(paradas))
+    }, [pendentes, paradas])
+
     /**
      * Pedidos que saíram da rota (cancelado / devolvido à fila) — contados a
      * partir do ledger porque já não existem em `paradas`.
@@ -341,6 +372,7 @@ export function useRouteDetails(rotaId: string | null | undefined): UseRouteDeta
         paradasConcluidasSucesso,
         paradasConcluidasInsucesso,
         insucessoRows,
+        devolucaoRows,
         paradasConcluidas,
         nenhumAndamento,
         temMultiplasEmAndamento,

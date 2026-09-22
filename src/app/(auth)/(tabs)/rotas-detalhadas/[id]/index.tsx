@@ -28,6 +28,7 @@ import {
   EmptyParadasList,
   RouteActions,
   InsucessoRowItem,
+  DevolucaoAoCdCard,
 } from './_components'
 import { MapaParadasModal } from './_components/MapaParadasModal'
 import { TransferLegExecution } from './_components/TransferLegExecution'
@@ -105,13 +106,16 @@ interface ListHeaderProps {
 }
 
 function ListHeader({ aba, setAba, proximaParada }: ListHeaderProps) {
-  const { routing } = useRota()
+  const { routing, devolucaoRows } = useRota()
 
   return (
     <>
       <RouteProgress />
       <AjudantesDaRota ajudantes={routing?.helpers} />
       <RotaTabs aba={aba} setAba={setAba} />
+      {/* Abaixo das abas, nas DUAS: o que volta no caminhão não pertence a uma
+          aba — é obrigação da rota, e o pedido cancelado nem parada tem mais. */}
+      <DevolucaoAoCdCard rows={devolucaoRows} />
       {aba === 'andamento' && proximaParada && (
         <Text preset="text14" color="gray600" marginBottom="y8">
           Próxima parada
