@@ -41,6 +41,9 @@ export type {
 export { InsucessoRowItem } from './InsucessoRowItem'
 export type { InsucessoRowItemProps } from './InsucessoRowItem'
 
+export { DevolucaoAoCdCard } from './DevolucaoAoCdCard'
+export type { DevolucaoAoCdCardProps } from './DevolucaoAoCdCard'
+
 // ============================================
 // COMPONENTES DE AÇÕES
 // ============================================

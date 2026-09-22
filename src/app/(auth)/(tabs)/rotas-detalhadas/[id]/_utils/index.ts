@@ -88,6 +88,16 @@ export {
 } from './routeNonDelivered'
 
 // ============================================
+// DEVOLUÇÃO PENDENTE ("Devolver ao CD")
+// ============================================
+
+export {
+    type DevolucaoRow,
+    buildDevolucaoList,
+    devolucaoDesfechoLabel,
+} from './devolucaoPendente'
+
+// ============================================
 // AGRUPAMENTO DE PARADAS (Camada 2)
 // ============================================
 

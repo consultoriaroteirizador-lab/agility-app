@@ -39,7 +39,7 @@ import type {
     RotaStatus,
     RotaTabType,
 } from '../_types/rota.types'
-import type { InsucessoRow, ParadaCountResult } from '../_utils'
+import type { DevolucaoRow, InsucessoRow, ParadaCountResult } from '../_utils'
 
 // ============================================
 // TIPOS
@@ -117,6 +117,9 @@ export interface RotaContextType {
 
     /** Lista unificada de insucesso (ao vivo + ledger de não-entregues) */
     insucessoRows: InsucessoRow[]
+
+    /** O que falta devolver ao CD nesta rota (tentativas pendentes) */
+    devolucaoRows: DevolucaoRow[]
 
     // ========================================
     // Estados de UI
@@ -247,6 +250,7 @@ export function RotaProvider({ children, routeId }: RotaProviderProps) {
         paradasConcluidasSucesso,
         paradasConcluidasInsucesso,
         insucessoRows,
+        devolucaoRows,
         nenhumAndamento,
         temMultiplasEmAndamento,
     } = useRouteDetails(routeId)
@@ -370,6 +374,7 @@ export function RotaProvider({ children, routeId }: RotaProviderProps) {
         paradasConcluidasSucesso,
         paradasConcluidasInsucesso,
         insucessoRows,
+        devolucaoRows,
 
         // Estados de UI
         nenhumAndamento,
@@ -407,6 +412,7 @@ export function RotaProvider({ children, routeId }: RotaProviderProps) {
         paradasConcluidasSucesso,
         paradasConcluidasInsucesso,
         insucessoRows,
+        devolucaoRows,
         nenhumAndamento,
         temMultiplasEmAndamento,
         popupConcluirRota,

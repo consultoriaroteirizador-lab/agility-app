@@ -45,5 +45,12 @@ export function routeStopChangedKeys(rotaId: string, serviceId?: string): unknow
         [KEY_SERVICES, 'routing', rotaId],
         [KEY_ROUTINGS, rotaId],
         [KEY_ROUTINGS, 'map-data', rotaId],
+        // As duas listas que respondem "o que aconteceu com a parada que saiu da
+        // lista". O cancelamento com a carga na rua tira o pedido da rota e cria
+        // a obrigação de devolver no MESMO evento: sem estas chaves a parada
+        // some e nada aparece no lugar até o motorista sair e voltar. Elas
+        // sofrem do mesmo descasamento posicional do `map-data` acima.
+        [KEY_ROUTINGS, 'pending-returns', rotaId],
+        [KEY_ROUTINGS, 'non-delivered', rotaId],
     ]
 }
