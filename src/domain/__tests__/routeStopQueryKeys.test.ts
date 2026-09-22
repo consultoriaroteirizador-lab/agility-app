@@ -79,3 +79,53 @@ describe('invalidação após mudança de status de parada', () => {
         expect(isMapDataStale(queryClient)).toBe(true)
     })
 })
+
+/**
+ * Mesma família do bug acima, com outra consequência.
+ *
+ * O cancelamento de um pedido com a carga já na rua chega ao app como
+ * `service_updated` e passa por `routeStopChangedKeys`. Ele tira a parada da
+ * lista (invalidando `/services`) e, no mesmo instante, cria a obrigação de
+ * devolver — que vive em `['routings','pending-returns',rotaId]` (o card
+ * "Devolver ao CD") e em `['routings','non-delivered',rotaId]` (a linha
+ * "Cancelado" do concluídas).
+ *
+ * Nenhuma das duas casa com `['routings', rotaId]`: o índice 1 diverge. Sem
+ * elas no conjunto, a parada some da tela e NADA aparece no lugar até o
+ * motorista sair e voltar — que é exatamente o sintoma que o card existe para
+ * resolver.
+ */
+describe('cancelamento em rota: o que substitui a parada que sumiu', () => {
+    const chavesDaDevolucao = [
+        [KEY_ROUTINGS, 'pending-returns', ROTA_ID],
+        [KEY_ROUTINGS, 'non-delivered', ROTA_ID],
+    ]
+
+    function seedDevolucaoCache() {
+        const queryClient = new QueryClient()
+        for (const chave of chavesDaDevolucao) queryClient.setQueryData(chave, [])
+        return queryClient
+    }
+
+    it('invalidar [routings, rotaId] NÃO atinge as listas de devolução', () => {
+        const queryClient = seedDevolucaoCache()
+
+        void queryClient.invalidateQueries({ queryKey: [KEY_ROUTINGS, ROTA_ID] })
+
+        for (const chave of chavesDaDevolucao) {
+            expect(queryClient.getQueryState(chave)?.isInvalidated).toBe(false)
+        }
+    })
+
+    it('routeStopChangedKeys invalida as duas', () => {
+        const queryClient = seedDevolucaoCache()
+
+        for (const queryKey of routeStopChangedKeys(ROTA_ID)) {
+            void queryClient.invalidateQueries({ queryKey })
+        }
+
+        for (const chave of chavesDaDevolucao) {
+            expect(queryClient.getQueryState(chave)?.isInvalidated).toBe(true)
+        }
+    })
+})
