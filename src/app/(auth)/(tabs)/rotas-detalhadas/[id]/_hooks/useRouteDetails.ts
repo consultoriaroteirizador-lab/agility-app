@@ -27,6 +27,7 @@ import {
     findProximaParada,
     getRotaStatus,
     hasMultipleParadasEmAndamento,
+    intervaloDeReserva,
     isNenhumAndamento,
     mapServicesToParadas,
     withLedgerNonDelivered,
@@ -164,14 +165,19 @@ export function useRouteDetails(rotaId: string | null | undefined): UseRouteDeta
         isRefetching,
     } = useFindOneRouting(rotaId)
 
+    // Reserva de polling das duas buscas da tela, com UM intervalo só: duas
+    // constantes iguais divergem na primeira vez que alguém mexe numa delas, e a
+    // tela passaria a se atualizar em dois ritmos sem ninguém ter decidido isso.
+    const reserva = intervaloDeReserva(routing?.isInProgress)
+
     // Buscar serviços da rota. Enquanto a rota está em andamento, faz polling de
-    // fallback (60s) caso o socket /monitoring caia — as ETAs re-projetadas por
+    // fallback caso o socket /monitoring caia — as ETAs re-projetadas por
     // atraso continuam chegando à tela.
     const {
         services,
         isLoading: isLoadingServices,
     } = useFindServicesByRoutingId(rotaId ?? undefined, {
-        refetchIntervalMs: routing?.isInProgress ? 60_000 : undefined,
+        refetchIntervalMs: reserva,
     })
 
     // ========================================
@@ -252,7 +258,14 @@ export function useRouteDetails(rotaId: string | null | undefined): UseRouteDeta
     // O que falta devolver ao CD. Mesma fonte que a parada de RETORNO confere
     // (`returnChecklist.ts`), para as duas telas não discordarem sobre quantas
     // caixas voltam. Em erro, `pendentes` = [] e a seção some — nunca inventa.
-    const { pendentes } = usePendingReturns(rotaId ?? '', !!rotaId)
+    //
+    // Com a MESMA reserva de polling das paradas, de propósito: o cancelamento
+    // que cria a devolução chega por push, e push em celular cai calado. Sem a
+    // reserva, este card ficaria menos protegido que a lista de paradas logo
+    // acima — na mesma tela e no mesmo hook —, o que se leria como esquecimento.
+    const { pendentes } = usePendingReturns(rotaId ?? '', !!rotaId, {
+        refetchIntervalMs: reserva,
+    })
 
     /**
      * Linhas do "Devolver ao CD".

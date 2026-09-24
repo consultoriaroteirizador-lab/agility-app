@@ -12,12 +12,22 @@ import { routingService } from '../routingService'
  * que substitui a dedução por status na tela de retorno — o pedido cancelado
  * devolvido perde a rota no cancelamento e nunca apareceria por lá.
  */
-export function usePendingReturns(routingId: Id, enabled = true) {
+export function usePendingReturns(
+    routingId: Id,
+    enabled = true,
+    options?: { refetchIntervalMs?: number },
+) {
     const { data, isLoading, isError, refetch } = useQuery({
         queryKey: [KEY_ROUTINGS, 'pending-returns', routingId],
         queryFn: () => routingService.findPendingReturns(routingId),
         enabled: !!routingId && enabled,
         retry: false,
+        // Reserva de polling — mesmo contrato do `useFindServicesByRoutingId`.
+        // Só a TELA DA ROTA liga: ela fica aberta enquanto o motorista dirige, e
+        // é lá que o cancelamento precisa aparecer sem ele mexer em nada. A
+        // parada de retorno não liga: é uma parada, aberta por alguns minutos no
+        // fim da rota, e o motorista está com o celular na mão.
+        refetchInterval: options?.refetchIntervalMs ?? false,
     })
 
     return {
