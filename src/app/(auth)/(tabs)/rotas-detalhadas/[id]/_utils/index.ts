@@ -140,3 +140,12 @@ export {
     type TransferComprovanteState,
     resolveTransferComprovanteCompletion,
 } from './transferComprovanteCompletion'
+
+// ============================================
+// RESERVA DE POLLING
+// ============================================
+
+export {
+    INTERVALO_RESERVA_MS,
+    intervaloDeReserva,
+} from './pollingReserva'
