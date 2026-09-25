@@ -5,6 +5,11 @@ import * as ImagePicker from 'expo-image-picker';
 
 import { Box, Text, TouchableOpacityBox } from '@/components';
 import type { OutgoingAttachment } from '@/domain/agility/chat/dto/types';
+import {
+  attachmentFromPicker,
+  validateChatAttachment,
+  type PickedFile,
+} from '@/domain/agility/chat/utils/chatAttachmentMime';
 import { useToastService } from '@/services/Toast/useToast';
 import { measure } from '@/theme';
 
@@ -24,6 +29,24 @@ export default function ChatAttachmentButton({
   const [showMenu, setShowMenu] = useState(false);
   const [selectedAttachments, setSelectedAttachments] = useState<Attachment[]>([]);
   const { showToast } = useToastService();
+
+  // Tipo (imagem/documento) sai do MIME, não do botão. Tipo fora da lista do backend ou acima de
+  // 10 MB é recusado aqui, com mensagem clara, em vez de falhar no upload.
+  const acceptPicked = (files: PickedFile[]) => {
+    const accepted: Attachment[] = [];
+    let rejection: string | undefined;
+    for (const file of files) {
+      const attachment = attachmentFromPicker(file);
+      const check = validateChatAttachment(attachment);
+      if (check.ok) accepted.push(attachment);
+      else rejection ??= check.message;
+    }
+    if (rejection) showToast({ message: rejection, type: 'error' });
+    if (accepted.length > 0) {
+      setSelectedAttachments(accepted);
+      onAttachmentsSelected(accepted);
+    }
+  };
 
   const requestPermissions = async () => {
     const { status: cameraStatus } = await ImagePicker.requestCameraPermissionsAsync();
@@ -51,13 +74,14 @@ export default function ChatAttachmentButton({
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
         // fileName pode vir null (ex.: Android): aí o nome fica ausente, não inventado.
-        const attachments: Attachment[] = result.assets.map(asset => ({
-          uri: asset.uri,
-          type: 'image' as const,
-          name: asset.fileName ?? undefined,
-        }));
-        setSelectedAttachments(attachments);
-        onAttachmentsSelected(attachments);
+        acceptPicked(
+          result.assets.map(asset => ({
+            uri: asset.uri,
+            name: asset.fileName,
+            mimeType: asset.mimeType,
+            size: asset.fileSize,
+          })),
+        );
       }
     } catch (error) {
       showToast({ message: 'Não foi possível selecionar a imagem', type: 'error' });
@@ -78,13 +102,10 @@ export default function ChatAttachmentButton({
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        const attachment: Attachment = {
-          uri: result.assets[0].uri,
-          type: 'image',
-          name: result.assets[0].fileName ?? undefined,
-        };
-        setSelectedAttachments([attachment]);
-        onAttachmentsSelected([attachment]);
+        const asset = result.assets[0];
+        acceptPicked([
+          { uri: asset.uri, name: asset.fileName, mimeType: asset.mimeType, size: asset.fileSize },
+        ]);
       }
     } catch (error) {
       showToast({ message: 'Não foi possível tirar a foto', type: 'error' });
@@ -107,14 +128,15 @@ export default function ChatAttachmentButton({
       });
 
       if (result.canceled === false && result.assets && result.assets.length > 0) {
-        const attachments: Attachment[] = result.assets.map(asset => ({
-          uri: asset.uri,
-          type: 'document' as const,
-          name: asset.name,
-          size: asset.size,
-        }));
-        setSelectedAttachments(attachments);
-        onAttachmentsSelected(attachments);
+        // O seletor também lista imagens: um JPG daqui vai como imagem (o MIME decide).
+        acceptPicked(
+          result.assets.map(asset => ({
+            uri: asset.uri,
+            name: asset.name,
+            mimeType: asset.mimeType,
+            size: asset.size,
+          })),
+        );
       }
     } catch (error) {
       showToast({ message: 'Não foi possível selecionar o documento', type: 'error' });
