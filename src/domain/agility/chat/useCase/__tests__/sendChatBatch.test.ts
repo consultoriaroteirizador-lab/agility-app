@@ -1,5 +1,13 @@
 import type { OutgoingAttachment } from '../../dto/types';
-import { appendAttachments, planChatSends, runChatSends, type ChatSendStep } from '../sendChatBatch';
+import {
+    MAX_ATTACHMENT_NAME_LENGTH,
+    appendAttachments,
+    attachmentMessageFields,
+    normalizeAttachmentName,
+    planChatSends,
+    runChatSends,
+    type ChatSendStep,
+} from '../sendChatBatch';
 
 const foto = (n: number): OutgoingAttachment => ({ uri: `file:///foto${n}.jpg`, type: 'image' });
 const pdf: OutgoingAttachment = { uri: 'file:///nota.pdf', type: 'document', name: 'nota.pdf' };
@@ -55,6 +63,50 @@ describe('runChatSends', () => {
     it('so texto que falha: devolve o texto', async () => {
         const out = await runChatSends('oi', [], jest.fn().mockRejectedValue(new Error('x')));
         expect(out).toMatchObject({ unsentText: 'oi', unsentAttachments: [] });
+    });
+});
+
+describe('attachmentMessageFields', () => {
+    it('manda o nome original do anexo junto com a chave e o tipo (completo, sem campo a mais)', () => {
+        expect(attachmentMessageFields(pdf, 'chat/k1')).toEqual({
+            attachmentUrl: 'chat/k1',
+            attachmentType: 'document',
+            attachmentName: 'nota.pdf',
+        });
+    });
+
+    it('sem nome no anexo: omite o campo (nao inventa nome)', () => {
+        const out = attachmentMessageFields(foto(1), 'chat/k2');
+        expect(out).toEqual({ attachmentUrl: 'chat/k2', attachmentType: 'image' });
+        expect(out).not.toHaveProperty('attachmentName');
+    });
+
+    it('nome so com espacos: omite o campo', () => {
+        expect(attachmentMessageFields({ ...pdf, name: '   ' }, 'k')).not.toHaveProperty('attachmentName');
+    });
+});
+
+describe('normalizeAttachmentName', () => {
+    it('apara espacos', () => {
+        expect(normalizeAttachmentName('  nota.pdf ')).toBe('nota.pdf');
+    });
+
+    it('vazio ou ausente vira undefined', () => {
+        expect(normalizeAttachmentName(undefined)).toBeUndefined();
+        expect(normalizeAttachmentName(null)).toBeUndefined();
+        expect(normalizeAttachmentName('')).toBeUndefined();
+    });
+
+    it('acima de 255 caracteres corta o meio e preserva a extensao (o backend recusa > 255)', () => {
+        const longo = `${'a'.repeat(300)}.pdf`;
+        const out = normalizeAttachmentName(longo)!;
+        expect(out).toHaveLength(MAX_ATTACHMENT_NAME_LENGTH);
+        expect(out.endsWith('.pdf')).toBe(true);
+    });
+
+    it('exatamente 255 fica intacto', () => {
+        const nome = `${'b'.repeat(251)}.pdf`;
+        expect(normalizeAttachmentName(nome)).toBe(nome);
     });
 });
 

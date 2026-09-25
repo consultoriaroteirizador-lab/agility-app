@@ -47,6 +47,8 @@ export interface ChatMessage {
   content: string
   attachmentUrl?: string
   attachmentType?: AttachmentType
+  /** Nome original do arquivo. `null` em mensagens anteriores ao campo ou sem nome. */
+  attachmentName?: string | null
   status: MessageStatus
   readAt?: string
   deliveredAt?: string
@@ -126,6 +128,8 @@ export interface SendMessagePayload {
   content: string
   attachmentUrl?: string
   attachmentType?: AttachmentType
+  /** Nome original do arquivo (máx. 255). Omitido quando o seletor não dá nome. */
+  attachmentName?: string
 }
 
 /** Anexo escolhido no aparelho e ainda não enviado. */

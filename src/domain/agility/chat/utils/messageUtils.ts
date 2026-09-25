@@ -145,6 +145,7 @@ export function toChatMessage(raw: unknown, chatId: string): ChatMessage {
         content: String(m.content ?? ''),
         attachmentUrl: m.attachmentUrl ? String(m.attachmentUrl) : undefined,
         attachmentType: m.attachmentType as ChatMessage['attachmentType'],
+        attachmentName: m.attachmentName ? String(m.attachmentName) : undefined,
         status: (m.status as MessageStatus) || MessageStatus.SENT,
         readAt: m.readAt as string | undefined,
         deliveredAt: m.deliveredAt as string | undefined,

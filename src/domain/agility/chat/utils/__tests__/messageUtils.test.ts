@@ -34,6 +34,18 @@ describe('toChatMessage', () => {
         });
     });
 
+    it('preserva o nome original do anexo (attachmentName)', () => {
+        const out = toChatMessage(
+            { id: 'm1', attachmentUrl: 'https://s3/chat-uuid', attachmentType: 'document', attachmentName: 'nota.pdf' },
+            'chat-1',
+        );
+        expect(out.attachmentName).toBe('nota.pdf');
+    });
+
+    it('attachmentName null (mensagem antiga) vira undefined', () => {
+        expect(toChatMessage({ id: 'm1', attachmentName: null }, 'chat-1').attachmentName).toBeUndefined();
+    });
+
     it('usa o chatId recebido quando a mensagem nao traz', () => {
         expect(toChatMessage({ id: 'm1' }, 'chat-9').chatId).toBe('chat-9');
     });

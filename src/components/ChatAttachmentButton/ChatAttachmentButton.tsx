@@ -50,9 +50,11 @@ export default function ChatAttachmentButton({
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
+        // fileName pode vir null (ex.: Android): aí o nome fica ausente, não inventado.
         const attachments: Attachment[] = result.assets.map(asset => ({
           uri: asset.uri,
           type: 'image' as const,
+          name: asset.fileName ?? undefined,
         }));
         setSelectedAttachments(attachments);
         onAttachmentsSelected(attachments);
@@ -79,6 +81,7 @@ export default function ChatAttachmentButton({
         const attachment: Attachment = {
           uri: result.assets[0].uri,
           type: 'image',
+          name: result.assets[0].fileName ?? undefined,
         };
         setSelectedAttachments([attachment]);
         onAttachmentsSelected([attachment]);

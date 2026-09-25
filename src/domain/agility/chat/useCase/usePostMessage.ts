@@ -16,6 +16,8 @@ export interface PostMessagePayload {
     content: string;
     attachmentUrl?: string;
     attachmentType?: string;
+    /** Nome original do arquivo. Só com o agility-services #771 no ar (senão 400 por campo desconhecido). */
+    attachmentName?: string;
     /** keycloakUserId do motorista. Continua no corpo (contrato C1: o backend ignora, mas aceita). */
     senderId?: string;
     /** ID of the message being replied to */
@@ -57,6 +59,7 @@ export function usePostMessage(senderType: string = 'DRIVER') {
                 content: payload.content,
                 attachmentUrl: payload.attachmentUrl,
                 attachmentType: payload.attachmentType as AttachmentType | undefined,
+                attachmentName: payload.attachmentName,
                 status: MessageStatus.SENT,
                 createdAt: new Date().toISOString(),
             };
