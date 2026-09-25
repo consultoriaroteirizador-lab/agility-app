@@ -135,7 +135,10 @@ export interface SendMessagePayload {
 /** Anexo escolhido no aparelho e ainda não enviado. */
 export interface OutgoingAttachment {
   uri: string
+  /** Sai do MIME (`image/*` = imagem), não do botão usado para escolher. */
   type: 'image' | 'document'
+  /** MIME do seletor (ou deduzido do nome): vira o `type` da parte do multipart. */
+  mimeType?: string
   name?: string
   size?: number
 }

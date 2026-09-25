@@ -42,6 +42,7 @@ import {
 import { useDisconnectedNotice } from '@/domain/agility/chat/useCase/useDisconnectedNotice';
 import { CHAT_OFFLINE_POLL_MS } from '@/domain/agility/chat/useCase/useGetChatMessages';
 import { supportUnreadKey } from '@/domain/agility/chat/useCase/useSupportUnreadCount';
+import { chatUploadErrorMessage } from '@/domain/agility/chat/utils/chatAttachmentMime';
 import { tituloDaConversa } from '@/domain/agility/chat/utils/chatSubject';
 import { generateTempId, isRemoteUrl, toChatMessage } from '@/domain/agility/chat/utils/messageUtils';
 import { useGetTicketByChatId, useResolveByRequester } from '@/domain/agility/ticket/useCase';
@@ -531,6 +532,12 @@ export default function SuporteChatPage() {
         showToast({ message: 'Este atendimento foi finalizado pelo operador.', type: 'error' });
         return;
       }
+      // Recusa do /chats/upload por tipo ou tamanho: dizer o motivo, não "não foi possível".
+      const uploadMessage = chatUploadErrorMessage(error);
+      if (uploadMessage) {
+        showToast({ message: uploadMessage, type: 'error' });
+        return;
+      }
       showToast({ message: fallbackMsg, type: 'error' });
     },
     [markClosedLocally, showToast],
@@ -607,7 +614,10 @@ export default function SuporteChatPage() {
       });
 
       try {
-        const upload = await uploadAttachments({ files: [attachment.uri], chatId });
+        const upload = await uploadAttachments({
+          files: [{ uri: attachment.uri, name: attachment.name, mimeType: attachment.mimeType }],
+          chatId,
+        });
         const key = upload.result?.urls?.[0];
         if (!key) throw new Error('UPLOAD_WITHOUT_KEY');
         // Contrato C5: a chave devolvida pelo /chats/upload vai exatamente como veio.

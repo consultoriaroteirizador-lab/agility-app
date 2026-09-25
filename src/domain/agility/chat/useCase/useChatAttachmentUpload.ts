@@ -3,9 +3,11 @@ import { useMutation } from '@tanstack/react-query';
 import type { BaseResponse } from '@/api/baseResponse';
 
 import { uploadChatAttachments } from '../../service/serviceUploadUtils';
+import type { AttachmentMimeSource } from '../utils/chatAttachmentMime';
 
 interface UploadChatAttachmentsParams {
-  files: string[]; // URIs dos arquivos no React Native
+  /** URI pura (legado) ou { uri, name, mimeType } do seletor: o MIME vai como tipo da parte. */
+  files: (string | AttachmentMimeSource)[];
   chatId: string; // obrigatório no back (query param)
 }
 
@@ -33,7 +35,7 @@ export function useChatAttachmentUpload(
     mutationFn: async (params: UploadChatAttachmentsParams) => {
       console.log('[useChatAttachmentUpload] Iniciando upload:', {
         filesCount: params.files.length,
-        files: params.files.map((f: string) => f?.substring(0, 50)),
+        files: params.files.map((f) => (typeof f === 'string' ? f : f?.uri)?.substring(0, 50)),
       });
 
       const response = await uploadChatAttachments(params.files, params.chatId);

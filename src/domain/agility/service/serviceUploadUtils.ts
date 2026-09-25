@@ -10,6 +10,10 @@ import * as ImageManipulator from 'expo-image-manipulator'
 import * as ImagePicker from 'expo-image-picker'
 
 import { apiAgility } from '@/api/apiConfig'
+import {
+  buildChatUploadPart,
+  type AttachmentMimeSource,
+} from '@/domain/agility/chat/utils/chatAttachmentMime'
 
 export interface UploadProgress {
   loaded: number
@@ -474,20 +478,23 @@ export async function uploadBase64Signature(
  * Returns array of S3 URLs
  */
 export async function uploadChatAttachments(
-  files: string[],
+  files: (string | AttachmentMimeSource)[],
   chatId: string,
   onProgress?: (progress: UploadProgress, index: number) => void,
 ): Promise<{ urls: string[] }> {
   console.log('[uploadChatAttachments] Iniciando upload:', {
     filesCount: files.length,
-    files: files.map(f => f?.substring(0, 50)),
+    files: files.map(f => (typeof f === 'string' ? f : f?.uri)?.substring(0, 50)),
     platform: Platform.OS,
   })
 
   const formData = new FormData()
 
   // Filter out any undefined/null/empty URIs
-  const validFiles = files.filter(uri => uri && typeof uri === 'string' && uri.trim() !== '')
+  const validFiles = files.filter(f => {
+    const uri = typeof f === 'string' ? f : f?.uri
+    return typeof uri === 'string' && uri.trim() !== ''
+  })
 
   if (validFiles.length === 0) {
     console.warn('[uploadChatAttachments] Nenhum arquivo válido para upload')
@@ -496,27 +503,18 @@ export async function uploadChatAttachments(
 
   console.log('[uploadChatAttachments] Arquivos válidos:', validFiles.length)
 
-  validFiles.forEach((fileUri, index) => {
-    const fileName = `chat-attachment-${Date.now()}-${index}`
-    const fileType = fileUri.match(/\.(jpg|jpeg|png|gif|webp)$/i)
-      ? 'image/jpeg'
-      : fileUri.match(/\.pdf$/i)
-        ? 'application/pdf'
-        : fileUri.match(/\.(doc|docx)$/i)
-          ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-          : 'application/octet-stream'
+  // MIME do seletor (ou do nome original). Deduzir só pela URI mandava octet-stream para o
+  // content:// sem extensão do Android, e o backend recusava com 400 "Invalid file type".
+  validFiles.forEach((file, index) => {
+    const part = buildChatUploadPart(file, index, Platform.OS)
 
     console.log(`[uploadChatAttachments] Processando arquivo ${index}:`, {
-      uri: fileUri?.substring(0, 100),
-      fileName,
-      fileType,
+      uri: part.uri.substring(0, 100),
+      fileName: part.name,
+      fileType: part.type,
     })
 
-    appendFileToFormData(formData, 'files', {
-      uri: Platform.OS === 'ios' ? fileUri.replace('file://', '') : fileUri,
-      name: fileName,
-      type: fileType,
-    })
+    appendFileToFormData(formData, 'files', part)
   })
 
   try {
