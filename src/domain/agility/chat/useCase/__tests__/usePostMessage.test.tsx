@@ -85,6 +85,33 @@ describe('usePostMessage', () => {
         expect(body).toMatchObject({ chatId: 'chat-1', content: 'oi', senderId: 'kc-1' });
     });
 
+    it('anexo: o corpo leva attachmentName junto com url e tipo, e so tempId fica de fora', async () => {
+        mockPostMessageService.mockResolvedValue({ success: true, result: serverMessage({}) });
+        const { getHook } = setup();
+
+        await act(async () => {
+            await getHook().mutateAsync({
+                chatId: 'chat-1',
+                content: 'Anexo',
+                senderId: 'kc-1',
+                attachmentUrl: 'chat/k1',
+                attachmentType: 'document',
+                attachmentName: 'nota.pdf',
+                tempId: 'temp-x',
+            });
+        });
+
+        // toEqual (nao toMatchObject): campo a mais daria 400 (forbidNonWhitelisted) e campo a menos some.
+        expect(mockPostMessageService.mock.calls[0][0]).toEqual({
+            chatId: 'chat-1',
+            content: 'Anexo',
+            senderId: 'kc-1',
+            attachmentUrl: 'chat/k1',
+            attachmentType: 'document',
+            attachmentName: 'nota.pdf',
+        });
+    });
+
     it('texto: grava a mensagem real no cache e remove a bolha', async () => {
         mockPostMessageService.mockResolvedValue({ success: true, result: serverMessage({}) });
         const { getHook, queryClient } = setup();

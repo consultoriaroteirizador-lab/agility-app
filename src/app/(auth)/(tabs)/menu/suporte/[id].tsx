@@ -33,7 +33,12 @@ import { getChatService, markChatReadService } from '@/domain/agility/chat/chatS
 import type { AttachmentType, ChatSendOutcome, OutgoingAttachment } from '@/domain/agility/chat/dto/types';
 import { upsertMessagesInCache } from '@/domain/agility/chat/useCase/messagesCache';
 import { findOrCreateSupportChatId, supportChatHref } from '@/domain/agility/chat/useCase/openSupportChat';
-import { runChatSends, type ChatSendStep } from '@/domain/agility/chat/useCase/sendChatBatch';
+import {
+  attachmentMessageFields,
+  normalizeAttachmentName,
+  runChatSends,
+  type ChatSendStep,
+} from '@/domain/agility/chat/useCase/sendChatBatch';
 import { useDisconnectedNotice } from '@/domain/agility/chat/useCase/useDisconnectedNotice';
 import { CHAT_OFFLINE_POLL_MS } from '@/domain/agility/chat/useCase/useGetChatMessages';
 import { supportUnreadKey } from '@/domain/agility/chat/useCase/useSupportUnreadCount';
@@ -208,12 +213,19 @@ function MessageItem({ item, prevItem, isOwnMessage, peerReadAt, peerDeliveredAt
               if (msg.attachmentUrl) onOpenAttachment(msg.attachmentUrl);
             }}
             accessibilityRole="link"
-            accessibilityLabel="Abrir anexo"
+            accessibilityLabel={msg.attachmentName ? `Abrir anexo ${msg.attachmentName}` : 'Abrir anexo'}
             opacity={canOpenAttachment ? 1 : 0.6}
           >
             <Text preset="text20">📄</Text>
-            <Text preset="text13" color={isOwn ? 'white' : 'primary100'} fontWeightPreset='semibold'>
-              Ver anexo
+            <Text
+              preset="text13"
+              color={isOwn ? 'white' : 'primary100'}
+              fontWeightPreset='semibold'
+              numberOfLines={1}
+              ellipsizeMode="middle"
+              flexShrink={1}
+            >
+              {msg.attachmentName || 'Ver anexo'}
             </Text>
           </TouchableOpacityBox>
         )}
@@ -589,6 +601,7 @@ export default function SuporteChatPage() {
         content: step.content,
         attachmentUrl: attachment.uri, // URI local: aparece na hora
         attachmentType: attachment.type as unknown as AttachmentType,
+        attachmentName: normalizeAttachmentName(attachment.name),
         status: MessageStatus.SENT,
         createdAt: new Date().toISOString(),
       });
@@ -598,12 +611,12 @@ export default function SuporteChatPage() {
         const key = upload.result?.urls?.[0];
         if (!key) throw new Error('UPLOAD_WITHOUT_KEY');
         // Contrato C5: a chave devolvida pelo /chats/upload vai exatamente como veio.
+        // attachmentName exige o agility-services #771 (senão 400 por forbidNonWhitelisted).
         await postMessage({
           chatId,
           content: step.content,
           senderId,
-          attachmentUrl: key,
-          attachmentType: attachment.type,
+          ...attachmentMessageFields(attachment, key),
           tempId,
         });
       } catch (error) {

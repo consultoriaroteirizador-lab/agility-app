@@ -18,6 +18,38 @@ export function attachmentPlaceholder(a: OutgoingAttachment): string {
     return a.type === 'image' ? 'Imagem' : 'Anexo';
 }
 
+/** Teto do `attachmentName` no `SendMessageDto` (`@MaxLength(255)`): acima disso o backend dá 400. */
+export const MAX_ATTACHMENT_NAME_LENGTH = 255;
+
+/**
+ * Nome original do arquivo, pronto para o payload. Vazio vira `undefined` (o campo é omitido,
+ * nunca inventado). Acima do teto, corta o meio e preserva a extensão.
+ */
+export function normalizeAttachmentName(name: string | null | undefined): string | undefined {
+    const trimmed = name?.trim();
+    if (!trimmed) return undefined;
+    if (trimmed.length <= MAX_ATTACHMENT_NAME_LENGTH) return trimmed;
+    const dot = trimmed.lastIndexOf('.');
+    const ext = dot > 0 && trimmed.length - dot <= 16 ? trimmed.slice(dot) : '';
+    return trimmed.slice(0, MAX_ATTACHMENT_NAME_LENGTH - ext.length) + ext;
+}
+
+/**
+ * Campos de anexo da mensagem, a partir do anexo escolhido e da chave devolvida pelo `/chats/upload`.
+ * `attachmentName` só entra quando o seletor deu um nome.
+ */
+export function attachmentMessageFields(
+    attachment: OutgoingAttachment,
+    key: string,
+): { attachmentUrl: string; attachmentType: OutgoingAttachment['type']; attachmentName?: string } {
+    const attachmentName = normalizeAttachmentName(attachment.name);
+    return {
+        attachmentUrl: key,
+        attachmentType: attachment.type,
+        ...(attachmentName ? { attachmentName } : {}),
+    };
+}
+
 export function planChatSends(text: string, attachments: OutgoingAttachment[]): ChatSendStep[] {
     const trimmed = text.trim();
     if (attachments.length === 0) {
