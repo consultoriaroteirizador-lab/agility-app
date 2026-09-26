@@ -3,6 +3,8 @@ import {
     buildChatUploadPart,
     chatUploadErrorMessage,
     CHAT_ATTACHMENT_ALLOWED_MIMES,
+    CHAT_ATTACHMENT_MIME_ALIASES,
+    CHAT_DOCUMENT_PICKER_TYPES,
     classifyAttachmentMime,
     MAX_CHAT_ATTACHMENT_BYTES,
     resolveAttachmentMime,
@@ -182,5 +184,79 @@ describe('chatUploadErrorMessage', () => {
         expect(chatUploadErrorMessage({ response: { status: 400, data: { message: ['chat encerrado'] } } })).toBeUndefined();
         expect(chatUploadErrorMessage(new Error('Network Error'))).toBeUndefined();
         expect(chatUploadErrorMessage(undefined)).toBeUndefined();
+    });
+});
+
+describe('tipos novos do backend (Excel, PowerPoint, TXT, CSV, ZIP)', () => {
+    const XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+    const PPTX = 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
+    it.each([
+        // [extensão, MIME canônico do backend]
+        ['xls', 'application/vnd.ms-excel'],
+        ['xlsx', XLSX],
+        ['ppt', 'application/vnd.ms-powerpoint'],
+        ['pptx', PPTX],
+        ['txt', 'text/plain'],
+        ['csv', 'text/csv'],
+        ['zip', 'application/zip'],
+    ])('%s: pelo mimeType e só pelo nome dá %s, aceito e documento', (ext, mime) => {
+        const pelaMime = { uri: 'content://docs/document/1', name: `arquivo.${ext}`, mimeType: mime };
+        const soNome = { uri: 'content://docs/document/1', name: `arquivo.${ext.toUpperCase()}` };
+        for (const file of [pelaMime, soNome]) {
+            const attachment = attachmentFromPicker(file);
+            expect(attachment.mimeType).toBe(mime);
+            expect(attachment.type).toBe('document');
+            expect(validateChatAttachment(attachment)).toEqual({ ok: true });
+            expect(buildChatUploadPart(file, 0, 'android', 1000)).toEqual({
+                uri: 'content://docs/document/1',
+                name: `chat-attachment-1000-0.${ext}`,
+                type: mime,
+            });
+        }
+    });
+});
+
+describe('apelidos de MIME (Android) viram o MIME canônico do backend', () => {
+    it.each([
+        ['text/comma-separated-values', 'text/csv'],
+        ['text/x-csv', 'text/csv'],
+        ['text/x-comma-separated-values', 'text/csv'],
+        ['application/csv', 'text/csv'],
+        ['application/x-csv', 'text/csv'],
+        ['application/x-zip-compressed', 'application/zip'],
+        ['application/x-zip', 'application/zip'],
+        ['multipart/x-zip', 'application/zip'],
+    ])('%s -> %s', (alias, canonico) => {
+        expect(resolveAttachmentMime({ uri: 'content://x/1', mimeType: alias })).toBe(canonico);
+        expect(resolveAttachmentMime({ uri: 'content://x/1', mimeType: `${alias.toUpperCase()}; charset=utf-8` })).toBe(canonico);
+        const attachment = attachmentFromPicker({ uri: 'content://x/1', name: 'a', mimeType: alias });
+        expect(validateChatAttachment(attachment)).toEqual({ ok: true });
+        // O multipart vai com o canônico: é o `file.mimetype` que o backend confere.
+        expect(buildChatUploadPart({ uri: 'content://x/1', mimeType: alias }, 0, 'android', 1000).type).toBe(canonico);
+    });
+
+    it('todo apelido aponta para um MIME da lista do backend e nenhum apelido está na lista', () => {
+        for (const [alias, canonico] of Object.entries(CHAT_ATTACHMENT_MIME_ALIASES)) {
+            expect(CHAT_ATTACHMENT_ALLOWED_MIMES).toContain(canonico);
+            expect(CHAT_ATTACHMENT_ALLOWED_MIMES).not.toContain(alias);
+        }
+    });
+});
+
+describe('CHAT_DOCUMENT_PICKER_TYPES', () => {
+    it('é exatamente a lista do backend mais os apelidos (sem image/* nem */*)', () => {
+        expect([...CHAT_DOCUMENT_PICKER_TYPES].sort()).toEqual(
+            [...CHAT_ATTACHMENT_ALLOWED_MIMES, ...Object.keys(CHAT_ATTACHMENT_MIME_ALIASES)].sort(),
+        );
+    });
+
+    it('não repete tipo', () => {
+        expect(new Set(CHAT_DOCUMENT_PICKER_TYPES).size).toBe(CHAT_DOCUMENT_PICKER_TYPES.length);
+    });
+
+    it('todo tipo oferecido pelo seletor passa na validação', () => {
+        for (const mimeType of CHAT_DOCUMENT_PICKER_TYPES) {
+            expect(validateChatAttachment({ uri: 'content://x/1', type: 'document', mimeType })).toEqual({ ok: true });
+        }
     });
 });
