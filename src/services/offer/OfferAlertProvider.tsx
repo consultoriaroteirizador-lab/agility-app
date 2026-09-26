@@ -60,9 +60,14 @@ function formatarTimer(segundos: number): string {
 
 interface OfferAlertContextValue {
   pushOffer: (offer: OfferPayload) => void;
+  /**
+   * O alerta de oferta está na tela. O banner de notificação in-app (NotificationBannerProvider)
+   * lê isto para esperar: a oferta tem prioridade e o banner só aparece depois dela.
+   */
+  alertaVisivel: boolean;
 }
 
-const OfferAlertContext = createContext<OfferAlertContextValue>({ pushOffer: () => {} });
+const OfferAlertContext = createContext<OfferAlertContextValue>({ pushOffer: () => {}, alertaVisivel: false });
 
 export const useOfferAlert = () => useContext(OfferAlertContext);
 
@@ -231,7 +236,8 @@ export function OfferAlertProvider({ children }: { children: React.ReactNode }) 
   // Evita recriar o objeto de contexto a cada render (o tique de 1s, quando
   // ativo, re-renderiza este provider várias vezes por minuto) — sem isto,
   // todo consumidor de `useOfferAlert()` re-renderizava junto.
-  const contextValue = useMemo(() => ({ pushOffer }), [pushOffer]);
+  const alertaVisivel = !!current && isAvailable;
+  const contextValue = useMemo(() => ({ pushOffer, alertaVisivel }), [pushOffer, alertaVisivel]);
 
   return (
     <OfferAlertContext.Provider value={contextValue}>
@@ -240,7 +246,7 @@ export function OfferAlertProvider({ children }: { children: React.ReactNode }) 
       <Modal
         animationType="slide"
         transparent
-        visible={!!current && isAvailable}
+        visible={alertaVisivel}
         onRequestClose={onRecusar}
       >
         <Box flex={1} justifyContent="flex-end" backgroundColor="blackOpaque">

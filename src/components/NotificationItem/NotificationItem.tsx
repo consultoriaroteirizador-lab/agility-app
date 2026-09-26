@@ -1,10 +1,11 @@
 import React from 'react';
 
 import type { NotificationResponse } from '@/domain/agility/notification/dto';
+import { iconeDaNotificacao } from '@/domain/agility/notification/notificationTarget';
 import { ThemeColors, measure } from '@/theme';
 
 import { Box } from '../BoxBackGround/BoxBackGround';
-import { Icon, IconNameMaterial } from '../Icon/Icon';
+import { Icon } from '../Icon/Icon';
 import { TouchableOpacityBox } from '../RestyleComponent/RestyleComponent';
 import { Text, TextProps } from '../Text/Text';
 
@@ -48,31 +49,6 @@ export const NotificationItem: React.FC<NotificationItemProps> = ({
   borderColor = "gray200",
 }) => {
   const isUnread = notification.status === 'UNREAD';
-
-  const getIcon = (): IconNameMaterial => {
-    switch (notification.type) {
-      case 'ROUTE_REPLANNED':
-        return 'alt-route';
-      case 'ROUTE_OFFER':
-        return 'map';
-      case 'ROUTE_STARTED':
-        return 'play-arrow';
-      case 'ROUTE_COMPLETED':
-        return 'check-circle';
-      case 'SERVICE_ADDED':
-        return 'add-circle';
-      case 'SERVICE_REMOVED':
-        return 'remove-circle';
-      case 'SERVICE_COMPLETED':
-        return 'done';
-      case 'PAYMENT_RECEIVED':
-        return 'payments';
-      case 'SYSTEM_ALERT':
-        return 'notifications';
-      default:
-        return 'info';
-    }
-  };
 
   const handlePress = () => {
     try {
@@ -125,7 +101,7 @@ export const NotificationItem: React.FC<NotificationItemProps> = ({
         marginRight="x12"
         backgroundColor="gray50"
       >
-        <Icon name={getIcon()} size={measure.m24} color="primary100" />
+        <Icon name={iconeDaNotificacao(notification.type)} size={measure.m24} color="primary100" />
       </Box>
 
       <Box flex={1}>

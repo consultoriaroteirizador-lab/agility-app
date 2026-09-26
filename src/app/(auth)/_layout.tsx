@@ -2,6 +2,7 @@ import { Stack } from 'expo-router';
 
 import { LocationTrackingProvider } from '@/components/LocationTrackingProvider';
 import { ChatProvider } from '@/domain/agility/chat/context';
+import { NotificationBannerProvider } from '@/services/notificationBanner/NotificationBannerProvider';
 import { OfferAlertProvider } from '@/services/offer/OfferAlertProvider';
 
 export default function LayoutStack() {
@@ -13,17 +14,21 @@ export default function LayoutStack() {
     // LocationTrackingProvider vive por toda a sessão autenticada (não mais preso
     // à tela de detalhe da rota). O start/stop do SDK é dirigido pela rota
     // IN_PROGRESS lá dentro, independente do toggle de disponibilidade.
+    // NotificationBannerProvider fica DENTRO do OfferAlertProvider: lê se o alerta de oferta
+    // está na tela para esperar a vez (a oferta tem prioridade sobre o banner).
     <OfferAlertProvider>
-      <LocationTrackingProvider>
-        <ChatProvider>
-          <Stack screenOptions={{ headerShown: false }}>
-            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      <NotificationBannerProvider>
+        <LocationTrackingProvider>
+          <ChatProvider>
+            <Stack screenOptions={{ headerShown: false }}>
+              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
 
-            <Stack.Screen name="ChanceTemporaryPasswordScreen/index" />
-            <Stack.Screen name="RegisterAllowsBiometricScreen/index" />
-          </Stack>
-        </ChatProvider>
-      </LocationTrackingProvider>
+              <Stack.Screen name="ChanceTemporaryPasswordScreen/index" />
+              <Stack.Screen name="RegisterAllowsBiometricScreen/index" />
+            </Stack>
+          </ChatProvider>
+        </LocationTrackingProvider>
+      </NotificationBannerProvider>
     </OfferAlertProvider>
   );
 }

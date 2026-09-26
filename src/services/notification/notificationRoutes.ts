@@ -1,6 +1,8 @@
 // src/navigation/notificationRoutes.ts
 import { router, Href } from "expo-router";
 
+import type { DestinoNotificacao } from "@/domain/agility/notification/notificationTarget";
+
 export type NotificationRoute =
     | "home"
     | "membership"
@@ -101,6 +103,19 @@ export const notificationRoutes: Record<string, (params?: any) => void> = {
 
 
 };
+
+/**
+ * Abre o destino de uma notificação da central (aba Notificações e banner in-app).
+ * `caminho` vai direto pelo expo-router; `nomeada` passa pelo mapa acima.
+ */
+export function abrirDestinoDaNotificacao(destino: DestinoNotificacao | null) {
+    if (!destino) return;
+    if (destino.tipo === 'caminho') {
+        router.push(destino.caminho as Href);
+        return;
+    }
+    navigateToNotificationRoute(destino.rota, destino.params);
+}
 
 export function navigateToNotificationRoute(
     route: string,

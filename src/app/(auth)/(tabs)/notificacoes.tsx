@@ -1,17 +1,14 @@
 import { useMemo } from 'react';
 
-import { useRouter, Href } from 'expo-router';
-
 import { Box, ScreenBase, Text } from '@/components';
 import { ListaDeNotificacoes } from '@/components/NotificationItem/ListaDeNotificacoes';
 import type { NotificationResponse } from '@/domain/agility/notification/dto';
+import { resolverDestinoDaNotificacao } from '@/domain/agility/notification/notificationTarget';
 import { useFindAllNotifications, useMarkNotificationAsRead } from '@/domain/agility/notification/useCase';
-import { navigateToNotificationRoute } from '@/services/notification/notificationRoutes';
+import { abrirDestinoDaNotificacao } from '@/services/notification/notificationRoutes';
 
 
 export default function NotificacoesScreen() {
-  const router = useRouter();
-
   const {
     notifications,
     isLoading,
@@ -33,78 +30,11 @@ export default function NotificacoesScreen() {
     return notificationsList.filter((n) => n.status === 'READ');
   }, [notificationsList]);
 
+  // O destino mora em `resolverDestinoDaNotificacao`, compartilhado com o banner in-app:
+  // tocar no item e tocar no banner levam ao mesmo lugar.
   const handleNotificationPress = (notification: NotificationResponse) => {
     try {
-      let route: string | null = null;
-
-      // Extrai IDs do metadata (backend envia routingId e serviceId)
-      const routingId = notification.metadata?.routingId;
-      const serviceId = notification.metadata?.serviceId;
-
-      switch (notification.type) {
-        case 'ROUTE_REPLANNED':
-        case 'ROUTE_STARTED':
-        case 'ROUTE_COMPLETED':
-          if (routingId) {
-            route = `/rotas-detalhadas/${routingId}`;
-          }
-          break;
-
-        case 'SERVICE_ADDED':
-        case 'SERVICE_REMOVED':
-          if (routingId && serviceId) {
-            // Navega direto para a parada específica
-            route = `/rotas-detalhadas/${routingId}/parada/${serviceId}`;
-          } else if (routingId) {
-            route = `/rotas-detalhadas/${routingId}`;
-          }
-          break;
-
-        case 'SERVICE_COMPLETED':
-          if (routingId && serviceId) {
-            // Navega para a parada específica completada
-            route = `/rotas-detalhadas/${routingId}/parada/${serviceId}`;
-          } else {
-            route = '/(auth)/(tabs)/menu/historico';
-          }
-          break;
-
-        case 'ROUTE_OFFER':
-          if (routingId) {
-            route = `/ofertas/${routingId}`;
-          } else {
-            route = '/ofertas';
-          }
-          break;
-
-        case 'PAYMENT_RECEIVED':
-          route = '/menu/ganhos';
-          break;
-
-        case 'CHAT_MESSAGE': {
-          const chatId = notification.metadata?.chatId;
-          route = chatId ? `/menu/suporte/${chatId}` : '/menu/suporte';
-          break;
-        }
-
-        case 'SYSTEM_ALERT':
-        default:
-          if (notification.linkUrl?.startsWith('/')) {
-            route = notification.linkUrl;
-          } else if (notification.linkUrl) {
-            // `linkUrl` também pode ser um NOME de rota ('suporte', 'ofertas'), o mesmo
-            // vocabulário que o push usa. Resolver pelo mapa compartilhado evita que o item
-            // da lista fique morto enquanto o push equivalente funciona — foi o que
-            // aconteceu com o aviso de atendimento encerrado.
-            navigateToNotificationRoute(notification.linkUrl, notification.metadata?.params ?? notification.metadata);
-            return;
-          }
-          break;
-      }
-
-      if (route) {
-        router.push(route as Href);
-      }
+      abrirDestinoDaNotificacao(resolverDestinoDaNotificacao(notification));
     } catch (error) {
       console.error('Erro ao navegar:', error);
     }
