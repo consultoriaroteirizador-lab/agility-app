@@ -19,6 +19,31 @@ export const CHAT_ATTACHMENT_ALLOWED_MIMES: readonly string[] = [
     'application/zip',
 ];
 
+/**
+ * Nomes alternativos que o Android (e alguns apps de arquivos) informam para tipos da lista. O
+ * backend só conhece o canônico, então o apelido é trocado antes de validar e de montar o multipart.
+ */
+export const CHAT_ATTACHMENT_MIME_ALIASES: Readonly<Record<string, string>> = {
+    'text/comma-separated-values': 'text/csv',
+    'text/x-csv': 'text/csv',
+    'text/x-comma-separated-values': 'text/csv',
+    'application/csv': 'text/csv',
+    'application/x-csv': 'text/csv',
+    'application/x-zip-compressed': 'application/zip',
+    'application/x-zip': 'application/zip',
+    'multipart/x-zip': 'application/zip',
+};
+
+/**
+ * Filtro do seletor "Documentos", derivado da lista acima para não divergir dela. Leva os apelidos
+ * porque o Android filtra pelo MIME que o provedor declara: sem eles, um CSV registrado como
+ * `text/comma-separated-values` aparece desabilitado. No iOS, MIME sem UTType é ignorado.
+ */
+export const CHAT_DOCUMENT_PICKER_TYPES: readonly string[] = [
+    ...CHAT_ATTACHMENT_ALLOWED_MIMES,
+    ...Object.keys(CHAT_ATTACHMENT_MIME_ALIASES),
+];
+
 /** Mesmo teto do `limits.fileSize` do `FilesInterceptor` do `/chats/upload`. */
 export const MAX_CHAT_ATTACHMENT_BYTES = 10 * 1024 * 1024;
 
@@ -64,7 +89,8 @@ function extensionOf(value: string | null | undefined): string | undefined {
 
 function normalizeMime(mime: string | null | undefined): string | undefined {
     const m = mime?.split(';')[0].trim().toLowerCase();
-    return m && m !== FALLBACK_MIME ? m : undefined;
+    if (!m || m === FALLBACK_MIME) return undefined;
+    return CHAT_ATTACHMENT_MIME_ALIASES[m] ?? m;
 }
 
 export interface AttachmentMimeSource {

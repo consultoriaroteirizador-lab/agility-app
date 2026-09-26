@@ -7,6 +7,7 @@ import { Box, Text, TouchableOpacityBox } from '@/components';
 import type { OutgoingAttachment } from '@/domain/agility/chat/dto/types';
 import {
   attachmentFromPicker,
+  CHAT_DOCUMENT_PICKER_TYPES,
   validateChatAttachment,
   type PickedFile,
 } from '@/domain/agility/chat/utils/chatAttachmentMime';
@@ -118,12 +119,7 @@ export default function ChatAttachmentButton({
 
     try {
       const result = await DocumentPicker.getDocumentAsync({
-        type: [
-          'application/pdf',
-          'application/msword',
-          'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-          'image/*',
-        ],
+        type: [...CHAT_DOCUMENT_PICKER_TYPES],
         multiple: true,
       });
 
@@ -239,7 +235,7 @@ export default function ChatAttachmentButton({
                 Documento
               </Text>
               <Text preset="text12" color="secondaryTextColor">
-                PDF, Word, etc.
+                PDF, Word, Excel, PowerPoint, TXT, CSV, ZIP
               </Text>
             </Box>
           </TouchableOpacityBox>
