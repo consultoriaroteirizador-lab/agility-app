@@ -15,6 +15,7 @@ import { ButtonBack } from '@/components/Button/ButtonBack';
 import { tituloDaConversa } from '@/domain/agility/chat/utils/chatSubject';
 import { TicketStatus } from '@/domain/agility/ticket/dto/types';
 import { useFindTicketsByDriver } from '@/domain/agility/ticket/useCase';
+import { ticketMatchesSearch } from '@/domain/agility/ticket/utils/ticketSearch';
 import { useAuthCredentialsService } from '@/services';
 import { measure } from '@/theme';
 
@@ -64,20 +65,9 @@ export default function HistoricoProtocolosScreen() {
     if (!tickets) return [];
     if (!busca.trim()) return tickets;
 
-    const buscaLower = busca.toLowerCase();
-    return tickets.filter((ticket: any) => {
-      const ticketNumber = ticket.ticketNumber?.toLowerCase() || '';
-      const subject = ticket.subject?.toLowerCase() || '';
-      const description = ticket.description?.toLowerCase() || '';
-      const statusLabel = mapStatus(ticket.status).toLowerCase();
-
-      return (
-        ticketNumber.includes(buscaLower) ||
-        subject.includes(buscaLower) ||
-        description.includes(buscaLower) ||
-        statusLabel.includes(buscaLower)
-      );
-    });
+    return tickets.filter((ticket: any) =>
+      ticketMatchesSearch(ticket, busca, mapStatus(ticket.status)),
+    );
   }, [tickets, busca]);
 
   function formatarData(data: string | Date | null | undefined): string {
