@@ -16,7 +16,6 @@ export interface UpdateBankInfoRequest {
 
 export interface CreateWithdrawalRequest {
     amount: number;
-    fee?: number;
 }
 
 export interface ListTransactionsRequest {

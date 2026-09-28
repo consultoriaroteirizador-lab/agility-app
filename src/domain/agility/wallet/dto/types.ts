@@ -81,11 +81,3 @@ export enum AdvanceStatus {
     CANCELLED = 'CANCELLED',
 }
 
-export enum AdvanceReturnMethod {
-    CASH = 'CASH',
-    BANK_DEPOSIT = 'BANK_DEPOSIT',
-    DEDUCTION = 'DEDUCTION',
-    CARD_DEBIT = 'CARD_DEBIT',
-    CARD_CREDIT = 'CARD_CREDIT',
-    OTHER = 'OTHER',
-}
