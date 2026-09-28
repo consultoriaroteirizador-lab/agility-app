@@ -1,11 +1,17 @@
 import { useMemo } from 'react';
 
 import { Box, ScreenBase, Text } from '@/components';
+import { CabecalhoDasNotificacoes } from '@/components/NotificationItem/CabecalhoDasNotificacoes';
 import { ListaDeNotificacoes } from '@/components/NotificationItem/ListaDeNotificacoes';
 import type { NotificationResponse } from '@/domain/agility/notification/dto';
 import { resolverDestinoDaNotificacao } from '@/domain/agility/notification/notificationTarget';
-import { useFindAllNotifications, useMarkNotificationAsRead } from '@/domain/agility/notification/useCase';
+import {
+  useFindAllNotifications,
+  useMarkAllNotificationsAsRead,
+  useMarkNotificationAsRead,
+} from '@/domain/agility/notification/useCase';
 import { abrirDestinoDaNotificacao } from '@/services/notification/notificationRoutes';
+import { useToastService } from '@/services/Toast/useToast';
 
 
 export default function NotificacoesScreen() {
@@ -18,6 +24,8 @@ export default function NotificacoesScreen() {
   } = useFindAllNotifications({ limit: 100, offset: 0 });
 
   const { markAsRead } = useMarkNotificationAsRead();
+  const { markAllAsRead, isLoading: marcandoTodas } = useMarkAllNotificationsAsRead();
+  const { showToast } = useToastService();
 
   // Garante que notifications seja sempre um array
   const notificationsList = Array.isArray(notifications) ? notifications : [];
@@ -44,41 +52,30 @@ export default function NotificacoesScreen() {
     markAsRead(id);
   };
 
+  // Otimista: a lista e o badge mudam na hora; se o servidor recusar, o hook devolve o estado anterior.
+  const handleMarcarTodas = () => {
+    markAllAsRead(undefined, {
+      onError: () => showToast({ message: 'Não foi possível marcar as notificações como lidas.', type: 'error' }),
+    });
+  };
+
   return (
-    <ScreenBase title={<Text preset='textTitle' fontWeightPreset='semibold'>Notificação</Text>}>
-      {
-        naoLidas.length > 0 && (
-          <Box
-            paddingTop="y12"
-            paddingBottom="y16"
-            marginBottom="y16"
-          >
-            <Box flexDirection="row" alignItems="center" justifyContent="center" width="100%">
-              {naoLidas.length > 0 && (
-                <Box
-                  backgroundColor="primary100"
-                  paddingHorizontal="x8"
-                  paddingVertical="y2"
-                  borderRadius="s12"
-                  marginLeft="x8"
-                >
-                  <Text preset="text14" color="white">
-                    ({naoLidas.length})
-                  </Text>
-                </Box>
-              )}
-            </Box>
-          </Box>
-        )
-      }
+    <ScreenBase title={<Text preset='textTitle' fontWeightPreset='semibold'>Notificações</Text>}>
+      {notificationsList.length > 0 && (
+        <CabecalhoDasNotificacoes
+          naoLidas={naoLidas.length}
+          marcando={marcandoTodas}
+          onMarcarTodas={handleMarcarTodas}
+        />
+      )}
 
       {/* Lista de notificações */}
       <Box flex={1} >
         {/* Seção não lidas */}
         {naoLidas.length > 0 && (
           <Box marginBottom="y24">
-            <Text preset="text16" fontWeight="bold" color="colorTextPrimary" marginBottom="y12">
-              Não lidas ({naoLidas.length})
+            <Text preset="text16" fontWeight="bold" color="colorTextPrimary" marginBottom="y12" accessibilityRole="header">
+              Não lidas
             </Text>
             <ListaDeNotificacoes
               notifications={naoLidas}
@@ -95,7 +92,7 @@ export default function NotificacoesScreen() {
         {/* Seção lidas */}
         {lidas.length > 0 && (
           <Box flex={1}>
-            <Text preset="text16" fontWeight="bold" color="colorTextPrimary" marginBottom="y12">
+            <Text preset="text16" fontWeight="bold" color="colorTextPrimary" marginBottom="y12" accessibilityRole="header">
               Lidas
             </Text>
             <ListaDeNotificacoes
