@@ -2,7 +2,7 @@ import React from 'react';
 
 import TestRenderer, { act } from 'react-test-renderer';
 
-import { serverDisconnectRetryDelay, useChatWebSocket, type UseChatWebSocketOptions } from '../useChatWebSocket';
+import { useChatWebSocket, type UseChatWebSocketOptions } from '../useChatWebSocket';
 
 type Handler = (...args: unknown[]) => void;
 const mockHandlers: Record<string, Handler> = {};
@@ -64,6 +64,7 @@ beforeEach(() => {
     mockIo.mockClear();
     mockSocket.connect.mockClear();
     mockSocket.emit.mockClear();
+    mockSocket.connected = false;
     for (const k of Object.keys(mockHandlers)) delete mockHandlers[k];
     mockAuth = { authCredentials: { accessToken: 'token-1', tenantId: 'tenant-1' }, userAuth: { id: 'kc-1' } };
 });
@@ -74,18 +75,6 @@ afterEach(() => {
     jest.clearAllTimers();
     jest.useRealTimers();
     jest.restoreAllMocks();
-});
-
-describe('serverDisconnectRetryDelay', () => {
-    it.each([
-        [0, 2000],
-        [1, 4000],
-        [3, 16000],
-        [4, 30000],
-        [10, 30000],
-    ])('tentativa %i -> %i ms', (attempt, expected) => {
-        expect(serverDisconnectRetryDelay(attempt)).toBe(expected);
-    });
 });
 
 describe('useChatWebSocket — reconexao', () => {
@@ -164,6 +153,33 @@ describe('useChatWebSocket — reconexao', () => {
         act(() => jest.advanceTimersByTime(60_000));
         expect(mockSocket.connect).not.toHaveBeenCalled();
         expect(mockIo).toHaveBeenCalledTimes(1);
+    });
+
+    it('reconexão re-emite join_chat: o servidor esqueceu a sala chat:<id>', () => {
+        mockSocket.connected = true;
+        render({ chatId: 'chat-1' });
+        act(() => mockHandlers.connected({}));
+        const joins = () => mockSocket.emit.mock.calls.filter(([ev]) => ev === 'join_chat');
+        expect(joins()).toHaveLength(1);
+
+        // Queda e volta no mesmo lote do React: o estado `isConnected` não chega a mudar,
+        // então o efeito de join não roda de novo. O rejoin tem que sair do próprio evento.
+        act(() => {
+            mockHandlers.disconnect('transport close');
+            mockHandlers.connected({});
+        });
+        expect(joins()).toHaveLength(2);
+        expect(joins()[1][1]).toEqual({ chatId: 'chat-1', userId: 'kc-1' });
+    });
+
+    it('reconexão com re-render entre a queda e a volta não duplica o join', () => {
+        mockSocket.connected = true;
+        render({ chatId: 'chat-1' });
+        act(() => mockHandlers.connected({}));
+        act(() => mockHandlers.disconnect('transport close'));
+        act(() => mockHandlers.connected({}));
+        const joins = mockSocket.emit.mock.calls.filter(([ev]) => ev === 'join_chat');
+        expect(joins).toHaveLength(2);
     });
 
     it('repassa o chat_history', () => {

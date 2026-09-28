@@ -1,32 +1,12 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
 
-import { io, Socket } from 'socket.io-client';
+import type { Socket } from 'socket.io-client';
 
-import { urls } from '@/config/urls';
 import { useAuthCredentialsService } from '@/services';
+import { createAuthedSocket, socketBaseUrl, type AuthedSocket } from '@/services/socket/createAuthedSocket';
 
 import type { ChatMessage } from '../dto/types';
 import { useChatStore } from '../store/useChatStore';
-
-const getWebSocketUrl = () => {
-    const baseUrl = urls.agilityApi;
-    const wsBase = baseUrl.replace(/^https?:\/\//, '');
-    const protocol = baseUrl.startsWith('https') ? 'wss' : 'ws';
-    return `${protocol}://${wsBase}`;
-};
-
-/** Teto do intervalo entre tentativas automáticas do socket.io. */
-export const CHAT_RECONNECT_DELAY_MAX_MS = 15_000;
-
-/**
- * Espera antes de reconectar quando o SERVIDOR derrubou a conexão (ex.: token vencido).
- * Nesse caso o socket.io não tenta sozinho. Enquanto isso, o polling REST da tela
- * dispara o refresh do token no interceptor do axios, e a próxima tentativa já sai
- * com o token novo.
- */
-export function serverDisconnectRetryDelay(attempt: number): number {
-    return Math.min(30_000, 2_000 * 2 ** attempt);
-}
 
 export interface UseChatWebSocketOptions {
     enabled?: boolean;
@@ -58,6 +38,9 @@ export function useChatWebSocket(options: UseChatWebSocketOptions = {}) {
     const { authCredentials, userAuth } = useAuthCredentialsService();
     const [isConnected, setIsConnected] = useState(false);
     const socketRef = useRef<Socket | null>(null);
+    const authedRef = useRef<AuthedSocket | null>(null);
+    // Chat aberto na tela: a reconexão re-emite `join_chat` para ele (ver `onReady`).
+    const chatIdRef = useRef(chatId);
     const joinedChatsRef = useRef<Set<string>>(new Set());
     const isMountedRef = useRef(true);
     const connectingRef = useRef(false);
@@ -65,18 +48,20 @@ export function useChatWebSocket(options: UseChatWebSocketOptions = {}) {
     const DELIVERED_IDS_MAX = 100;
     // Token lido a cada tentativa de conexão: o refresh troca `authCredentials` sem recriar o socket.
     const tokenRef = useRef(authCredentials?.accessToken);
-    const serverRetryAttemptRef = useRef(0);
-    const serverRetryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     useEffect(() => {
         tokenRef.current = authCredentials?.accessToken;
     }, [authCredentials?.accessToken]);
 
-    const clearServerRetry = useCallback(() => {
-        if (serverRetryTimerRef.current) {
-            clearTimeout(serverRetryTimerRef.current);
-            serverRetryTimerRef.current = null;
-        }
+    useEffect(() => {
+        chatIdRef.current = chatId;
+    }, [chatId]);
+
+    /** Descarta o socket atual (cancela a retentativa agendada pelo helper). */
+    const disposeSocket = useCallback(() => {
+        authedRef.current?.dispose();
+        authedRef.current = null;
+        socketRef.current = null;
     }, []);
 
     const onMessageRef = useRef(onMessage);
@@ -108,20 +93,18 @@ export function useChatWebSocket(options: UseChatWebSocketOptions = {}) {
         isMountedRef.current = true;
         const setConnected = setConnectedRef.current;
         return () => {
-            clearServerRetry();
             isMountedRef.current = false;
             deliveredMessageIdsRef.current.clear();
             if (socketRef.current) {
                 console.log('[useChatWebSocket] Component unmounting, disconnecting...');
-                socketRef.current.disconnect();
-                socketRef.current = null;
+                disposeSocket();
                 setIsConnected(false);
                 setConnected(false);
                 joinedChatsRef.current.clear();
                 connectingRef.current = false;
             }
         };
-    }, [clearServerRetry]);
+    }, [disposeSocket]);
 
     const getUserType = useCallback((): string => {
         return 'DRIVER';
@@ -184,49 +167,60 @@ export function useChatWebSocket(options: UseChatWebSocketOptions = {}) {
         }
 
         const userType = getUserType();
-        const wsUrl = getWebSocketUrl();
         console.log('[useChatWebSocket] Creating socket connection:', {
-            url: `${wsUrl}/chat`,
+            url: `${socketBaseUrl()}/chat`,
             userId,
             userType,
             tenantId,
         });
 
-        const socket = io(`${wsUrl}/chat`, {
-            // Função, não objeto: cada (re)conexão lê o token atual.
+        // Token por tentativa, reconexão infinita e `io server disconnect` (token vencido)
+        // ficam com o helper. Aqui não há refetch próprio para renovar o token: com o socket
+        // fora, a tela do chat liga o polling REST (`CHAT_OFFLINE_POLL_MS`), e é o 401 dele que
+        // renova o token antes da próxima tentativa.
+        const authed = createAuthedSocket({
+            namespace: '/chat',
             // userType 'DRIVER' continua no handshake (contrato C2): o gateway recusa sem ele.
-            auth: (cb) =>
-                cb({
-                    token: tokenRef.current,
-                    userId,
-                    userType,
-                    tenantId,
-                }),
+            getAuth: () => ({
+                token: tokenRef.current,
+                userId,
+                userType,
+                tenantId,
+            }),
             query: {
                 userId,
                 userType,
                 tenantId,
             },
-            transports: ['websocket', 'polling'],
-            reconnection: true,
-            reconnectionDelay: 1000,
-            reconnectionDelayMax: CHAT_RECONNECT_DELAY_MAX_MS,
-            reconnectionAttempts: Infinity,
+            onReady: () => {
+                console.log('[useChatWebSocket] ✅ Server confirmed connection');
+                if (!isMountedRef.current || !socketRef.current?.connected) return;
+                setIsConnected(true);
+                setConnectedRef.current(true);
+                // A sala `chat:<id>` é do socket ANTIGO: numa reconexão o servidor não sabe
+                // mais do chat aberto. O rejoin sai daqui, e não só do efeito de `isConnected`:
+                // se a queda e a volta caem no mesmo lote do React, o estado não muda e o
+                // efeito não roda. O `chat_history` que volta do join repõe o que se perdeu.
+                const aberto = chatIdRef.current;
+                if (aberto && !joinedChatsRef.current.has(aberto)) {
+                    socket.emit('join_chat', { chatId: aberto, userId });
+                    joinedChatsRef.current.add(aberto);
+                }
+            },
+            onDisconnect: (reason) => {
+                console.log('[useChatWebSocket] Disconnected:', reason);
+                if (isMountedRef.current) {
+                    setIsConnected(false);
+                    setConnectedRef.current(false);
+                }
+                joinedChatsRef.current.clear();
+            },
         });
+        const socket = authed.socket;
 
         socket.on('connect', () => {
             console.log('[useChatWebSocket] ✅ Socket connected! Socket ID:', socket.id, '- Aguardando confirmação do servidor...');
             connectingRef.current = false;
-        });
-
-        socket.on('connected', (data) => {
-            serverRetryAttemptRef.current = 0;
-            console.log('[useChatWebSocket] ✅ Server confirmed connection:', data);
-            if (isMountedRef.current && socketRef.current?.connected) {
-                console.log('[useChatWebSocket] ✅ Connection fully established, setting isConnected=true');
-                setIsConnected(true);
-                setConnectedRef.current(true);
-            }
         });
 
         const deliverOnce = (message: ChatMessage & { messageId?: string }) => {
@@ -345,29 +339,6 @@ export function useChatWebSocket(options: UseChatWebSocketOptions = {}) {
             }
         });
 
-        socket.on('disconnect', (reason) => {
-            console.log('[useChatWebSocket] Disconnected:', reason);
-            if (isMountedRef.current) {
-                setIsConnected(false);
-                setConnectedRef.current(false);
-            }
-            joinedChatsRef.current.clear();
-
-            // Queda de rede: o socket.io reconecta sozinho. Derrubada pelo servidor
-            // (token vencido/recusado): ele NÃO tenta, então agendamos com backoff.
-            if (reason === 'io server disconnect' && isMountedRef.current) {
-                const delay = serverDisconnectRetryDelay(serverRetryAttemptRef.current);
-                serverRetryAttemptRef.current += 1;
-                clearServerRetry();
-                serverRetryTimerRef.current = setTimeout(() => {
-                    serverRetryTimerRef.current = null;
-                    if (isMountedRef.current && socketRef.current === socket) {
-                        socket.connect();
-                    }
-                }, delay);
-            }
-        });
-
         socket.on('connect_error', (error) => {
             console.error('[useChatWebSocket] Connection error:', error);
             connectingRef.current = false;
@@ -377,22 +348,21 @@ export function useChatWebSocket(options: UseChatWebSocketOptions = {}) {
         });
 
         socketRef.current = socket;
-    }, [enabled, authCredentials, userAuth, getUserType, clearServerRetry]);
+        authedRef.current = authed;
+    }, [enabled, authCredentials, userAuth, getUserType]);
 
     const disconnect = useCallback(() => {
         if (socketRef.current) {
             console.log('[useChatWebSocket] Disconnecting...');
             connectingRef.current = false;
-            clearServerRetry();
-            socketRef.current.disconnect();
-            socketRef.current = null;
+            disposeSocket();
             if (isMountedRef.current) {
                 setIsConnected(false);
                 setConnectedRef.current(false);
             }
             joinedChatsRef.current.clear();
         }
-    }, [clearServerRetry]);
+    }, [disposeSocket]);
 
     const joinChat = useCallback((chatIdToJoin: string, userId: string) => {
         if (!socketRef.current) {

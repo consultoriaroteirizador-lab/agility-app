@@ -7,11 +7,11 @@
 
 import { useEffect, useRef, useCallback } from 'react';
 
-import { io, Socket } from 'socket.io-client';
+import type { Socket } from 'socket.io-client';
 
-import { urls } from '@/config/urls';
 import type { OfferPayload } from '@/domain/agility/offer/offerStore';
 import { useAuthCredentialsService } from '@/services/authCredentials/useAuthCredentialsService';
+import { createAuthedSocket, socketBaseUrl, type AuthedSocket } from '@/services/socket/createAuthedSocket';
 
 import type { DriverLocationUpdate } from '../types';
 
@@ -26,26 +26,42 @@ export interface TrackingWebSocketOptions {
    *  Emitido pelo backend em `offer.available` na sala `user:${keycloakUserId}`. */
   onOfferAvailable?: (offer: OfferPayload) => void;
   onConnect?: () => void;
+  /**
+   * Voltou depois de uma queda. O gateway não reenvia (para as salas) o que emitiu com o
+   * socket fora: quem mostra dado ao vivo recarrega aqui.
+   */
+  onReconnect?: () => void;
+  /**
+   * O servidor derrubou a conexão (token vencido). Dispare um refetch REST: é o 401 dele
+   * que faz o interceptor do axios renovar o token antes da próxima tentativa.
+   */
+  onServerDisconnect?: () => void;
   onDisconnect?: () => void;
   onError?: (error: Error) => void;
 }
 
 // Estado global do socket para evitar múltiplas conexões
 let globalSocket: Socket | null = null;
+let globalAuthed: AuthedSocket | null = null;
 let connectionCount = 0;
-// Guardamos o token usado na conexão atual para detectar refresh e forçar
-// reconexão com credenciais novas.
-let connectedAccessToken: string | null = null;
+// Token mais recente visto por qualquer consumidor. O `auth` do socket é função e lê
+// daqui a cada handshake: renovar o token não exige recriar o socket (o gateway só
+// valida na conexão), e a próxima reconexão já sai com o token novo.
+let latestAccessToken: string | null = null;
 // Geração do socket global: sobe a cada socket criado. `connectionCount` conta
-// referências AO SOCKET ATUAL; quem segurava um socket já descartado (troca de
-// token) não pode descontar do contador do novo.
+// referências AO SOCKET ATUAL; quem segurava um socket já descartado não pode
+// descontar do contador do novo.
 let socketGeneration = 0;
+// Opções de cada consumidor anexado, para repassar conexão/reconexão/derrubada.
+const attachedOptions = new Set<{ current: TrackingWebSocketOptions }>();
 
 /** Só para testes: zera o estado de módulo entre casos. */
 export function __resetTrackingSocketForTests() {
   globalSocket = null;
+  globalAuthed = null;
   connectionCount = 0;
-  connectedAccessToken = null;
+  latestAccessToken = null;
+  attachedOptions.clear();
 }
 
 /**
@@ -60,6 +76,11 @@ export function useTrackingWebSocket(options: TrackingWebSocketOptions = {}) {
   useEffect(() => {
     optionsRef.current = options;
   }, [options]);
+
+  const accessToken = authCredentials?.accessToken ?? null;
+  useEffect(() => {
+    if (accessToken) latestAccessToken = accessToken;
+  }, [accessToken]);
 
   // Esta instância segura no máximo UMA referência ao socket global. Antes o
   // consumidor decrementava duas vezes (o próprio disconnect + o cleanup
@@ -92,30 +113,24 @@ export function useTrackingWebSocket(options: TrackingWebSocketOptions = {}) {
       on('disconnect', () => optionsRef.current.onDisconnect?.()),
       on('connect_error', (e: Error) => optionsRef.current.onError?.(e)),
     ];
-    detachRef.current = () => { offs.forEach((off) => off()); detachRef.current = null; };
+    attachedOptions.add(optionsRef);
+    detachRef.current = () => {
+      offs.forEach((off) => off());
+      attachedOptions.delete(optionsRef);
+      detachRef.current = null;
+    };
   }, []);
 
   /**
    * Conectar ao WebSocket
    */
   const connect = useCallback(() => {
-    const currentToken = authCredentials?.accessToken ?? null;
+    // Token renovado NÃO recria o socket (e `connect` nem depende dele): o gateway
+    // só valida no handshake, e o `auth` (função) lê `latestAccessToken`, mantido
+    // pelo efeito acima, na próxima tentativa. Recriar derrubava a conexão a cada
+    // refresh e perdia o que chegasse no intervalo.
 
-    // Se o socket global já existe mas o token mudou (refresh), derruba para
-    // que o handshake aconteça com o token novo. Sem isso, o socket continua
-    // autenticado com o token velho e cai em loop de reconnect quando expira.
-    // O contador volta a zero: as instâncias vivas se registram de novo ao
-    // reconectar (o efeito de cada consumidor depende do token).
-    if (globalSocket && connectedAccessToken !== currentToken) {
-      console.log('[TrackingWebSocket] Token mudou, recriando conexão');
-      connectionCount = 0;
-      globalSocket.removeAllListeners();
-      globalSocket.disconnect();
-      globalSocket = null;
-      connectedAccessToken = null;
-    }
-
-    // Reutilizar o socket global se existir (e o token coincide), MESMO que
+    // Reutilizar o socket global se existir, MESMO que
     // ainda não esteja conectado: em handshake ou em backoff de reconexão, o
     // socket.io retoma sozinho. Exigir `connected` aqui criava um segundo
     // socket e o primeiro virava órfão, vivo depois do logout. `connect()` no
@@ -140,63 +155,49 @@ export function useTrackingWebSocket(options: TrackingWebSocketOptions = {}) {
       return;
     }
 
-    // Construir URL do WebSocket
-    const baseUrl = urls.agilityApi;
-    const wsBase = baseUrl.replace(/^https?:\/\//, '');
-    const protocol = baseUrl.startsWith('https') ? 'wss' : 'ws';
-    const wsUrl = `${protocol}://${wsBase}`;
+    console.log('[TrackingWebSocket] Conectando a:', socketBaseUrl());
 
-    console.log('[TrackingWebSocket] Conectando a:', wsUrl);
-
-    // Criar socket
-    globalSocket = io(`${wsUrl}/monitoring`, {
+    // Token por tentativa, reconexão infinita e `io server disconnect` (token
+    // vencido) ficam com o helper.
+    //
+    // `subscribe_routings` precisa ser re-emitido a cada (re)conexão: a sala
+    // `:routings` pertencia ao socket antigo (`user:<sub>` e `tenant:*` o
+    // gateway junta sozinho). ATENÇÃO: emitir no `connect` do cliente dispara
+    // ANTES do servidor terminar handleConnection (que é async — busca tenant
+    // no Redis + valida JWT via JWKS), e o subscribe responde "Not
+    // authenticated". O servidor emite `connected` só depois de toda a auth
+    // terminar — esse é o sinal correto (`onReady`).
+    let socket!: Socket;
+    globalAuthed = createAuthedSocket({
+      namespace: '/monitoring',
       path: '/socket.io',
-      auth: {
-        token: authCredentials?.accessToken,
-        tenantId,
-        userId,
+      getAuth: () => ({ token: latestAccessToken, tenantId, userId }),
+      query: { tenantId, userId },
+      onReady: ({ reconnected }) => {
+        console.log('[TrackingWebSocket] Servidor confirmou autenticação, subscrevendo');
+        socket.emit('subscribe_routings', { tenantId });
+        attachedOptions.forEach((o) => {
+          o.current.onConnect?.();
+          if (reconnected) o.current.onReconnect?.();
+        });
       },
-      transports: ['websocket', 'polling'],
-      query: {
-        tenantId,
-        userId,
+      onServerDisconnect: () => {
+        attachedOptions.forEach((o) => o.current.onServerDisconnect?.());
       },
-      reconnection: true,
-      reconnectionAttempts: 10,
-      reconnectionDelay: 1000,
-      reconnectionDelayMax: 5000,
+      onDisconnect: (reason) => {
+        console.log('[TrackingWebSocket] Desconectado:', reason);
+      },
     });
+    globalSocket = globalAuthed.socket;
 
     // Usar referência local para evitar race com globalSocket sendo nullado
-    // entre a anexação do listener e o fire do evento (ex: refresh de token
-    // durante o handshake).
-    const socket = globalSocket;
+    // entre a anexação do listener e o fire do evento.
+    socket = globalSocket;
     socketGeneration++;
     socketRef.current = socket;
-    connectedAccessToken = authCredentials?.accessToken ?? null;
 
-    // Eventos de conexão. `subscribe_routings` precisa ser re-emitido a cada
-    // (re)conexão do socket. ATENÇÃO: emitir no `connect` do cliente dispara
-    // ANTES do servidor terminar handleConnection (que é async — busca
-    // tenant no Redis + valida JWT via JWKS). Resultado: o handler de
-    // subscribe responde "Not authenticated" porque client.tenantId ainda
-    // não foi setado pelo backend. O servidor emite o evento `connected`
-    // só depois de toda a auth terminar — esse é o sinal correto para
-    // emitir subscribe.
     socket.on('connect', () => {
       console.log('[TrackingWebSocket] Conectado ao namespace /monitoring (aguardando confirmação do servidor)');
-    });
-
-    socket.on('connected', () => {
-      console.log('[TrackingWebSocket] Servidor confirmou autenticação, subscrevendo');
-      socket.emit('subscribe_routings', { tenantId });
-      optionsRef.current.onConnect?.();
-    });
-
-    // Só log: os callbacks de cada consumidor (disconnect, connect_error,
-    // localização, rota, serviço, oferta) são anexados por `attach`.
-    socket.on('disconnect', (reason) => {
-      console.log('[TrackingWebSocket] Desconectado:', reason);
     });
 
     socket.on('connect_error', (error) => {
@@ -210,7 +211,7 @@ export function useTrackingWebSocket(options: TrackingWebSocketOptions = {}) {
 
     attach(socket);
     hold();
-  }, [userAuth?.id, authCredentials?.tenantId, authCredentials?.accessToken, attach, hold]);
+  }, [userAuth?.id, authCredentials?.tenantId, attach, hold]);
 
   /**
    * Desconectar do WebSocket
@@ -221,7 +222,7 @@ export function useTrackingWebSocket(options: TrackingWebSocketOptions = {}) {
     if (holdsRef.current === null) return; // idempotente por instância
     const heldCurrent = holdsRef.current === socketGeneration;
     holdsRef.current = null;
-    // Referência a um socket já descartado (troca de token) não desconta do atual.
+    // Referência a um socket já descartado não desconta do atual.
     if (!heldCurrent) return;
     connectionCount = Math.max(0, connectionCount - 1);
 
@@ -229,9 +230,9 @@ export function useTrackingWebSocket(options: TrackingWebSocketOptions = {}) {
     if (connectionCount === 0 && globalSocket) {
       console.log('[TrackingWebSocket] Desconectando socket global');
       globalSocket.removeAllListeners();
-      globalSocket.disconnect();
+      globalAuthed?.dispose();
+      globalAuthed = null;
       globalSocket = null;
-      connectedAccessToken = null;
     }
   }, []);
 

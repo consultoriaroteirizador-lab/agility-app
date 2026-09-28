@@ -1,26 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 
 import { useQueryClient } from '@tanstack/react-query';
-import { io, Socket } from 'socket.io-client';
 
-import { urls } from '@/config/urls';
-import { serverDisconnectRetryDelay } from '@/domain/agility/chat/useCase/useChatWebSocket';
 import { KEY_NOTIFICATIONS } from '@/domain/queryKeys';
 import { useAuthCredentialsService } from '@/services';
+import { createAuthedSocket } from '@/services/socket/createAuthedSocket';
 
 import type { NotificationResponse } from '../dto';
 import { aplicarNoCacheDaLista } from '../notificationGrouping';
-
-const getWebSocketUrl = () => {
-    const baseUrl = urls.agilityApi;
-    // Remove http:// ou https:// e adiciona ws:// ou wss://
-    const wsBase = baseUrl.replace(/^https?:\/\//, '');
-    const protocol = baseUrl.startsWith('https') ? 'wss' : 'ws';
-    return `${protocol}://${wsBase}`;
-};
-
-/** Teto do intervalo entre tentativas automáticas do socket.io (queda de rede). */
-export const NOTIFICATION_RECONNECT_DELAY_MAX_MS = 15_000;
 
 /**
  * Eventos que o `NotificationGateway` do backend emite para `user:<sub>`
@@ -47,13 +34,10 @@ export interface UseNotificationWebSocketOptions {
  * emite `notification` ali a cada aviso novo (inclusive a linha agrupada de chat, reemitida
  * com o mesmo id a cada mensagem).
  *
- * O gateway valida o token SÓ no handshake e, se ele estiver vencido, emite `error` e derruba
- * a conexão (`io server disconnect`) — caso em que o socket.io NÃO tenta de novo sozinho. Por
- * isso:
- * - `auth` é função: cada (re)conexão lê o token ATUAL, não o da criação do socket;
- * - derrubada pelo servidor reagenda a conexão com backoff e, antes, dispara um refetch REST das
- *   notificações — é esse 401 que faz o interceptor do axios renovar o token;
- * - ao reconectar, a lista é invalidada: o gateway não reenvia o que foi emitido com o socket fora.
+ * Token lido a cada tentativa, reconexão infinita e `io server disconnect` (token vencido) ficam
+ * com `createAuthedSocket`. Aqui: a derrubada pelo servidor dispara o refetch REST das
+ * notificações (é esse 401 que renova o token) e a reconexão invalida a lista — o gateway não
+ * reenvia o que foi emitido com o socket fora.
  */
 export function useNotificationWebSocket(options: UseNotificationWebSocketOptions = {}) {
     const { enabled = true, onNotification, onError } = options;
@@ -85,32 +69,25 @@ export function useNotificationWebSocket(options: UseNotificationWebSocketOption
         }
 
         let desmontado = false;
-        let tentativaDoServidor = 0;
-        let caiuAntes = false;
-        let timerRetentativa: ReturnType<typeof setTimeout> | null = null;
 
         const invalidarNotificacoes = () => {
             queryClient.invalidateQueries({ queryKey: [KEY_NOTIFICATIONS] });
         };
 
-        const socket: Socket = io(`${getWebSocketUrl()}/notifications`, {
-            auth: (cb) => cb({ token: tokenRef.current, userId, tenantId }),
-            transports: ['websocket', 'polling'],
-            reconnection: true,
-            reconnectionDelay: 1000,
-            reconnectionDelayMax: NOTIFICATION_RECONNECT_DELAY_MAX_MS,
-            reconnectionAttempts: Infinity,
-        });
-
-        // `connected` sai do gateway DEPOIS de validar o token e entrar em `user:<sub>`:
-        // só a partir daqui o motorista recebe `notification`.
-        socket.on('connected', () => {
-            tentativaDoServidor = 0;
-            if (!desmontado) setIsConnected(true);
-            if (caiuAntes) {
-                caiuAntes = false;
-                invalidarNotificacoes();
-            }
+        const { socket, dispose } = createAuthedSocket({
+            namespace: '/notifications',
+            getAuth: () => ({ token: tokenRef.current, userId, tenantId }),
+            // `connected` sai do gateway DEPOIS de validar o token e entrar em `user:<sub>`:
+            // só a partir daqui o motorista recebe `notification`.
+            onReady: ({ reconnected }) => {
+                if (!desmontado) setIsConnected(true);
+                if (reconnected) invalidarNotificacoes();
+            },
+            onDisconnect: () => {
+                if (!desmontado) setIsConnected(false);
+            },
+            // O refetch REST é o que renova o token (401 -> interceptor do axios).
+            onServerDisconnect: invalidarNotificacoes,
         });
 
         socket.on('notification', (notification: NotificationResponse) => {
@@ -141,24 +118,6 @@ export function useNotificationWebSocket(options: UseNotificationWebSocketOption
             onErrorRef.current?.(new Error(error?.message));
         });
 
-        socket.on('disconnect', (reason) => {
-            caiuAntes = true;
-            if (!desmontado) setIsConnected(false);
-
-            // Queda de rede: o socket.io reconecta sozinho. Derrubada pelo servidor (token
-            // vencido/recusado): ele NÃO tenta — agendamos, e o refetch REST renova o token.
-            if (reason === 'io server disconnect' && !desmontado) {
-                invalidarNotificacoes();
-                const espera = serverDisconnectRetryDelay(tentativaDoServidor);
-                tentativaDoServidor += 1;
-                if (timerRetentativa) clearTimeout(timerRetentativa);
-                timerRetentativa = setTimeout(() => {
-                    timerRetentativa = null;
-                    if (!desmontado) socket.connect();
-                }, espera);
-            }
-        });
-
         socket.on('connect_error', (error) => {
             console.warn('[useNotificationWebSocket] Connection error:', error?.message);
             onErrorRef.current?.(error);
@@ -166,8 +125,7 @@ export function useNotificationWebSocket(options: UseNotificationWebSocketOption
 
         return () => {
             desmontado = true;
-            if (timerRetentativa) clearTimeout(timerRetentativa);
-            socket.disconnect();
+            dispose();
             setIsConnected(false);
         };
     }, [enabled, temToken, userId, tenantId, queryClient]);
