@@ -1,7 +1,7 @@
 /**
  * Os hooks de gesto de dinheiro devolvem `mutateAsync`: a promise REJEITA no erro do
  * back. Com `mutate` (antes), o `await` na tela resolvia na hora e o toast de sucesso
- * aparecia com o saque recusado (auditoria, Bug 2).
+ * aparecia com o saque ou os dados bancários recusados (auditoria, Bugs 2 e 3).
  */
 import React from 'react';
 
@@ -11,17 +11,22 @@ import TestRenderer, { act } from 'react-test-renderer';
 import { KEY_WALLET } from '@/domain/queryKeys';
 
 import { useRequestWithdrawal } from '../useRequestWithdrawal';
+import { useUpdateBankInfo } from '../useUpdateBankInfo';
 
 const mockRequestWithdrawal = jest.fn();
+const mockUpdateBankInfo = jest.fn();
 jest.mock('../../walletAPI', () => ({
     walletAPI: {
         requestWithdrawal: (...args: unknown[]) => mockRequestWithdrawal(...args),
+        updateBankInfo: (...args: unknown[]) => mockUpdateBankInfo(...args),
     },
 }));
 
 let saque!: ReturnType<typeof useRequestWithdrawal>;
+let dados!: ReturnType<typeof useUpdateBankInfo>;
 function Probe() {
     saque = useRequestWithdrawal();
+    dados = useUpdateBankInfo();
     return null;
 }
 
@@ -30,6 +35,7 @@ let tree: TestRenderer.ReactTestRenderer | null = null;
 
 beforeEach(() => {
     mockRequestWithdrawal.mockReset();
+    mockUpdateBankInfo.mockReset();
     queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity }, mutations: { retry: false } } });
     queryClient.setQueryData([KEY_WALLET, 'balance'], { availableBalance: 10000 });
     act(() => {
@@ -65,6 +71,27 @@ describe('useRequestWithdrawal', () => {
         });
 
         expect(mockRequestWithdrawal).toHaveBeenCalledWith({ amount: 5000 });
+        expect(queryClient.getQueryState([KEY_WALLET, 'balance'])?.isInvalidated).toBe(true);
+    });
+});
+
+describe('useUpdateBankInfo', () => {
+    it('rejeita quando o back recusa', async () => {
+        const erro = { success: false, error: { message: 'pixKeyType must be one of the following values' } };
+        mockUpdateBankInfo.mockRejectedValue(erro);
+
+        await act(async () => {
+            await expect(dados.updateBankInfo({ pixKey: null, pixKeyType: null })).rejects.toBe(erro);
+        });
+    });
+
+    it('resolve e invalida a carteira', async () => {
+        mockUpdateBankInfo.mockResolvedValue({ id: 'w-1', hasBankInfo: true });
+
+        await act(async () => {
+            await dados.updateBankInfo({ bankName: 'Banco X', bankAgency: '1', bankAccount: '2', pixKey: null, pixKeyType: null });
+        });
+
         expect(queryClient.getQueryState([KEY_WALLET, 'balance'])?.isInvalidated).toBe(true);
     });
 });

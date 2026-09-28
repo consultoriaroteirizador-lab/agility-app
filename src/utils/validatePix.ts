@@ -43,9 +43,11 @@ export function validatePixKey(value: string, type: PixKeyType | null): string |
             return null;
         }
         case PixKeyType.PHONE: {
+            // Aceita com ou sem o +55: a chave salva vem normalizada como +55DDDNUMERO (R8),
+            // e reabrir a tela não pode acusar erro nela.
             const digits = trimmed.replace(/\D/g, '');
-            // Aceita 10 (fixo) ou 11 (celular com 9).
-            if (digits.length < 10 || digits.length > 11) {
+            const local = trimmed.startsWith('+55') ? digits.slice(2) : digits;
+            if (local.length < 10 || local.length > 11) {
                 return 'Telefone deve ter DDD + número (10 ou 11 dígitos)';
             }
             return null;
