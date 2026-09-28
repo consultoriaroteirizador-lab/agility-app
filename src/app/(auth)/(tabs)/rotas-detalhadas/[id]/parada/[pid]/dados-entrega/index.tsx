@@ -17,7 +17,7 @@ import { ServiceStatus } from '@/domain/agility/service/dto';
 import { serviceService } from '@/domain/agility/service/serviceService';
 import { uploadMultipleServicePhotos, uploadSignature } from '@/domain/agility/service/serviceUploadUtils';
 import { useCompleteServiceWithDetails, useFindOneService, useStartService } from '@/domain/agility/service/useCase';
-import { KEY_ROUTINGS, KEY_SERVICES, routeStopChangedKeys } from '@/domain/queryKeys';
+import { KEY_ROUTINGS, KEY_SERVICES, moneyChangedKeys, routeStopChangedKeys } from '@/domain/queryKeys';
 import { formatHHmm } from '@/functions';
 import { useToastService } from '@/services/Toast/useToast';
 import { measure } from '@/theme';
@@ -80,6 +80,10 @@ function DadosEntregaContent() {
           queryClient.invalidateQueries({ queryKey }),
         ),
       );
+      // Ponto de conclusão: cobrança em dinheiro na entrega cria dívida (carteira) e
+      // pagamento (cobranças) no mesmo gesto. Fora de `routeStopChangedKeys` (ver
+      // comentário em `src/domain/queryKeys.ts`) — chamada só aqui, na conclusão.
+      await Promise.all(moneyChangedKeys().map((queryKey) => queryClient.invalidateQueries({ queryKey })));
       queryClient.refetchQueries({ queryKey: [KEY_SERVICES, 'routing', rotaId] });
       queryClient.refetchQueries({ queryKey: [KEY_ROUTINGS, rotaId] });
 

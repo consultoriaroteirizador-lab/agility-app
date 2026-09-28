@@ -11,7 +11,7 @@ import type { OrderOccurrenceReasonResponse } from '@/domain/agility/order-occur
 import { useFindOccurrenceReasons } from '@/domain/agility/order-occurrence-reason/useCase';
 import type { ApplyOccurrenceRequest } from '@/domain/agility/service/dto';
 import { useFindOneService, useFindServicesByRoutingId, useRegisterOccurrence } from '@/domain/agility/service/useCase';
-import { KEY_SERVICES, routeStopChangedKeys } from '@/domain/queryKeys';
+import { KEY_SERVICES, moneyChangedKeys, routeStopChangedKeys } from '@/domain/queryKeys';
 import { loadOccurrenceReasonsMirror } from '@/services/storage/occurrenceReasonsStorage';
 import { useToastService } from '@/services/Toast/useToast';
 import { measure } from '@/theme';
@@ -103,6 +103,12 @@ function FalhaScreenContent() {
       // do "Cheguei no retorno" (ver `routeStopChangedKeys`). Sem ele, o retorno
       // continuava vendo esta parada como pendente e o botão ficava morto.
       for (const queryKey of routeStopChangedKeys(rotaId, serviceId)) {
+        void queryClient.invalidateQueries({ queryKey });
+      }
+      // Ponto de insucesso: cobrança em dinheiro tentada nesta parada pode ter virado
+      // dívida antes da falha ser registrada. Fora de `routeStopChangedKeys` (ver
+      // comentário em `src/domain/queryKeys.ts`) — chamada só aqui, no fechamento da nota.
+      for (const queryKey of moneyChangedKeys()) {
         void queryClient.invalidateQueries({ queryKey });
       }
 

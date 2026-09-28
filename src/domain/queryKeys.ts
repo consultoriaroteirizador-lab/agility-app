@@ -20,8 +20,22 @@ export const KEY_TEAMS = 'teams'
 /**
  * Chaves invalidadas a cada push recebido ou tocado (ver `NotificationContext`).
  * Invalidar só refaz as queries com observador ativo, então o custo é baixo.
+ *
+ * `KEY_WALLET`/`KEY_FINANCE` entraram porque o back manda ROUTE_COMPLETED
+ * (`route.completed`) e PAYMENT_RECEIVED (`payment.received`) pelos MESMOS
+ * eventos que criam a parcela de frete e a dívida/pagamento em dinheiro
+ * (`notification.listener.ts` no back). Sem isso, um push chegando com a
+ * tela de carteira/ganhos/cobranças montada em background não refazia o
+ * saldo — só a rota/notificação.
  */
-export const PUSH_INVALIDATED_KEYS: readonly string[] = [KEY_ROUTINGS, KEY_NOTIFICATIONS, KEY_CHATS, KEY_TICKETS]
+export const PUSH_INVALIDATED_KEYS: readonly string[] = [
+    KEY_ROUTINGS,
+    KEY_NOTIFICATIONS,
+    KEY_CHATS,
+    KEY_TICKETS,
+    KEY_WALLET,
+    KEY_FINANCE,
+]
 
 /**
  * Chaves a invalidar quando o STATUS de uma parada muda (conclusão, insucesso,
@@ -41,9 +55,13 @@ export const PUSH_INVALIDATED_KEYS: readonly string[] = [KEY_ROUTINGS, KEY_NOTIF
  */
 /**
  * Chaves do dinheiro do motorista. Concluir uma parada com cobrança em dinheiro cria a
- * dívida e o pagamento; concluir a rota cria a parcela de frete (F2). O back não emite
- * evento de carteira por WebSocket/push, então quem conclui invalida. Invalidar só refaz
- * o que tem observador ativo; o resto refaz ao abrir a tela.
+ * dívida e o pagamento; concluir a rota cria a parcela de frete (F2). Além do push
+ * (ROUTE_COMPLETED/PAYMENT_RECEIVED, ver `PUSH_INVALIDATED_KEYS`), quem conclui invalida
+ * direto — cobre o caso de app em foreground sem passar pelo listener de notificação.
+ * Chamada só nos pontos de conclusão/insucesso (`useServiceCompletion`, `dados-entrega`,
+ * `useStopActions`, `insucesso`, `useCompleteRouting`) — NUNCA dentro de
+ * `routeStopChangedKeys`, que também roda a cada `routing_updated`/`service_updated` do
+ * `/monitoring` (reprojeção de ETA, sem nenhuma mudança de dinheiro).
  */
 export function moneyChangedKeys(): unknown[][] {
     return [[KEY_WALLET], [KEY_FINANCE]]
@@ -62,8 +80,9 @@ export function routeStopChangedKeys(rotaId: string, serviceId?: string): unknow
         // sofrem do mesmo descasamento posicional do `map-data` acima.
         [KEY_ROUTINGS, 'pending-returns', rotaId],
         [KEY_ROUTINGS, 'non-delivered', rotaId],
-        // Parada concluída com cobrança em dinheiro: dívida (carteira) e pagamento
-        // (cobranças) nascem no mesmo evento.
-        ...moneyChangedKeys(),
+        // NÃO inclui `moneyChangedKeys()`: esta função roda a cada `routing_updated`/
+        // `service_updated` vindo do `/monitoring` (`useRouteLiveSync`), inclusive na
+        // reprojeção de ETA por atraso — que não move dinheiro nenhum. Quem conclui ou
+        // marca insucesso chama `moneyChangedKeys()` à parte (ver comentário acima dela).
     ]
 }

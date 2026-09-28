@@ -79,7 +79,14 @@ describe('invalidação após mudança de status de parada', () => {
         expect(isMapDataStale(queryClient)).toBe(true)
     })
 
-    it('invalida o dinheiro do motorista: carteira e cobranças (parada com cobrança em dinheiro vira dívida)', () => {
+    /**
+     * F5 (correção do review): `routeStopChangedKeys` roda a cada `routing_updated`/
+     * `service_updated` do `/monitoring` (`useRouteLiveSync`), inclusive na reprojeção de
+     * ETA por atraso — que não move dinheiro nenhum. `moneyChangedKeys()` saiu daqui e
+     * passou a ser chamada só nos pontos de conclusão/insucesso (`useServiceCompletion`,
+     * `dados-entrega`, `useStopActions`, `insucesso`, `useCompleteRouting`).
+     */
+    it('NÃO invalida o dinheiro do motorista (isso ia refazer a carteira a cada reprojeção de ETA)', () => {
         const queryClient = new QueryClient()
         queryClient.setQueryData([KEY_WALLET, 'balance'], {})
         queryClient.setQueryData([KEY_WALLET, 'advances', 'summary'], {})
@@ -89,9 +96,9 @@ describe('invalidação após mudança de status de parada', () => {
             void queryClient.invalidateQueries({ queryKey })
         }
 
-        expect(queryClient.getQueryState([KEY_WALLET, 'balance'])?.isInvalidated).toBe(true)
-        expect(queryClient.getQueryState([KEY_WALLET, 'advances', 'summary'])?.isInvalidated).toBe(true)
-        expect(queryClient.getQueryState([KEY_FINANCE, 'payments', 'infinite', { startDate: '2026-09-01' }])?.isInvalidated).toBe(true)
+        expect(queryClient.getQueryState([KEY_WALLET, 'balance'])?.isInvalidated).toBe(false)
+        expect(queryClient.getQueryState([KEY_WALLET, 'advances', 'summary'])?.isInvalidated).toBe(false)
+        expect(queryClient.getQueryState([KEY_FINANCE, 'payments', 'infinite', { startDate: '2026-09-01' }])?.isInvalidated).toBe(false)
     })
 })
 
