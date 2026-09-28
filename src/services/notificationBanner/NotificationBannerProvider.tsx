@@ -6,6 +6,7 @@ import { usePathname } from 'expo-router';
 import { NotificationBanner } from '@/components/NotificationBanner/NotificationBanner';
 import type { NotificationResponse } from '@/domain/agility/notification/dto';
 import { NotificationStatus } from '@/domain/agility/notification/dto';
+import { chaveDaNotificacao, tituloComContagem } from '@/domain/agility/notification/notificationGrouping';
 import { resolverDestinoDaNotificacao } from '@/domain/agility/notification/notificationTarget';
 import { useMarkNotificationAsRead } from '@/domain/agility/notification/useCase/useMarkNotificationAsRead';
 import { useNotificationWebSocket } from '@/domain/agility/notification/useCase/useNotificationWebSocket';
@@ -55,15 +56,16 @@ export function NotificationBannerProvider({ children }: { children: React.React
 
     const atual = estado.atual;
     const visivel = !!atual && !alertaVisivel;
-    const idExibido = visivel ? atual.id : null;
+    // Chave (id + updatedAt), não só o id: a mensagem nova no mesmo chat agrupado vibra e é anunciada de novo.
+    const chaveExibida = visivel ? chaveDaNotificacao(atual) : null;
 
     useEffect(() => {
-        if (!idExibido || !atual) return;
+        if (!chaveExibida || !atual) return;
         Vibration.vibrate(VIBRACAO_MS);
-        AccessibilityInfo.announceForAccessibility(`Nova notificação: ${atual.title}. ${atual.description ?? ''}`);
-        // Só na troca do que está na tela: `atual` muda junto com o id.
+        AccessibilityInfo.announceForAccessibility(`Nova notificação: ${tituloComContagem(atual)}. ${atual.description ?? ''}`);
+        // Só na troca do que está na tela: `atual` muda junto com a chave.
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [idExibido]);
+    }, [chaveExibida]);
 
     // O motorista foi sozinho para onde o banner levaria (abriu a conversa pela lista, por
     // exemplo): o aviso cumpriu o papel e sai.

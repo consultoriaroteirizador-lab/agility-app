@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import { Animated, PanResponder, StyleSheet } from 'react-native';
 
 import type { NotificationResponse } from '@/domain/agility/notification/dto';
+import { chaveDaNotificacao, tituloComContagem } from '@/domain/agility/notification/notificationGrouping';
 import { iconeDaNotificacao } from '@/domain/agility/notification/notificationTarget';
 import { measure } from '@/theme';
 
@@ -51,6 +52,7 @@ export function NotificationBanner({
 }: NotificationBannerProps) {
     const translateY = useRef(new Animated.Value(FORA_DA_TELA)).current;
     const saindo = useRef(false);
+    const chave = chaveDaNotificacao(notificacao);
     const onDispensarRef = useRef(onDispensar);
     onDispensarRef.current = onDispensar;
 
@@ -64,7 +66,8 @@ export function NotificationBanner({
         }).start(() => onDispensarRef.current());
     }, [translateY]);
 
-    // Entrada, e o relógio de 5 s. Uma notificação nova por cima (id muda) reinicia o relógio:
+    // Entrada, e o relógio de 5 s. Uma notificação nova por cima (chave muda: outro id, ou a mesma
+    // notificação agrupada atualizada) reinicia o relógio:
     // o motorista ganha os 5 s inteiros para ler a mais nova.
     useEffect(() => {
         saindo.current = false;
@@ -75,7 +78,7 @@ export function NotificationBanner({
         }).start();
         const timer = setTimeout(sair, duracaoMs);
         return () => clearTimeout(timer);
-    }, [notificacao.id, duracaoMs, sair, translateY]);
+    }, [chave, duracaoMs, sair, translateY]);
 
     const panResponder = useMemo(
         () =>
@@ -96,7 +99,8 @@ export function NotificationBanner({
         [sair, translateY],
     );
 
-    const rotuloAcessivel = `${notificacao.title}. ${notificacao.description ?? ''}`.trim();
+    const titulo = tituloComContagem(notificacao);
+    const rotuloAcessivel = `${titulo}. ${notificacao.description ?? ''}`.trim();
 
     return (
         <Animated.View
@@ -145,7 +149,7 @@ export function NotificationBanner({
                                 numberOfLines={1}
                                 flexShrink={1}
                             >
-                                {notificacao.title}
+                                {titulo}
                             </Text>
                             {novas > 0 && (
                                 <Box
