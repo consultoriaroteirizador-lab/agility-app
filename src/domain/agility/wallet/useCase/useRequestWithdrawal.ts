@@ -17,8 +17,12 @@ export function useRequestWithdrawal() {
 
     const { mutateAsync, isPending } = useMutation({
         mutationFn: (data: CreateWithdrawalRequest) => walletAPI.requestWithdrawal(data),
-        onSuccess: () => {
-            // Saldo, extrato (WITHDRAWAL_HOLD) e Meus saques: tudo mora sob KEY_WALLET.
+        // `onSettled`, não `onSuccess`: o back pode ter criado o WITHDRAWAL_HOLD e mesmo
+        // assim devolvido um 400 (ex.: outro saque concorrente esgotou o saldo disponível
+        // DEPOIS do hold deste). Invalidar só no sucesso deixava o saldo/Meus saques
+        // desatualizados no caminho de erro. Saldo, extrato (WITHDRAWAL_HOLD) e Meus saques:
+        // tudo mora sob KEY_WALLET.
+        onSettled: () => {
             void queryClient.invalidateQueries({ queryKey: [KEY_WALLET] });
         },
     });
