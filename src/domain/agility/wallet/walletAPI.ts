@@ -1,5 +1,6 @@
 // src/domain/agility/wallet/walletAPI.ts
 import { apiAgility } from '@/api/apiConfig'
+import type { PagedResponse } from '@/domain/hooks/pagination';
 
 import {
     WalletResponse,
@@ -55,19 +56,19 @@ export const walletAPI = {
         return unwrap<WithdrawalResponse>(response.data);
     },
 
-    async getWithdrawals(page: number = 1, limit: number = 20): Promise<{ data: WithdrawalResponse[]; meta: any }> {
+    async getWithdrawals(page: number = 1, limit: number = 20): Promise<PagedResponse<WithdrawalResponse>> {
         const response = await apiAgility.get(`${BASE_URL}/withdrawals`, {
             params: { page, limit },
         });
-        return unwrap<{ data: WithdrawalResponse[]; meta: any }>(response.data);
+        return unwrap<PagedResponse<WithdrawalResponse>>(response.data);
     },
 
     // Advances
-    async getAdvances(page: number = 1, limit: number = 20): Promise<{ data: AdvanceResponse[]; meta: any }> {
+    async getAdvances(page: number = 1, limit: number = 20): Promise<PagedResponse<AdvanceResponse>> {
         const response = await apiAgility.get(`${BASE_URL}/advances`, {
             params: { page, limit },
         });
-        return unwrap<{ data: AdvanceResponse[]; meta: any }>(response.data);
+        return unwrap<PagedResponse<AdvanceResponse>>(response.data);
     },
 
     async getAdvancesSummary(): Promise<{ totalPending: number; count: number; overdueCount: number }> {

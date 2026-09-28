@@ -8,3 +8,4 @@ export * from './useUpdateBankInfo';
 export * from './useFinancialSummary';
 export * from './useWalletBreakdown';
 export * from './useGetPendingReceivables';
+export * from './useInfiniteWalletLists';
