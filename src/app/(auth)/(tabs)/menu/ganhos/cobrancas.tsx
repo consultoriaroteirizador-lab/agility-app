@@ -1,10 +1,10 @@
 // src/app/(auth)/(tabs)/menu/ganhos/cobrancas.tsx
 
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { FlatList, RefreshControl } from 'react-native';
 
 import { format } from 'date-fns';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 
 import { ActivityIndicator, Box, ButtonBack, ScreenBase, Text, TouchableOpacityBox } from '@/components';
 import { useInfinitePayments } from '@/domain/agility/finance';
@@ -56,7 +56,27 @@ function PaymentItem({ item }: { item: PaymentResponse }) {
 export default function CobrancasScreen() {
     const router = useRouter();
     const [period, setPeriod] = useState<Period>('month');
-    const startDate = useMemo(() => format(periodStart(period), 'yyyy-MM-dd'), [period]);
+    // `periodStart` chama `new Date()` por dentro quando `now` não é passado — o `useMemo`
+    // só recomputava quando `period` mudava, então com o app aberto atravessando a
+    // meia-noite (ou reaberto dias depois sem trocar o seletor), o filtro por período
+    // continuava calculado a partir do dia em que o período foi escolhido.
+    //
+    // A correção precisa passar `now` EXPLÍCITO e USADO dentro do `useMemo` — não basta
+    // listar uma chave no array de deps sem lê-la no corpo. O React Compiler deste projeto
+    // re-infere as dependências pela ANÁLISE ESTÁTICA de quem o `useMemo` de fato LÊ, não
+    // pelo array escrito à mão: uma dependência só ali para forçar recálculo (sem uso no
+    // corpo) é DESCARTADA do cache do compilador, mesmo que o array a liste (mesmo ajuste em
+    // `menu/ganhos/index.tsx`). `now` como `useState`, recalculado no foco da tela
+    // (`useFocusEffect` — o motorista reabrindo "Cobranças" depois da meia-noite é
+    // exatamente o caso a cobrir), e passado como argumento de `periodStart` resolve os dois
+    // lados: React "puro" respeita o array, e o compilador respeita o uso real.
+    const [now, setNow] = useState(() => new Date());
+    useFocusEffect(
+        useCallback(() => {
+            setNow(new Date());
+        }, []),
+    );
+    const startDate = useMemo(() => format(periodStart(period, now), 'yyyy-MM-dd'), [period, now]);
     const range = useMemo(() => ({ startDate }), [startDate]);
     const { items, isLoading, isError, isFetchNextPageError, isFetchingNextPage, loadMore, refetch, isRefreshing } = useInfinitePayments(range);
     const { summary, isError: isSummaryError, refetch: refetchSummary } = useGetAdvancesSummary();
@@ -69,7 +89,7 @@ export default function CobrancasScreen() {
             </Text>
 
             {debt.kind === 'error' ? (
-                <TouchableOpacityBox testID="divida-erro" p="m16" borderRadius="s12" backgroundColor="gray50" onPress={() => void refetchSummary()}>
+                <TouchableOpacityBox testID="divida-erro" p="m16" borderRadius="s12" backgroundColor="gray50" onPress={() => void refetchSummary()} accessibilityRole="button">
                     <Text fontSize={measure.m13} color="colorTextError">
                         Não foi possível carregar o que você deve devolver. Toque para tentar de novo.
                     </Text>
@@ -141,7 +161,7 @@ export default function CobrancasScreen() {
                             <Text color="colorTextSecondary" textAlign="center">
                                 Não foi possível carregar as cobranças.
                             </Text>
-                            <TouchableOpacityBox mt="t16" onPress={refetch}>
+                            <TouchableOpacityBox mt="t16" onPress={refetch} accessibilityRole="button">
                                 <Text color="colorTextPrimary">Tentar novamente</Text>
                             </TouchableOpacityBox>
                         </Box>
@@ -159,7 +179,7 @@ export default function CobrancasScreen() {
                             <ActivityIndicator />
                         </Box>
                     ) : isFetchNextPageError ? (
-                        <TouchableOpacityBox py="y16" alignItems="center" onPress={loadMore}>
+                        <TouchableOpacityBox py="y16" alignItems="center" onPress={loadMore} accessibilityRole="button">
                             <Text fontSize={measure.m13} color="colorTextError">
                                 Falha ao carregar mais. Toque para tentar de novo.
                             </Text>

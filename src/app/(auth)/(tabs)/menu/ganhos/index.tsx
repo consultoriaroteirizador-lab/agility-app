@@ -1,10 +1,10 @@
 // src/app/(auth)/(tabs)/menu/ganhos/index.tsx
 
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { RefreshControl, ScrollView } from 'react-native';
 
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 
 import { ActivityIndicator, Box, ScreenBase, Text, TouchableOpacityBox } from '@/components';
 import { ButtonBack } from '@/components/Button/ButtonBack';
@@ -37,7 +37,27 @@ function StatCard({ title, value, subtitle, testID }: { title: string; value: st
 export default function GanhosScreen() {
     const router = useRouter();
     const [period, setPeriod] = useState<Period>('month');
-    const startDate = useMemo(() => periodStart(period).toISOString(), [period]);
+    // `periodStart` chama `new Date()` por dentro quando `now` não é passado — o `useMemo`
+    // só recomputava quando `period` mudava, então com o app aberto atravessando a
+    // meia-noite (ou reaberto dias depois sem trocar o seletor), "Hoje"/"Semana"/etc.
+    // continuavam calculados a partir do dia em que o período foi escolhido.
+    //
+    // A correção precisa passar `now` EXPLÍCITO e USADO dentro do `useMemo` — não basta
+    // listar uma chave no array de deps sem lê-la no corpo. O React Compiler deste projeto
+    // (`babel.config.js`) re-infere as dependências pela ANÁLISE ESTÁTICA de quem o
+    // `useMemo` de fato LÊ, não pelo array escrito à mão: uma dependência só ali para forçar
+    // recálculo (sem uso no corpo) é DESCARTADA do cache do compilador, mesmo que o array
+    // a liste. `now` como `useState`, recalculado no foco da tela (`useFocusEffect` — o
+    // motorista reabrindo "Ganhos" depois da meia-noite é exatamente o caso a cobrir), e
+    // passado como argumento de `periodStart` resolve os dois lados: React "puro" respeita
+    // o array, e o compilador respeita o uso real.
+    const [now, setNow] = useState(() => new Date());
+    useFocusEffect(
+        useCallback(() => {
+            setNow(new Date());
+        }, []),
+    );
+    const startDate = useMemo(() => periodStart(period, now).toISOString(), [period, now]);
     const { wallet } = useGetWallet();
     const { earnings, isLoading, isError, refetch, isRefetching } = useFreightEarnings(startDate);
     const chartData = useMemo(() => chartDataFor(earnings?.items ?? [], period), [earnings, period]);
@@ -109,7 +129,7 @@ export default function GanhosScreen() {
                         <Text preset="text14" color="secondaryTextColor" textAlign="center">
                             Não foi possível carregar seus ganhos.
                         </Text>
-                        <TouchableOpacityBox mt="t16" onPress={() => void refetch()}>
+                        <TouchableOpacityBox mt="t16" onPress={() => void refetch()} accessibilityRole="button">
                             <Text color="colorTextPrimary">Tentar novamente</Text>
                         </TouchableOpacityBox>
                     </Box>
@@ -135,7 +155,7 @@ export default function GanhosScreen() {
                                 title="Frete a liberar"
                                 // Sem carteira (carregando ou erro) mostra "—": R$ 0,00 diria "nada a liberar".
                                 value={wallet ? formatCurrency(wallet.freightPendingBalance) : '—'}
-                                subtitle="Total de hoje, esperando a empresa liberar"
+                                subtitle="Agora, esperando a empresa liberar"
                             />
                         </Box>
 
