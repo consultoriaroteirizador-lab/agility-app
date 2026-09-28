@@ -21,6 +21,8 @@ export interface PaymentResponse {
   updatedAt: string;
   /** Código da rota (snapshot do backend via JOIN). */
   routingCode?: string | null;
+  /** Nome da rota (snapshot do backend via JOIN; null em rota antiga sem nome). */
+  routingName?: string | null;
   /** Título do serviço (snapshot do backend via JOIN). */
   serviceTitle?: string | null;
 }
