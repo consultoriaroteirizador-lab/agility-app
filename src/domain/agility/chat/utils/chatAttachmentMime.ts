@@ -111,6 +111,54 @@ export function resolveAttachmentMime(source: AttachmentMimeSource): string {
     return (ext && MIME_BY_EXTENSION[ext]) || FALLBACK_MIME;
 }
 
+/**
+ * SEGURANÇA — cópia de `CHAT_ATTACHMENT_EXTENSIONS_BY_MIME` do backend (agility-services
+ * `src/chat/constants/chat-attachment.constants.ts`, a fonte da verdade; mudou lá, mude aqui).
+ * Extensões aceitas para cada MIME da lista. O arquivo só passa se o MIME estiver na lista E a
+ * extensão do nome estiver no conjunto do MIME: `teste.apk` informado como `application/zip`
+ * (o Android faz isso) é recusado. Aqui só adianta a mensagem; quem fecha o buraco é o backend.
+ */
+export const CHAT_ATTACHMENT_EXTENSIONS_BY_MIME: Readonly<Record<string, readonly string[]>> = {
+    'image/jpeg': ['jpg', 'jpeg'],
+    'image/jpg': ['jpg', 'jpeg'],
+    'image/png': ['png'],
+    'image/webp': ['webp'],
+    'image/gif': ['gif'],
+    'application/pdf': ['pdf'],
+    'application/msword': ['doc'],
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['docx'],
+    // `.csv` com este tipo vira text/csv antes (o Windows registra CSV assim); aqui só sobra o .xls.
+    'application/vnd.ms-excel': ['xls'],
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['xlsx'],
+    'application/vnd.ms-powerpoint': ['ppt'],
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation': ['pptx'],
+    'text/plain': ['txt'],
+    'text/csv': ['csv'],
+    'application/zip': ['zip'],
+};
+
+/** DOCX/XLSX/PPTX são ZIP por dentro: informados como zip, o nome decide e o tipo vira o do Office. */
+const OOXML_MIME_BY_EXTENSION: Readonly<Record<string, string>> = {
+    docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+};
+
+/**
+ * Espelho de `normalizeChatMime` do backend: MIME que o `/chats/upload` vai aceitar, ou `null`.
+ * A extensão é a mesma que vai no nome da parte do multipart (a do nome original, senão a da URI).
+ * Sem extensão, só imagem passa (câmera/galeria podem não ter nome útil).
+ */
+export function normalizeChatAttachmentMime(source: AttachmentMimeSource): string | null {
+    const ext = extensionOf(source.name) ?? extensionOf(source.uri);
+    let mime = resolveAttachmentMime(source);
+    if (mime === 'application/vnd.ms-excel' && ext === 'csv') mime = 'text/csv';
+    if (mime === 'application/zip' && ext && OOXML_MIME_BY_EXTENSION[ext]) mime = OOXML_MIME_BY_EXTENSION[ext];
+    if (!CHAT_ATTACHMENT_ALLOWED_MIMES.includes(mime)) return null;
+    if (!ext) return mime.startsWith('image/') ? mime : null;
+    return CHAT_ATTACHMENT_EXTENSIONS_BY_MIME[mime].includes(ext) ? mime : null;
+}
+
 /** `image/*` vira anexo de imagem (a web renderiza), o resto é documento. */
 export function classifyAttachmentMime(mime: string): OutgoingAttachment['type'] {
     return mime.startsWith('image/') ? 'image' : 'document';
@@ -143,8 +191,7 @@ export type AttachmentValidation =
     | { ok: false; reason: 'unsupported' | 'too_large'; message: string };
 
 export function validateChatAttachment(attachment: OutgoingAttachment): AttachmentValidation {
-    const mime = resolveAttachmentMime(attachment);
-    if (!CHAT_ATTACHMENT_ALLOWED_MIMES.includes(mime)) {
+    if (!normalizeChatAttachmentMime(attachment)) {
         return { ok: false, reason: 'unsupported', message: UNSUPPORTED_TYPE_MESSAGE };
     }
     if (typeof attachment.size === 'number' && attachment.size > MAX_CHAT_ATTACHMENT_BYTES) {
@@ -170,8 +217,8 @@ export function buildChatUploadPart(
     now: number = Date.now(),
 ): ChatUploadPart {
     const source: AttachmentMimeSource = typeof file === 'string' ? { uri: file } : file;
-    const type = resolveAttachmentMime(source);
-    const ext = extensionOf(source.name) ?? extensionOf(source.uri) ?? EXTENSION_BY_MIME[type];
+    const type = normalizeChatAttachmentMime(source) ?? resolveAttachmentMime(source);
+    const ext =extensionOf(source.name) ?? extensionOf(source.uri) ?? EXTENSION_BY_MIME[type];
     return {
         uri: platform === 'ios' ? source.uri.replace('file://', '') : source.uri,
         name: `chat-attachment-${now}-${index}${ext ? `.${ext}` : ''}`,

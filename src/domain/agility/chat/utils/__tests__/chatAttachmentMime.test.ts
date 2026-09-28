@@ -3,11 +3,14 @@ import {
     buildChatUploadPart,
     chatUploadErrorMessage,
     CHAT_ATTACHMENT_ALLOWED_MIMES,
+    CHAT_ATTACHMENT_EXTENSIONS_BY_MIME,
     CHAT_ATTACHMENT_MIME_ALIASES,
     CHAT_DOCUMENT_PICKER_TYPES,
     classifyAttachmentMime,
     MAX_CHAT_ATTACHMENT_BYTES,
+    normalizeChatAttachmentMime,
     resolveAttachmentMime,
+    UNSUPPORTED_TYPE_MESSAGE,
     validateChatAttachment,
 } from '../chatAttachmentMime';
 
@@ -90,11 +93,12 @@ describe('attachmentFromPicker', () => {
 });
 
 describe('validateChatAttachment', () => {
-    const base = { uri: 'content://x/1', type: 'document' as const };
+    const base = { uri: 'content://x/1', type: 'document' as const, name: 'nota.pdf' };
 
-    it('aceita todos os MIMEs da lista do backend', () => {
+    it('aceita todos os MIMEs da lista do backend, com nome na extensão do tipo', () => {
         for (const mimeType of CHAT_ATTACHMENT_ALLOWED_MIMES) {
-            expect(validateChatAttachment({ ...base, mimeType })).toEqual({ ok: true });
+            const name = `arquivo.${CHAT_ATTACHMENT_EXTENSIONS_BY_MIME[mimeType][0]}`;
+            expect(validateChatAttachment({ ...base, name, mimeType })).toEqual({ ok: true });
         }
     });
 
@@ -229,7 +233,11 @@ describe('apelidos de MIME (Android) viram o MIME canônico do backend', () => {
     ])('%s -> %s', (alias, canonico) => {
         expect(resolveAttachmentMime({ uri: 'content://x/1', mimeType: alias })).toBe(canonico);
         expect(resolveAttachmentMime({ uri: 'content://x/1', mimeType: `${alias.toUpperCase()}; charset=utf-8` })).toBe(canonico);
-        const attachment = attachmentFromPicker({ uri: 'content://x/1', name: 'a', mimeType: alias });
+        const attachment = attachmentFromPicker({
+            uri: 'content://x/1',
+            name: `a.${CHAT_ATTACHMENT_EXTENSIONS_BY_MIME[canonico][0]}`,
+            mimeType: alias,
+        });
         expect(validateChatAttachment(attachment)).toEqual({ ok: true });
         // O multipart vai com o canônico: é o `file.mimetype` que o backend confere.
         expect(buildChatUploadPart({ uri: 'content://x/1', mimeType: alias }, 0, 'android', 1000).type).toBe(canonico);
@@ -256,7 +264,53 @@ describe('CHAT_DOCUMENT_PICKER_TYPES', () => {
 
     it('todo tipo oferecido pelo seletor passa na validação', () => {
         for (const mimeType of CHAT_DOCUMENT_PICKER_TYPES) {
-            expect(validateChatAttachment({ uri: 'content://x/1', type: 'document', mimeType })).toEqual({ ok: true });
+            const canonico = CHAT_ATTACHMENT_MIME_ALIASES[mimeType] ?? mimeType;
+            const name = `arquivo.${CHAT_ATTACHMENT_EXTENSIONS_BY_MIME[canonico][0]}`;
+            expect(validateChatAttachment({ uri: 'content://x/1', type: 'document', name, mimeType })).toEqual({ ok: true });
         }
+    });
+});
+
+// SEGURANÇA: mesma tabela do backend (agility-services `chat-attachment.constants.ts`). Reproduzido
+// no dev: `teste.apk` declarado como application/zip subia e era gravado como .apk.
+describe('extensão do nome precisa bater com o tipo', () => {
+    const DOCX = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+    const XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+    it.each<[string, { uri: string; name?: string | null; mimeType?: string | null }, string | null]>([
+        ['apk como zip', { uri: 'content://x/1', name: 'teste.apk', mimeType: 'application/zip' }, null],
+        ['apk como x-zip-compressed', { uri: 'content://x/1', name: 'teste.apk', mimeType: 'application/x-zip-compressed' }, null],
+        ['exe como pdf', { uri: 'content://x/1', name: 'setup.exe', mimeType: 'application/pdf' }, null],
+        ['jar como zip', { uri: 'content://x/1', name: 'lib.jar', mimeType: 'application/zip' }, null],
+        ['bat como text/plain', { uri: 'content://x/1', name: 'rodar.bat', mimeType: 'text/plain' }, null],
+        ['apk sem nome, só na URI, como zip', { uri: 'file:///cache/teste.apk', mimeType: 'application/zip' }, null],
+        ['zip como zip', { uri: 'content://x/1', name: 'fotos.zip', mimeType: 'application/zip' }, 'application/zip'],
+        ['csv via vnd.ms-excel', { uri: 'content://x/1', name: 'lista.csv', mimeType: 'application/vnd.ms-excel' }, 'text/csv'],
+        ['xls', { uri: 'content://x/1', name: 'planilha.xls', mimeType: 'application/vnd.ms-excel' }, 'application/vnd.ms-excel'],
+        ['docx como zip vira Word', { uri: 'content://x/1', name: 'contrato.docx', mimeType: 'application/zip' }, DOCX],
+        ['xlsx como zip vira Excel', { uri: 'content://x/1', name: 'planilha.xlsx', mimeType: 'application/zip' }, XLSX],
+        ['câmera: imagem sem extensão em lugar nenhum', { uri: 'content://media/1', name: null, mimeType: 'image/jpeg' }, 'image/jpeg'],
+        ['câmera: .jpg na URI, sem nome', { uri: 'file:///cache/ImagePicker/x.jpg', name: null, mimeType: 'image/jpeg' }, 'image/jpeg'],
+        ['pdf sem extensão em lugar nenhum', { uri: 'content://x/1', name: 'arquivo', mimeType: 'application/pdf' }, null],
+    ])('%s -> %p', (_caso, file, esperado) => {
+        expect(normalizeChatAttachmentMime(file)).toBe(esperado);
+        const check = validateChatAttachment(attachmentFromPicker(file));
+        if (esperado) {
+            expect(check).toEqual({ ok: true });
+        } else {
+            expect(check).toEqual({ ok: false, reason: 'unsupported', message: UNSUPPORTED_TYPE_MESSAGE });
+        }
+    });
+
+    it('o multipart vai com o MIME normalizado (docx informado como zip sobe como Word)', () => {
+        const file = { uri: 'content://x/1', name: 'contrato.docx', mimeType: 'application/zip' };
+        expect(buildChatUploadPart(file, 0, 'android', 1000)).toEqual({
+            uri: 'content://x/1',
+            name: 'chat-attachment-1000-0.docx',
+            type: DOCX,
+        });
+    });
+
+    it('a tabela cobre exatamente a lista do backend', () => {
+        expect(Object.keys(CHAT_ATTACHMENT_EXTENSIONS_BY_MIME).sort()).toEqual([...CHAT_ATTACHMENT_ALLOWED_MIMES].sort());
     });
 });
