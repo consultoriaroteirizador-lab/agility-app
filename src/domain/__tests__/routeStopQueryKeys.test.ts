@@ -18,7 +18,7 @@
 
 import { QueryClient } from '@tanstack/react-query'
 
-import { KEY_ROUTINGS, KEY_SERVICES, routeStopChangedKeys } from '../queryKeys'
+import { KEY_FINANCE, KEY_ROUTINGS, KEY_SERVICES, KEY_WALLET, routeStopChangedKeys } from '../queryKeys'
 
 const ROTA_ID = 'rota-1'
 const SERVICE_ID = 'servico-1'
@@ -77,6 +77,21 @@ describe('invalidação após mudança de status de parada', () => {
             void queryClient.invalidateQueries({ queryKey })
         }
         expect(isMapDataStale(queryClient)).toBe(true)
+    })
+
+    it('invalida o dinheiro do motorista: carteira e cobranças (parada com cobrança em dinheiro vira dívida)', () => {
+        const queryClient = new QueryClient()
+        queryClient.setQueryData([KEY_WALLET, 'balance'], {})
+        queryClient.setQueryData([KEY_WALLET, 'advances', 'summary'], {})
+        queryClient.setQueryData([KEY_FINANCE, 'payments', 'infinite', { startDate: '2026-09-01' }], {})
+
+        for (const queryKey of routeStopChangedKeys(ROTA_ID, SERVICE_ID)) {
+            void queryClient.invalidateQueries({ queryKey })
+        }
+
+        expect(queryClient.getQueryState([KEY_WALLET, 'balance'])?.isInvalidated).toBe(true)
+        expect(queryClient.getQueryState([KEY_WALLET, 'advances', 'summary'])?.isInvalidated).toBe(true)
+        expect(queryClient.getQueryState([KEY_FINANCE, 'payments', 'infinite', { startDate: '2026-09-01' }])?.isInvalidated).toBe(true)
     })
 })
 

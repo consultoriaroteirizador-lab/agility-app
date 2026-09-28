@@ -36,7 +36,7 @@ describe('resolverDestinoDaNotificacao', () => {
         [NotificationType.SERVICE_COMPLETED, {}, '/(auth)/(tabs)/menu/historico'],
         [NotificationType.ROUTE_OFFER, { routingId: 'r1' }, '/ofertas/r1'],
         [NotificationType.ROUTE_OFFER, {}, '/ofertas'],
-        [NotificationType.PAYMENT_RECEIVED, {}, '/menu/ganhos'],
+        [NotificationType.PAYMENT_RECEIVED, {}, '/menu/ganhos/cobrancas'],
         [NotificationType.CHAT_MESSAGE, { chatId: 'c9' }, '/menu/suporte/c9'],
         [NotificationType.CHAT_MESSAGE, {}, '/menu/suporte'],
     ])('%s com %j vai para %s', (type, metadata, caminho) => {

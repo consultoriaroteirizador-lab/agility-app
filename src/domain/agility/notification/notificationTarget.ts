@@ -39,7 +39,7 @@ export function resolverDestinoDaNotificacao(notification: NotificationResponse)
             return caminho(routingId ? `/ofertas/${routingId}` : '/ofertas');
 
         case NotificationType.PAYMENT_RECEIVED:
-            return caminho('/menu/ganhos');
+            return caminho('/menu/ganhos/cobrancas');
 
         case NotificationType.CHAT_MESSAGE: {
             const chatId = notification.metadata?.chatId;

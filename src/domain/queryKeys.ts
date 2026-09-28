@@ -39,6 +39,16 @@ export const PUSH_INVALIDATED_KEYS: readonly string[] = [KEY_ROUTINGS, KEY_NOTIF
  * Invalidar a rota inteira (`[KEY_ROUTINGS]`) resolveria, mas refaz também as
  * listas de rotas/ofertas a cada parada — este conjunto mira só o que mudou.
  */
+/**
+ * Chaves do dinheiro do motorista. Concluir uma parada com cobrança em dinheiro cria a
+ * dívida e o pagamento; concluir a rota cria a parcela de frete (F2). O back não emite
+ * evento de carteira por WebSocket/push, então quem conclui invalida. Invalidar só refaz
+ * o que tem observador ativo; o resto refaz ao abrir a tela.
+ */
+export function moneyChangedKeys(): unknown[][] {
+    return [[KEY_WALLET], [KEY_FINANCE]]
+}
+
 export function routeStopChangedKeys(rotaId: string, serviceId?: string): unknown[][] {
     return [
         ...(serviceId ? [[KEY_SERVICES, serviceId]] : []),
@@ -52,5 +62,8 @@ export function routeStopChangedKeys(rotaId: string, serviceId?: string): unknow
         // sofrem do mesmo descasamento posicional do `map-data` acima.
         [KEY_ROUTINGS, 'pending-returns', rotaId],
         [KEY_ROUTINGS, 'non-delivered', rotaId],
+        // Parada concluída com cobrança em dinheiro: dívida (carteira) e pagamento
+        // (cobranças) nascem no mesmo evento.
+        ...moneyChangedKeys(),
     ]
 }
