@@ -8,6 +8,7 @@ import { KEY_NOTIFICATIONS } from '@/domain/queryKeys';
 import { useAuthCredentialsService } from '@/services';
 
 import type { NotificationResponse } from '../dto';
+import { aplicarNoCacheDaLista } from '../notificationGrouping';
 
 
 
@@ -118,6 +119,16 @@ export function useNotificationWebSocket(options: UseNotificationWebSocketOption
 
         socket.on('notification', (notification: NotificationResponse) => {
             console.log('[useNotificationWebSocket] New notification received:', notification);
+
+            // Upsert por id nas listas em cache: a notificação agrupada de chat chega de novo com o
+            // MESMO id a cada mensagem — substitui o item e sobe para o topo, em vez de duplicar.
+            // A invalidação depois confirma com o servidor (contagem de não lidas inclusive).
+            queryClient.setQueriesData({ queryKey: [KEY_NOTIFICATIONS, 'all'] }, (dado: unknown) =>
+                aplicarNoCacheDaLista(dado, notification, false),
+            );
+            queryClient.setQueriesData({ queryKey: [KEY_NOTIFICATIONS, 'unread'] }, (dado: unknown) =>
+                aplicarNoCacheDaLista(dado, notification, true),
+            );
 
             // Invalida queries para atualizar a lista
             queryClient.invalidateQueries({ queryKey: [KEY_NOTIFICATIONS] });

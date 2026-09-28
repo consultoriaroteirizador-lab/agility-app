@@ -10,6 +10,7 @@ import {
     reduzirBanner,
 } from '../bannerQueue';
 import type { ContextoDoBanner, EstadoDoBanner } from '../bannerQueue';
+import { chaveDaNotificacao } from '@/domain/agility/notification/notificationGrouping';
 
 const AGORA = Date.parse('2026-09-26T12:00:00.000Z');
 
@@ -69,7 +70,7 @@ describe('avaliarNotificacao', () => {
     });
 
     it('suprime id repetido', () => {
-        expect(avaliarNotificacao(notificacao(), new Set(['n1']), contexto())).toEqual({ exibir: false, motivo: 'duplicada' });
+        expect(avaliarNotificacao(notificacao(), new Set([chaveDaNotificacao(notificacao())]), contexto())).toEqual({ exibir: false, motivo: 'duplicada' });
     });
 
     it('suprime notificação já lida', () => {
@@ -78,14 +79,19 @@ describe('avaliarNotificacao', () => {
     });
 
     it('suprime notificação antiga (reenvio), com folga para relógio do aparelho', () => {
-        const velha = notificacao({ createdAt: new Date(AGORA - IDADE_MAXIMA_MS - 1).toISOString() });
+        // A idade conta da última mudança (updatedAt): reenvio de algo parado há muito tempo.
+        const antes = new Date(AGORA - IDADE_MAXIMA_MS - 1).toISOString();
+        const velha = notificacao({ createdAt: antes, updatedAt: antes });
         expect(avaliarNotificacao(velha, new Set(), contexto())).toEqual({ exibir: false, motivo: 'antiga' });
-        const noLimite = notificacao({ createdAt: new Date(AGORA - IDADE_MAXIMA_MS + 1000).toISOString() });
+        const legado = notificacao({ createdAt: antes, updatedAt: undefined as unknown as string });
+        expect(avaliarNotificacao(legado, new Set(), contexto())).toEqual({ exibir: false, motivo: 'antiga' });
+        const quase = new Date(AGORA - IDADE_MAXIMA_MS + 1000).toISOString();
+        const noLimite = notificacao({ createdAt: quase, updatedAt: quase });
         expect(avaliarNotificacao(noLimite, new Set(), contexto())).toEqual({ exibir: true });
     });
 
-    it('createdAt ilegível não bloqueia', () => {
-        expect(avaliarNotificacao(notificacao({ createdAt: 'lixo' }), new Set(), contexto())).toEqual({ exibir: true });
+    it('data ilegível não bloqueia', () => {
+        expect(avaliarNotificacao(notificacao({ createdAt: 'lixo', updatedAt: 'lixo' }), new Set(), contexto())).toEqual({ exibir: true });
     });
 
     it('oferta de rota fica com o alerta de oferta, não com o banner', () => {
@@ -151,7 +157,9 @@ describe('reduzirBanner', () => {
             estado = receber(estado, notificacao({ id: `id-${i}` }));
         }
         expect(estado.vistos).toHaveLength(LIMITE_VISTOS);
-        expect(estado.vistos[estado.vistos.length - 1]).toBe(`id-${LIMITE_VISTOS + 9}`);
+        expect(estado.vistos[estado.vistos.length - 1]).toBe(
+            chaveDaNotificacao(notificacao({ id: `id-${LIMITE_VISTOS + 9}` })),
+        );
     });
 });
 
@@ -165,5 +173,69 @@ describe('destinoEhTelaAtual', () => {
     it('notificação sem destino nunca está na tela atual', () => {
         const semDestino = notificacao({ type: NotificationType.SYSTEM_ALERT, linkUrl: undefined, metadata: undefined });
         expect(destinoEhTelaAtual(semDestino, '/')).toBe(false);
+    });
+});
+
+describe('notificação agrupada (mesma linha atualizada)', () => {
+    const DEPOIS = new Date(AGORA - 500).toISOString();
+
+    it('atualização da mesma notificação (updatedAt novo) mostra o banner de novo', () => {
+        let estado = receber(ESTADO_INICIAL_BANNER, notificacao());
+        estado = reduzirBanner(estado, { tipo: 'dispensada' });
+        estado = receber(estado, notificacao({ title: '2 novas mensagens', updatedAt: DEPOIS }));
+        expect(estado.atual?.title).toBe('2 novas mensagens');
+        expect(estado.novas).toBe(0);
+    });
+
+    it('atualização com o banner da mesma notificação na tela substitui, sem contar +1', () => {
+        let estado = receber(ESTADO_INICIAL_BANNER, notificacao());
+        estado = receber(estado, notificacao({ title: '2 novas mensagens', updatedAt: DEPOIS }));
+        expect(estado.atual?.title).toBe('2 novas mensagens');
+        expect(estado.novas).toBe(0);
+    });
+
+    it('substituir preserva o +N que já existia das outras', () => {
+        let estado = receber(ESTADO_INICIAL_BANNER, notificacao({ id: 'a' }));
+        estado = receber(estado, notificacao({ id: 'n1' }));
+        expect(estado.novas).toBe(1);
+        estado = receber(estado, notificacao({ id: 'n1', updatedAt: DEPOIS }));
+        expect(estado.atual?.id).toBe('n1');
+        expect(estado.novas).toBe(1);
+    });
+
+    it('mesma chave (id + updatedAt) repetida continua ignorada', () => {
+        const estado = receber(ESTADO_INICIAL_BANNER, notificacao({ updatedAt: DEPOIS }));
+        expect(receber(estado, notificacao({ updatedAt: DEPOIS }))).toBe(estado);
+    });
+
+    it('atualização do chat que está aberto continua suprimida', () => {
+        const estado = receber(
+            ESTADO_INICIAL_BANNER,
+            notificacao({ updatedAt: DEPOIS }),
+            contexto({ caminhoAtual: '/menu/suporte/chat-1' }),
+        );
+        expect(estado.atual).toBeNull();
+    });
+
+    it('atualização de oferta continua com o alerta de oferta', () => {
+        const n = notificacao({
+            type: NotificationType.ROUTE_OFFER,
+            linkUrl: undefined,
+            metadata: { routingId: 'r9' },
+            updatedAt: DEPOIS,
+        });
+        expect(avaliarNotificacao(n, new Set(), contexto())).toEqual({ exibir: false, motivo: 'oferta' });
+    });
+
+    it('linha criada há muito tempo mas atualizada agora não é "antiga"', () => {
+        const n = notificacao({ createdAt: new Date(AGORA - IDADE_MAXIMA_MS * 3).toISOString(), updatedAt: DEPOIS });
+        expect(avaliarNotificacao(n, new Set(), contexto())).toEqual({ exibir: true });
+    });
+
+    it('sem updatedAt (backend antigo) deduplica pelo id + createdAt, como antes', () => {
+        const legado = notificacao({ updatedAt: undefined as unknown as string });
+        const estado = receber(ESTADO_INICIAL_BANNER, legado);
+        expect(estado.atual?.id).toBe('n1');
+        expect(receber(estado, { ...legado })).toBe(estado);
     });
 });

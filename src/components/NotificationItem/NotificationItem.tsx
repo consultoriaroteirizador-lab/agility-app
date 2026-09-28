@@ -1,6 +1,7 @@
 import React from 'react';
 
 import type { NotificationResponse } from '@/domain/agility/notification/dto';
+import { tituloComContagem } from '@/domain/agility/notification/notificationGrouping';
 import { iconeDaNotificacao } from '@/domain/agility/notification/notificationTarget';
 import { ThemeColors, measure } from '@/theme';
 
@@ -112,7 +113,7 @@ export const NotificationItem: React.FC<NotificationItemProps> = ({
           numberOfLines={2}
           marginBottom="y4"
         >
-          {notification.title}
+          {tituloComContagem(notification)}
         </Text>
 
         <Text

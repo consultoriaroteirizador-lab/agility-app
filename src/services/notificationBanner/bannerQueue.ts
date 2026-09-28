@@ -1,5 +1,6 @@
 import type { NotificationResponse } from '@/domain/agility/notification/dto';
 import { NotificationStatus, NotificationType } from '@/domain/agility/notification/dto';
+import { chaveDaNotificacao, momentoDaNotificacao } from '@/domain/agility/notification/notificationGrouping';
 import {
     caminhoComparavelDoDestino,
     normalizarCaminho,
@@ -13,7 +14,11 @@ import {
  */
 export const IDADE_MAXIMA_MS = 5 * 60 * 1000;
 
-/** Quantos ids já tratados o banner lembra, para não repetir o mesmo aviso. */
+/**
+ * Quantas chaves já tratadas o banner lembra, para não repetir o mesmo aviso. A chave é
+ * id + updatedAt (`chaveDaNotificacao`): a notificação agrupada de chat é a mesma linha
+ * atualizada a cada mensagem, e cada atualização é uma novidade.
+ */
 export const LIMITE_VISTOS = 100;
 
 export interface ContextoDoBanner {
@@ -42,11 +47,12 @@ export function avaliarNotificacao(
     contexto: ContextoDoBanner,
 ): DecisaoDoBanner {
     if (!notificacao?.id) return { exibir: false, motivo: 'invalida' };
-    if (vistos.has(notificacao.id)) return { exibir: false, motivo: 'duplicada' };
+    if (vistos.has(chaveDaNotificacao(notificacao))) return { exibir: false, motivo: 'duplicada' };
     if (notificacao.status === NotificationStatus.READ) return { exibir: false, motivo: 'lida' };
 
-    const criadaEm = Date.parse(notificacao.createdAt);
-    if (Number.isFinite(criadaEm) && contexto.agora - criadaEm > IDADE_MAXIMA_MS) {
+    // Idade pela última mudança: a linha agrupada pode ter sido criada há horas e atualizada agora.
+    const mudouEm = Date.parse(momentoDaNotificacao(notificacao));
+    if (Number.isFinite(mudouEm) && contexto.agora - mudouEm > IDADE_MAXIMA_MS) {
         return { exibir: false, motivo: 'antiga' };
     }
 
@@ -64,7 +70,7 @@ export interface EstadoDoBanner {
     atual: NotificationResponse | null;
     /** Quantas chegaram antes da atual sem o motorista dispensar — o "+N novas". */
     novas: number;
-    /** Ids já tratados (exibidos OU suprimidos), do mais antigo para o mais novo. */
+    /** Chaves (id + updatedAt) já tratadas (exibidas OU suprimidas), da mais antiga para a mais nova. */
     vistos: string[];
 }
 
@@ -89,14 +95,18 @@ export function reduzirBanner(estado: EstadoDoBanner, acao: AcaoDoBanner): Estad
     switch (acao.tipo) {
         case 'recebida': {
             const decisao = avaliarNotificacao(acao.notificacao, new Set(estado.vistos), acao.contexto);
+            const chave = chaveDaNotificacao(acao.notificacao);
             if (!decisao.exibir) {
                 if (decisao.motivo === 'duplicada' || decisao.motivo === 'invalida') return estado;
-                return { ...estado, vistos: lembrar(estado.vistos, acao.notificacao.id) };
+                return { ...estado, vistos: lembrar(estado.vistos, chave) };
             }
+            // A mesma notificação atualizada (chat agrupado) substitui a da tela sem somar ao "+N":
+            // continua sendo um aviso só, agora com o texto e a contagem mais novos.
+            const mesmaNaTela = estado.atual?.id === acao.notificacao.id;
             return {
                 atual: acao.notificacao,
-                novas: estado.atual ? estado.novas + 1 : 0,
-                vistos: lembrar(estado.vistos, acao.notificacao.id),
+                novas: !estado.atual ? 0 : mesmaNaTela ? estado.novas : estado.novas + 1,
+                vistos: lembrar(estado.vistos, chave),
             };
         }
         case 'dispensada':
