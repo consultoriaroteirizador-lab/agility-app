@@ -74,6 +74,51 @@ describe('describeTransaction — movimento entre baldes (affectsBalance false)'
     });
 });
 
+describe('describeTransaction — FREIGHT_RELEASE cancelado (metadata.action === CANCEL)', () => {
+    // Back: `freight-share-admin.service.ts` `cancel()` lança FREIGHT_RELEASE com
+    // metadata `{ reason, action: 'CANCEL' }` (cancelPlan) — mesmo `type` da liberação
+    // normal. Sem o desvio por metadata, o motorista via "Frete liberado" numa parcela
+    // que o operador CANCELOU, não liberou.
+    it('rótulo e movimento próprios, não "Frete liberado"', () => {
+        const d = describeTransaction(
+            tx({
+                type: 'FREIGHT_RELEASE' as Tx['type'],
+                direction: 'IN',
+                affectsBalance: false,
+                sourceType: 'FREIGHT_SHARE_RELEASE',
+                metadata: { action: 'CANCEL' },
+            }),
+        );
+        expect(d.label).toBe('Frete cancelado');
+        expect(d.movement).toBe('Frete a liberar → Cancelado');
+    });
+
+    it('FREIGHT_RELEASE sem metadata (ou action RELEASE) continua "Frete liberado"', () => {
+        const semMetadata = describeTransaction(
+            tx({ type: 'FREIGHT_RELEASE' as Tx['type'], direction: 'IN', affectsBalance: false, sourceType: 'FREIGHT_SHARE_RELEASE' }),
+        );
+        const comRelease = describeTransaction(
+            tx({
+                type: 'FREIGHT_RELEASE' as Tx['type'],
+                direction: 'IN',
+                affectsBalance: false,
+                sourceType: 'FREIGHT_SHARE_RELEASE',
+                metadata: { action: 'RELEASE' },
+            }),
+        );
+        expect(semMetadata.label).toBe('Frete liberado');
+        expect(comRelease.label).toBe('Frete liberado');
+    });
+
+    it('categoria continua "freight" mesmo cancelado', () => {
+        expect(
+            categoryOf(
+                tx({ type: 'FREIGHT_RELEASE' as Tx['type'], sourceType: 'FREIGHT_SHARE_RELEASE', metadata: { action: 'CANCEL' } }),
+            ),
+        ).toBe('freight');
+    });
+});
+
 describe('describeTransaction — status', () => {
     it('PENDING ganha selo e cor de aviso', () => {
         const d = describeTransaction(tx({ type: 'CREDIT' as Tx['type'], direction: 'IN', status: 'PENDING' as Tx['status'], sourceType: 'LEGACY' }));

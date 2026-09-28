@@ -45,6 +45,13 @@ export interface TransactionResponse {
     sourceType: string;
     /** Na linha de frete, o id da parcela. Nunca exibir. */
     sourceId: string;
+    /**
+     * Metadata do gesto que originou o lançamento (`wallet-transaction.entity.ts`, back).
+     * Tipado minimamente: hoje só `action` é lido no app (FREIGHT_RELEASE com
+     * `action === 'CANCEL'` é o cancelamento da parcela, não a liberação normal —
+     * ver `transactionDisplay.ts`). O resto do objeto varia por gesto/origem.
+     */
+    metadata?: { action?: string; [key: string]: unknown } | null;
     /** Derivados de `direction` no back. Não use para sinal. */
     isCredit: boolean;
     isDebit: boolean;

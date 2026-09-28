@@ -54,6 +54,15 @@ const TYPE_CONFIG: Record<TransactionType, TypeConfig> = {
 
 /** MANUAL_DEBIT de origem FREIGHT_SHARE_REVERSAL: a empresa liberou menos que o bloqueado, ou cancelou. */
 const FREIGHT_REVERSAL: TypeConfig = { label: 'Estorno de frete', icon: 'return-down-back', iconColor: '#F44336', bgColor: '#FFEBEE', category: 'freight' };
+/**
+ * FREIGHT_RELEASE com `metadata.action === 'CANCEL'` (back, `freight-share-admin.service.ts`
+ * `cancelPlan`): o operador cancelou a parcela, não liberou. Mesmo `type` do "Frete liberado"
+ * normal — sem este desvio o motorista via "Frete liberado" numa parcela cancelada.
+ */
+const FREIGHT_CANCEL: TypeConfig = {
+    label: 'Frete cancelado', icon: 'close-circle', iconColor: '#F44336', bgColor: '#FFEBEE', category: 'freight',
+    movement: 'Frete a liberar → Cancelado',
+};
 const UNKNOWN: TypeConfig = { label: 'Movimentação', icon: 'swap-horizontal', iconColor: '#607D8B', bgColor: '#ECEFF1', category: 'other' };
 
 const STATUS_BADGE: Partial<Record<TransactionStatus, StatusColorConfig>> = {
@@ -70,7 +79,7 @@ export const EXTRATO_FILTERS: { value: ExtratoFilter; label: string }[] = [
     { value: 'advances', label: 'Adiantamentos' },
 ];
 
-type TxShape = Pick<TransactionResponse, 'type' | 'direction' | 'affectsBalance' | 'status' | 'amount' | 'sourceType'>;
+type TxShape = Pick<TransactionResponse, 'type' | 'direction' | 'affectsBalance' | 'status' | 'amount' | 'sourceType' | 'metadata'>;
 
 export interface TransactionDisplay {
     label: string;
@@ -85,8 +94,9 @@ export interface TransactionDisplay {
     badge: StatusColorConfig | null;
 }
 
-function configOf(tx: Pick<TransactionResponse, 'type' | 'sourceType'>): TypeConfig {
+function configOf(tx: Pick<TransactionResponse, 'type' | 'sourceType' | 'metadata'>): TypeConfig {
     if (tx.sourceType === LedgerSourceType.FREIGHT_SHARE_REVERSAL) return FREIGHT_REVERSAL;
+    if (tx.type === TransactionType.FREIGHT_RELEASE && tx.metadata?.action === 'CANCEL') return FREIGHT_CANCEL;
     return TYPE_CONFIG[tx.type] ?? UNKNOWN;
 }
 
@@ -126,12 +136,12 @@ export function describeTransaction(tx: TxShape): TransactionDisplay {
     };
 }
 
-export function categoryOf(tx: Pick<TransactionResponse, 'type' | 'sourceType'>): TransactionCategory {
+export function categoryOf(tx: Pick<TransactionResponse, 'type' | 'sourceType' | 'metadata'>): TransactionCategory {
     return configOf(tx).category;
 }
 
 /** Filtro no cliente, sobre as páginas acumuladas: o back só aceita UM `type` exato (R2). */
-export function filterTransactions<T extends Pick<TransactionResponse, 'type' | 'sourceType'>>(list: T[], filter: ExtratoFilter): T[] {
+export function filterTransactions<T extends Pick<TransactionResponse, 'type' | 'sourceType' | 'metadata'>>(list: T[], filter: ExtratoFilter): T[] {
     if (filter === 'all') return list;
     return list.filter((tx) => categoryOf(tx) === filter);
 }
