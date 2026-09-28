@@ -1,16 +1,15 @@
-import { useEffect, useRef, useCallback, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import { useQueryClient } from '@tanstack/react-query';
 import { io, Socket } from 'socket.io-client';
 
 import { urls } from '@/config/urls';
+import { serverDisconnectRetryDelay } from '@/domain/agility/chat/useCase/useChatWebSocket';
 import { KEY_NOTIFICATIONS } from '@/domain/queryKeys';
 import { useAuthCredentialsService } from '@/services';
 
 import type { NotificationResponse } from '../dto';
 import { aplicarNoCacheDaLista } from '../notificationGrouping';
-
-
 
 const getWebSocketUrl = () => {
     const baseUrl = urls.agilityApi;
@@ -20,106 +19,101 @@ const getWebSocketUrl = () => {
     return `${protocol}://${wsBase}`;
 };
 
+/** Teto do intervalo entre tentativas automáticas do socket.io (queda de rede). */
+export const NOTIFICATION_RECONNECT_DELAY_MAX_MS = 15_000;
+
+/**
+ * Eventos que o `NotificationGateway` do backend emite para `user:<sub>`
+ * (`notification.gateway.ts`: `notifyRead`, `notifyAllRead`, `notifyDeleted`).
+ * Os nomes antigos com `_` nunca existiram no backend e ficam só por tolerância.
+ */
+const EVENTOS_QUE_MUDAM_A_LISTA = [
+    'notification:read',
+    'notification:all_read',
+    'notification:deleted',
+    'notification_updated',
+    'notification_deleted',
+    'notifications_read_all',
+] as const;
+
 export interface UseNotificationWebSocketOptions {
     enabled?: boolean;
     onNotification?: (notification: NotificationResponse) => void;
     onError?: (error: Error) => void;
 }
 
+/**
+ * Socket `/notifications`: o gateway põe o motorista na sala `user:<sub>` ao validar o token e
+ * emite `notification` ali a cada aviso novo (inclusive a linha agrupada de chat, reemitida
+ * com o mesmo id a cada mensagem).
+ *
+ * O gateway valida o token SÓ no handshake e, se ele estiver vencido, emite `error` e derruba
+ * a conexão (`io server disconnect`) — caso em que o socket.io NÃO tenta de novo sozinho. Por
+ * isso:
+ * - `auth` é função: cada (re)conexão lê o token ATUAL, não o da criação do socket;
+ * - derrubada pelo servidor reagenda a conexão com backoff e, antes, dispara um refetch REST das
+ *   notificações — é esse 401 que faz o interceptor do axios renovar o token;
+ * - ao reconectar, a lista é invalidada: o gateway não reenvia o que foi emitido com o socket fora.
+ */
 export function useNotificationWebSocket(options: UseNotificationWebSocketOptions = {}) {
     const { enabled = true, onNotification, onError } = options;
     const { authCredentials, userAuth } = useAuthCredentialsService();
     const queryClient = useQueryClient();
-    const socketRef = useRef<Socket | null>(null);
     const [isConnected, setIsConnected] = useState(false);
-    const isMountedRef = useRef(true);
 
-    // Usar refs para callbacks para evitar recriação do socket
+    const accessToken = authCredentials?.accessToken ?? null;
+    const tenantId = authCredentials?.tenantId ?? null;
+    const userId = userAuth?.id ?? null;
+    const temToken = !!accessToken;
+
+    // Token lido a cada tentativa: a renovação troca `authCredentials` sem recriar o socket.
+    const tokenRef = useRef(accessToken);
+    useEffect(() => {
+        tokenRef.current = accessToken;
+    }, [accessToken]);
+
     const onNotificationRef = useRef(onNotification);
     const onErrorRef = useRef(onError);
-
-    // Atualizar refs quando callbacks mudarem
     useEffect(() => {
         onNotificationRef.current = onNotification;
         onErrorRef.current = onError;
     }, [onNotification, onError]);
 
-    // Marcar componente como montado
     useEffect(() => {
-        isMountedRef.current = true;
-        return () => {
-            isMountedRef.current = false;
+        if (!enabled || !temToken || !userId || !tenantId) {
+            return;
+        }
+
+        let desmontado = false;
+        let tentativaDoServidor = 0;
+        let caiuAntes = false;
+        let timerRetentativa: ReturnType<typeof setTimeout> | null = null;
+
+        const invalidarNotificacoes = () => {
+            queryClient.invalidateQueries({ queryKey: [KEY_NOTIFICATIONS] });
         };
-    }, []);
 
-    const connect = useCallback(() => {
-        if (!enabled || socketRef.current?.connected) {
-            return;
-        }
-
-        if (!authCredentials?.accessToken) {
-            console.warn('[useNotificationWebSocket] Missing accessToken, cannot connect');
-            return;
-        }
-
-        // userId = keycloakUserId (JWT sub), already extracted at login
-        const userId = userAuth?.id || null;
-
-        if (!userId) {
-            console.warn('[useNotificationWebSocket] Could not extract userId');
-            return;
-        }
-
-        // CORREÇÃO: Usar authCredentials.tenantId diretamente como fonte principal
-        // O tenantId está disponível no authCredentials, não precisa extrair do JWT
-        const tenantId = authCredentials?.tenantId || null;
-
-        console.log('[useNotificationWebSocket] Using tenantId from authCredentials:', tenantId);
-
-        if (!tenantId) {
-            console.warn('[useNotificationWebSocket] Missing tenantId, cannot connect');
-            console.warn('[useNotificationWebSocket] authCredentials:', {
-                hasTenantId: !!authCredentials?.tenantId,
-                tenantIdValue: authCredentials?.tenantId,
-            });
-            return;
-        }
-
-        const wsUrl = getWebSocketUrl();
-        console.log('[useNotificationWebSocket] Connecting to:', `${wsUrl}/notifications`, { userId, tenantId });
-
-        const socketConfig: any = {
-            auth: {
-                token: authCredentials?.accessToken,
-                userId,
-            },
+        const socket: Socket = io(`${getWebSocketUrl()}/notifications`, {
+            auth: (cb) => cb({ token: tokenRef.current, userId, tenantId }),
             transports: ['websocket', 'polling'],
             reconnection: true,
             reconnectionDelay: 1000,
-            reconnectionAttempts: 5,
-        };
+            reconnectionDelayMax: NOTIFICATION_RECONNECT_DELAY_MAX_MS,
+            reconnectionAttempts: Infinity,
+        });
 
-        // Adiciona tenantId se disponível
-        if (tenantId) {
-            socketConfig.auth.tenantId = tenantId;
-        }
-
-        const socket = io(`${wsUrl}/notifications`, socketConfig);
-
-        socket.on('connect', () => {
-            console.log('[useNotificationWebSocket] Connected');
-            if (isMountedRef.current) {
-                setIsConnected(true);
+        // `connected` sai do gateway DEPOIS de validar o token e entrar em `user:<sub>`:
+        // só a partir daqui o motorista recebe `notification`.
+        socket.on('connected', () => {
+            tentativaDoServidor = 0;
+            if (!desmontado) setIsConnected(true);
+            if (caiuAntes) {
+                caiuAntes = false;
+                invalidarNotificacoes();
             }
         });
 
-        socket.on('connected', (data) => {
-            console.log('[useNotificationWebSocket] Connection confirmed:', data);
-        });
-
         socket.on('notification', (notification: NotificationResponse) => {
-            console.log('[useNotificationWebSocket] New notification received:', notification);
-
             // Upsert por id nas listas em cache: a notificação agrupada de chat chega de novo com o
             // MESMO id a cada mensagem — substitui o item e sobe para o topo, em vez de duplicar.
             // A invalidação depois confirma com o servidor (contagem de não lidas inclusive).
@@ -129,104 +123,54 @@ export function useNotificationWebSocket(options: UseNotificationWebSocketOption
             queryClient.setQueriesData({ queryKey: [KEY_NOTIFICATIONS, 'unread'] }, (dado: unknown) =>
                 aplicarNoCacheDaLista(dado, notification, true),
             );
-
-            // Invalida queries para atualizar a lista
-            queryClient.invalidateQueries({ queryKey: [KEY_NOTIFICATIONS] });
-
-            // Chama callback se fornecido
-            if (onNotificationRef.current) {
-                onNotificationRef.current(notification);
-            }
+            invalidarNotificacoes();
+            onNotificationRef.current?.(notification);
         });
 
-        socket.on('notification_updated', (notification: NotificationResponse) => {
-            console.log('[useNotificationWebSocket] Notification updated:', notification);
-            queryClient.invalidateQueries({ queryKey: [KEY_NOTIFICATIONS] });
-        });
-
-        socket.on('notification_deleted', (data: { id: string }) => {
-            console.log('[useNotificationWebSocket] Notification deleted:', data.id);
-            queryClient.invalidateQueries({ queryKey: [KEY_NOTIFICATIONS] });
-        });
-
-        socket.on('notifications_read_all', () => {
-            console.log('[useNotificationWebSocket] All notifications marked as read');
-            queryClient.invalidateQueries({ queryKey: [KEY_NOTIFICATIONS] });
-        });
+        for (const evento of EVENTOS_QUE_MUDAM_A_LISTA) {
+            socket.on(evento, invalidarNotificacoes);
+        }
 
         socket.on('initial_unread_count', (data: { unreadCount: number }) => {
-            console.log('[useNotificationWebSocket] Initial unread count:', data.unreadCount);
-            queryClient.setQueryData([KEY_NOTIFICATIONS, 'unread-count'], {
-                success: true,
-                result: { unreadCount: data.unreadCount },
-            });
+            // Mesmo formato que `useGetUnreadCount` guarda (o `result` da resposta REST).
+            queryClient.setQueryData([KEY_NOTIFICATIONS, 'unread-count'], { unreadCount: data.unreadCount });
         });
 
         socket.on('error', (error: { message: string }) => {
-            console.error('[useNotificationWebSocket] Error:', error);
-            if (onErrorRef.current) {
-                onErrorRef.current(new Error(error.message));
-            }
+            console.warn('[useNotificationWebSocket] Error:', error?.message);
+            onErrorRef.current?.(new Error(error?.message));
         });
 
         socket.on('disconnect', (reason) => {
-            console.log('[useNotificationWebSocket] Disconnected:', reason);
-            if (isMountedRef.current) {
-                setIsConnected(false);
+            caiuAntes = true;
+            if (!desmontado) setIsConnected(false);
+
+            // Queda de rede: o socket.io reconecta sozinho. Derrubada pelo servidor (token
+            // vencido/recusado): ele NÃO tenta — agendamos, e o refetch REST renova o token.
+            if (reason === 'io server disconnect' && !desmontado) {
+                invalidarNotificacoes();
+                const espera = serverDisconnectRetryDelay(tentativaDoServidor);
+                tentativaDoServidor += 1;
+                if (timerRetentativa) clearTimeout(timerRetentativa);
+                timerRetentativa = setTimeout(() => {
+                    timerRetentativa = null;
+                    if (!desmontado) socket.connect();
+                }, espera);
             }
         });
 
         socket.on('connect_error', (error) => {
-            console.error('[useNotificationWebSocket] Connection error:', error);
-            if (onErrorRef.current) {
-                onErrorRef.current(error);
-            }
+            console.warn('[useNotificationWebSocket] Connection error:', error?.message);
+            onErrorRef.current?.(error);
         });
 
-        socketRef.current = socket;
-    }, [enabled, authCredentials, userAuth, queryClient]);
-
-    const disconnect = useCallback(() => {
-        if (socketRef.current) {
-            console.log('[useNotificationWebSocket] Disconnecting...');
-            socketRef.current.disconnect();
-            socketRef.current = null;
-            if (isMountedRef.current) {
-                setIsConnected(false);
-            }
-        }
-    }, []);
-
-    useEffect(() => {
-        const shouldConnect = enabled && !!authCredentials?.accessToken && !!userAuth?.id;
-
-        if (shouldConnect) {
-            // Pequeno delay para garantir que tudo está disponível
-            const timeoutId = setTimeout(() => {
-                if (isMountedRef.current && enabled) {
-                    connect();
-                }
-            }, 500);
-
-            return () => {
-                clearTimeout(timeoutId);
-                disconnect();
-            };
-        } else {
-            disconnect();
-        }
-    }, [enabled, authCredentials, userAuth, connect, disconnect]);
-
-    // Cleanup no unmount
-    useEffect(() => {
         return () => {
-            disconnect();
+            desmontado = true;
+            if (timerRetentativa) clearTimeout(timerRetentativa);
+            socket.disconnect();
+            setIsConnected(false);
         };
-    }, [disconnect]);
+    }, [enabled, temToken, userId, tenantId, queryClient]);
 
-    return {
-        isConnected,
-        connect,
-        disconnect,
-    };
+    return { isConnected };
 }

@@ -11,11 +11,16 @@ interface UseFindAllNotificationsOptions {
   enabled?: boolean;
 }
 
+/** Chave da lista da aba Notificações. O WebSocket e o "marcar todas" escrevem por prefixo (`[KEY_NOTIFICATIONS, 'all']`). */
+export function chaveDaListaDeNotificacoes(limit: number, offset: number) {
+  return [KEY_NOTIFICATIONS, 'all', limit, offset] as const;
+}
+
 export function useFindAllNotifications(options: UseFindAllNotificationsOptions = {}) {
   const { limit = 100, offset = 0, enabled = true } = options;
 
   const query = useQuery({
-    queryKey: [KEY_NOTIFICATIONS, 'all', limit, offset],
+    queryKey: chaveDaListaDeNotificacoes(limit, offset),
     queryFn: async () => {
       const response = await listNotificationsService(limit, offset);
       if (!response.success || !response.result) {
