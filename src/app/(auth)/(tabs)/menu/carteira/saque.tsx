@@ -23,7 +23,7 @@ export default function SaqueScreen() {
     const { showToast } = useToastService();
     const [amountCents, setAmountCents] = useState<number | null>(null);
     const [showConfirmModal, setShowConfirmModal] = useState(false);
-    const { wallet, isLoading: isLoadingWallet } = useGetWallet();
+    const { wallet, isLoading: isLoadingWallet, isError: isWalletError, refetch: refetchWallet } = useGetWallet();
     const { requestWithdrawal } = useRequestWithdrawal();
     const { run, isSubmitting, isLocked } = useSubmitLock();
 
@@ -76,6 +76,33 @@ export default function SaqueScreen() {
             <ScreenBase buttonLeft={<ButtonBack />} title={<Text preset="textTitleScreen">Saque</Text>}>
                 <Box flex={1} justifyContent="center" alignItems="center">
                     <ActivityIndicator size="large" />
+                </Box>
+            </ScreenBase>
+        );
+    }
+
+    // GET /wallet falhou e não há nada em cache: mostrar R$ 0,00 + "Configure seus dados
+    // bancários" mentiria — pareceria uma carteira vazia/sem PIX cadastrado, quando na
+    // verdade nada foi carregado ainda. Erro pede "Tentar novamente", nunca cai no vazio.
+    if (isWalletError && !wallet) {
+        return (
+            <ScreenBase buttonLeft={<ButtonBack />} title={<Text preset="textTitleScreen">Saque</Text>}>
+                <Box flex={1} justifyContent="center" alignItems="center" p="m24">
+                    <Ionicons name="alert-circle" size={40} color="#F44336" />
+                    <Text mt="t16" color="colorTextSecondary" textAlign="center">
+                        Não foi possível carregar sua carteira.
+                    </Text>
+                    <TouchableOpacityBox
+                        testID="saque-carteira-erro"
+                        accessibilityRole="button"
+                        mt="t16"
+                        p="m12"
+                        onPress={() => refetchWallet()}
+                    >
+                        <Text color="colorTextPrimary" fontWeightPreset="semibold">
+                            Tentar novamente
+                        </Text>
+                    </TouchableOpacityBox>
                 </Box>
             </ScreenBase>
         );

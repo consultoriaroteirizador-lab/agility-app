@@ -40,8 +40,19 @@ jest.mock('@/components/Modal/Modal', () => ({
 }));
 
 const mockRequestWithdrawal = jest.fn();
+const mockRefetchWallet = jest.fn();
+type MockWallet = { availableBalance: number; hasBankInfo: boolean; balance: number } | undefined;
+const mockUseGetWallet = jest.fn<
+    { wallet: MockWallet; isLoading: boolean; isError: boolean; refetch: typeof mockRefetchWallet },
+    []
+>(() => ({
+    wallet: { availableBalance: 10000, hasBankInfo: true, balance: 10000 },
+    isLoading: false,
+    isError: false,
+    refetch: mockRefetchWallet,
+}));
 jest.mock('@/domain/agility/wallet', () => ({
-    useGetWallet: () => ({ wallet: { availableBalance: 10000, hasBankInfo: true, balance: 10000 }, isLoading: false }),
+    useGetWallet: () => mockUseGetWallet(),
     useRequestWithdrawal: () => ({ requestWithdrawal: mockRequestWithdrawal, isPending: false }),
 }));
 
@@ -74,9 +85,34 @@ function digitarEPedir(tree: TestRenderer.ReactTestRenderer, cents: number) {
 beforeEach(() => {
     jest.clearAllMocks();
     mockModalProps = null;
+    mockUseGetWallet.mockReturnValue({
+        wallet: { availableBalance: 10000, hasBankInfo: true, balance: 10000 },
+        isLoading: false,
+        isError: false,
+        refetch: mockRefetchWallet,
+    });
 });
 
 describe('Saque', () => {
+    // F5 (correção do review): GET /wallet falhou e não há nada em cache. Antes disso a
+    // tela caía no `wallet?.hasBankInfo` falso e mostrava R$ 0,00 + "Configure seus dados
+    // bancários" — parecia uma carteira vazia/sem PIX, quando na verdade nada carregou.
+    it('erro ao carregar a carteira (sem nada em cache): mostra erro com "Tentar novamente", não R$ 0,00', () => {
+        mockUseGetWallet.mockReturnValue({ wallet: undefined, isLoading: false, isError: true, refetch: mockRefetchWallet });
+        const tree = render();
+
+        expect(tree.root.findAllByProps({ testID: 'saque-carteira-erro' }).length).toBeGreaterThan(0);
+        expect(tree.root.findAllByProps({ children: 'Configure seus dados bancários (toque para abrir)' })).toHaveLength(0);
+        expect(tree.root.findAllByProps({ title: 'Solicitar Saque' })).toHaveLength(0);
+
+        act(() => {
+            tree.root.findAllByProps({ testID: 'saque-carteira-erro' })[0].props.onPress();
+        });
+        expect(mockRefetchWallet).toHaveBeenCalledTimes(1);
+
+        act(() => tree.unmount());
+    });
+
     it('back recusa: toast com a frase do back, sem sucesso, sem sair da tela e com o botão destravado', async () => {
         mockRequestWithdrawal.mockRejectedValue({ success: false, error: { message: 'Saldo disponível insuficiente' } });
         const tree = render();

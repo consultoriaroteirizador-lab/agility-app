@@ -102,7 +102,7 @@ export default function MeusSaquesScreen() {
                     <Text textAlign="center" color="colorTextSecondary">
                         Não foi possível carregar seus saques.
                     </Text>
-                    <TouchableOpacityBox mt="t16" onPress={refetch}>
+                    <TouchableOpacityBox mt="t16" onPress={refetch} accessibilityRole="button">
                         <Text color="colorTextPrimary">Tentar novamente</Text>
                     </TouchableOpacityBox>
                 </Box>
@@ -133,7 +133,7 @@ export default function MeusSaquesScreen() {
                             <ActivityIndicator />
                         </Box>
                     ) : isFetchNextPageError ? (
-                        <TouchableOpacityBox py="y16" alignItems="center" onPress={loadMore}>
+                        <TouchableOpacityBox py="y16" alignItems="center" onPress={loadMore} accessibilityRole="button">
                             <Text fontSize={measure.m13} color="colorTextError">
                                 Falha ao carregar mais. Toque para tentar de novo.
                             </Text>

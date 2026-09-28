@@ -78,7 +78,7 @@ export default function CarteiraScreen() {
                     <Text mt="t16" textAlign="center" color="colorTextSecondary">
                         Não foi possível carregar sua carteira.
                     </Text>
-                    <TouchableOpacityBox mt="t16" onPress={refresh}>
+                    <TouchableOpacityBox mt="t16" onPress={refresh} accessibilityRole="button">
                         <Text color="colorTextPrimary">Tentar novamente</Text>
                     </TouchableOpacityBox>
                 </Box>
@@ -123,6 +123,7 @@ export default function CarteiraScreen() {
                             borderRadius="s12"
                             backgroundColor="gray50"
                             onPress={() => void refetchAdvances()}
+                            accessibilityRole="button"
                         >
                             <Text fontSize={measure.m13} color="colorTextError">
                                 Não foi possível carregar o que você deve devolver. Toque para tentar de novo.
