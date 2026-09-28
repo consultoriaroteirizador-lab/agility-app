@@ -84,7 +84,20 @@ function Manual({ capture }: { capture: (h: Hook) => void }) {
     return null;
 }
 
+function ioOptions() {
+    return socketIo.io.mock.calls[0][1] as {
+        auth: (cb: (data: Record<string, unknown>) => void) => void;
+        reconnectionAttempts: number;
+    };
+}
+
+afterEach(() => {
+    jest.clearAllTimers();
+    jest.useRealTimers();
+});
+
 beforeEach(() => {
+    jest.useFakeTimers();
     __resetTrackingSocketForTests();
     socketIo.__sockets.length = 0;
     mockAccessToken = 't1';
@@ -189,7 +202,7 @@ describe('useTrackingWebSocket — reconexão sem socket duplicado (A6)', () => 
         expect(socketIo.__sockets[0].disconnect).toHaveBeenCalledTimes(1);
     });
 
-    it('troca de token recria o socket, e quem segurava o socket VELHO não derruba o novo', () => {
+    it('troca de token NÃO recria o socket: o próximo handshake já lê o token novo', () => {
         let a!: Hook;
         let b!: Hook;
         let rA!: TestRenderer.ReactTestRenderer;
@@ -197,22 +210,74 @@ describe('useTrackingWebSocket — reconexão sem socket duplicado (A6)', () => 
         act(() => { rA = TestRenderer.create(<Manual capture={(h) => { a = h; }} />); });
         act(() => { rB = TestRenderer.create(<Manual capture={(h) => { b = h; }} />); });
         act(() => { a.connect(); b.connect(); });
-        expect(socketIo.io).toHaveBeenCalledTimes(1);
 
-        // Token renovado: A reconecta primeiro, com o token novo.
+        // Token renovado: A chama connect de novo (o efeito do consumidor depende do token).
         mockAccessToken = 't2';
         act(() => { rA.update(<Manual capture={(h) => { a = h; }} />); });
         act(() => { a.connect(); });
 
-        const [velho, novo] = socketIo.__sockets;
-        expect(socketIo.io).toHaveBeenCalledTimes(2);
-        expect(velho.disconnect).toHaveBeenCalledTimes(1);
+        const [socket] = socketIo.__sockets;
+        expect(socketIo.io).toHaveBeenCalledTimes(1);
+        expect(socket.disconnect).not.toHaveBeenCalled();
+        const cb = jest.fn();
+        ioOptions().auth(cb);
+        expect(cb).toHaveBeenCalledWith(expect.objectContaining({ token: 't2', tenantId: 'ten', userId: 'u1' }));
 
-        // B ainda segurava o socket velho: desmontar B não pode derrubar o novo.
+        // As duas referências continuam valendo: só a ÚLTIMA a sair derruba o socket.
         act(() => { rB.unmount(); });
-        expect(novo.disconnect).not.toHaveBeenCalled();
-
+        expect(socket.disconnect).not.toHaveBeenCalled();
         act(() => { rA.unmount(); });
-        expect(novo.disconnect).toHaveBeenCalledTimes(1);
+        expect(socket.disconnect).toHaveBeenCalledTimes(1);
+    });
+});
+
+describe('useTrackingWebSocket — token vencido e reconexão', () => {
+    it('auth é função e não desiste de reconectar', () => {
+        let dono!: TestRenderer.ReactTestRenderer;
+        act(() => { dono = TestRenderer.create(<Dono />); });
+        expect(typeof ioOptions().auth).toBe('function');
+        expect(ioOptions().reconnectionAttempts).toBe(Infinity);
+        act(() => { dono.unmount(); });
+    });
+
+    it('`io server disconnect`: avisa o consumidor (renovar o token por REST) e reconecta com backoff', () => {
+        const onServerDisconnect = jest.fn();
+        function ComRenovacao() {
+            const { connect } = useTrackingWebSocket({ onServerDisconnect });
+            useEffect(() => { connect(); }, [connect]);
+            return null;
+        }
+        let r!: TestRenderer.ReactTestRenderer;
+        act(() => { r = TestRenderer.create(<ComRenovacao />); });
+
+        const socket = socketIo.__sockets[0];
+        act(() => { socket.__fire('disconnect', 'io server disconnect'); });
+        expect(onServerDisconnect).toHaveBeenCalledTimes(1);
+        expect(socket.connect).not.toHaveBeenCalled();
+        act(() => { jest.advanceTimersByTime(2000); });
+        expect(socket.connect).toHaveBeenCalledTimes(1);
+        act(() => { r.unmount(); });
+    });
+
+    it('reconexão re-inscreve em :routings e avisa onReconnect; a primeira conexão não', () => {
+        const onReconnect = jest.fn();
+        function ComReconexao() {
+            const { connect } = useTrackingWebSocket({ onReconnect });
+            useEffect(() => { connect(); }, [connect]);
+            return null;
+        }
+        let r!: TestRenderer.ReactTestRenderer;
+        act(() => { r = TestRenderer.create(<ComReconexao />); });
+
+        const socket = socketIo.__sockets[0];
+        act(() => { socket.__fire('connected'); });
+        expect(onReconnect).not.toHaveBeenCalled();
+
+        act(() => { socket.__fire('disconnect', 'transport close'); });
+        act(() => { socket.__fire('connected'); });
+        expect(socket.emit).toHaveBeenCalledTimes(2);
+        expect(socket.emit).toHaveBeenLastCalledWith('subscribe_routings', { tenantId: 'ten' });
+        expect(onReconnect).toHaveBeenCalledTimes(1);
+        act(() => { r.unmount(); });
     });
 });

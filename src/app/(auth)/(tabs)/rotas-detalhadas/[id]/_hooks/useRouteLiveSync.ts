@@ -31,6 +31,10 @@ export function useRouteLiveSync(routeId: string | undefined) {
         onServiceUpdated: (data) => {
             if (!data?.routingId || data.routingId === routeId) invalidate()
         },
+        // Evento emitido com o socket fora não volta: recarrega ao reconectar. Na
+        // derrubada por token vencido, o refetch REST é o que renova o token.
+        onReconnect: invalidate,
+        onServerDisconnect: invalidate,
     })
 
     useEffect(() => {

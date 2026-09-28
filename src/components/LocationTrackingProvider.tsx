@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
 
+import { useQueryClient } from '@tanstack/react-query';
+
 import { useFindOneDriver } from '@/domain/agility/driver/useCase';
 import type { OfferPayload } from '@/domain/agility/offer/offerStore';
 import { RoutingStatus } from '@/domain/agility/routing/dto/types';
@@ -8,6 +10,7 @@ import { useFindMyRoutings } from '@/domain/agility/routing/useCase';
 import { useTrackingWebSocket } from '@/domain/agility/tracking';
 import type { DriverLocationUpdate } from '@/domain/agility/tracking';
 import { authAdapter } from '@/domain/Auth/authAdapter';
+import { KEY_DRIVER, KEY_ROUTINGS } from '@/domain/queryKeys';
 import { useAuthCredentialsService } from '@/services';
 import { initializeGeofenceService, cleanupGeofenceService } from '@/services/geofence';
 import { useLocationTracking, updateBackgroundGeolocationAuth } from '@/services/location';
@@ -70,6 +73,7 @@ export function LocationTrackingProvider({ children }: { children: React.ReactNo
   // entrega o payload; o OfferAlertProvider (montado acima, em
   // (auth)/_layout.tsx) decide exibir.
   const { pushOffer } = useOfferAlert();
+  const queryClient = useQueryClient();
 
   // WebSocket de telemetria (canal /monitoring). NÃO é o canal que envia
   // localizações — o SDK faz isso por HTTP direto. Aqui só recebemos updates
@@ -91,6 +95,17 @@ export function LocationTrackingProvider({ children }: { children: React.ReactNo
     },
     onConnect: () => {
       console.log('[LocationTrackingProvider] WebSocket conectado ao /monitoring');
+    },
+    // O que o gateway emitiu com o socket fora (`offer.available` em `user:<sub>`,
+    // `routing_updated` em `:routings`) não volta: rotas e ofertas
+    // (`[routings, 'broadcasting']`) recarregam ao reconectar.
+    onReconnect: () => {
+      void queryClient.invalidateQueries({ queryKey: [KEY_ROUTINGS] });
+    },
+    // Token vencido: o gateway derrubou. Um GET autenticado (o motorista, sempre
+    // montado aqui) toma 401 e o interceptor renova o token antes da retentativa.
+    onServerDisconnect: () => {
+      void queryClient.invalidateQueries({ queryKey: [KEY_DRIVER] });
     },
     onDisconnect: () => {
       console.log('[LocationTrackingProvider] WebSocket desconectado');
@@ -221,16 +236,20 @@ export function LocationTrackingProvider({ children }: { children: React.ReactNo
     return unsubscribe;
   }, [saveCredentials]);
 
-  // [5] WebSocket de telemetria — vida independente do SDK. Reconecta
-  // livremente em refresh de token sem afetar o tracking de localização.
+  // [5] WebSocket de telemetria — vida independente do SDK. Refresh de token
+  // NÃO recicla o socket: o `auth` dele é função e lê o token atual a cada
+  // handshake (o gateway só valida na conexão). Por isso a dep é "tem token",
+  // e não o token.
+  const hasAccessToken = !!authCredentials?.accessToken;
+  const wsTenantId = authCredentials?.tenantId;
   useEffect(() => {
     if (!driverId) return;
-    if (!authCredentials?.accessToken || !authCredentials?.tenantId) return;
+    if (!hasAccessToken || !wsTenantId) return;
     connectWebSocket();
     return () => {
       disconnectWebSocket();
     };
-  }, [driverId, authCredentials?.accessToken, authCredentials?.tenantId, connectWebSocket, disconnectWebSocket]);
+  }, [driverId, hasAccessToken, wsTenantId, connectWebSocket, disconnectWebSocket]);
 
   // [6] AppState — reconecta WS ao voltar do background. Tracking nativo
   // continua sozinho, não precisa de ação do JS aqui.
