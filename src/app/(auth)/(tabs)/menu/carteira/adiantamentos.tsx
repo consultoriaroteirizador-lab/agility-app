@@ -14,7 +14,7 @@ import { colors } from '@/theme/colors';
 import { formatCurrency } from '@/utils/formatCurrency';
 import { formatDate } from '@/utils/formatDate';
 
-import { advanceDueText, advanceTitle } from './_utils/advanceDisplay';
+import { advanceDueText, advanceOverdueText, advanceTitle } from './_utils/advanceDisplay';
 
 const STATUS_CONFIG: Record<AdvanceStatus, StatusColorConfig> = {
     [AdvanceStatus.PENDING]: { label: 'Pendente', textColor: 'yellow100', bgColor: 'yellow20' },
@@ -69,7 +69,7 @@ function AdvanceItem({ item }: { item: AdvanceResponse }) {
                 <Box flexDirection="row" alignItems="center" mt="t12">
                     {item.isOverdue && <Ionicons name="alert-circle" size={16} color={colors.redError} />}
                     <Text testID={`vencimento-${item.id}`} ml={item.isOverdue ? 'l6' : 'l0'} fontSize={measure.m12} color={item.isOverdue ? 'colorTextError' : 'colorTextSecondary'}>
-                        {item.isOverdue ? `Vencido — ${due.toLowerCase()}` : due}
+                        {item.isOverdue ? advanceOverdueText(item) : due}
                     </Text>
                 </Box>
             )}
@@ -83,7 +83,7 @@ export default function AdiantamentosScreen() {
 
     const resumo = !summary ? (
         isSummaryError ? (
-            <TouchableOpacityBox testID="resumo-erro" mt="t16" p="m16" borderRadius="s12" backgroundColor="gray50" onPress={() => void refetchSummary()}>
+            <TouchableOpacityBox testID="resumo-erro" mt="t16" p="m16" borderRadius="s12" backgroundColor="gray50" onPress={() => void refetchSummary()} accessibilityRole="button">
                 <Text fontSize={measure.m13} color="colorTextError">
                     Não foi possível carregar o total a devolver. Toque para tentar de novo.
                 </Text>
@@ -143,7 +143,7 @@ export default function AdiantamentosScreen() {
                             <Text color="colorTextSecondary" textAlign="center">
                                 Não foi possível carregar os adiantamentos.
                             </Text>
-                            <TouchableOpacityBox mt="t16" onPress={refetch}>
+                            <TouchableOpacityBox mt="t16" onPress={refetch} accessibilityRole="button">
                                 <Text color="colorTextPrimary">Tentar novamente</Text>
                             </TouchableOpacityBox>
                         </Box>
@@ -162,7 +162,7 @@ export default function AdiantamentosScreen() {
                             <ActivityIndicator size="small" />
                         </Box>
                     ) : isFetchNextPageError ? (
-                        <TouchableOpacityBox py="y16" alignItems="center" onPress={loadMore}>
+                        <TouchableOpacityBox py="y16" alignItems="center" onPress={loadMore} accessibilityRole="button">
                             <Text fontSize={measure.m13} color="colorTextError">
                                 Falha ao carregar mais. Toque para tentar de novo.
                             </Text>
