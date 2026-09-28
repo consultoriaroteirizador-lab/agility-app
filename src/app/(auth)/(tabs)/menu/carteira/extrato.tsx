@@ -1,109 +1,22 @@
 // src/app/(auth)/(tabs)/menu/carteira/extrato.tsx
 
-import React, { useCallback, useState, useMemo } from 'react';
-import { FlatList, Linking, RefreshControl } from 'react-native';
+import React, { useCallback, useMemo, useState } from 'react';
+import { FlatList, Linking, RefreshControl, ScrollView } from 'react-native';
 
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
 
 import { ActivityIndicator, Box, ButtonBack, ScreenBase, Text, TouchableOpacityBox } from '@/components';
 import { isRemoteUrl } from '@/domain/agility/chat/utils/messageUtils';
-import { useGetTransactions } from '@/domain/agility/wallet';
-import { TransactionResponse } from '@/domain/agility/wallet/dto';
-import { TransactionType } from '@/domain/agility/wallet/dto/types';
+import { useInfiniteTransactions } from '@/domain/agility/wallet';
+import type { TransactionResponse } from '@/domain/agility/wallet/dto';
 import { useToastService } from '@/services/Toast/useToast';
 import { measure } from '@/theme';
-import { formatCurrency } from '@/utils/formatCurrency';
 import { formatDate } from '@/utils/formatDate';
 
-// Tipos de filtro
-type FilterType = 'all' | 'earnings' | 'advances' | 'withdrawals';
-
-// Configuração completa de cada tipo de transação
-interface TransactionConfig {
-    label: string;
-    icon: keyof typeof Ionicons.glyphMap;
-    iconColor: string;
-    bgColor: string;
-    category: 'earnings' | 'advances' | 'withdrawals' | 'other';
-}
-
-const TRANSACTION_CONFIG: Record<TransactionType, TransactionConfig> = {
-    [TransactionType.CREDIT]: {
-        label: 'Crédito',
-        icon: 'add-circle',
-        iconColor: '#4CAF50',
-        bgColor: '#E8F5E9',
-        category: 'earnings',
-    },
-    [TransactionType.UBERIZATION]: {
-        label: 'Uberização',
-        icon: 'car',
-        iconColor: '#9C27B0',
-        bgColor: '#F3E5F5',
-        category: 'earnings',
-    },
-    [TransactionType.DEBIT]: {
-        label: 'Débito',
-        icon: 'remove-circle',
-        iconColor: '#F44336',
-        bgColor: '#FFEBEE',
-        category: 'withdrawals',
-    },
-    [TransactionType.REFUND]: {
-        label: 'Estorno',
-        icon: 'refresh',
-        iconColor: '#2196F3',
-        bgColor: '#E3F2FD',
-        category: 'earnings',
-    },
-    [TransactionType.ADJUSTMENT]: {
-        label: 'Ajuste',
-        icon: 'create',
-        iconColor: '#607D8B',
-        bgColor: '#ECEFF1',
-        category: 'other',
-    },
-    [TransactionType.ADVANCE]: {
-        label: 'Adiantamento',
-        icon: 'arrow-forward',
-        iconColor: '#FF9800',
-        bgColor: '#FFF3E0',
-        category: 'advances',
-    },
-    [TransactionType.ADVANCE_RETURN]: {
-        label: 'Devolução',
-        icon: 'arrow-back',
-        iconColor: '#FF5722',
-        bgColor: '#FBE9E7',
-        category: 'advances',
-    },
-    [TransactionType.COMMISSION]: {
-        label: 'Comissão',
-        icon: 'cash',
-        iconColor: '#4CAF50',
-        bgColor: '#E8F5E9',
-        category: 'earnings',
-    },
-    [TransactionType.BONUS]: {
-        label: 'Bônus',
-        icon: 'gift',
-        iconColor: '#E91E63',
-        bgColor: '#FCE4EC',
-        category: 'earnings',
-    },
-};
-
-const FILTER_OPTIONS: { value: FilterType; label: string }[] = [
-    { value: 'all', label: 'Todos' },
-    { value: 'earnings', label: 'Ganhos' },
-    { value: 'advances', label: 'Adiantamentos' },
-    { value: 'withdrawals', label: 'Saques' },
-];
+import { describeTransaction, EXTRATO_FILTERS, ExtratoFilter, filterTransactions } from './_utils/transactionDisplay';
 
 function TransactionItem({ item }: { item: TransactionResponse }) {
-    const config = TRANSACTION_CONFIG[item.type] || TRANSACTION_CONFIG[TransactionType.CREDIT];
-    const isCredit = item.isCredit;
+    const display = describeTransaction(item);
     const { showToast } = useToastService();
 
     // So URL http(s) abre. O backend assina a URL na listagem; se vier a CHAVE
@@ -122,43 +35,43 @@ function TransactionItem({ item }: { item: TransactionResponse }) {
 
     return (
         <Box py="y12" borderRadius="s12" mb="b8">
-            <Box
-                flexDirection="row"
-                alignItems="center"
-            >
+            <Box flexDirection="row" alignItems="center">
                 <Box
                     width={measure.x40}
                     height={measure.y40}
                     borderRadius="s20"
-                    backgroundColor="background"
                     alignItems="center"
                     justifyContent="center"
-                    style={{ backgroundColor: config.bgColor }}
+                    style={{ backgroundColor: display.bgColor }}
                 >
-                    <Ionicons
-                        name={config.icon}
-                        size={measure.m20}
-                        color={config.iconColor}
-                    />
+                    <Ionicons name={display.icon} size={measure.m20} color={display.iconColor} />
                 </Box>
 
                 <Box flex={1} ml="l12">
-                    <Text fontSize={measure.m14} fontWeightPreset='semibold' numberOfLines={1}>
+                    <Text fontSize={measure.m14} fontWeightPreset="semibold" numberOfLines={1}>
                         {item.description}
                     </Text>
                     <Text fontSize={measure.m12} color="colorTextSecondary" mt="t2">
-                        {config.label} • {formatDate(item.createdAt)}
+                        {`${display.label} • ${formatDate(item.createdAt)}`}
                     </Text>
+                    {display.movement && (
+                        <Text testID={`movimento-${item.id}`} fontSize={measure.m12} color="colorTextSecondary" mt="t2">
+                            {display.movement}
+                        </Text>
+                    )}
                 </Box>
 
                 <Box alignItems="flex-end">
-                    <Text
-                        fontSize={measure.m16}
-                        fontWeightPreset='bold'
-                        color={isCredit ? 'colorTextSuccess' : 'colorTextError'}
-                    >
-                        {isCredit ? '+' : '-'}{formatCurrency(item.amount)}
+                    <Text testID={`valor-${item.id}`} fontSize={measure.m16} fontWeightPreset="bold" color={display.amountColor}>
+                        {display.amountText}
                     </Text>
+                    {display.badge && (
+                        <Box mt="t4" px="x8" py="y4" borderRadius="s4" bg={display.badge.bgColor}>
+                            <Text testID={`status-${item.id}`} fontSize={measure.m12} fontWeightPreset="semibold" color={display.badge.textColor}>
+                                {display.badge.label}
+                            </Text>
+                        </Box>
+                    )}
                 </Box>
             </Box>
 
@@ -191,44 +104,25 @@ function TransactionItem({ item }: { item: TransactionResponse }) {
 }
 
 export default function ExtratoScreen() {
-    const router = useRouter();
-    const [page, setPage] = useState(1);
-    const [filter, setFilter] = useState<FilterType>('all');
-    const { transactions, meta, isLoading, isError, refetch, isRefetching } = useGetTransactions({
-        page,
-        limit: 20,
-    });
+    const [filter, setFilter] = useState<ExtratoFilter>('all');
+    const {
+        items: transactions,
+        isLoading,
+        isError,
+        isFetchNextPageError,
+        hasNextPage,
+        isFetchingNextPage,
+        loadMore,
+        refetch,
+        isRefreshing,
+    } = useInfiniteTransactions();
 
-    // Filtrar transações por categoria
-    const filteredTransactions = useMemo(() => {
-        if (filter === 'all') return transactions;
+    const visible = useMemo(() => filterTransactions(transactions, filter), [transactions, filter]);
+    const title = <Text preset="textTitleScreen">Extrato</Text>;
 
-        return transactions.filter(transaction => {
-            const config = TRANSACTION_CONFIG[transaction.type];
-            if (!config) return false;
-
-            switch (filter) {
-                case 'earnings':
-                    return config.category === 'earnings';
-                case 'advances':
-                    return config.category === 'advances';
-                case 'withdrawals':
-                    return config.category === 'withdrawals';
-                default:
-                    return true;
-            }
-        });
-    }, [transactions, filter]);
-
-    const loadMore = () => {
-        if (meta && page < meta.totalPages) {
-            setPage(page + 1);
-        }
-    };
-
-    if (isLoading && page === 1) {
+    if (isLoading) {
         return (
-            <ScreenBase buttonLeft={<ButtonBack />} title={<Text preset='textTitleScreen'>Extrato</Text>}>
+            <ScreenBase buttonLeft={<ButtonBack />} title={title}>
                 <Box flex={1} justifyContent="center" alignItems="center">
                     <ActivityIndicator size="large" />
                 </Box>
@@ -236,72 +130,98 @@ export default function ExtratoScreen() {
         );
     }
 
-    return (
-        <ScreenBase buttonLeft={<ButtonBack />} title={<Text preset='textTitleScreen'>Extrato</Text>}>
-            {/* Filtros */}
-            <Box px="m16" py="y12" borderBottomWidth={1} borderBottomColor="borderColor">
-                <Box flexDirection="row" gap="x8">
-                    {FILTER_OPTIONS.map(option => (
-                        <TouchableOpacityBox
-                            key={option.value}
-                            px="m12"
-                            py="y8"
-                            borderRadius="s20"
-                            backgroundColor={filter === option.value ? 'primary100' : 'gray50'}
-                            onPress={() => setFilter(option.value)}
-                        >
-                            <Text
-                                fontSize={measure.m13}
-                                fontWeightPreset={filter === option.value ? 'semibold' : 'regular'}
-                                color={filter === option.value ? 'white' : 'colorTextSecondary'}
-                            >
-                                {option.label}
-                            </Text>
-                        </TouchableOpacityBox>
-                    ))}
+    // Erro sem nada carregado NÃO é "nenhuma movimentação" (auditoria, Bug 9).
+    if (isError && transactions.length === 0) {
+        return (
+            <ScreenBase buttonLeft={<ButtonBack />} title={title}>
+                <Box testID="extrato-erro" flex={1} justifyContent="center" alignItems="center" px="x24">
+                    <Ionicons name="cloud-offline-outline" size={48} color="#999" />
+                    <Text mt="t12" color="colorTextSecondary" textAlign="center">
+                        Não foi possível carregar o extrato.
+                    </Text>
+                    <TouchableOpacityBox mt="t16" onPress={refetch} accessibilityRole="button">
+                        <Text color="colorTextPrimary">Tentar novamente</Text>
+                    </TouchableOpacityBox>
                 </Box>
+            </ScreenBase>
+        );
+    }
+
+    const filterLabel = EXTRATO_FILTERS.find((f) => f.value === filter)?.label.toLowerCase();
+
+    return (
+        <ScreenBase buttonLeft={<ButtonBack />} title={title}>
+            <Box py="y12" borderBottomWidth={1} borderBottomColor="borderColor">
+                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                    <Box flexDirection="row" gap="x8">
+                        {EXTRATO_FILTERS.map((option) => (
+                            <TouchableOpacityBox
+                                key={option.value}
+                                testID={`filtro-${option.value}`}
+                                px="m12"
+                                py="y8"
+                                borderRadius="s20"
+                                backgroundColor={filter === option.value ? 'primary100' : 'gray50'}
+                                onPress={() => setFilter(option.value)}
+                            >
+                                <Text
+                                    fontSize={measure.m13}
+                                    fontWeightPreset={filter === option.value ? 'semibold' : 'regular'}
+                                    color={filter === option.value ? 'white' : 'colorTextSecondary'}
+                                >
+                                    {option.label}
+                                </Text>
+                            </TouchableOpacityBox>
+                        ))}
+                    </Box>
+                </ScrollView>
             </Box>
 
             <FlatList
-                data={filteredTransactions}
+                data={visible}
                 keyExtractor={(item) => item.id}
                 renderItem={({ item }) => <TransactionItem item={item} />}
                 contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 32 }}
-                refreshControl={
-                    <RefreshControl refreshing={isRefetching} onRefresh={refetch} />
-                }
-                onEndReached={loadMore}
+                refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={refetch} />}
+                // Com a próxima página em erro, rolar não dispara de novo: o rodapé oferece o retry.
+                onEndReached={isFetchNextPageError ? undefined : loadMore}
                 onEndReachedThreshold={0.5}
                 ListEmptyComponent={
                     <Box py="y32" alignItems="center" px="x16">
                         <Ionicons name="document-text-outline" size={48} color="#999" />
-                        <Text mt="t12" color="colorTextSecondary" textAlign="center">
+                        <Text testID="extrato-vazio" mt="t12" color="colorTextSecondary" textAlign="center">
                             {filter === 'all'
-                                ? 'Nenhuma transação encontrada ainda.'
-                                : `Nenhuma transação de ${FILTER_OPTIONS.find(f => f.value === filter)?.label.toLowerCase()}.`
-                            }
+                                ? 'Nenhuma movimentação ainda.'
+                                : `Nenhuma movimentação de ${filterLabel} entre as carregadas.`}
                         </Text>
-                        {filter === 'all' && (
+                        {filter !== 'all' && hasNextPage && (
                             <TouchableOpacityBox
+                                testID="extrato-carregar-mais"
                                 mt="t16"
                                 px="x16"
                                 py="y8"
                                 borderRadius="s8"
                                 backgroundColor="primary100"
-                                onPress={() => router.push('/menu/ganhos')}
+                                onPress={loadMore}
                             >
-                                <Text fontSize={measure.m14} fontWeightPreset='semibold' color="white">
-                                    Ver meus ganhos
+                                <Text fontSize={measure.m14} fontWeightPreset="semibold" color="white">
+                                    Carregar mais antigas
                                 </Text>
                             </TouchableOpacityBox>
                         )}
                     </Box>
                 }
                 ListFooterComponent={
-                    isLoading && page > 1 ? (
+                    isFetchingNextPage ? (
                         <Box py="y16" alignItems="center">
                             <ActivityIndicator />
                         </Box>
+                    ) : isFetchNextPageError ? (
+                        <TouchableOpacityBox testID="extrato-erro-mais" py="y16" alignItems="center" onPress={loadMore}>
+                            <Text fontSize={measure.m13} color="colorTextError">
+                                Falha ao carregar mais. Toque para tentar de novo.
+                            </Text>
+                        </TouchableOpacityBox>
                     ) : null
                 }
             />
