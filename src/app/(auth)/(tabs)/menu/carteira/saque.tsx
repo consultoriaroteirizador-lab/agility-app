@@ -1,32 +1,31 @@
 // src/app/(auth)/(tabs)/menu/carteira/saque.tsx
 
-import React, { useRef, useState } from 'react';
+import React, { useState } from 'react';
 import { ScrollView } from 'react-native';
 
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 
-import { Box, Text, ScreenBase, TouchableOpacityBox, ActivityIndicator, BRLInput, Button } from '@/components';
+import { mensagemDaApi } from '@/api/apiErrorMessage';
+import { ActivityIndicator, Box, BRLInput, Button, ScreenBase, Text, TouchableOpacityBox } from '@/components';
 import { ButtonBack } from '@/components/Button/ButtonBack';
 import Modal from '@/components/Modal/Modal';
 import { useGetWallet, useRequestWithdrawal } from '@/domain/agility/wallet';
+import { useSubmitLock } from '@/hooks/useSubmitLock';
 import { useToastService } from '@/services/Toast/useToast';
 import { measure } from '@/theme';
 import { formatCurrency } from '@/utils/formatCurrency';
 
-const MIN_WITHDRAWAL_CENTS = 100; // R$ 1,00
+const MIN_WITHDRAWAL_CENTS = 100; // R$ 1,00, o mesmo @Min(100) do CreateWithdrawalDto
 
 export default function SaqueScreen() {
     const router = useRouter();
     const { showToast } = useToastService();
     const [amountCents, setAmountCents] = useState<number | null>(null);
     const [showConfirmModal, setShowConfirmModal] = useState(false);
-    const { wallet, isLoading: isLoadingWallet, refetch } = useGetWallet();
-    const { requestWithdrawal, isPending } = useRequestWithdrawal();
-    // Guard síncrono contra duplo-tap no botão "Confirmar" do modal.
-    // O `isPending` da mutation só vira true depois que a request inicia,
-    // deixando uma janela onde uma segunda chamada passa sem bloqueio.
-    const isSubmittingRef = useRef(false);
+    const { wallet, isLoading: isLoadingWallet } = useGetWallet();
+    const { requestWithdrawal } = useRequestWithdrawal();
+    const { run, isSubmitting, isLocked } = useSubmitLock();
 
     const availableBalance = wallet?.availableBalance ?? 0;
     const value = amountCents ?? 0;
@@ -36,6 +35,8 @@ export default function SaqueScreen() {
     }
 
     function handleRequestSaque() {
+        // Com um pedido em voo, reabrir o modal permitiria um segundo POST.
+        if (isLocked()) return;
         if (value < MIN_WITHDRAWAL_CENTS) {
             showToast({ message: 'O valor mínimo para saque é R$ 1,00', type: 'error' });
             return;
@@ -56,24 +57,23 @@ export default function SaqueScreen() {
     }
 
     async function handleConfirmSaque() {
-        if (isSubmittingRef.current) return;
-        isSubmittingRef.current = true;
         setShowConfirmModal(false);
-        try {
-            await requestWithdrawal({ amount: value });
-            showToast({ message: 'Solicitação de saque realizada com sucesso!', type: 'success' });
-            setAmountCents(null);
-            refetch();
-        } catch (error) {
-            showToast({ message: 'Não foi possível processar sua solicitação.', type: 'error' });
-        } finally {
-            isSubmittingRef.current = false;
-        }
+        await run(async () => {
+            try {
+                await requestWithdrawal({ amount: value });
+                showToast({ message: 'Saque solicitado. Acompanhe em Meus saques.', type: 'success' });
+                // `replace`: voltar não reabre o formulário preenchido (R10).
+                router.replace('/menu/carteira/saques');
+            } catch (error) {
+                // O valor digitado fica: o motorista corrige ou tenta de novo.
+                showToast({ message: mensagemDaApi(error, 'Não foi possível solicitar o saque. Tente novamente.'), type: 'error' });
+            }
+        });
     }
 
     if (isLoadingWallet) {
         return (
-            <ScreenBase buttonLeft={<ButtonBack />} title={<Text preset='textTitleScreen'>Saque</Text>}>
+            <ScreenBase buttonLeft={<ButtonBack />} title={<Text preset="textTitleScreen">Saque</Text>}>
                 <Box flex={1} justifyContent="center" alignItems="center">
                     <ActivityIndicator size="large" />
                 </Box>
@@ -81,7 +81,7 @@ export default function SaqueScreen() {
         );
     }
 
-    const buttonDisabled = value < MIN_WITHDRAWAL_CENTS || value > availableBalance || !wallet?.hasBankInfo;
+    const invalid = value < MIN_WITHDRAWAL_CENTS || value > availableBalance || !wallet?.hasBankInfo;
     const disabledReason = !wallet?.hasBankInfo
         ? 'Configure seus dados bancários para sacar'
         : value < MIN_WITHDRAWAL_CENTS
@@ -91,90 +91,64 @@ export default function SaqueScreen() {
                 : null;
 
     return (
-        <ScreenBase buttonLeft={<ButtonBack />} title={<Text preset='textTitleScreen'>Saque</Text>}>
+        <ScreenBase buttonLeft={<ButtonBack />} title={<Text preset="textTitleScreen">Saque</Text>}>
             <ScrollView>
                 <Box pt="t16">
-                    {/* Available Balance */}
                     <Box mt="t24" p="m20" borderRadius="s16" alignItems="center">
                         <Text fontSize={measure.m14} color="colorTextSecondary">
-                            Saldo disponível
+                            Disponível para saque
                         </Text>
                         <Text fontSize={28} fontWeight="bold" mt="t8" color="colorTextSuccess">
                             {formatCurrency(availableBalance)}
                         </Text>
                     </Box>
 
-                    {/* Amount Input */}
                     <Box mt="t24">
-                        <Text fontSize={measure.m14} fontWeightPreset='semibold' mb="b8">
+                        <Text fontSize={measure.m14} fontWeightPreset="semibold" mb="b8">
                             Valor do saque
                         </Text>
-                        <BRLInput
-                            valueCents={amountCents}
-                            onChangeCents={setAmountCents}
-                            maxCents={availableBalance}
-                            placeholder="R$ 0,00"
-                        />
+                        <BRLInput valueCents={amountCents} onChangeCents={setAmountCents} maxCents={availableBalance} placeholder="R$ 0,00" />
 
                         <TouchableOpacityBox
                             mt="t8"
                             onPress={() => setAmountCents(availableBalance)}
-                            disabled={availableBalance < MIN_WITHDRAWAL_CENTS}
+                            disabled={availableBalance < MIN_WITHDRAWAL_CENTS || isSubmitting}
                         >
                             <Text fontSize={measure.m12} color="colorTextPrimary">
-                                Sacar tudo ({formatCurrency(availableBalance)})
+                                {`Sacar tudo (${formatCurrency(availableBalance)})`}
                             </Text>
                         </TouchableOpacityBox>
                     </Box>
 
-                    {/* Preview */}
                     {value > 0 && (
                         <Box mt="t24" p="m16" borderRadius="s12">
                             <Box flexDirection="row" justifyContent="space-between">
                                 <Text color="colorTextSecondary">Valor solicitado</Text>
-                                <Text fontWeightPreset='semibold'>{formatCurrency(value)}</Text>
-                            </Box>
-                            <Box flexDirection="row" justifyContent="space-between" mt="t8">
-                                <Text color="colorTextSecondary">Taxa</Text>
-                                <Text fontWeightPreset='semibold'>{formatCurrency(0)}</Text>
+                                <Text fontWeightPreset="semibold">{formatCurrency(value)}</Text>
                             </Box>
                             <Box flexDirection="row" justifyContent="space-between" mt="t12" pt="t12" borderTopWidth={1}>
-                                <Text fontWeightPreset='bold'>Você recebe</Text>
-                                <Text fontWeightPreset='bold' color="colorTextSuccess">
+                                <Text fontWeightPreset="bold">Você recebe</Text>
+                                <Text fontWeightPreset="bold" color="colorTextSuccess">
                                     {formatCurrency(value)}
                                 </Text>
                             </Box>
                         </Box>
                     )}
 
-                    {/* Bank Info Status — clickable */}
-                    <TouchableOpacityBox
-                        mt="t24"
-                        onPress={goToBankInfo}
-                        flexDirection="row"
-                        alignItems="center"
-                    >
+                    <TouchableOpacityBox mt="t24" onPress={goToBankInfo} flexDirection="row" alignItems="center">
                         <Ionicons
                             name={wallet?.hasBankInfo ? 'checkmark-circle' : 'alert-circle'}
                             size={measure.m20}
                             color={wallet?.hasBankInfo ? '#4CAF50' : '#FF9800'}
                         />
                         <Text ml="l8" color="colorTextSecondary" flex={1}>
-                            {wallet?.hasBankInfo
-                                ? 'Dados bancários configurados'
-                                : 'Configure seus dados bancários (toque para abrir)'}
+                            {wallet?.hasBankInfo ? 'Dados bancários configurados' : 'Configure seus dados bancários (toque para abrir)'}
                         </Text>
                         <Ionicons name="chevron-forward" size={measure.m16} color="#9CA3AF" />
                     </TouchableOpacityBox>
 
-                    {/* Submit Button */}
                     <Box mt="t32" mb="b8">
-                        <Button
-                            title="Solicitar Saque"
-                            onPress={handleRequestSaque}
-                            isLoading={isPending}
-                            disabled={buttonDisabled}
-                        />
+                        <Button title="Solicitar Saque" onPress={handleRequestSaque} isLoading={isSubmitting} disabled={invalid || isSubmitting} />
                     </Box>
 
                     {disabledReason && (
@@ -183,22 +157,20 @@ export default function SaqueScreen() {
                         </Text>
                     )}
 
-                    {/* Info */}
                     <Box p="m16" borderRadius="s12" mt="t16">
                         <Text fontSize={measure.m12} color="colorTextSecondary" textAlign="center">
-                            O saque será processado em até 24 horas úteis.
-                            O valor ficará bloqueado até a confirmação do pagamento.
+                            O saque é pago pela empresa, normalmente em até 24 horas úteis. Até lá, o valor sai do disponível e fica em
+                            &quot;Saque pendente&quot;.
                         </Text>
                     </Box>
                 </Box>
             </ScrollView>
 
-            {/* Confirmation Modal */}
             <Modal
                 preset="action"
-                isVisible={showConfirmModal}
+                isVisible={showConfirmModal && !isSubmitting}
                 title="Confirmar saque"
-                text={`Deseja solicitar o saque de ${formatCurrency(value)}?\n\nApós confirmar, o valor ficará bloqueado até o processamento.`}
+                text={`Deseja solicitar o saque de ${formatCurrency(value)}?\n\nO valor sai do disponível e fica em "Saque pendente" até o pagamento.`}
                 buttonActionTitle="Confirmar"
                 buttonCloseTitle="Cancelar"
                 onPress={handleConfirmSaque}

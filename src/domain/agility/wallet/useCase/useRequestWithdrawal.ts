@@ -7,30 +7,21 @@ import { KEY_WALLET } from '@/domain/queryKeys';
 import { CreateWithdrawalRequest } from '../dto';
 import { walletAPI } from '../walletAPI';
 
+/**
+ * `requestWithdrawal` é `mutateAsync`: REJEITA no erro do back. Quem chama mostra a
+ * mensagem com `mensagemDaApi` (antes era `mutate`, e o toast de sucesso aparecia com o
+ * saque recusado).
+ */
 export function useRequestWithdrawal() {
     const queryClient = useQueryClient();
 
-    const {
-        mutate: requestWithdrawal,
-        isPending,
-        isError,
-        error,
-        data,
-        reset,
-    } = useMutation({
+    const { mutateAsync, isPending } = useMutation({
         mutationFn: (data: CreateWithdrawalRequest) => walletAPI.requestWithdrawal(data),
         onSuccess: () => {
-            // Invalidate wallet queries to refresh balance
-            queryClient.invalidateQueries({ queryKey: [KEY_WALLET] });
+            // Saldo, extrato (WITHDRAWAL_HOLD) e Meus saques: tudo mora sob KEY_WALLET.
+            void queryClient.invalidateQueries({ queryKey: [KEY_WALLET] });
         },
     });
 
-    return {
-        requestWithdrawal,
-        isPending,
-        isError,
-        error,
-        data,
-        reset,
-    };
+    return { requestWithdrawal: mutateAsync, isPending };
 }
