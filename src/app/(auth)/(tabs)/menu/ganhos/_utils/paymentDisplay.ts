@@ -10,7 +10,7 @@ const STATUS: Record<string, StatusColorConfig> = {
 
 type P = Pick<
     PaymentResponse,
-    'customerName' | 'serviceTitle' | 'routingCode' | 'routingName' | 'expectedValue' | 'receivedValue' | 'status' | 'paymentDate' | 'createdAt'
+    'customerName' | 'serviceTitle' | 'routingCode' | 'routingName' | 'expectedValue' | 'receivedValue' | 'status' | 'createdAt'
 >;
 
 export interface PaymentDisplay {
@@ -30,7 +30,11 @@ export function describePayment(p: P): PaymentDisplay {
         route: p.routingName || p.routingCode || null,
         status: STATUS[p.status] ?? STATUS.PENDING,
         amountCents: p.receivedValue ?? p.expectedValue,
-        date: p.paymentDate ?? p.createdAt,
+        // SEMPRE `createdAt`, nunca `paymentDate`: `GET /finance/payments` filtra o período
+        // por `createdAt` (`finance.controller.ts`, back). Mostrar `paymentDate` podia listar
+        // uma data fora do período que o motorista escolheu — a mesma cobrança pareceria ter
+        // "vazado" do filtro de Hoje/Semana/Mês/Ano.
+        date: p.createdAt,
     };
 }
 

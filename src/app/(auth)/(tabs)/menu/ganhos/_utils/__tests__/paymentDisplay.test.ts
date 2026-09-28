@@ -31,9 +31,15 @@ describe('describePayment', () => {
         expect(describePayment(pagamento({ receivedValue: undefined, status: 'PENDING' as P['status'] })).amountCents).toBe(15000);
     });
 
-    it('data do pagamento, ou do registro quando não houver', () => {
-        expect(describePayment(pagamento()).date).toBe('2026-09-20T14:00:00.000Z');
-        expect(describePayment(pagamento({ paymentDate: undefined })).date).toBe('2026-09-20T14:05:00.000Z');
+    // F5 (correção do review): SEMPRE `createdAt`, nunca `paymentDate` — o back
+    // (`GET /finance/payments`) filtra o período pedido (Hoje/Semana/Mês/Ano) por
+    // `createdAt`. Mostrar `paymentDate` podia exibir uma data fora do período escolhido.
+    it('sempre a data de registro (createdAt) — nunca paymentDate, que não é o campo do filtro do back', () => {
+        expect(describePayment(pagamento()).date).toBe('2026-09-20T14:05:00.000Z');
+        // `paymentDate` nem faz mais parte do tipo lido por `describePayment` (ver `P` em
+        // `paymentDisplay.ts`) — um valor divergente nele não pode vazar para `date`.
+        const comPaymentDateDivergente = { ...pagamento(), paymentDate: '2026-01-01T00:00:00.000Z' };
+        expect(describePayment(comPaymentDateDivergente).date).toBe('2026-09-20T14:05:00.000Z');
     });
 
     it('status em português', () => {
