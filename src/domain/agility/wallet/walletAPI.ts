@@ -7,7 +7,6 @@ import {
     PaginatedTransactionsResponse,
     WithdrawalResponse,
     AdvanceResponse,
-    WalletSummaryResponse,
     UpdateBankInfoRequest,
     CreateWithdrawalRequest,
     ListTransactionsRequest,
@@ -32,11 +31,6 @@ export const walletAPI = {
     async getMyWallet(): Promise<WalletResponse> {
         const response = await apiAgility.get(BASE_URL);
         return unwrap<WalletResponse>(response.data);
-    },
-
-    async getSummary(): Promise<WalletSummaryResponse> {
-        const response = await apiAgility.get(`${BASE_URL}/summary`);
-        return unwrap<WalletSummaryResponse>(response.data);
     },
 
     async updateBankInfo(data: UpdateBankInfoRequest): Promise<WalletResponse> {

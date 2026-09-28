@@ -1,6 +1,6 @@
 // src/domain/agility/wallet/dto/request/wallet.request.ts
 
-import { PixKeyType, AdvanceReturnMethod } from '../types';
+import { PixKeyType } from '../types';
 
 /**
  * `PATCH /wallet/bank-info`. `undefined` = não mexe; `null` = APAGA (o `@IsOptional` do
@@ -26,21 +26,4 @@ export interface ListTransactionsRequest {
     status?: string;
     startDate?: string;
     endDate?: string;
-}
-
-export interface CreateAdvanceRequest {
-    driverId: string;
-    amount: number;
-    description: string;
-    routingId?: string;
-    serviceId?: string;
-    dueDate?: string;
-    notes?: string;
-}
-
-export interface ReturnAdvanceRequest {
-    amount: number;
-    method: AdvanceReturnMethod;
-    paymentMethod?: string;
-    notes?: string;
 }

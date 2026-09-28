@@ -27,12 +27,4 @@ export interface PaymentResponse {
   serviceTitle?: string | null;
 }
 
-export interface DriverSummaryItem {
-  id: string;
-  driver: string;
-  totalTrips: number;
-  totalReceived: number; // in cents
-  pendingAmount: number; // in cents
-}
-
 export type Payment = PaymentResponse;

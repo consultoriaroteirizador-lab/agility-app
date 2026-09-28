@@ -120,14 +120,3 @@ export interface AdvanceResponse {
     notes?: string;
     createdAt: string;
 }
-
-export interface WalletSummaryResponse {
-    balance: number;
-    blockedBalance: number;
-    availableBalance: number;
-    totalReceived: number;
-    totalWithdrawn: number;
-    pendingWithdrawals: number;
-    pendingAdvances: number;
-    transactionCount: number;
-}
