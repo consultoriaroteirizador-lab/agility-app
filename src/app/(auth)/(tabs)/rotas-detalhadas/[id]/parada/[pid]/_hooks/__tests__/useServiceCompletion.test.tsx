@@ -30,6 +30,7 @@ import TestRenderer, { act } from 'react-test-renderer';
 
 import type { CompletionRequirements, FlowCompletionRequirements } from '@/domain/agility/company/completionRequirements';
 import { resolveCompletionRequirements } from '@/domain/agility/company/completionRequirements';
+import { KEY_FINANCE, KEY_WALLET } from '@/domain/queryKeys';
 
 import { useParada } from '../../_context/ParadaContext';
 import { useServiceCompletion } from '../useServiceCompletion';
@@ -153,8 +154,7 @@ function makeParadaContext(overrides: ParadaOverrides = {}) {
 }
 
 /** Roda o hook fora de uma tela de verdade, capturando o resultado do render. */
-function runHook(serviceType: Parameters<typeof useServiceCompletion>[0]) {
-    const queryClient = new QueryClient();
+function runHook(serviceType: Parameters<typeof useServiceCompletion>[0], queryClient = new QueryClient()) {
     let captured: ReturnType<typeof useServiceCompletion> | undefined;
     function Probe() {
         captured = useServiceCompletion(serviceType);
@@ -536,6 +536,29 @@ describe('useServiceCompletion — regra unica de conclusao', () => {
             const [payloadArg] = mockCompleteServiceWithDetailsAsync.mock.calls[0];
             expect(payloadArg.details.pickupCompletion).not.toHaveProperty('receivedByRelationCode');
             expect(payloadArg.details.pickupCompletion).not.toHaveProperty('receivedByRelationLabel');
+        });
+    });
+
+    // F5 (correção do review): `moneyChangedKeys()` saiu de `routeStopChangedKeys` (que
+    // roda a cada reprojeção de ETA) e passou a ser chamada só nos pontos de
+    // conclusão/insucesso — `invalidateQueries` deste hook é um deles.
+    describe('invalidação de dinheiro na conclusão (Task F5)', () => {
+        it('invalidateQueries invalida carteira e financeiro, além das chaves da parada/rota', () => {
+            const queryClient = new QueryClient();
+            queryClient.setQueryData([KEY_WALLET, 'balance'], {});
+            queryClient.setQueryData([KEY_FINANCE, 'payments', 'infinite', { startDate: '2026-09-01' }], {});
+
+            mockedUseParada.mockReturnValue(makeParadaContext());
+            const result = runHook('entrega', queryClient);
+
+            act(() => {
+                result.invalidateQueries();
+            });
+
+            expect(queryClient.getQueryState([KEY_WALLET, 'balance'])?.isInvalidated).toBe(true);
+            expect(
+                queryClient.getQueryState([KEY_FINANCE, 'payments', 'infinite', { startDate: '2026-09-01' }])?.isInvalidated,
+            ).toBe(true);
         });
     });
 });

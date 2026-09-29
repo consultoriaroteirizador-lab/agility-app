@@ -5,7 +5,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { requirementsForServiceType, ServiceFlowType } from '@/domain/agility/company/completionRequirements';
 import type { ServiceCompletionDetailsRequest } from '@/domain/agility/service/dto/request/service-completion-details.request';
 import { useCompleteServiceWithDetails } from '@/domain/agility/service/useCase';
-import { routeStopChangedKeys } from '@/domain/queryKeys';
+import { moneyChangedKeys, routeStopChangedKeys } from '@/domain/queryKeys';
 import { useToastService } from '@/services/Toast/useToast';
 import { parseBRLToCents } from '@/utils/parseCurrency';
 
@@ -120,6 +120,12 @@ export function useServiceCompletion(serviceType: ServiceFlowType) {
         // serviço, a lista da rota, a própria rota e o /map-data (que também carrega o
         // status das paradas — ver `routeStopChangedKeys`).
         for (const queryKey of routeStopChangedKeys(rotaId, serviceId)) {
+            void queryClient.invalidateQueries({ queryKey });
+        }
+        // Ponto de conclusão: cobrança em dinheiro na entrega cria dívida (carteira) e
+        // pagamento (cobranças) no mesmo gesto. `moneyChangedKeys()` NÃO mora dentro de
+        // `routeStopChangedKeys` (ver comentário lá) — só é chamada aqui, na conclusão.
+        for (const queryKey of moneyChangedKeys()) {
             void queryClient.invalidateQueries({ queryKey });
         }
     }, [queryClient, serviceId, rotaId]);

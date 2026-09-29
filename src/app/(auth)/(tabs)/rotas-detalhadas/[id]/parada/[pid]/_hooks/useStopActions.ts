@@ -9,7 +9,7 @@ import {
     useStartService,
     useStartAttendance,
 } from '@/domain/agility/service/useCase';
-import { routeStopChangedKeys } from '@/domain/queryKeys';
+import { moneyChangedKeys, routeStopChangedKeys } from '@/domain/queryKeys';
 import { useToastService } from '@/services/Toast/useToast';
 
 import { getCurrentCoords } from './getCurrentCoords';
@@ -154,6 +154,13 @@ export const useStopActions = ({
     const { completeService, isLoading: isCompleting } = useCompleteService({
         onSuccess: async () => {
             await invalidateQueries();
+            // Ponto de conclusão (não os de start service/atendimento, que também passam
+            // por `invalidateQueries`): cobrança em dinheiro pode ter criado dívida e
+            // pagamento no mesmo gesto. Fora de `routeStopChangedKeys` de propósito (ver
+            // comentário em `src/domain/queryKeys.ts`) — chamada só aqui, na conclusão.
+            for (const queryKey of moneyChangedKeys()) {
+                void queryClient.invalidateQueries({ queryKey });
+            }
             setTimeout(() => router.back(), 500);
         },
         onError: (error) => {

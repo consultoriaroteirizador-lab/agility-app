@@ -18,7 +18,7 @@
 
 import { QueryClient } from '@tanstack/react-query'
 
-import { KEY_ROUTINGS, KEY_SERVICES, routeStopChangedKeys } from '../queryKeys'
+import { KEY_FINANCE, KEY_ROUTINGS, KEY_SERVICES, KEY_WALLET, routeStopChangedKeys } from '../queryKeys'
 
 const ROTA_ID = 'rota-1'
 const SERVICE_ID = 'servico-1'
@@ -77,6 +77,28 @@ describe('invalidação após mudança de status de parada', () => {
             void queryClient.invalidateQueries({ queryKey })
         }
         expect(isMapDataStale(queryClient)).toBe(true)
+    })
+
+    /**
+     * F5 (correção do review): `routeStopChangedKeys` roda a cada `routing_updated`/
+     * `service_updated` do `/monitoring` (`useRouteLiveSync`), inclusive na reprojeção de
+     * ETA por atraso — que não move dinheiro nenhum. `moneyChangedKeys()` saiu daqui e
+     * passou a ser chamada só nos pontos de conclusão/insucesso (`useServiceCompletion`,
+     * `dados-entrega`, `useStopActions`, `insucesso`, `useCompleteRouting`).
+     */
+    it('NÃO invalida o dinheiro do motorista (isso ia refazer a carteira a cada reprojeção de ETA)', () => {
+        const queryClient = new QueryClient()
+        queryClient.setQueryData([KEY_WALLET, 'balance'], {})
+        queryClient.setQueryData([KEY_WALLET, 'advances', 'summary'], {})
+        queryClient.setQueryData([KEY_FINANCE, 'payments', 'infinite', { startDate: '2026-09-01' }], {})
+
+        for (const queryKey of routeStopChangedKeys(ROTA_ID, SERVICE_ID)) {
+            void queryClient.invalidateQueries({ queryKey })
+        }
+
+        expect(queryClient.getQueryState([KEY_WALLET, 'balance'])?.isInvalidated).toBe(false)
+        expect(queryClient.getQueryState([KEY_WALLET, 'advances', 'summary'])?.isInvalidated).toBe(false)
+        expect(queryClient.getQueryState([KEY_FINANCE, 'payments', 'infinite', { startDate: '2026-09-01' }])?.isInvalidated).toBe(false)
     })
 })
 

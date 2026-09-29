@@ -1,40 +1,28 @@
-import React, { useState, useMemo } from 'react';
+// src/app/(auth)/(tabs)/menu/ganhos/index.tsx
+
+import React, { useCallback, useMemo, useState } from 'react';
+import { RefreshControl, ScrollView } from 'react-native';
 
 import { Ionicons } from '@expo/vector-icons';
-import { format, startOfDay, startOfWeek, startOfMonth, startOfYear, isAfter } from 'date-fns';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 
-import { Box, ScreenBase, Text, TouchableOpacityBox } from '@/components';
+import { ActivityIndicator, Box, ScreenBase, Text, TouchableOpacityBox } from '@/components';
 import { ButtonBack } from '@/components/Button/ButtonBack';
-import Modal from '@/components/Modal/Modal';
-import { useGetPayments } from '@/domain/agility/finance';
-import type { Payment } from '@/domain/agility/finance';
-import { useGetWallet } from '@/domain/agility/wallet';
+import { useFreightEarnings, useGetWallet } from '@/domain/agility/wallet';
 import EarningsChart from '@/EarningsChart';
 import { measure } from '@/theme';
+import { formatCurrency } from '@/utils/formatCurrency';
+import { formatDate } from '@/utils/formatDate';
 
-type Period = 'today' | 'week' | 'month' | 'year';
+import { chartDataFor, Period, periodLabel, PERIODS, periodStart } from './_utils/period';
 
-interface StatCardProps {
-    title: string;
-    value: string;
-    subtitle?: string;
-}
-
-function StatCard({ title, value, subtitle }: StatCardProps) {
+function StatCard({ title, value, subtitle, testID }: { title: string; value: string; subtitle?: string; testID: string }) {
     return (
-        <Box
-            flex={1}
-            backgroundColor="white"
-            borderRadius="s20"
-            padding="m12"
-            margin="m4"
-            borderWidth={measure.m1}
-            borderColor="borderColor">
+        <Box flex={1} backgroundColor="white" borderRadius="s20" padding="m12" margin="m4" borderWidth={measure.m1} borderColor="borderColor">
             <Text preset="text12" color="secondaryTextColor" marginBottom="y4">
                 {title}
             </Text>
-            <Text preset="text20" color="primary100" fontWeight="bold" marginBottom="y2">
+            <Text testID={testID} preset="text20" color="primary100" fontWeight="bold" marginBottom="y2">
                 {value}
             </Text>
             {!!subtitle && (
@@ -48,539 +36,181 @@ function StatCard({ title, value, subtitle }: StatCardProps) {
 
 export default function GanhosScreen() {
     const router = useRouter();
-    const [selectedPeriod, setSelectedPeriod] = useState<Period>('month');
-    const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
-    const [showPaymentDetail, setShowPaymentDetail] = useState(false);
-    const { payments, isLoading: paymentsLoading } = useGetPayments();
+    const [period, setPeriod] = useState<Period>('month');
+    // `periodStart` chama `new Date()` por dentro quando `now` não é passado — o `useMemo`
+    // só recomputava quando `period` mudava, então com o app aberto atravessando a
+    // meia-noite (ou reaberto dias depois sem trocar o seletor), "Hoje"/"Semana"/etc.
+    // continuavam calculados a partir do dia em que o período foi escolhido.
+    //
+    // A correção precisa passar `now` EXPLÍCITO e USADO dentro do `useMemo` — não basta
+    // listar uma chave no array de deps sem lê-la no corpo. O React Compiler deste projeto
+    // (`babel.config.js`) re-infere as dependências pela ANÁLISE ESTÁTICA de quem o
+    // `useMemo` de fato LÊ, não pelo array escrito à mão: uma dependência só ali para forçar
+    // recálculo (sem uso no corpo) é DESCARTADA do cache do compilador, mesmo que o array
+    // a liste. `now` como `useState`, recalculado no foco da tela (`useFocusEffect` — o
+    // motorista reabrindo "Ganhos" depois da meia-noite é exatamente o caso a cobrir), e
+    // passado como argumento de `periodStart` resolve os dois lados: React "puro" respeita
+    // o array, e o compilador respeita o uso real.
+    const [now, setNow] = useState(() => new Date());
+    useFocusEffect(
+        useCallback(() => {
+            setNow(new Date());
+        }, []),
+    );
+    const startDate = useMemo(() => periodStart(period, now).toISOString(), [period, now]);
     const { wallet } = useGetWallet();
-
-    /**
-     * Limite máximo de pagamentos renderizados. A tela usa Box scrollable como
-     * container; sem virtualization, renderizar muitos itens degrada a UI.
-     * Quando truncado, exibimos um aviso e um botão "Carregar mais" abaixo.
-     */
-    const RENDER_LIMIT = 50;
-    const [renderLimit, setRenderLimit] = useState(RENDER_LIMIT);
-
-    const formatCurrency = (valueInCents: number): string => {
-        const value = valueInCents / 100;
-        return new Intl.NumberFormat('pt-BR', {
-            style: 'currency',
-            currency: 'BRL',
-        }).format(value);
-    };
-
-    const filteredPayments = useMemo(() => {
-        if (!payments || payments.length === 0) return [];
-
-        const now = new Date();
-        let startDate: Date;
-
-        switch (selectedPeriod) {
-            case 'today':
-                startDate = startOfDay(now);
-                break;
-            case 'week':
-                startDate = startOfWeek(now, { weekStartsOn: 1 });
-                break;
-            case 'month':
-                startDate = startOfMonth(now);
-                break;
-            case 'year':
-                startDate = startOfYear(now);
-                break;
-            default:
-                startDate = startOfMonth(now);
-        }
-
-        return payments.filter(payment => {
-            const paymentDate = new Date(payment.createdAt);
-            return (
-                isAfter(paymentDate, startDate) ||
-                paymentDate.getTime() === startDate.getTime()
-            );
-        });
-    }, [payments, selectedPeriod]);
-
-    const stats = useMemo(() => {
-        if (!filteredPayments || filteredPayments.length === 0) {
-            return {
-                totalReceived: 0,
-                totalTrips: 0,
-                pendingAmount: 0,
-            };
-        }
-
-        const approvedPayments = filteredPayments.filter(p => p.status === 'APPROVED');
-        const pendingPayments = filteredPayments.filter(p => p.status === 'PENDING');
-
-        const totalReceived = approvedPayments.reduce(
-            (sum, p) => sum + (p.receivedValue || 0),
-            0,
-        );
-
-        const pendingAmount = pendingPayments.reduce(
-            (sum, p) => {
-                const pending = p.expectedValue - (p.receivedValue || 0);
-                return sum + Math.max(pending, 0);
-            },
-            0,
-        );
-
-        return {
-            totalReceived,
-            totalTrips: filteredPayments.length,
-            pendingAmount,
-        };
-    }, [filteredPayments]);
-
-    const chartData = useMemo(() => {
-        if (!filteredPayments || filteredPayments.length === 0) {
-            return {
-                labels: ['Sem dados'],
-                datasets: [{ data: [0] }],
-            };
-        }
-
-        const groupedData: Record<string, number> = {};
-
-        filteredPayments.forEach(payment => {
-            const paymentDate = new Date(payment.createdAt);
-            let key: string;
-
-            switch (selectedPeriod) {
-                case 'today':
-                    key = `${paymentDate.getHours()}h`;
-                    break;
-                case 'week':
-                    key = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'][paymentDate.getDay()];
-                    break;
-                case 'month':
-                    key = paymentDate.getDate().toString();
-                    break;
-                case 'year':
-                    key = [
-                        'Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun',
-                        'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez',
-                    ][paymentDate.getMonth()];
-                    break;
-                default:
-                    key = paymentDate.getDate().toString();
-            }
-
-            if (payment.status === 'APPROVED' && payment.receivedValue) {
-                groupedData[key] = (groupedData[key] || 0) + (payment.receivedValue / 100);
-            }
-        });
-
-        const sortedKeys = Object.keys(groupedData).sort((a, b) => {
-            if (selectedPeriod === 'today') {
-                return parseInt(a) - parseInt(b);
-            }
-            if (selectedPeriod === 'week') {
-                const days = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
-                return days.indexOf(a) - days.indexOf(b);
-            }
-            if (selectedPeriod === 'month') {
-                return parseInt(a) - parseInt(b);
-            }
-            if (selectedPeriod === 'year') {
-                const months = [
-                    'Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun',
-                    'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez',
-                ];
-                return months.indexOf(a) - months.indexOf(b);
-            }
-            return 0;
-        });
-
-        return {
-            labels: sortedKeys.length > 0 ? sortedKeys : ['Sem dados'],
-            datasets: [
-                {
-                    data: sortedKeys.length > 0 ? sortedKeys.map(key => groupedData[key]) : [0],
-                },
-            ],
-        };
-    }, [filteredPayments, selectedPeriod]);
-
-    const periods: { value: Period; label: string }[] = [
-        { value: 'today', label: 'Hoje' },
-        { value: 'week', label: 'Semana' },
-        { value: 'month', label: 'Mês' },
-        { value: 'year', label: 'Ano' },
-    ];
-
-    const getPeriodLabel = (period: Period): string => {
-        return periods.find(p => p.value === period)?.label || 'Mês';
-    };
-
-    const getStatusLabel = (status: string): string => {
-        if (status === 'APPROVED') return 'Aprovado';
-        if (status === 'PENDING') return 'Pendente';
-        return 'Rejeitado';
-    };
-
-    const getStatusColor = (status: string) => {
-        if (status === 'APPROVED') return 'colorTextSuccess' as const;
-        if (status === 'PENDING') return 'colorTextWarning' as const;
-        return 'colorTextError' as const;
-    };
+    const { earnings, isLoading, isError, refetch, isRefetching } = useFreightEarnings(startDate);
+    const chartData = useMemo(() => chartDataFor(earnings?.items ?? [], period), [earnings, period]);
 
     return (
-        <ScreenBase buttonLeft={<ButtonBack />} title={
-            <Text preset="textTitleScreen">
-                Meus Ganhos
-            </Text>
-        }>
-            <Box backgroundColor="white" padding="m12" paddingBottom="y24">
-                <Box flexDirection="row" alignItems="center" justifyContent="space-between">
-                    <Box>
-                        <Text preset="text14" color="secondaryTextColor">
-                            Visualize suas estatísticas e histórico de pagamentos
-                        </Text>
-                    </Box>
-                </Box>
-            </Box>
+        <ScreenBase buttonLeft={<ButtonBack />} title={<Text preset="textTitleScreen">Meus Ganhos</Text>}>
+            <ScrollView refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={() => void refetch()} />}>
+                <Text preset="text14" color="secondaryTextColor" marginBottom="y12">
+                    Fretes que a empresa liberou para você. O que você recebeu de clientes fica em Cobranças.
+                </Text>
 
-            {/* Wallet Balance Card - Link to Carteira */}
-            {wallet && (
-                <TouchableOpacityBox
-                    marginBottom="b12"
-                    backgroundColor="primary10"
-                    borderRadius="s16"
-                    padding="m16"
-                    flexDirection="row"
-                    alignItems="center"
-                    justifyContent="space-between"
-                    onPress={() => router.push('/menu/carteira')}
-                >
-                    <Box>
-                        <Text preset="text12" color="colorTextSecondary">
-                            Saldo disponível
-                        </Text>
-                        <Text preset="text20" color="primary100" fontWeight="bold" marginTop="y4">
-                            {formatCurrency(wallet.availableBalance ?? 0)}
-                        </Text>
-                    </Box>
-                    <Box flexDirection="row" alignItems="center">
-                        <Text preset="text14" color="primary100" fontWeight="semibold">
-                            Ver carteira
-                        </Text>
-                        <Ionicons name="chevron-forward" size={20} color="#4A90E2" />
-                    </Box>
-                </TouchableOpacityBox>
-            )}
-
-            <Box scrollable>
-                <Box margin="m4" borderRadius="s20" paddingVertical="y12">
-                    <Box flexDirection="row" justifyContent="space-between">
-                        {periods.map(period => (
-                            <TouchableOpacityBox
-                                key={period.value}
-                                flex={1}
-                                backgroundColor={selectedPeriod === period.value ? 'primary100' : 'gray50'}
-                                borderRadius="s10"
-                                padding="m12"
-                                marginHorizontal="x4"
-                                onPress={() => setSelectedPeriod(period.value)}>
-                                <Text
-                                    preset="text12"
-                                    color={selectedPeriod === period.value ? 'white' : 'secondaryTextColor'}
-                                    fontWeight={selectedPeriod === period.value ? 'bold' : 'normal'}
-                                    textAlign="center">
-                                    {period.label}
-                                </Text>
-                            </TouchableOpacityBox>
-                        ))}
-                    </Box>
-                </Box>
-
-                <EarningsChart data={chartData} period={selectedPeriod} />
-
-                <Box >
-                    <Text preset="text16" color="colorTextPrimary" fontWeight="bold" marginBottom="y12">
-                        Estatísticas - {getPeriodLabel(selectedPeriod)}
-                    </Text>
-
-                    <Box flexDirection="row">
-                        <StatCard
-                            title="Total Recebido"
-                            value={formatCurrency(stats.totalReceived)}
-                            subtitle={`${stats.totalTrips} viagens`}
-                        />
-                    </Box>
-
-                    <Box flexDirection="row">
-                        <StatCard
-                            title="Pendente"
-                            value={formatCurrency(stats.pendingAmount)}
-                        />
-                    </Box>
-
-                    <Box flexDirection="row">
-                        <StatCard
-                            title="Total de Viagens"
-                            value={stats.totalTrips.toString()}
-                        />
-                    </Box>
-                </Box>
-
-                <Box marginTop="y32" >
-                    <Text preset="text16" color="colorTextPrimary" fontWeight="bold" marginBottom="y12">
-                        Pagamentos - {getPeriodLabel(selectedPeriod)}
-                    </Text>
-
-                    {paymentsLoading ? (
-                        <Box padding="y32" alignItems="center">
-                            <Text preset="text14" color="secondaryTextColor">
-                                Carregando pagamentos...
+                {wallet && (
+                    <TouchableOpacityBox
+                        marginBottom="b12"
+                        backgroundColor="primary10"
+                        borderRadius="s16"
+                        padding="m16"
+                        flexDirection="row"
+                        alignItems="center"
+                        justifyContent="space-between"
+                        onPress={() => router.push('/menu/carteira')}
+                    >
+                        <Box>
+                            <Text preset="text12" color="colorTextSecondary">
+                                Disponível para saque
+                            </Text>
+                            <Text preset="text20" color="primary100" fontWeight="bold" marginTop="y4">
+                                {formatCurrency(wallet.availableBalance)}
                             </Text>
                         </Box>
-                    ) : filteredPayments.length === 0 ? (
-                        <Box padding="y32" alignItems="center">
-                            <Text preset="text14" color="secondaryTextColor">
-                                Nenhum pagamento encontrado para este período
+                        <Box flexDirection="row" alignItems="center">
+                            <Text preset="text14" color="primary100" fontWeight="semibold">
+                                Ver carteira
                             </Text>
+                            <Ionicons name="chevron-forward" size={20} color="#4A90E2" />
                         </Box>
-                    ) : (
-                        filteredPayments.slice(0, renderLimit).map(payment => (
-                            <TouchableOpacityBox
-                                key={payment.id}
-                                backgroundColor="white"
-                                borderRadius="s20"
-                                padding="m12"
-                                marginBottom="y10"
-                                borderWidth={measure.m1}
-                                borderColor="borderColor"
-                                onPress={() => {
-                                    setSelectedPayment(payment);
-                                    setShowPaymentDetail(true);
-                                }}>
-                                <Box flexDirection="row" justifyContent="space-between" alignItems="center" marginBottom="y4">
-                                    <Text
-                                        preset="text14"
-                                        color="colorTextPrimary"
-                                        fontWeight="bold"
-                                        numberOfLines={1}
-                                        style={{ flex: 1, marginRight: 8 }}>
-                                        {payment.customerName}
-                                    </Text>
-                                    <Text preset="text12" color={getStatusColor(payment.status)}>
-                                        {getStatusLabel(payment.status)}
-                                    </Text>
-                                </Box>
+                    </TouchableOpacityBox>
+                )}
 
-                                <Box flexDirection="row" justifyContent="space-between" marginBottom="y2">
-                                    <Text preset="text12" color="secondaryTextColor">
-                                        Valor: {formatCurrency(payment.expectedValue)}
-                                    </Text>
-                                    {payment.receivedValue != null && payment.receivedValue > 0 && (
-                                        <Text preset="text12" color="primary100" fontWeight="bold">
-                                            Recebido: {formatCurrency(payment.receivedValue)}
-                                        </Text>
-                                    )}
-                                </Box>
-
-                                {(!!payment.routingCode || !!payment.routingId) && (
-                                    <Text preset="text12" color="secondaryTextColor" marginBottom="y2">
-                                        Rota: {payment.routingCode ?? `…${payment.routingId!.slice(-8)}`}
-                                    </Text>
-                                )}
-                                {!!payment.serviceTitle && (
-                                    <Text
-                                        preset="text12"
-                                        color="secondaryTextColor"
-                                        marginBottom="y2"
-                                        numberOfLines={1}
-                                    >
-                                        {payment.serviceTitle}
-                                    </Text>
-                                )}
-
-                                {!!payment.paymentDate && (
-                                    <Text preset="text12" color="secondaryTextColor">
-                                        {format(new Date(payment.paymentDate), 'dd/MM/yyyy')}
-                                    </Text>
-                                )}
-
-                                <Text preset="text12" color="primary100">
-                                    Toque para detalhes
-                                </Text>
-                            </TouchableOpacityBox>
-                        ))
-                    )}
-
-                    {/* "Carregar mais" quando há registros além do limite renderizado */}
-                    {filteredPayments.length > renderLimit && (
-                        <Box marginTop="y12" alignItems="center">
-                            <Text preset="text12" color="secondaryTextColor" marginBottom="y8" textAlign="center">
-                                Mostrando {renderLimit} de {filteredPayments.length}. Use o filtro de período para refinar.
-                            </Text>
-                            <TouchableOpacityBox
-                                px="x16"
-                                py="y8"
-                                borderRadius="s8"
-                                borderWidth={measure.m1}
-                                borderColor="primary100"
-                                onPress={() => setRenderLimit((prev) => prev + RENDER_LIMIT)}
+                <Box flexDirection="row" justifyContent="space-between" paddingVertical="y12">
+                    {PERIODS.map((option) => (
+                        <TouchableOpacityBox
+                            key={option.value}
+                            flex={1}
+                            backgroundColor={period === option.value ? 'primary100' : 'gray50'}
+                            borderRadius="s10"
+                            padding="m12"
+                            marginHorizontal="x4"
+                            onPress={() => setPeriod(option.value)}
+                        >
+                            <Text
+                                preset="text12"
+                                color={period === option.value ? 'white' : 'secondaryTextColor'}
+                                fontWeight={period === option.value ? 'bold' : 'normal'}
+                                textAlign="center"
                             >
-                                <Text fontSize={measure.m14} color="primary100" fontWeightPreset="semibold">
-                                    Carregar mais
-                                </Text>
-                            </TouchableOpacityBox>
-                        </Box>
-                    )}
+                                {option.label}
+                            </Text>
+                        </TouchableOpacityBox>
+                    ))}
                 </Box>
 
-                <Modal
-                    title="Detalhes do Pagamento"
-                    isVisible={showPaymentDetail && !!selectedPayment}
-                    onClose={() => {
-                        setShowPaymentDetail(false);
-                        setSelectedPayment(null);
-                    }}>
+                {isLoading ? (
+                    <Box padding="y32" alignItems="center">
+                        <ActivityIndicator />
+                    </Box>
+                ) : isError && !earnings ? (
+                    <Box padding="y32" alignItems="center">
+                        <Text preset="text14" color="secondaryTextColor" textAlign="center">
+                            Não foi possível carregar seus ganhos.
+                        </Text>
+                        <TouchableOpacityBox mt="t16" onPress={() => void refetch()} accessibilityRole="button">
+                            <Text color="colorTextPrimary">Tentar novamente</Text>
+                        </TouchableOpacityBox>
+                    </Box>
+                ) : earnings ? (
                     <>
-                        {selectedPayment != null && (
-                            <Box backgroundColor="white" padding="m12">
-                                <Box flexDirection="row" justifyContent="space-between" alignItems="center" marginBottom="y12">
-                                    <Text preset="text20" color="colorTextPrimary" fontWeight="bold">
-                                        Detalhes do Pagamento
+                        <EarningsChart data={chartData} period={period} />
+
+                        {earnings.truncated && (
+                            <Text preset="text12" color="colorTextWarning" marginTop="y8">
+                                Valores parciais: há lançamentos demais neste período. Escolha um período menor.
+                            </Text>
+                        )}
+
+                        <Box flexDirection="row" marginTop="y12">
+                            <StatCard
+                                testID="frete-liberado"
+                                title={`Frete liberado · ${periodLabel(period)}`}
+                                value={formatCurrency(earnings.totalCents)}
+                                subtitle={`${earnings.items.length} frete(s)`}
+                            />
+                            <StatCard
+                                testID="frete-a-liberar"
+                                title="Frete a liberar"
+                                // Sem carteira (carregando ou erro) mostra "—": R$ 0,00 diria "nada a liberar".
+                                value={wallet ? formatCurrency(wallet.freightPendingBalance) : '—'}
+                                subtitle="Agora, esperando a empresa liberar"
+                            />
+                        </Box>
+
+                        <Text preset="text16" color="colorTextPrimary" fontWeight="bold" marginTop="y24" marginBottom="y12">
+                            {`Fretes liberados · ${periodLabel(period)}`}
+                        </Text>
+                        {earnings.items.length === 0 ? (
+                            <Text preset="text14" color="secondaryTextColor">
+                                Nenhum frete liberado neste período.
+                            </Text>
+                        ) : (
+                            earnings.items.map((item) => (
+                                <Box
+                                    key={item.shareId}
+                                    flexDirection="row"
+                                    justifyContent="space-between"
+                                    alignItems="center"
+                                    padding="m12"
+                                    marginBottom="y10"
+                                    borderRadius="s12"
+                                    borderWidth={measure.m1}
+                                    borderColor="borderColor"
+                                >
+                                    <Box flex={1} marginRight="x8">
+                                        <Text preset="text14" color="colorTextPrimary" numberOfLines={2}>
+                                            {item.description}
+                                        </Text>
+                                        <Text preset="text12" color="secondaryTextColor">
+                                            {formatDate(item.releasedAt)}
+                                        </Text>
+                                    </Box>
+                                    <Text preset="text14" color="colorTextSuccess" fontWeight="bold">
+                                        {formatCurrency(item.releasedCents)}
                                     </Text>
-                                    <TouchableOpacityBox
-                                        backgroundColor="gray50"
-                                        borderRadius="s10"
-                                        width={measure.x32}
-                                        height={measure.y32}
-                                        alignItems="center"
-                                        justifyContent="center"
-                                        onPress={() => {
-                                            setShowPaymentDetail(false);
-                                            setSelectedPayment(null);
-                                        }}>
-                                        <Text preset="text18" color="secondaryTextColor">
-                                            ×
-                                        </Text>
-                                    </TouchableOpacityBox>
                                 </Box>
-
-                                <Box marginBottom="y12">
-                                    <Text preset="text14" color="colorTextPrimary" fontWeight="bold">
-                                        Cliente: {selectedPayment.customerName}
-                                    </Text>
-                                </Box>
-
-                                <Box marginBottom="y12">
-                                    <Text preset="text12" color="secondaryTextColor" marginBottom="y4">
-                                        Valores
-                                    </Text>
-                                    <Box flexDirection="row" justifyContent="space-between" alignItems="center" marginBottom="y2">
-                                        <Text preset="text14" color="secondaryTextColor">
-                                            Esperado:
-                                        </Text>
-                                        <Text preset="text14" color="colorTextPrimary" fontWeight="bold">
-                                            {formatCurrency(selectedPayment.expectedValue)}
-                                        </Text>
-                                    </Box>
-                                    {selectedPayment.receivedValue != null && selectedPayment.receivedValue > 0 && (
-                                        <Box flexDirection="row" justifyContent="space-between" alignItems="center" marginBottom="y2">
-                                            <Text preset="text14" color="secondaryTextColor">
-                                                Recebido:
-                                            </Text>
-                                            <Text preset="text14" color="primary100" fontWeight="bold">
-                                                {formatCurrency(selectedPayment.receivedValue)}
-                                            </Text>
-                                        </Box>
-                                    )}
-                                </Box>
-
-                                <Box marginBottom="y12">
-                                    <Text preset="text12" color="secondaryTextColor" marginBottom="y4">
-                                        Status
-                                    </Text>
-                                    <Box
-                                        backgroundColor={getStatusColor(selectedPayment.status)}
-                                        borderRadius="s10"
-                                        padding="y4"
-                                        alignSelf="flex-start">
-                                        <Text preset="text12" color="white" fontWeight="bold">
-                                            {getStatusLabel(selectedPayment.status)}
-                                        </Text>
-                                    </Box>
-                                </Box>
-
-                                {(!!selectedPayment.routingCode || !!selectedPayment.routingId) && (
-                                    <Box marginBottom="y12">
-                                        <Text preset="text12" color="secondaryTextColor" marginBottom="y4">
-                                            Rota
-                                        </Text>
-                                        <Text preset="text14" color="colorTextPrimary">
-                                            {selectedPayment.routingCode ?? `…${selectedPayment.routingId!.slice(-8)}`}
-                                        </Text>
-                                    </Box>
-                                )}
-
-                                {(!!selectedPayment.serviceTitle || !!selectedPayment.serviceId) && (
-                                    <Box marginBottom="y12">
-                                        <Text preset="text12" color="secondaryTextColor" marginBottom="y4">
-                                            Serviço
-                                        </Text>
-                                        <Text preset="text14" color="colorTextPrimary">
-                                            {selectedPayment.serviceTitle ?? `…${selectedPayment.serviceId!.slice(-8)}`}
-                                        </Text>
-                                    </Box>
-                                )}
-
-                                {!!selectedPayment.paymentDate && (
-                                    <Box marginBottom="y12">
-                                        <Text preset="text12" color="secondaryTextColor" marginBottom="y4">
-                                            Data do Pagamento
-                                        </Text>
-                                        <Text preset="text14" color="colorTextPrimary">
-                                            {format(new Date(selectedPayment.paymentDate), "dd/MM/yyyy 'às' HH:mm")}
-                                        </Text>
-                                    </Box>
-                                )}
-
-                                {!!selectedPayment.createdAt && (
-                                    <Box marginBottom="y12">
-                                        <Text preset="text12" color="secondaryTextColor" marginBottom="y4">
-                                            Criado em
-                                        </Text>
-                                        <Text preset="text14" color="colorTextPrimary">
-                                            {format(new Date(selectedPayment.createdAt), "dd/MM/yyyy 'às' HH:mm")}
-                                        </Text>
-                                    </Box>
-                                )}
-
-                                {!!selectedPayment.updatedAt && (
-                                    <Box marginBottom="y12">
-                                        <Text preset="text12" color="secondaryTextColor" marginBottom="y4">
-                                            Última atualização
-                                        </Text>
-                                        <Text preset="text14" color="colorTextPrimary">
-                                            {format(new Date(selectedPayment.updatedAt), "dd/MM/yyyy 'às' HH:mm")}
-                                        </Text>
-                                    </Box>
-                                )}
-
-                                {!!selectedPayment.notes && (
-                                    <Box marginBottom="y12">
-                                        <Text preset="text12" color="secondaryTextColor" marginBottom="y4">
-                                            Observações
-                                        </Text>
-                                        <Text preset="text14" color="colorTextPrimary">
-                                            {selectedPayment.notes}
-                                        </Text>
-                                    </Box>
-                                )}
-                            </Box>
+                            ))
                         )}
                     </>
-                </Modal>
+                ) : null}
 
-                <Box height={measure.y20} />
-            </Box>
+                <TouchableOpacityBox
+                    marginTop="y24"
+                    marginBottom="y20"
+                    padding="m16"
+                    borderRadius="s12"
+                    borderWidth={measure.m1}
+                    borderColor="primary100"
+                    alignItems="center"
+                    onPress={() => router.push('/menu/ganhos/cobrancas')}
+                >
+                    <Text preset="text14" color="primary100" fontWeight="semibold">
+                        Ver cobranças recebidas de clientes
+                    </Text>
+                </TouchableOpacityBox>
+            </ScrollView>
         </ScreenBase>
     );
 }

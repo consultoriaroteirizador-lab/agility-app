@@ -1,12 +1,12 @@
 // src/domain/agility/wallet/walletAPI.ts
 import { apiAgility } from '@/api/apiConfig'
+import type { PagedResponse } from '@/domain/hooks/pagination';
 
 import {
     WalletResponse,
     PaginatedTransactionsResponse,
     WithdrawalResponse,
     AdvanceResponse,
-    WalletSummaryResponse,
     UpdateBankInfoRequest,
     CreateWithdrawalRequest,
     ListTransactionsRequest,
@@ -33,11 +33,6 @@ export const walletAPI = {
         return unwrap<WalletResponse>(response.data);
     },
 
-    async getSummary(): Promise<WalletSummaryResponse> {
-        const response = await apiAgility.get(`${BASE_URL}/summary`);
-        return unwrap<WalletSummaryResponse>(response.data);
-    },
-
     async updateBankInfo(data: UpdateBankInfoRequest): Promise<WalletResponse> {
         const response = await apiAgility.patch(`${BASE_URL}/bank-info`, data);
         return unwrap<WalletResponse>(response.data);
@@ -55,19 +50,19 @@ export const walletAPI = {
         return unwrap<WithdrawalResponse>(response.data);
     },
 
-    async getWithdrawals(page: number = 1, limit: number = 20): Promise<{ data: WithdrawalResponse[]; meta: any }> {
+    async getWithdrawals(page: number = 1, limit: number = 20): Promise<PagedResponse<WithdrawalResponse>> {
         const response = await apiAgility.get(`${BASE_URL}/withdrawals`, {
             params: { page, limit },
         });
-        return unwrap<{ data: WithdrawalResponse[]; meta: any }>(response.data);
+        return unwrap<PagedResponse<WithdrawalResponse>>(response.data);
     },
 
     // Advances
-    async getAdvances(page: number = 1, limit: number = 20): Promise<{ data: AdvanceResponse[]; meta: any }> {
+    async getAdvances(page: number = 1, limit: number = 20): Promise<PagedResponse<AdvanceResponse>> {
         const response = await apiAgility.get(`${BASE_URL}/advances`, {
             params: { page, limit },
         });
-        return unwrap<{ data: AdvanceResponse[]; meta: any }>(response.data);
+        return unwrap<PagedResponse<AdvanceResponse>>(response.data);
     },
 
     async getAdvancesSummary(): Promise<{ totalPending: number; count: number; overdueCount: number }> {
