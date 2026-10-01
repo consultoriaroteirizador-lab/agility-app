@@ -28,6 +28,8 @@ export function resolverDestinoDaNotificacao(notification: NotificationResponse)
 
         case NotificationType.SERVICE_ADDED:
         case NotificationType.SERVICE_REMOVED:
+        // A central corrigiu o local da parada: o motorista confere NA parada.
+        case NotificationType.ROUTE_STOP_RELOCATED:
             if (routingId && serviceId) return caminho(`/rotas-detalhadas/${routingId}/parada/${serviceId}`);
             return routingId ? caminho(`/rotas-detalhadas/${routingId}`) : null;
 
@@ -110,6 +112,8 @@ export function iconeDaNotificacao(type: NotificationType): IconNameMaterial {
             return 'payments';
         case NotificationType.CHAT_MESSAGE:
             return 'chat';
+        case NotificationType.ROUTE_STOP_RELOCATED:
+            return 'edit-location';
         case NotificationType.SYSTEM_ALERT:
             return 'notifications';
         default:
