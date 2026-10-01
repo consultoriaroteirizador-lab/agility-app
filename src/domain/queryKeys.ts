@@ -92,3 +92,17 @@ export function routeStopChangedKeys(rotaId: string, serviceId?: string): unknow
         // marca insucesso chama `moneyChangedKeys()` à parte (ver comentário acima dela).
     ]
 }
+
+/**
+ * Chaves do live sync da rota aberta (`useRouteLiveSync`: `routing_updated` /
+ * `service_updated` do `/monitoring`). É o conjunto de `routeStopChangedKeys` MAIS
+ * o prefixo `KEY_SERVICES`, porque o evento não diz qual parada mudou e a tela da
+ * parada (`['services', serviceId]`) precisa refazer — é dela que sai o link do
+ * Waze/Maps quando a central corrige o local (ROUTE_STOP_RELOCATED, 01/10/2026).
+ *
+ * Função separada, e não um item a mais em `routeStopChangedKeys`, porque aquela
+ * roda nos fluxos de conclusão/insucesso, que sabem a parada exata.
+ */
+export function routeLiveSyncKeys(rotaId: string): unknown[][] {
+    return [...routeStopChangedKeys(rotaId), [KEY_SERVICES]]
+}

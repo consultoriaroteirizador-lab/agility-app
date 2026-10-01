@@ -2,9 +2,9 @@
  * useRouteLiveSync — mantém a tela de detalhes da rota sincronizada ao vivo.
  *
  * Ouve os eventos do namespace /monitoring (routing_updated / service_updated)
- * e invalida as queries de routing/services para refletir imediatamente uma
- * re-projeção de ETA por atraso (ou replan) sem pull-to-refresh. Filtra pelo
- * routingId corrente quando o payload traz o id.
+ * e invalida as queries de routing/services, inclusive a parada aberta (`routeLiveSyncKeys`),
+ * para refletir imediatamente uma re-projeção de ETA por atraso (ou replan) sem
+ * pull-to-refresh. Filtra pelo routingId corrente quando o payload traz o id.
  */
 
 import { useCallback, useEffect } from 'react'
@@ -12,14 +12,14 @@ import { useCallback, useEffect } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 
 import { useTrackingWebSocket } from '@/domain/agility/tracking/useCase/useTrackingWebSocket'
-import { routeStopChangedKeys } from '@/domain/queryKeys'
+import { routeLiveSyncKeys } from '@/domain/queryKeys'
 
 export function useRouteLiveSync(routeId: string | undefined) {
     const queryClient = useQueryClient()
 
     const invalidate = useCallback(() => {
         if (!routeId) return
-        for (const queryKey of routeStopChangedKeys(routeId)) {
+        for (const queryKey of routeLiveSyncKeys(routeId)) {
             void queryClient.invalidateQueries({ queryKey })
         }
     }, [queryClient, routeId])
