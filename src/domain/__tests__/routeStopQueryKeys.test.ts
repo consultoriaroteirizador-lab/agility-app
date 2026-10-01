@@ -18,7 +18,7 @@
 
 import { QueryClient } from '@tanstack/react-query'
 
-import { KEY_FINANCE, KEY_ROUTINGS, KEY_SERVICES, KEY_WALLET, routeStopChangedKeys } from '../queryKeys'
+import { KEY_FINANCE, KEY_ROUTINGS, KEY_SERVICES, KEY_WALLET, routeStopChangedKeys, routeLiveSyncKeys } from '../queryKeys'
 
 const ROTA_ID = 'rota-1'
 const SERVICE_ID = 'servico-1'
@@ -150,4 +150,38 @@ describe('cancelamento em rota: o que substitui a parada que sumiu', () => {
             expect(queryClient.getQueryState(chave)?.isInvalidated).toBe(true)
         }
     })
+})
+
+describe('routeLiveSyncKeys (routing_updated / service_updated ao vivo)', () => {
+    // O evento não diz QUAL parada mudou. Antes, a tela da parada aberta
+    // (`['services', serviceId]`) ficava fora: a correção de local feita pela
+    // central não aparecia, e o link do Waze/Maps abria no endereço antigo.
+    it('atinge a parada aberta, sem precisar saber o id dela', () => {
+        const queryClient = new QueryClient();
+        queryClient.setQueryData([KEY_SERVICES, 'servico-9'], {});
+
+        for (const queryKey of routeLiveSyncKeys(ROTA_ID)) {
+            void queryClient.invalidateQueries({ queryKey });
+        }
+
+        expect(queryClient.getQueryState([KEY_SERVICES, 'servico-9'])?.isInvalidated).toBe(true);
+    });
+
+    it('mantém tudo o que routeStopChangedKeys já invalidava (map-data incluso)', () => {
+        const keys = routeLiveSyncKeys(ROTA_ID);
+        for (const k of routeStopChangedKeys(ROTA_ID)) {
+            expect(keys).toContainEqual(k);
+        }
+    });
+
+    it('não atinge a carteira (reprojeção de ETA não move dinheiro)', () => {
+        const queryClient = new QueryClient();
+        queryClient.setQueryData([KEY_WALLET], {});
+
+        for (const queryKey of routeLiveSyncKeys(ROTA_ID)) {
+            void queryClient.invalidateQueries({ queryKey });
+        }
+
+        expect(queryClient.getQueryState([KEY_WALLET])?.isInvalidated).toBe(false);
+    });
 })

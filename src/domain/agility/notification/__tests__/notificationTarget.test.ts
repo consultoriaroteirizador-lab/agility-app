@@ -39,6 +39,9 @@ describe('resolverDestinoDaNotificacao', () => {
         [NotificationType.PAYMENT_RECEIVED, {}, '/menu/ganhos/cobrancas'],
         [NotificationType.CHAT_MESSAGE, { chatId: 'c9' }, '/menu/suporte/c9'],
         [NotificationType.CHAT_MESSAGE, {}, '/menu/suporte'],
+        [NotificationType.ROUTE_STOP_RELOCATED, { routingId: 'r1', serviceId: 's1' }, '/rotas-detalhadas/r1/parada/s1'],
+        // Sem a parada no metadata (backend antigo), a rota ainda é o melhor destino.
+        [NotificationType.ROUTE_STOP_RELOCATED, { routingId: 'r1' }, '/rotas-detalhadas/r1'],
     ])('%s com %j vai para %s', (type, metadata, caminho) => {
         expect(resolverDestinoDaNotificacao(notificacao({ type, metadata }))).toEqual({ tipo: 'caminho', caminho });
     });
@@ -96,5 +99,11 @@ describe('iconeDaNotificacao', () => {
         expect(iconeDaNotificacao(NotificationType.SERVICE_REMOVED)).toBe('remove-circle');
         expect(iconeDaNotificacao(NotificationType.CHAT_MESSAGE)).toBe('chat');
         expect(iconeDaNotificacao('OUTRO' as NotificationType)).toBe('info');
+    });
+});
+
+describe('iconeDaNotificacao — local corrigido', () => {
+    it('usa edit-location', () => {
+        expect(iconeDaNotificacao(NotificationType.ROUTE_STOP_RELOCATED)).toBe('edit-location');
     });
 });

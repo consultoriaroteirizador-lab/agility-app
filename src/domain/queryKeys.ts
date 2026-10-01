@@ -27,6 +27,11 @@ export const KEY_TEAMS = 'teams'
  * (`notification.listener.ts` no back). Sem isso, um push chegando com a
  * tela de carteira/ganhos/cobranças montada em background não refazia o
  * saldo — só a rota/notificação.
+ *
+ * `KEY_SERVICES` entrou com ROUTE_STOP_RELOCATED (01/10/2026): a central corrige o
+ * local de uma parada da rota do motorista, e a tela da parada — de onde sai o link
+ * do Waze/Maps — guardava a coordenada antiga por até 5 min. Invalidar só refaz o que
+ * está montado, então com a parada fechada o custo é zero.
  */
 export const PUSH_INVALIDATED_KEYS: readonly string[] = [
     KEY_ROUTINGS,
@@ -35,6 +40,7 @@ export const PUSH_INVALIDATED_KEYS: readonly string[] = [
     KEY_TICKETS,
     KEY_WALLET,
     KEY_FINANCE,
+    KEY_SERVICES,
 ]
 
 /**
@@ -85,4 +91,18 @@ export function routeStopChangedKeys(rotaId: string, serviceId?: string): unknow
         // reprojeção de ETA por atraso — que não move dinheiro nenhum. Quem conclui ou
         // marca insucesso chama `moneyChangedKeys()` à parte (ver comentário acima dela).
     ]
+}
+
+/**
+ * Chaves do live sync da rota aberta (`useRouteLiveSync`: `routing_updated` /
+ * `service_updated` do `/monitoring`). É o conjunto de `routeStopChangedKeys` MAIS
+ * o prefixo `KEY_SERVICES`, porque o evento não diz qual parada mudou e a tela da
+ * parada (`['services', serviceId]`) precisa refazer — é dela que sai o link do
+ * Waze/Maps quando a central corrige o local (ROUTE_STOP_RELOCATED, 01/10/2026).
+ *
+ * Função separada, e não um item a mais em `routeStopChangedKeys`, porque aquela
+ * roda nos fluxos de conclusão/insucesso, que sabem a parada exata.
+ */
+export function routeLiveSyncKeys(rotaId: string): unknown[][] {
+    return [...routeStopChangedKeys(rotaId), [KEY_SERVICES]]
 }
