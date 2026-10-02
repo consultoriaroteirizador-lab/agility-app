@@ -10,6 +10,7 @@ import {
     UpdateBankInfoRequest,
     CreateWithdrawalRequest,
     ListTransactionsRequest,
+    WalletSummaryResponse,
 } from './dto';
 
 const BASE_URL = '/wallet';
@@ -68,5 +69,11 @@ export const walletAPI = {
     async getAdvancesSummary(): Promise<{ totalPending: number; count: number; overdueCount: number }> {
         const response = await apiAgility.get(`${BASE_URL}/advances/summary`);
         return unwrap<{ totalPending: number; count: number; overdueCount: number }>(response.data);
+    },
+
+    /** Resumo (F3): política de saque com dívida e o teto que ela deixa (`withdrawableBalance`). */
+    async getSummary(): Promise<WalletSummaryResponse> {
+        const response = await apiAgility.get(`${BASE_URL}/summary`);
+        return unwrap<WalletSummaryResponse>(response.data);
     },
 };

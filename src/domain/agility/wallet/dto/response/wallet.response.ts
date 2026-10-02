@@ -1,6 +1,16 @@
 // src/domain/agility/wallet/dto/response/wallet.response.ts
 
-import { AdvanceStatus, LedgerDirection, PixKeyType, TransactionStatus, TransactionType, WithdrawalMethod, WithdrawalStatus } from '../types';
+import {
+    AdvanceOrigin,
+    AdvanceStatus,
+    LedgerDirection,
+    PixKeyType,
+    TransactionStatus,
+    TransactionType,
+    WithdrawalMethod,
+    WithdrawalStatus,
+    WithdrawalWithDebtPolicy,
+} from '../types';
 
 export interface WalletResponse {
     id: string;
@@ -22,6 +32,12 @@ export interface WalletResponse {
     bankAccount?: string | null;
     pixKey?: string | null;
     pixKeyType?: PixKeyType | null;
+    /** Última troca de banco, conta ou chave (F3). */
+    bankInfoChangedAt?: string | null;
+    /** Última troca da chave PIX, ISO (F3). Conta o primeiro cadastro, a remoção e a troca de tipo. */
+    pixKeyChangedAt?: string | null;
+    /** Chave anterior à última troca, já mascarada pelo back (4 últimos). `null` = não havia chave. */
+    previousPixKeyMasked?: string | null;
     isActive: boolean;
     createdAt: string;
     updatedAt: string;
@@ -85,6 +101,10 @@ export interface WithdrawalResponse {
     walletId: string;
     driverId?: string | null;
     driverName?: string | null;
+    /** Última troca da chave da carteira (F3). */
+    walletPixKeyChangedAt?: string | null;
+    /** A chave da carteira mudou DEPOIS deste pedido; o pagamento vai para o destino gravado aqui (F3). */
+    pixKeyChangedAfterRequest?: boolean;
     amount: number;
     fee: number;
     netAmount: number;
@@ -125,5 +145,22 @@ export interface AdvanceResponse {
     returnedAt?: string;
     isOverdue: boolean;
     notes?: string;
+    /** Pagamento em dinheiro que gerou a dívida (F3). Nunca exibir. */
+    paymentId?: string | null;
+    /** `CASH_COLLECTION` = dinheiro recebido de cliente; `ADVANCE` = adiantamento. */
+    origin?: AdvanceOrigin;
+    cancelledAt?: string | null;
+    /** Motivo do cancelamento, escrito pela empresa (UC15). `cancelledBy` é id: não é tipado de propósito. */
+    cancelReason?: string | null;
     createdAt: string;
+}
+
+/** `GET /wallet/summary` (back `WalletService.getSummary`, F3). Só os campos que o app lê. */
+export interface WalletSummaryResponse {
+    availableBalance: number;
+    /** Dívida aberta (PENDING/PARTIAL), em centavos. */
+    pendingAdvances: number;
+    withdrawalWithDebtPolicy: WithdrawalWithDebtPolicy;
+    /** Quanto a política deixa sacar agora, em centavos (a mesma conta do pedido de saque). */
+    withdrawableBalance: number;
 }
