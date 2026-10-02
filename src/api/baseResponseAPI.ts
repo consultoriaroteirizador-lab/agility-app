@@ -9,6 +9,8 @@ export type ErrorResponseAPI = {
     message?: string;
     code?: string;
     validationErrors?: ValidationErrorsResponseAPI[]
+    /** Campos extras que o back põe no corpo da exceção (ex.: `maxAmountCents` do saque). */
+    [extra: string]: unknown
 }
 
 export type ValidationErrorsResponseAPI = {

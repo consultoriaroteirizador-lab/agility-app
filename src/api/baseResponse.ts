@@ -27,6 +27,8 @@ export type ErrorResponse = {
     message?: string;
     code?: string;
     validationErrors?: ValidationErrorsResponse[]
+    /** Extras do back, repassados por `baseResponseAdapter.toBaseResponseError`. */
+    [extra: string]: unknown
 }
 
 export type ValidationErrorsResponse = {

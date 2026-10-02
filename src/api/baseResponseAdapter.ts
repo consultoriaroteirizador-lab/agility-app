@@ -32,6 +32,10 @@ function toBaseResponseError(error: AxiosError<BaseResponseAPI<any>>): BaseRespo
         return {
             success: responseData.success,
             error: {
+                // Extras do back primeiro: `message`/`code`/`validationErrors` abaixo sempre
+                // ganham. Sem o repasse, o `maxAmountCents` da recusa do saque (F3) sumia aqui
+                // — o mesmo defeito que o `AllExceptionsFilter` do back já corrigiu do lado dele.
+                ...(responseData?.error ?? {}),
                 message: responseData.error?.message || 'Erro desconhecido',
                 code: responseData.error?.code || 'N/A',
                 validationErrors: responseData.error?.validationErrors || [],
