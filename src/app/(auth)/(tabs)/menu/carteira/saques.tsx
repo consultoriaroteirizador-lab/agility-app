@@ -60,6 +60,11 @@ function WithdrawalItem({ item }: { item: WithdrawalResponse }) {
                     {display.note}
                 </Text>
             )}
+            {display.pixNote && (
+                <Text testID={`aviso-chave-${item.id}`} fontSize={measure.m12} color="colorTextWarning" mt="t8">
+                    {display.pixNote}
+                </Text>
+            )}
 
             {comprovantes.map((url, indice) => (
                 <TouchableOpacityBox
