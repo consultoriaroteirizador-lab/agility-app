@@ -81,7 +81,7 @@ it('moneyChangedKeys() alcança a query do hook montado (prefixo posicional)', a
         }
     });
     await settle();
-    expect(mockGetSummary.mock.calls.length).toBeGreaterThanOrEqual(2);
+    expect(mockGetSummary.mock.calls.length).toBe(2);
 
     act(() => tree.unmount());
     queryClient.clear();

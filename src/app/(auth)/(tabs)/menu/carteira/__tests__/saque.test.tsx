@@ -290,6 +290,56 @@ describe('Saque — política de dívida (F3)', () => {
         expect(tree.root.findAllByProps({ testID: 'aviso-politica-divida' })).toHaveLength(0);
     });
 
+    it('"Sacar tudo" preenche o teto da política, não o disponível', () => {
+        mockUseWithdrawalAllowance.mockReturnValue({ allowance: { policy: 'EXCESS_ONLY', withdrawableCents: 7000, openDebtCents: 3000 } });
+        const tree = render();
+        act(() => {
+            tree.root.findAllByProps({ testID: 'sacar-tudo' })[0].props.onPress();
+        });
+        expect(campo(tree).props.valueCents).toBe(7000);
+    });
+
+    it('saldo fracionado sem política: acima do teto diz "saldo insuficiente", nunca "regra de dívidas"', () => {
+        mockUseGetWallet.mockReturnValue({
+            wallet: { availableBalance: 10000.7, hasBankInfo: true, balance: 10000.7 },
+            isLoading: false,
+            isError: false,
+            refetch: mockRefetchWallet,
+        });
+        const tree = render();
+        digitarEPedir(tree, 10001);
+
+        expect(mockModalProps?.isVisible).toBe(false);
+        expect(mockShowToast).toHaveBeenCalledWith({ message: 'Saldo insuficiente para este saque', type: 'error' });
+        expect(tree.root.findAllByProps({ children: `Máximo pela regra de dívidas: ${formatCurrency(10000)}` })).toHaveLength(0);
+        expect(tree.root.findAllByProps({ children: 'Valor maior que o saldo disponível' }).length).toBeGreaterThan(0);
+    });
+
+    it('teto baixa com o modal aberto: Confirmar não manda o POST', async () => {
+        mockUseWithdrawalAllowance.mockReturnValue({ allowance: { policy: 'EXCESS_ONLY', withdrawableCents: 7000, openDebtCents: 3000 } });
+        const tree = render();
+        digitarEPedir(tree, 5000);
+        expect(mockModalProps?.isVisible).toBe(true);
+
+        mockUseWithdrawalAllowance.mockReturnValue({ allowance: { policy: 'EXCESS_ONLY', withdrawableCents: 3000, openDebtCents: 7000 } });
+        act(() => {
+            tree.update(
+                <ThemeProvider theme={theme}>
+                    <SaqueScreen />
+                </ThemeProvider>,
+            );
+        });
+        await act(async () => {
+            await mockModalProps!.onPress!();
+        });
+
+        expect(mockRequestWithdrawal).not.toHaveBeenCalled();
+        expect(mockShowToast).toHaveBeenCalledWith({
+            message: `Pela regra de dívidas da empresa, o máximo agora é ${formatCurrency(3000)}`,
+            type: 'error',
+        });
+    });
+
     it('modal mostra o destino e o alerta de chave trocada recentemente', () => {
         mockUseGetWallet.mockReturnValue({
             wallet: {

@@ -37,7 +37,8 @@ export default function SaqueScreen() {
     // Teto = menor entre o disponível e o que a política de dívida deixa (F3). Sem o resumo
     // (carregando, erro, back sem F3), o teto é o disponível e o back decide (R3).
     const cap = withdrawCapCents(availableBalance, allowance);
-    const limitedByDebt = cap < Math.max(0, availableBalance);
+    // Só há "regra de dívidas" quando há política: sem ela (allowance null) o teto é o disponível.
+    const limitedByDebt = allowance !== null && cap < withdrawCapCents(availableBalance, null);
     const value = amountCents ?? 0;
     const policyNotice = withdrawalPolicyNotice(allowance, debts?.overdueCount ?? null);
     const pixNotice = pixKeyChangeNotice(wallet);
@@ -79,6 +80,16 @@ export default function SaqueScreen() {
 
     async function handleConfirmSaque() {
         setShowConfirmModal(false);
+        // O teto pode ter baixado (refetch) com o modal aberto: revalida antes de mandar o POST.
+        if (value > cap) {
+            showToast({
+                message: limitedByDebt
+                    ? `Pela regra de dívidas da empresa, o máximo agora é ${formatCurrency(cap)}`
+                    : 'Saldo insuficiente para este saque',
+                type: 'error',
+            });
+            return;
+        }
         await run(async () => {
             try {
                 await requestWithdrawal({ amount: value });

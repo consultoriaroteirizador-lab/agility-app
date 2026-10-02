@@ -12,6 +12,11 @@ describe('toWithdrawalAllowance', () => {
         expect(toWithdrawalAllowance(resumo)).toEqual({ policy: 'EXCESS_ONLY', withdrawableCents: 7000, openDebtCents: 3000 });
     });
 
+    it('dívida aberta fracionada cai para o centavo inteiro de baixo', () => {
+        const resumo = { availableBalance: 10000, pendingAdvances: 3000.9, withdrawalWithDebtPolicy: 'EXCESS_ONLY', withdrawableBalance: 7000 } as Resumo;
+        expect(toWithdrawalAllowance(resumo)?.openDebtCents).toBe(3000);
+    });
+
     it('back sem a F3 (sem os campos novos): null', () => {
         expect(toWithdrawalAllowance({ availableBalance: 10000, pendingAdvances: 0 } as Resumo)).toBeNull();
     });

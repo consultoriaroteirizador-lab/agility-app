@@ -29,7 +29,7 @@ export function toWithdrawalAllowance(s: Partial<WalletSummaryResponse> | null |
     return {
         policy,
         withdrawableCents: Math.floor(s.withdrawableBalance),
-        openDebtCents: Number.isFinite(openDebt) && openDebt > 0 ? openDebt : 0,
+        openDebtCents: Number.isFinite(openDebt) && openDebt > 0 ? Math.floor(openDebt) : 0,
     };
 }
 
