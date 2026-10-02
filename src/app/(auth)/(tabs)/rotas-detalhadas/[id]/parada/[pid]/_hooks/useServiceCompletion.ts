@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef } from 'react';
 
 import { useQueryClient } from '@tanstack/react-query';
 
+import { mensagemDaApi } from '@/api/apiErrorMessage';
 import { requirementsForServiceType, ServiceFlowType } from '@/domain/agility/company/completionRequirements';
 import type { ServiceCompletionDetailsRequest } from '@/domain/agility/service/dto/request/service-completion-details.request';
 import { useCompleteServiceWithDetails } from '@/domain/agility/service/useCase';
@@ -98,8 +99,12 @@ export function useServiceCompletion(serviceType: ServiceFlowType) {
         };
     }, []);
 
-    // Hook para enviar detalhes de conclusão
-    const { completeServiceWithDetailsAsync, isLoading: isCompletingWithDetails } = useCompleteServiceWithDetails();
+    // Hook para enviar detalhes de conclusão. `onError` vazio de propósito: sem ele o
+    // `useMutationService` abre o modal de erro com a mesma frase que o toast do catch de
+    // `handleFinalizar` já mostra (a recusa do back aparecia duas vezes).
+    const { completeServiceWithDetailsAsync, isLoading: isCompletingWithDetails } = useCompleteServiceWithDetails({
+        onError: () => undefined,
+    });
 
     // Reset defensivo: se o consumer (ex: SharedEtapaFinalizacao) monta com
     // `finalizing=true` no contexto MAS não há mutation em voo, é resíduo de
@@ -333,7 +338,9 @@ export function useServiceCompletion(serviceType: ServiceFlowType) {
             console.error('[useServiceCompletion] Erro ao finalizar:', e);
 
             if (isMountedRef.current) {
-                const errorMessage = (e as { message?: string })?.message || 'Ocorreu um erro ao finalizar.';
+                // O interceptor rejeita `{ error: { message } }`, não um `Error`: ler só `e.message`
+                // escondia a recusa do back (ex.: 400 SERVICE_REQUIRES_PAYMENT_DETAILS, F3).
+                const errorMessage = mensagemDaApi(e, 'Ocorreu um erro ao finalizar.');
                 showToast({ message: errorMessage, type: 'error' });
                 setFinalizing(false);
             }

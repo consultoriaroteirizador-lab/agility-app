@@ -34,6 +34,10 @@ export const LedgerSourceType = {
     FREIGHT_SHARE_COMPLEMENT: 'FREIGHT_SHARE_COMPLEMENT',
     FREIGHT_SHARE_RELEASE: 'FREIGHT_SHARE_RELEASE',
     FREIGHT_SHARE_REVERSAL: 'FREIGHT_SHARE_REVERSAL',
+    // Redistribuição entre as parcelas da mesma rota (F3). `sourceId` = `<chave>_<parcela>`.
+    FREIGHT_SHARE_REDISTRIBUTION_IN: 'FREIGHT_SHARE_REDISTRIBUTION_IN',
+    FREIGHT_SHARE_REDISTRIBUTION_RELEASE: 'FREIGHT_SHARE_REDISTRIBUTION_RELEASE',
+    FREIGHT_SHARE_REDISTRIBUTION_REVERSAL: 'FREIGHT_SHARE_REDISTRIBUTION_REVERSAL',
     WITHDRAWAL_HOLD: 'WITHDRAWAL_HOLD',
     WITHDRAWAL_HOLD_RELEASE: 'WITHDRAWAL_HOLD_RELEASE',
     WITHDRAWAL: 'WITHDRAWAL',
@@ -81,3 +85,8 @@ export enum AdvanceStatus {
     CANCELLED = 'CANCELLED',
 }
 
+/** Política de saque com dívida da empresa (`Company.params.finance`, F3). Padrão `FREE`. */
+export type WithdrawalWithDebtPolicy = 'FREE' | 'BLOCK_IF_OVERDUE' | 'EXCESS_ONLY';
+
+/** Origem da dívida (`DriverAdvanceEntity.origin()`, F3): com `paymentId` é cobrança em dinheiro. */
+export type AdvanceOrigin = 'CASH_COLLECTION' | 'ADVANCE';

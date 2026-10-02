@@ -6,15 +6,20 @@ import { ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 
-import { mensagemDaApi } from '@/api/apiErrorMessage';
 import { ActivityIndicator, Box, BRLInput, Button, ScreenBase, Text, TouchableOpacityBox } from '@/components';
 import { ButtonBack } from '@/components/Button/ButtonBack';
 import Modal from '@/components/Modal/Modal';
-import { useGetWallet, useRequestWithdrawal } from '@/domain/agility/wallet';
+import { useGetAdvancesSummary, useGetWallet, useRequestWithdrawal, useWithdrawalAllowance } from '@/domain/agility/wallet';
+import { withdrawCapCents } from '@/domain/agility/wallet/withdrawalAllowance';
 import { useSubmitLock } from '@/hooks/useSubmitLock';
 import { useToastService } from '@/services/Toast/useToast';
 import { measure } from '@/theme';
 import { formatCurrency } from '@/utils/formatCurrency';
+
+import { PolicyNoticeBox } from './_components/PolicyNoticeBox';
+import { maxWithdrawalFromError, withdrawalErrorMessage, withdrawalPolicyNotice } from './_utils/debtPolicy';
+import { pixKeyChangeNotice } from './_utils/pixKeyNotice';
+import { walletDestination } from './_utils/withdrawalDisplay';
 
 const MIN_WITHDRAWAL_CENTS = 100; // R$ 1,00, o mesmo @Min(100) do CreateWithdrawalDto
 
@@ -24,14 +29,28 @@ export default function SaqueScreen() {
     const [amountCents, setAmountCents] = useState<number | null>(null);
     const [showConfirmModal, setShowConfirmModal] = useState(false);
     const { wallet, isLoading: isLoadingWallet, isError: isWalletError, refetch: refetchWallet } = useGetWallet();
+    const { allowance } = useWithdrawalAllowance();
+    const { summary: debts } = useGetAdvancesSummary();
     const { requestWithdrawal } = useRequestWithdrawal();
     const { run, isSubmitting, isLocked } = useSubmitLock();
 
     const availableBalance = wallet?.availableBalance ?? 0;
+    // Teto = menor entre o disponível e o que a política de dívida deixa (F3). Sem o resumo
+    // (carregando, erro, back sem F3), o teto é o disponível e o back decide (R3).
+    const cap = withdrawCapCents(availableBalance, allowance);
+    // Só há "regra de dívidas" quando há política que limita: sem ela (allowance null) o teto é o
+    // disponível, e com FREE um teto menor é só o resumo de outro momento que o /wallet.
+    const limitedByDebt = allowance !== null && allowance.policy !== 'FREE' && cap < withdrawCapCents(availableBalance, null);
     const value = amountCents ?? 0;
+    const policyNotice = withdrawalPolicyNotice(allowance, debts?.overdueCount ?? null);
+    const pixNotice = pixKeyChangeNotice(wallet);
 
     function goToBankInfo() {
         router.push('/menu/carteira/config/dados-bancarios');
+    }
+
+    function goToDebts() {
+        router.push('/menu/carteira/adiantamentos');
     }
 
     function handleRequestSaque() {
@@ -41,8 +60,13 @@ export default function SaqueScreen() {
             showToast({ message: 'O valor mínimo para saque é R$ 1,00', type: 'error' });
             return;
         }
-        if (value > availableBalance) {
-            showToast({ message: 'Saldo insuficiente para este saque', type: 'error' });
+        if (value > cap) {
+            showToast({
+                message: limitedByDebt
+                    ? `Pela regra de dívidas da empresa, o máximo agora é ${formatCurrency(cap)}`
+                    : 'Saldo insuficiente para este saque',
+                type: 'error',
+            });
             return;
         }
         if (!wallet?.hasBankInfo) {
@@ -58,6 +82,16 @@ export default function SaqueScreen() {
 
     async function handleConfirmSaque() {
         setShowConfirmModal(false);
+        // O teto pode ter baixado (refetch) com o modal aberto: revalida antes de mandar o POST.
+        if (value > cap) {
+            showToast({
+                message: limitedByDebt
+                    ? `Pela regra de dívidas da empresa, o máximo agora é ${formatCurrency(cap)}`
+                    : 'Saldo insuficiente para este saque',
+                type: 'error',
+            });
+            return;
+        }
         await run(async () => {
             try {
                 await requestWithdrawal({ amount: value });
@@ -65,8 +99,14 @@ export default function SaqueScreen() {
                 // `replace`: voltar não reabre o formulário preenchido (R10).
                 router.replace('/menu/carteira/saques');
             } catch (error) {
-                // O valor digitado fica: o motorista corrige ou tenta de novo.
-                showToast({ message: mensagemDaApi(error, 'Não foi possível solicitar o saque. Tente novamente.'), type: 'error' });
+                // O valor digitado fica. A recusa pela política de dívida (F3) traz o máximo: a
+                // mensagem diz o número e a ação SÓ preenche o campo — enviar é outro toque.
+                const max = maxWithdrawalFromError(error);
+                showToast({
+                    message: withdrawalErrorMessage(error, 'Não foi possível solicitar o saque. Tente novamente.'),
+                    type: 'error',
+                    ...(max !== null ? { action: { title: 'Usar o máximo', onPress: () => setAmountCents(max) } } : {}),
+                });
             }
         });
     }
@@ -108,14 +148,32 @@ export default function SaqueScreen() {
         );
     }
 
-    const invalid = value < MIN_WITHDRAWAL_CENTS || value > availableBalance || !wallet?.hasBankInfo;
-    const disabledReason = !wallet?.hasBankInfo
-        ? 'Configure seus dados bancários para sacar'
-        : value < MIN_WITHDRAWAL_CENTS
-            ? `Valor mínimo: ${formatCurrency(MIN_WITHDRAWAL_CENTS)}`
-            : value > availableBalance
-                ? 'Valor maior que o saldo disponível'
-                : null;
+    const invalid = value < MIN_WITHDRAWAL_CENTS || value > cap || !wallet?.hasBankInfo;
+    // Com o aviso de bloqueio na tela, "Valor mínimo..." ao lado dele confundiria (P10).
+    const disabledReason = policyNotice?.tone === 'block'
+        ? null
+        : !wallet?.hasBankInfo
+            ? 'Configure seus dados bancários para sacar'
+            : value < MIN_WITHDRAWAL_CENTS
+                ? `Valor mínimo: ${formatCurrency(MIN_WITHDRAWAL_CENTS)}`
+                : value > cap
+                    ? limitedByDebt
+                        ? `Máximo pela regra de dívidas: ${formatCurrency(cap)}`
+                        : 'Valor maior que o saldo disponível'
+                    : null;
+
+    // Destino e alerta de chave (F3): o motorista confere PARA ONDE vai antes de confirmar (R9).
+    // O destino vem do GET /wallet em cache: é a chave (ou a conta, no TED) ATUAL da carteira, e o texto diz isso.
+    const confirmText = [
+        `Deseja solicitar o saque de ${formatCurrency(value)}?`,
+        wallet
+            ? `Destino: ${walletDestination(wallet)}\n${wallet.pixKey ? '(a chave atual da sua carteira)' : '(os dados atuais da sua carteira)'}`
+            : null,
+        pixNotice?.recent ? `Atenção: ${pixNotice.text}` : null,
+        'O valor sai do disponível e fica em "Saque pendente" até o pagamento.',
+    ]
+        .filter(Boolean)
+        .join('\n\n');
 
     return (
         <ScreenBase buttonLeft={<ButtonBack />} title={<Text preset="textTitleScreen">Saque</Text>}>
@@ -130,19 +188,22 @@ export default function SaqueScreen() {
                         </Text>
                     </Box>
 
+                    {policyNotice && <PolicyNoticeBox notice={policyNotice} onPress={goToDebts} linkText="Ver o que devo à empresa" />}
+
                     <Box mt="t24">
                         <Text fontSize={measure.m14} fontWeightPreset="semibold" mb="b8">
                             Valor do saque
                         </Text>
-                        <BRLInput valueCents={amountCents} onChangeCents={setAmountCents} maxCents={availableBalance} placeholder="R$ 0,00" />
+                        <BRLInput valueCents={amountCents} onChangeCents={setAmountCents} maxCents={cap} placeholder="R$ 0,00" />
 
                         <TouchableOpacityBox
+                            testID="sacar-tudo"
                             mt="t8"
-                            onPress={() => setAmountCents(availableBalance)}
-                            disabled={availableBalance < MIN_WITHDRAWAL_CENTS || isSubmitting}
+                            onPress={() => setAmountCents(cap)}
+                            disabled={cap < MIN_WITHDRAWAL_CENTS || isSubmitting}
                         >
                             <Text fontSize={measure.m12} color="colorTextPrimary">
-                                {`Sacar tudo (${formatCurrency(availableBalance)})`}
+                                {`Sacar tudo (${formatCurrency(cap)})`}
                             </Text>
                         </TouchableOpacityBox>
                     </Box>
@@ -197,7 +258,7 @@ export default function SaqueScreen() {
                 preset="action"
                 isVisible={showConfirmModal && !isSubmitting}
                 title="Confirmar saque"
-                text={`Deseja solicitar o saque de ${formatCurrency(value)}?\n\nO valor sai do disponível e fica em "Saque pendente" até o pagamento.`}
+                text={confirmText}
                 buttonActionTitle="Confirmar"
                 buttonCloseTitle="Cancelar"
                 onPress={handleConfirmSaque}

@@ -27,9 +27,11 @@ jest.mock('expo-router', () => ({
 
 const mockUseInfiniteAdvances = jest.fn();
 const mockUseGetAdvancesSummary = jest.fn();
+const mockUseWithdrawalAllowance = jest.fn();
 jest.mock('@/domain/agility/wallet', () => ({
     useInfiniteAdvances: () => mockUseInfiniteAdvances(),
     useGetAdvancesSummary: () => mockUseGetAdvancesSummary(),
+    useWithdrawalAllowance: () => mockUseWithdrawalAllowance(),
 }));
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -47,7 +49,8 @@ const LISTA_OK = {
     isRefreshing: false,
 };
 
-function render(lista: Record<string, unknown>, resumo: Record<string, unknown>) {
+function render(lista: Record<string, unknown>, resumo: Record<string, unknown>, politica: Record<string, unknown> = {}) {
+    mockUseWithdrawalAllowance.mockReturnValue({ allowance: null, ...politica });
     mockUseInfiniteAdvances.mockReturnValue({ ...LISTA_OK, ...lista });
     mockUseGetAdvancesSummary.mockReturnValue({ refetch: jest.fn(), ...resumo });
     let tree!: TestRenderer.ReactTestRenderer;
@@ -97,5 +100,66 @@ describe('Adiantamentos', () => {
         );
         expect(tree.root.findAllByProps({ testID: 'vencimento-a-1' })[0].props.children).toBe('Vence em 30/09/2026');
         expect(tree.root.findAllByProps({ testID: 'titulo-a-1' })[0].props.children).toBe('Dinheiro recebido de cliente');
+    });
+
+    it('dívida cancelada mostra o motivo que a empresa escreveu', () => {
+        const tree = render(
+            {
+                items: [
+                    {
+                        id: 'a-2',
+                        amount: 5000,
+                        pendingAmount: 0,
+                        returnedAmount: 0,
+                        status: 'CANCELLED',
+                        description: 'Dinheiro recebido no service 2f6c1c8e-1111 — devolução pendente',
+                        origin: 'CASH_COLLECTION',
+                        cancelReason: 'Pedido estornado ao cliente',
+                        isOverdue: false,
+                        createdAt: '2026-09-23T12:00:00.000Z',
+                    },
+                ],
+            },
+            { summary: { totalPending: 0, count: 0, overdueCount: 0 }, isError: false },
+        );
+        expect(tree.root.findAllByProps({ testID: 'cancelamento-a-2' })[0].props.children).toBe('Cancelada pela empresa: Pedido estornado ao cliente');
+    });
+
+    it('BLOCK_IF_OVERDUE com vencida: aviso de bloqueio do saque no topo', () => {
+        const tree = render(
+            { items: [] },
+            { summary: { totalPending: 5000, count: 1, overdueCount: 1 }, isError: false },
+            { allowance: { policy: 'BLOCK_IF_OVERDUE', withdrawableCents: 0, openDebtCents: 5000 } },
+        );
+        expect(tree.root.findAllByProps({ testID: 'aviso-politica-divida-texto' })[0].props.children).toBe(
+            'Saque bloqueado: você tem 1 dívida(s) vencida(s) com a empresa. Devolva o valor para liberar o saque.',
+        );
+    });
+
+    // Achado 1 da revisão final: sem a contagem de vencidas, o aviso não pode dizer "até o
+    // vencimento" (pode já ter vencido) nem sair em tom de informação quando o bloqueio está provado.
+    it('BLOCK_IF_OVERDUE com o resumo falho e bloqueio provado pela política: aviso de bloqueio sem contagem', () => {
+        const tree = render(
+            { items: [] },
+            { summary: undefined, isError: true },
+            { allowance: { policy: 'BLOCK_IF_OVERDUE', withdrawableCents: 0, openDebtCents: 5000, availableCents: 10000 } },
+        );
+        const aviso = tree.root.findAllByProps({ testID: 'aviso-politica-divida-texto' })[0];
+        expect(aviso.props.children).toBe('Saque bloqueado: você tem dívida vencida com a empresa. Devolva o valor para liberar o saque.');
+        expect(aviso.props.color).toBe('colorTextError');
+    });
+
+    it('BLOCK_IF_OVERDUE com o resumo falho e sem prova de bloqueio: texto neutro, sem "até o vencimento"', () => {
+        const tree = render(
+            { items: [] },
+            { summary: undefined, isError: true },
+            { allowance: { policy: 'BLOCK_IF_OVERDUE', withdrawableCents: 10000, openDebtCents: 5000, availableCents: 10000 } },
+        );
+        expect(tree.root.findAllByProps({ testID: 'aviso-politica-divida-texto' })[0].props.children).toBe('Na sua empresa, dívida vencida bloqueia o saque.');
+    });
+
+    it('política livre ou não carregada: sem aviso', () => {
+        const tree = render({ items: [] }, { summary: { totalPending: 5000, count: 1, overdueCount: 1 }, isError: false });
+        expect(existe(tree, 'aviso-politica-divida')).toBe(false);
     });
 });

@@ -73,7 +73,6 @@ export type DynamicAppRoute =
     | `/menu/protocolos/${string}`
     | `/menu/suporte/${string}`
     | `/rotas-detalhadas/${string}/parada/${string}`
-    | `/rotas-detalhadas/${string}/parada/${string}/dados-entrega`
     | `/rotas-detalhadas/${string}/parada/${string}/dados-servico`
     | `/rotas-detalhadas/${string}/parada/${string}/entrega`
     | `/rotas-detalhadas/${string}/parada/${string}/coleta`

@@ -9,7 +9,6 @@ import type {
     UpdateServiceRequest,
     ListServicesRequest,
     ServiceResponse,
-    ChangeServiceStatusRequest,
     ServiceCompletionDetailsRequest,
     ServiceFailRequest,
     ServiceDraftData,
@@ -118,13 +117,6 @@ async function startAttendance(
     return data
 }
 
-async function complete(id: Id, completionNotes?: string): Promise<BaseResponse<ServiceResponse>> {
-    const { data } = await apiAgility.patch<BaseResponse<ServiceResponse>>(`/services/${id}/complete`, {
-        completionNotes,
-    })
-    return data
-}
-
 async function completeWithDetails(
     id: Id,
     details: ServiceCompletionDetailsRequest,
@@ -181,14 +173,6 @@ async function applyOccurrence(
 /** Tentativas de entrega do pedido, em ordem (falhas, devolução e desfecho). */
 async function findAttempts(id: Id): Promise<BaseResponse<DeliveryAttemptResponse[]>> {
     const { data } = await apiAgility.get<BaseResponse<DeliveryAttemptResponse[]>>(`/services/${id}/attempts`)
-    return data
-}
-
-async function changeStatus(
-    id: Id,
-    payload: ChangeServiceStatusRequest,
-): Promise<BaseResponse<ServiceResponse>> {
-    const { data } = await apiAgility.put<BaseResponse<ServiceResponse>>(`/services/${id}/status`, payload)
     return data
 }
 
@@ -283,12 +267,10 @@ export const serviceAPI = {
     unassignDriver,
     start,
     startAttendance,
-    complete,
     completeWithDetails,
     fail,
     applyOccurrence,
     findAttempts,
-    changeStatus,
     remove,
     removeBatch,
     // Materials

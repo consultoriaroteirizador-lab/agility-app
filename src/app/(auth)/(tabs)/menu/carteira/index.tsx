@@ -12,6 +12,8 @@ import { useGetAdvancesSummary, useGetWallet } from '@/domain/agility/wallet';
 import { measure } from '@/theme';
 import { formatCurrency } from '@/utils/formatCurrency';
 
+import { pixKeyChangeNotice } from './_utils/pixKeyNotice';
+
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
 function QuickAction({ icon, color, label, onPress }: { icon: IconName; color: string; label: string; onPress: () => void }) {
@@ -87,11 +89,28 @@ export default function CarteiraScreen() {
     }
 
     const hasOverdue = (advances?.overdueCount ?? 0) > 0;
+    // Calculado no render (sem memo): é barato, e o "agora" é lido dentro da função.
+    const pixNotice = pixKeyChangeNotice(wallet);
 
     return (
         <ScreenBase buttonLeft={<ButtonBack />} title={title}>
             <ScrollView refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refresh} />}>
                 <Box>
+                    {/* Troca de chave PIX recente (F3): o golpe que redireciona o saque. */}
+                    {pixNotice?.recent && (
+                        <Box testID="aviso-chave-pix" p="m16" mb="b16" borderRadius="s12" borderWidth={1} borderColor="redError">
+                            <Box flexDirection="row" alignItems="center">
+                                <Ionicons name="warning" size={16} color="#F44336" />
+                                <Text ml="l8" fontSize={measure.m14} fontWeightPreset="bold" color="colorTextError">
+                                    {pixNotice.title}
+                                </Text>
+                            </Box>
+                            <Text testID="aviso-chave-pix-texto" mt="t8" fontSize={measure.m13} color="colorTextSecondary">
+                                {pixNotice.text}
+                            </Text>
+                        </Box>
+                    )}
+
                     {/* Os quatro números vêm prontos do GET /wallet (F2); nenhum é somado aqui. */}
                     <Box p="m20" borderRadius="s16">
                         <Text fontSize={measure.m14} color="colorTextSecondary">
@@ -219,6 +238,11 @@ export default function CarteiraScreen() {
                                             <Text fontSize={measure.m14} fontWeightPreset="semibold" mt="t4">
                                                 {wallet.pixKey}
                                             </Text>
+                                            {pixNotice && !pixNotice.recent && (
+                                                <Text testID="chave-pix-alterada-em" fontSize={measure.m11} color="colorTextSecondary" mt="t4">
+                                                    {pixNotice.text}
+                                                </Text>
+                                            )}
                                         </Box>
                                     )}
                                     {!!wallet.bankName && (

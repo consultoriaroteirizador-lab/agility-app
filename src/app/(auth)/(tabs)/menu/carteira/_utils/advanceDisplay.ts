@@ -1,16 +1,25 @@
 import type { AdvanceResponse } from '@/domain/agility/wallet/dto/response/wallet.response';
+import { AdvanceStatus } from '@/domain/agility/wallet/dto/types';
 import { formatDateOnly } from '@/utils/formatDate';
 
 /**
- * A dívida de cobrança em dinheiro nasce com a descrição
- * "Dinheiro recebido no service <uuid> — devolução pendente" (back, payment.listener.ts:99).
- * O id não vai para a tela (regra "nome, nunca id").
+ * Dívida de cobrança em dinheiro: pela `origin` (F3, `CASH_COLLECTION` = tem `paymentId`) ou,
+ * na legada sem vínculo, pela descrição do listener ("Dinheiro recebido no service <uuid> —
+ * devolução pendente" ou o prefixo antigo "Cash recebido no service "). O id não vai para a
+ * tela (regra "nome, nunca id").
  */
-const CASH_DEBT_PREFIX = /^Dinheiro recebido no service /;
+const CASH_DEBT_PREFIX = /^(Dinheiro|Cash) recebido no service /;
 
-export function advanceTitle(a: Pick<AdvanceResponse, 'description'>): string {
-    if (CASH_DEBT_PREFIX.test(a.description ?? '')) return 'Dinheiro recebido de cliente';
+export function advanceTitle(a: Pick<AdvanceResponse, 'description' | 'origin'>): string {
+    if (a.origin === 'CASH_COLLECTION' || CASH_DEBT_PREFIX.test(a.description ?? '')) return 'Dinheiro recebido de cliente';
     return a.description;
+}
+
+/** UC15: a empresa cancelou a dívida (ex.: pedido estornado). O motivo é escrito para o motorista. */
+export function advanceCancelText(a: Pick<AdvanceResponse, 'status' | 'cancelReason'>): string | null {
+    if (a.status !== AdvanceStatus.CANCELLED) return null;
+    const motivo = a.cancelReason?.trim();
+    return motivo ? `Cancelada pela empresa: ${motivo}` : 'Cancelada pela empresa.';
 }
 
 /**

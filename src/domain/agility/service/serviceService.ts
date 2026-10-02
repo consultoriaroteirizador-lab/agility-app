@@ -8,7 +8,6 @@ import type {
     UpdateServiceRequest,
     ListServicesRequest,
     ServiceResponse,
-    ChangeServiceStatusRequest,
     ServiceCompletionDetailsRequest,
     ServiceFailRequest,
     ServiceDraftData,
@@ -83,10 +82,6 @@ async function startAttendance(
     return serviceAPI.startAttendance(id, opts)
 }
 
-async function complete(id: Id, completionNotes?: string): Promise<BaseResponse<ServiceResponse>> {
-    return serviceAPI.complete(id, completionNotes)
-}
-
 async function completeWithDetails(
     id: Id,
     details: ServiceCompletionDetailsRequest,
@@ -110,13 +105,6 @@ async function applyOccurrence(
 
 async function findAttempts(id: Id): Promise<BaseResponse<DeliveryAttemptResponse[]>> {
     return serviceAPI.findAttempts(id)
-}
-
-async function changeStatus(
-    id: Id,
-    payload: ChangeServiceStatusRequest,
-): Promise<BaseResponse<ServiceResponse>> {
-    return serviceAPI.changeStatus(id, payload)
 }
 
 async function remove(id: Id): Promise<BaseResponse<{ success: boolean; message: string }>> {
@@ -174,12 +162,10 @@ export const serviceService = {
     unassignDriver,
     start,
     startAttendance,
-    complete,
     completeWithDetails,
     fail,
     applyOccurrence,
     findAttempts,
-    changeStatus,
     remove,
     removeBatch,
     // Materials

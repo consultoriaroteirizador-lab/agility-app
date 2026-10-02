@@ -73,3 +73,36 @@ describe('groupReleasedFreight', () => {
         expect(itens.map((i) => i.shareId)).toEqual(['b', 'a']);
     });
 });
+
+describe('redistribuição antes da liberação (F3)', () => {
+    const reducao = (over: Partial<Line> & { id: string }) =>
+        linha({
+            type: 'FREIGHT_RELEASE' as Line['type'],
+            sourceType: 'FREIGHT_SHARE_REDISTRIBUTION_RELEASE',
+            sourceId: 'chave-1_share-1',
+            description: 'Frete redistribuído (desbloqueio da redução) - roteirização LMR-260920-A1',
+            amount: 4000,
+            ...over,
+        });
+    const estornoDaReducao = (over: Partial<Line> & { id: string }) =>
+        linha({
+            type: 'MANUAL_DEBIT' as Line['type'],
+            direction: 'OUT',
+            sourceType: 'FREIGHT_SHARE_REDISTRIBUTION_REVERSAL',
+            sourceId: 'chave-1_share-1',
+            description: 'Frete redistribuído (redução) - roteirização LMR-260920-A1',
+            amount: 4000,
+            ...over,
+        });
+
+    it('conta só a liberação da parcela, já com o valor redistribuído, uma vez', () => {
+        const itens = groupReleasedFreight([reducao({ id: 'r0' }), estornoDaReducao({ id: 'e0' }), linha({ id: 'r1', amount: 6000 })]);
+        expect(itens).toHaveLength(1);
+        expect(itens[0]).toMatchObject({ shareId: 'share-1', releasedCents: 6000 });
+        expect(totalReleasedCents(itens)).toBe(6000);
+    });
+
+    it('só a redistribuição, sem liberação: nada em Ganhos', () => {
+        expect(groupReleasedFreight([reducao({ id: 'r0' }), estornoDaReducao({ id: 'e0' })])).toEqual([]);
+    });
+});

@@ -7,7 +7,6 @@ export default function RotasDetalhadasLayout() {
       <Stack.Screen name="[id]/parada/[pid]/index" />
       <Stack.Screen name="[id]/parada/[pid]/dados-servico" />
       <Stack.Screen name="[id]/parada/[pid]/entrega" />
-      <Stack.Screen name="[id]/parada/[pid]/dados-entrega" />
       <Stack.Screen name="[id]/parada/[pid]/insucesso" />
       <Stack.Screen name="[id]/parada/[pid]/nao-realizado" />
       <Stack.Screen name="[id]/parada/[pid]/retorno/index" />

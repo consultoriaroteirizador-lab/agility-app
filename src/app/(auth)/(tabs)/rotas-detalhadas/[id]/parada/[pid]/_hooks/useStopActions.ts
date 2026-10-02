@@ -5,11 +5,10 @@ import { useRouter } from 'expo-router';
 
 import { ServiceStatus } from '@/domain/agility/service/dto/types';
 import {
-    useCompleteService,
     useStartService,
     useStartAttendance,
 } from '@/domain/agility/service/useCase';
-import { moneyChangedKeys, routeStopChangedKeys } from '@/domain/queryKeys';
+import { routeStopChangedKeys } from '@/domain/queryKeys';
 import { useToastService } from '@/services/Toast/useToast';
 
 import { getCurrentCoords } from './getCurrentCoords';
@@ -40,15 +39,13 @@ interface UseStopActionsReturn {
      * NÃO deve avançar o wizard nesse caso.
      */
     handleStartAttendance: (args?: StartAttendanceArgs) => Promise<boolean>;
-    handleCompleteService: () => void;
     handleMarkAsFailed: () => void;
     isStarting: boolean;
     isStartingAttendance: boolean;
-    isCompleting: boolean;
 }
 
 /**
- * Hook to manage stop/service actions (start, complete, fail)
+ * Hook to manage stop/service actions (start, attendance, fail)
  */
 export const useStopActions = ({
     serviceId,
@@ -151,24 +148,6 @@ export const useStopActions = ({
         },
     })
 
-    const { completeService, isLoading: isCompleting } = useCompleteService({
-        onSuccess: async () => {
-            await invalidateQueries();
-            // Ponto de conclusão (não os de start service/atendimento, que também passam
-            // por `invalidateQueries`): cobrança em dinheiro pode ter criado dívida e
-            // pagamento no mesmo gesto. Fora de `routeStopChangedKeys` de propósito (ver
-            // comentário em `src/domain/queryKeys.ts`) — chamada só aqui, na conclusão.
-            for (const queryKey of moneyChangedKeys()) {
-                void queryClient.invalidateQueries({ queryKey });
-            }
-            setTimeout(() => router.back(), 500);
-        },
-        onError: (error) => {
-            console.error('Error completing service:', error);
-            showToast({ message: 'Não foi possível concluir o serviço. Tente novamente.', type: 'error' });
-        },
-    });
-
     const handleStartService = useCallback(() => {
         setPendingStart(true);
         startService(serviceId);
@@ -254,10 +233,6 @@ export const useStopActions = ({
         }
     }, [serviceStatus, startAttendanceAsync, serviceId, invalidateQueries, onSuccess, showToast]);
 
-    const handleCompleteService = useCallback(() => {
-        completeService({ id: serviceId });
-    }, [completeService, serviceId]);
-
     // Quick-fail agora roteia pro picker de motivos do catálogo (tela insucesso) em
     // vez de disparar a mutation direto com FailureReason.OTHER hardcoded.
     const handleMarkAsFailed = useCallback(() => {
@@ -271,11 +246,9 @@ export const useStopActions = ({
         handleStartService,
         handleGoToLocation,
         handleStartAttendance,
-        handleCompleteService,
         handleMarkAsFailed,
         // Loading estendido: cobre do clique até o backend confirmar o novo status.
         isStarting: isStarting || pendingStart,
         isStartingAttendance: isStartingAttendance || pendingAttendance,
-        isCompleting,
     };
 };

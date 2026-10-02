@@ -1,4 +1,4 @@
-import { describeWithdrawal } from '../withdrawalDisplay';
+import { describeWithdrawal, walletDestination } from '../withdrawalDisplay';
 
 type W = Parameters<typeof describeWithdrawal>[0];
 
@@ -50,5 +50,34 @@ describe('describeWithdrawal', () => {
             describeWithdrawal(saque({ method: 'TED' as W['method'], pixKey: null, bankName: 'Banco X', bankAgency: '1234', bankAccount: '56789-0' }))
                 .destination,
         ).toBe('TED: Banco X · Ag. 1234 · Conta 56789-0');
+    });
+});
+
+describe('chave trocada depois do pedido (F3, R1)', () => {
+    const AVISO =
+        'Sua chave PIX mudou depois deste pedido. O pagamento vai para o destino acima, gravado no pedido. Se não foi você quem trocou a chave, fale com a central.';
+
+    it('saque aguardando com a chave trocada depois: aviso', () => {
+        expect(describeWithdrawal(saque({ pixKeyChangedAfterRequest: true } as Partial<W>)).pixNote).toBe(AVISO);
+        expect(describeWithdrawal(saque({ status: 'PROCESSING' as W['status'], pixKeyChangedAfterRequest: true } as Partial<W>)).pixNote).toBe(AVISO);
+    });
+
+    it('saque já pago, recusado ou sem troca: sem aviso', () => {
+        expect(describeWithdrawal(saque({ status: 'COMPLETED' as W['status'], pixKeyChangedAfterRequest: true } as Partial<W>)).pixNote).toBeNull();
+        expect(describeWithdrawal(saque({ status: 'CANCELLED' as W['status'], pixKeyChangedAfterRequest: true } as Partial<W>)).pixNote).toBeNull();
+        expect(describeWithdrawal(saque({ pixKeyChangedAfterRequest: false } as Partial<W>)).pixNote).toBeNull();
+        expect(describeWithdrawal(saque()).pixNote).toBeNull();
+    });
+});
+
+describe('walletDestination', () => {
+    it('com chave PIX: o back paga por PIX', () => {
+        expect(walletDestination({ pixKey: 'nova@exemplo.com', bankName: 'Banco X', bankAgency: '1', bankAccount: '2' })).toBe('PIX: nova@exemplo.com');
+    });
+
+    it('sem chave: TED com a conta', () => {
+        expect(walletDestination({ pixKey: null, bankName: 'Banco X', bankAgency: '0001', bankAccount: '12345-6' })).toBe(
+            'TED: Banco X · Ag. 0001 · Conta 12345-6',
+        );
     });
 });

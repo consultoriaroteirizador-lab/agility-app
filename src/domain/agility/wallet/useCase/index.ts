@@ -6,3 +6,4 @@ export * from './useGetAdvances';
 export * from './useUpdateBankInfo';
 export * from './useInfiniteWalletLists';
 export * from './useFreightEarnings';
+export * from './useWithdrawalAllowance';

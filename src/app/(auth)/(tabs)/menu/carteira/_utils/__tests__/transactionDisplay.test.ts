@@ -171,3 +171,35 @@ describe('filterTransactions', () => {
         expect(categoryOf(tx({ type: 'MANUAL_CREDIT' as Tx['type'], direction: 'IN', sourceType: 'MANUAL' }))).toBe('adjustments');
     });
 });
+
+describe('redistribuição entre motoristas da mesma rota (F3)', () => {
+    it('acréscimo: FREIGHT IN, rótulo próprio e categoria frete', () => {
+        const d = describeTransaction(tx({ type: 'FREIGHT' as Tx['type'], direction: 'IN', sourceType: 'FREIGHT_SHARE_REDISTRIBUTION_IN' }));
+        expect(d.label).toBe('Frete redistribuído (acréscimo)');
+        expect(d.category).toBe('freight');
+        expect(d.amountText).toBe(`+${formatCurrency(5000)}`);
+    });
+
+    it('redução: FREIGHT_RELEASE sem sinal NÃO é "Frete liberado"', () => {
+        const d = describeTransaction(
+            tx({
+                type: 'FREIGHT_RELEASE' as Tx['type'],
+                direction: 'IN',
+                affectsBalance: false,
+                sourceType: 'FREIGHT_SHARE_REDISTRIBUTION_RELEASE',
+                metadata: { action: 'REDISTRIBUTE' },
+            }),
+        );
+        expect(d.label).toBe('Frete redistribuído (redução)');
+        expect(d.label).not.toBe('Frete liberado');
+        expect(d.amountText).toBe(formatCurrency(5000));
+    });
+
+    it('estorno da redução: MANUAL_DEBIT em frete, não em ajustes', () => {
+        const linha = tx({ type: 'MANUAL_DEBIT' as Tx['type'], direction: 'OUT', sourceType: 'FREIGHT_SHARE_REDISTRIBUTION_REVERSAL' });
+        expect(describeTransaction(linha).label).toBe('Estorno da redistribuição');
+        expect(describeTransaction(linha).amountText).toBe(`-${formatCurrency(5000)}`);
+        expect(filterTransactions([linha], 'freight')).toHaveLength(1);
+        expect(filterTransactions([linha], 'adjustments')).toHaveLength(0);
+    });
+});

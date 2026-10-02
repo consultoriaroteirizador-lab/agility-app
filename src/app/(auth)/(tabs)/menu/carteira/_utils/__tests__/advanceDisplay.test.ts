@@ -1,4 +1,4 @@
-import { advanceDueText, advanceOverdueText, advanceTitle } from '../advanceDisplay';
+import { advanceCancelText, advanceDueText, advanceOverdueText, advanceTitle } from '../advanceDisplay';
 
 describe('advanceTitle', () => {
     it('dívida de cobrança em dinheiro não mostra o id do serviço', () => {
@@ -47,5 +47,35 @@ describe('advanceOverdueText', () => {
 
     it('sem vencimento', () => {
         expect(advanceOverdueText({ dueDate: undefined })).toBeNull();
+    });
+});
+
+describe('título pela origem (F3)', () => {
+    it('origin CASH_COLLECTION é dinheiro de cliente, qualquer que seja a descrição', () => {
+        expect(advanceTitle({ description: 'Cobrança na entrega', origin: 'CASH_COLLECTION' })).toBe('Dinheiro recebido de cliente');
+    });
+
+    it('descrição legada "Cash recebido no service …" também (dívida de pod antigo)', () => {
+        expect(advanceTitle({ description: 'Cash recebido no service 2f6c1c8e-1111', origin: 'ADVANCE' })).toBe('Dinheiro recebido de cliente');
+    });
+
+    it('adiantamento mostra a descrição do operador', () => {
+        expect(advanceTitle({ description: 'Adiantamento combustível', origin: 'ADVANCE' })).toBe('Adiantamento combustível');
+    });
+});
+
+describe('advanceCancelText (UC15)', () => {
+    it('cancelada com motivo: o motivo que a empresa escreveu', () => {
+        expect(advanceCancelText({ status: 'CANCELLED' as never, cancelReason: 'Pedido estornado ao cliente' })).toBe(
+            'Cancelada pela empresa: Pedido estornado ao cliente',
+        );
+    });
+
+    it('cancelada sem motivo', () => {
+        expect(advanceCancelText({ status: 'CANCELLED' as never, cancelReason: null })).toBe('Cancelada pela empresa.');
+    });
+
+    it('não cancelada: null', () => {
+        expect(advanceCancelText({ status: 'PENDING' as never, cancelReason: 'x' })).toBeNull();
     });
 });

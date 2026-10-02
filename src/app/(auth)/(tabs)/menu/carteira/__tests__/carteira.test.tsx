@@ -51,8 +51,11 @@ const CARTEIRA = {
     updatedAt: '2026-09-01T00:00:00.000Z',
 };
 
-function render(adiantamentos: Record<string, unknown> = { summary: { totalPending: 0, count: 0, overdueCount: 0 }, isError: false }) {
-    mockUseGetWallet.mockReturnValue({ wallet: CARTEIRA, isLoading: false, isError: false, refetch: jest.fn(), isRefetching: false });
+function render(
+    adiantamentos: Record<string, unknown> = { summary: { totalPending: 0, count: 0, overdueCount: 0 }, isError: false },
+    carteira: Record<string, unknown> = {},
+) {
+    mockUseGetWallet.mockReturnValue({ wallet: { ...CARTEIRA, ...carteira }, isLoading: false, isError: false, refetch: jest.fn(), isRefetching: false });
     mockUseGetAdvancesSummary.mockReturnValue({ refetch: jest.fn(), ...adiantamentos });
     let tree!: TestRenderer.ReactTestRenderer;
     act(() => {
@@ -95,5 +98,67 @@ describe('Carteira', () => {
         const tree = render({ summary: undefined, isError: true });
         expect(texto(tree, 'saldo-disponivel')).toBe(formatCurrency(12000));
         expect(tree.root.findAllByProps({ testID: 'adiantamentos-erro' }).length).toBeGreaterThan(0);
+    });
+
+    it('chave PIX trocada há 1 hora: alerta no topo com a chave anterior mascarada', () => {
+        const tree = render(undefined, {
+            hasBankInfo: true,
+            pixKey: 'nova@exemplo.com',
+            pixKeyChangedAt: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
+            previousPixKeyMasked: '*******1234',
+        });
+        expect(tree.root.findAllByProps({ testID: 'aviso-chave-pix' }).length).toBeGreaterThan(0);
+        expect(texto(tree, 'aviso-chave-pix-texto')).toContain('A anterior era *******1234.');
+        expect(texto(tree, 'aviso-chave-pix-texto')).toContain('Se não foi você, fale com a central');
+        expect(texto(tree, 'aviso-chave-pix-texto')).toContain('foi alterada em');
+    });
+
+    it('primeiro cadastro recente: o alerta diz "cadastrada", nunca "alterada"', () => {
+        const tree = render(undefined, {
+            hasBankInfo: true,
+            pixKey: 'nova@exemplo.com',
+            pixKeyChangedAt: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
+            previousPixKeyMasked: null,
+        });
+        expect(texto(tree, 'aviso-chave-pix-texto')).toContain('foi cadastrada em');
+        expect(texto(tree, 'aviso-chave-pix-texto')).not.toContain('alterada');
+    });
+
+    it('chave removida há 1 hora: o alerta diz "removida"', () => {
+        const tree = render(undefined, {
+            hasBankInfo: true,
+            pixKey: null,
+            pixKeyChangedAt: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
+            previousPixKeyMasked: '*******1234',
+        });
+        expect(texto(tree, 'aviso-chave-pix-texto')).toContain('foi removida em');
+    });
+
+    it('chave removida há 30 dias: sem alerta e sem linha cinza (sem chave não há onde ancorar)', () => {
+        const tree = render(undefined, {
+            hasBankInfo: true,
+            pixKey: null,
+            pixKeyChangedAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+            previousPixKeyMasked: '*******1234',
+        });
+        expect(tree.root.findAllByProps({ testID: 'aviso-chave-pix' })).toHaveLength(0);
+        expect(tree.root.findAllByProps({ testID: 'chave-pix-alterada-em' })).toHaveLength(0);
+    });
+
+    it('troca de 30 dias atrás: sem alerta, só o registro junto da chave', () => {
+        const tree = render(undefined, {
+            hasBankInfo: true,
+            pixKey: 'nova@exemplo.com',
+            pixKeyChangedAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+            previousPixKeyMasked: '*******1234',
+        });
+        expect(tree.root.findAllByProps({ testID: 'aviso-chave-pix' })).toHaveLength(0);
+        expect(texto(tree, 'chave-pix-alterada-em')).toContain('foi alterada em');
+    });
+
+    it('sem troca registrada: nenhum aviso de chave', () => {
+        const tree = render(undefined, { hasBankInfo: true, pixKey: 'nova@exemplo.com', pixKeyChangedAt: null, previousPixKeyMasked: null });
+        expect(tree.root.findAllByProps({ testID: 'aviso-chave-pix' })).toHaveLength(0);
+        expect(tree.root.findAllByProps({ testID: 'chave-pix-alterada-em' })).toHaveLength(0);
     });
 });

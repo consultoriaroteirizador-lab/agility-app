@@ -44,12 +44,24 @@ jest.mock('../../_context/ParadaContext', () => ({
 // manda para a API sem bater em rede de verdade.
 const mockCompleteServiceWithDetailsAsync = jest.fn();
 
-jest.mock('@/domain/agility/service/useCase', () => ({
-    useCompleteServiceWithDetails: () => ({
-        completeServiceWithDetailsAsync: mockCompleteServiceWithDetailsAsync,
-        isLoading: false,
-    }),
+// O hook de mutação é o REAL (com o `useMutationService` por baixo): a recusa do back passa
+// pelo `onError` dele, e só assim dá para provar que a frase aparece numa superfície só
+// (achado 4 da revisão final). A rede é o `serviceService`, que repassa ao mock no
+// formato `{ id, details }` que os testes abaixo já conferem. Sem valor configurado, responde
+// o envelope de sucesso (o `onSuccess` do `useMutationService` lê `data.message`).
+jest.mock('@/domain/agility/service/serviceService', () => ({
+    serviceService: {
+        completeWithDetails: async (id: string, details: unknown) =>
+            (await mockCompleteServiceWithDetailsAsync({ id, details })) ?? { success: true, result: {} },
+    },
 }));
+jest.mock('@/domain/agility/service/useCase', () => ({
+    useCompleteServiceWithDetails: jest.requireActual('@/domain/agility/service/useCase/useCompleteServiceWithDetails')
+        .useCompleteServiceWithDetails,
+}));
+
+const mockOpenModal = jest.fn();
+jest.mock('@/services/modalError/useModalErrorService', () => ({ useModalErrorService: () => ({ openModal: mockOpenModal }) }));
 
 // `handleFinalizar` sobe fotos/assinatura e le GPS antes de montar o payload —
 // nenhum dos tres precisa (nem pode, sem NativeModules) rodar de verdade aqui.
@@ -61,6 +73,9 @@ jest.mock('@/domain/agility/service/serviceUploadUtils', () => ({
 jest.mock('../getCurrentCoords', () => ({
     getCurrentCoords: jest.fn().mockResolvedValue(undefined),
 }));
+
+const mockShowToast = jest.fn();
+jest.mock('@/services/Toast/useToast', () => ({ useToastService: () => ({ showToast: mockShowToast }) }));
 
 // `useParada` real devolve dezenas de campos; o mock so precisa dos que
 // `useServiceCompletion` e `useServiceUpload` (chamado por baixo) leem.
@@ -118,12 +133,16 @@ interface ParadaOverrides {
     } | null;
     /** O pedido tem formulario proprio vinculado (`service.formGroupIds`). */
     hasFormGroups?: boolean;
+    /** Pedido carregado no contexto (só os campos que o hook lê). */
+    service?: Record<string, unknown> | null;
+    paymentAmount?: string;
+    paymentMethod?: string | null;
 }
 
 /** Contexto mínimo que `useServiceCompletion` + `useServiceUpload` precisam. */
 function makeParadaContext(overrides: ParadaOverrides = {}) {
     return {
-        service: null,
+        service: overrides.service ?? null,
         serviceId: 'service-1',
         rotaId: 'rota-1',
         recipient: overrides.recipient ?? null,
@@ -134,8 +153,8 @@ function makeParadaContext(overrides: ParadaOverrides = {}) {
         setShowSuccess: jest.fn(),
         resetState: jest.fn(),
         photos: overrides.photos ?? [],
-        paymentAmount: '',
-        paymentMethod: null,
+        paymentAmount: overrides.paymentAmount ?? '',
+        paymentMethod: overrides.paymentMethod ?? null,
         pickupEvidence: overrides.pickupEvidence ?? null,
         deliveryCode: '',
         bypassReasonCode: null,
@@ -175,6 +194,8 @@ describe('useServiceCompletion — regra unica de conclusao', () => {
     afterEach(() => {
         mockedUseParada.mockReset();
         mockCompleteServiceWithDetailsAsync.mockReset();
+        mockShowToast.mockReset();
+        mockOpenModal.mockReset();
     });
 
     it('tudo REQUIRED e estado vazio: canFinalize falso e missing com os quatro rotulos', () => {
@@ -542,6 +563,70 @@ describe('useServiceCompletion — regra unica de conclusao', () => {
     // F5 (correção do review): `moneyChangedKeys()` saiu de `routeStopChangedKeys` (que
     // roda a cada reprojeção de ETA) e passou a ser chamada só nos pontos de
     // conclusão/insucesso — `invalidateQueries` deste hook é um deles.
+    describe('cobrança na entrega (F5b)', () => {
+        const comCobranca = (over: ParadaOverrides = {}) =>
+            makeParadaContext({
+                completionRequirements: ALL_HIDDEN,
+                hasFormGroups: true,
+                photos: [{ uri: 'a.jpg' }],
+                signature: 'sig.png',
+                service: { id: 'service-1', requiresPayment: true },
+                paymentAmount: 'R$ 1.234,56',
+                paymentMethod: 'CASH',
+                ...over,
+            });
+
+        it('valor em CENTAVOS inteiros e a forma de pagamento vão no completion-details', async () => {
+            mockedUseParada.mockReturnValue(comCobranca());
+            const result = runHook('entrega');
+
+            await act(async () => {
+                await result.handleFinalizar();
+            });
+
+            expect(mockCompleteServiceWithDetailsAsync).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    id: 'service-1',
+                    details: expect.objectContaining({ receivedValue: 123456, paymentMethod: 'CASH' }),
+                }),
+            );
+        });
+
+        it('back recusa a conclusão: o toast mostra a frase do back, não o genérico', async () => {
+            const frase =
+                'Este pedido tem cobrança na entrega: conclua pela finalização com detalhes, informando o valor recebido e a forma de pagamento.';
+            mockCompleteServiceWithDetailsAsync.mockRejectedValue({
+                success: false,
+                error: { code: 'SERVICE_REQUIRES_PAYMENT_DETAILS', message: frase },
+            });
+            mockedUseParada.mockReturnValue(comCobranca());
+            const result = runHook('entrega');
+
+            await act(async () => {
+                await result.handleFinalizar();
+            });
+
+            expect(mockShowToast).toHaveBeenCalledWith({ message: frase, type: 'error' });
+        });
+
+        // Achado 4 da revisão final: o modal de erro do `useMutationService` repetia a frase
+        // que o toast já mostra. Uma superfície só: o toast.
+        it('back recusa a conclusão: a frase aparece uma vez só (toast), sem o modal de erro', async () => {
+            const frase = 'receivedValue é obrigatório para pedido com cobrança.';
+            mockCompleteServiceWithDetailsAsync.mockRejectedValue({ success: false, error: { code: 'BAD_REQUEST', message: frase } });
+            mockedUseParada.mockReturnValue(comCobranca());
+            const result = runHook('entrega');
+
+            await act(async () => {
+                await result.handleFinalizar();
+            });
+
+            expect(mockOpenModal).not.toHaveBeenCalled();
+            const comFrase = mockShowToast.mock.calls.filter(([arg]) => arg?.message === frase);
+            expect(comFrase).toEqual([[{ message: frase, type: 'error' }]]);
+        });
+    });
+
     describe('invalidação de dinheiro na conclusão (Task F5)', () => {
         it('invalidateQueries invalida carteira e financeiro, além das chaves da parada/rota', () => {
             const queryClient = new QueryClient();
