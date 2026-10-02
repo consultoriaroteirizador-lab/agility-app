@@ -278,6 +278,22 @@ describe('Saque — política de dívida (F3)', () => {
         expect(tree.root.findAllByProps({ children: `Valor mínimo: ${formatCurrency(100)}` })).toHaveLength(0);
     });
 
+    // Achado 1 da revisão final: /wallet/advances/summary falhou (overdueCount null), mas a
+    // resposta da política diz teto 0 com disponível > 0 — o bloqueio está provado.
+    it('BLOCK_IF_OVERDUE com o resumo de dívidas falho e bloqueio provado: aviso de bloqueio, sem "Valor mínimo"', () => {
+        mockUseWithdrawalAllowance.mockReturnValue({
+            allowance: { policy: 'BLOCK_IF_OVERDUE', withdrawableCents: 0, openDebtCents: 5000, availableCents: 10000 },
+        });
+        mockUseGetAdvancesSummary.mockReturnValue({ summary: undefined });
+        const tree = render();
+
+        const aviso = tree.root.findAllByProps({ testID: 'aviso-politica-divida-texto' })[0];
+        expect(aviso.props.children).toBe('Saque bloqueado: você tem dívida vencida com a empresa. Devolva o valor para liberar o saque.');
+        expect(aviso.props.color).toBe('colorTextError');
+        expect(tree.root.findAllByProps({ children: `Valor mínimo: ${formatCurrency(100)}` })).toHaveLength(0);
+        expect(tree.root.findAllByProps({ testID: 'sacar-tudo' })[0].props.disabled).toBe(true);
+    });
+
     it('sem aviso de bloqueio: o "Valor mínimo" continua aparecendo', () => {
         const tree = render();
         expect(tree.root.findAllByProps({ children: `Valor mínimo: ${formatCurrency(100)}` }).length).toBeGreaterThan(0);

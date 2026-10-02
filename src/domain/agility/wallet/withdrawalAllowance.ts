@@ -8,6 +8,11 @@ export interface WithdrawalAllowance {
     withdrawableCents: number;
     /** Dívida aberta (PENDING/PARTIAL), em centavos. */
     openDebtCents: number;
+    /**
+     * Disponível da MESMA resposta (centavos), ou `null` se não veio válido. Junto do teto 0, é
+     * o que prova o bloqueio sem depender de `/wallet/advances/summary` (`withdrawalPolicyNotice`).
+     */
+    availableCents: number | null;
 }
 
 const POLICIES: readonly string[] = ['FREE', 'BLOCK_IF_OVERDUE', 'EXCESS_ONLY'];
@@ -30,6 +35,7 @@ export function toWithdrawalAllowance(s: Partial<WalletSummaryResponse> | null |
         policy,
         withdrawableCents: Math.floor(s.withdrawableBalance),
         openDebtCents: Number.isFinite(openDebt) && openDebt > 0 ? Math.floor(openDebt) : 0,
+        availableCents: isCents(s.availableBalance) ? Math.floor(s.availableBalance) : null,
     };
 }
 

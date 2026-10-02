@@ -136,6 +136,28 @@ describe('Adiantamentos', () => {
         );
     });
 
+    // Achado 1 da revisão final: sem a contagem de vencidas, o aviso não pode dizer "até o
+    // vencimento" (pode já ter vencido) nem sair em tom de informação quando o bloqueio está provado.
+    it('BLOCK_IF_OVERDUE com o resumo falho e bloqueio provado pela política: aviso de bloqueio sem contagem', () => {
+        const tree = render(
+            { items: [] },
+            { summary: undefined, isError: true },
+            { allowance: { policy: 'BLOCK_IF_OVERDUE', withdrawableCents: 0, openDebtCents: 5000, availableCents: 10000 } },
+        );
+        const aviso = tree.root.findAllByProps({ testID: 'aviso-politica-divida-texto' })[0];
+        expect(aviso.props.children).toBe('Saque bloqueado: você tem dívida vencida com a empresa. Devolva o valor para liberar o saque.');
+        expect(aviso.props.color).toBe('colorTextError');
+    });
+
+    it('BLOCK_IF_OVERDUE com o resumo falho e sem prova de bloqueio: texto neutro, sem "até o vencimento"', () => {
+        const tree = render(
+            { items: [] },
+            { summary: undefined, isError: true },
+            { allowance: { policy: 'BLOCK_IF_OVERDUE', withdrawableCents: 10000, openDebtCents: 5000, availableCents: 10000 } },
+        );
+        expect(tree.root.findAllByProps({ testID: 'aviso-politica-divida-texto' })[0].props.children).toBe('Na sua empresa, dívida vencida bloqueia o saque.');
+    });
+
     it('política livre ou não carregada: sem aviso', () => {
         const tree = render({ items: [] }, { summary: { totalPending: 5000, count: 1, overdueCount: 1 }, isError: false });
         expect(existe(tree, 'aviso-politica-divida')).toBe(false);

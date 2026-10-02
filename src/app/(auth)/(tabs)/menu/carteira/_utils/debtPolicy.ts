@@ -16,7 +16,11 @@ export function policyNoticeColor(tone: PolicyNotice['tone']): 'colorTextError' 
 /**
  * O que a política de saque com dívida da empresa (spec 4.4, UC11) significa para o motorista
  * AGORA. `overdueCount` vem de `/wallet/advances/summary` (o `/wallet/summary` não traz);
- * `null` = não carregou, e o texto não afirma bloqueio.
+ * `null` = não carregou.
+ *
+ * Em `BLOCK_IF_OVERDUE` o back devolve teto = disponível, ou 0 se há vencida. Teto 0 com
+ * disponível > 0 na MESMA resposta (`allowance.availableCents`) prova o bloqueio sem a contagem.
+ * Sem contagem e sem prova, o texto é neutro: nem afirma bloqueio, nem promete "até o vencimento".
  */
 export function withdrawalPolicyNotice(allowance: WithdrawalAllowance | null, overdueCount: number | null): PolicyNotice | null {
     if (!allowance || allowance.policy === 'FREE' || allowance.openDebtCents <= 0) return null;
@@ -27,6 +31,14 @@ export function withdrawalPolicyNotice(allowance: WithdrawalAllowance | null, ov
                 tone: 'block',
                 text: `Saque bloqueado: você tem ${overdueCount} dívida(s) vencida(s) com a empresa. Devolva o valor para liberar o saque.`,
             };
+        }
+        const available = allowance.availableCents;
+        if (allowance.withdrawableCents === 0 && available !== null && available > 0) {
+            // A contagem pode ter falhado ou estar atrasada; quem trava o saque é a política.
+            return { tone: 'block', text: 'Saque bloqueado: você tem dívida vencida com a empresa. Devolva o valor para liberar o saque.' };
+        }
+        if (overdueCount === null) {
+            return { tone: 'info', text: 'Na sua empresa, dívida vencida bloqueia o saque.' };
         }
         return { tone: 'info', text: 'Na sua empresa, dívida vencida bloqueia o saque. Devolva o dinheiro até o vencimento.' };
     }

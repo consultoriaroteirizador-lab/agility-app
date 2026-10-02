@@ -55,7 +55,7 @@ it('normaliza o resumo e refaz a busca quando [KEY_WALLET] é invalidada', async
     const tree = montar(queryClient);
     await settle();
 
-    expect(resultado.allowance).toEqual({ policy: 'EXCESS_ONLY', withdrawableCents: 7000, openDebtCents: 3000 });
+    expect(resultado.allowance).toEqual({ policy: 'EXCESS_ONLY', withdrawableCents: 7000, openDebtCents: 3000, availableCents: 10000 });
     expect(mockGetSummary).toHaveBeenCalledTimes(1);
 
     await act(async () => {

@@ -3,7 +3,7 @@ import { formatCurrency } from '@/utils/formatCurrency';
 import { maxWithdrawalFromError, policyNoticeColor, withdrawalErrorMessage, withdrawalPolicyNotice } from '../debtPolicy';
 
 type Allowance = NonNullable<Parameters<typeof withdrawalPolicyNotice>[0]>;
-const politica = (over: Partial<Allowance>): Allowance => ({ policy: 'FREE', withdrawableCents: 10000, openDebtCents: 0, ...over });
+const politica = (over: Partial<Allowance>): Allowance => ({ policy: 'FREE', withdrawableCents: 10000, openDebtCents: 0, availableCents: null, ...over });
 
 describe('withdrawalPolicyNotice', () => {
     it('sem política carregada, ou FREE: nenhum aviso', () => {
@@ -18,10 +18,40 @@ describe('withdrawalPolicyNotice', () => {
         });
     });
 
-    it('BLOCK_IF_OVERDUE com dívida a vencer (ou contagem indisponível): só o aviso da regra', () => {
-        const esperado = { tone: 'info', text: 'Na sua empresa, dívida vencida bloqueia o saque. Devolva o dinheiro até o vencimento.' };
-        expect(withdrawalPolicyNotice(politica({ policy: 'BLOCK_IF_OVERDUE', openDebtCents: 5000 }), 0)).toEqual(esperado);
-        expect(withdrawalPolicyNotice(politica({ policy: 'BLOCK_IF_OVERDUE', openDebtCents: 5000 }), null)).toEqual(esperado);
+    it('BLOCK_IF_OVERDUE com dívida a vencer (contagem carregada, 0 vencidas): o aviso da regra com o prazo', () => {
+        expect(withdrawalPolicyNotice(politica({ policy: 'BLOCK_IF_OVERDUE', openDebtCents: 5000, availableCents: 10000 }), 0)).toEqual({
+            tone: 'info',
+            text: 'Na sua empresa, dívida vencida bloqueia o saque. Devolva o dinheiro até o vencimento.',
+        });
+    });
+
+    // Achado 1 da revisão final: com /wallet/advances/summary falho, o teto 0 com disponível > 0
+    // na MESMA resposta da política prova o bloqueio — o aviso não pode sair como "info".
+    const BLOQUEIO_SEM_CONTAGEM = {
+        tone: 'block',
+        text: 'Saque bloqueado: você tem dívida vencida com a empresa. Devolva o valor para liberar o saque.',
+    };
+
+    it('BLOCK_IF_OVERDUE, contagem indisponível, teto 0 com disponível > 0: bloqueio provado, sem citar o número de dívidas', () => {
+        expect(withdrawalPolicyNotice(politica({ policy: 'BLOCK_IF_OVERDUE', withdrawableCents: 0, openDebtCents: 5000, availableCents: 10000 }), null)).toEqual(
+            BLOQUEIO_SEM_CONTAGEM,
+        );
+    });
+
+    it('BLOCK_IF_OVERDUE, contagem desatualizada (0) mas a política prova o bloqueio: vale a política', () => {
+        expect(withdrawalPolicyNotice(politica({ policy: 'BLOCK_IF_OVERDUE', withdrawableCents: 0, openDebtCents: 5000, availableCents: 10000 }), 0)).toEqual(
+            BLOQUEIO_SEM_CONTAGEM,
+        );
+    });
+
+    it('BLOCK_IF_OVERDUE, contagem indisponível e sem prova: texto neutro, sem "até o vencimento"', () => {
+        const neutro = { tone: 'info', text: 'Na sua empresa, dívida vencida bloqueia o saque.' };
+        // teto = disponível: a política não está travando agora
+        expect(withdrawalPolicyNotice(politica({ policy: 'BLOCK_IF_OVERDUE', withdrawableCents: 10000, openDebtCents: 5000, availableCents: 10000 }), null)).toEqual(neutro);
+        // teto 0 com disponível 0: nada a sacar, não prova bloqueio
+        expect(withdrawalPolicyNotice(politica({ policy: 'BLOCK_IF_OVERDUE', withdrawableCents: 0, openDebtCents: 5000, availableCents: 0 }), null)).toEqual(neutro);
+        // resumo sem o disponível: não prova
+        expect(withdrawalPolicyNotice(politica({ policy: 'BLOCK_IF_OVERDUE', withdrawableCents: 0, openDebtCents: 5000, availableCents: null }), null)).toEqual(neutro);
     });
 
     it('BLOCK_IF_OVERDUE sem dívida: nenhum aviso', () => {

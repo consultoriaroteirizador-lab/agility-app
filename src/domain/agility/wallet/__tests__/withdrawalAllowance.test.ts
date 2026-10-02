@@ -9,7 +9,16 @@ type Resumo = Parameters<typeof toWithdrawalAllowance>[0];
 describe('toWithdrawalAllowance', () => {
     it('lê a política, o teto e a dívida aberta do resumo', () => {
         const resumo = { availableBalance: 10000, pendingAdvances: 3000, withdrawalWithDebtPolicy: 'EXCESS_ONLY', withdrawableBalance: 7000 } as Resumo;
-        expect(toWithdrawalAllowance(resumo)).toEqual({ policy: 'EXCESS_ONLY', withdrawableCents: 7000, openDebtCents: 3000 });
+        expect(toWithdrawalAllowance(resumo)).toEqual({ policy: 'EXCESS_ONLY', withdrawableCents: 7000, openDebtCents: 3000, availableCents: 10000 });
+    });
+
+    // O disponível da MESMA resposta: é o que prova o bloqueio (teto 0 com disponível > 0).
+    it('disponível fracionado cai para o centavo de baixo; ausente ou inválido vira null sem descartar a política', () => {
+        const base = { pendingAdvances: 0, withdrawalWithDebtPolicy: 'BLOCK_IF_OVERDUE', withdrawableBalance: 0 } as const;
+        expect(toWithdrawalAllowance({ ...base, availableBalance: 100.9 } as Resumo)?.availableCents).toBe(100);
+        expect(toWithdrawalAllowance({ ...base } as Resumo)).toEqual({ policy: 'BLOCK_IF_OVERDUE', withdrawableCents: 0, openDebtCents: 0, availableCents: null });
+        expect(toWithdrawalAllowance({ ...base, availableBalance: -1 } as Resumo)?.availableCents).toBeNull();
+        expect(toWithdrawalAllowance({ ...base, availableBalance: '10' } as unknown as Resumo)?.availableCents).toBeNull();
     });
 
     it('dívida aberta fracionada cai para o centavo inteiro de baixo', () => {
@@ -33,7 +42,7 @@ describe('toWithdrawalAllowance', () => {
 
     it('teto fracionado (Decimal(12,2) do back) não descarta a política: arredonda para baixo', () => {
         const resumo = { availableBalance: 2000, pendingAdvances: 0, withdrawalWithDebtPolicy: 'EXCESS_ONLY', withdrawableBalance: 1234.5 } as Resumo;
-        expect(toWithdrawalAllowance(resumo)).toEqual({ policy: 'EXCESS_ONLY', withdrawableCents: 1234, openDebtCents: 0 });
+        expect(toWithdrawalAllowance(resumo)).toEqual({ policy: 'EXCESS_ONLY', withdrawableCents: 1234, openDebtCents: 0, availableCents: 2000 });
     });
 
     it('sem resumo: null', () => {
@@ -42,7 +51,7 @@ describe('toWithdrawalAllowance', () => {
 });
 
 describe('withdrawCapCents', () => {
-    const politica = (withdrawableCents: number) => ({ policy: 'EXCESS_ONLY' as const, withdrawableCents, openDebtCents: 3000 });
+    const politica = (withdrawableCents: number) => ({ policy: 'EXCESS_ONLY' as const, withdrawableCents, openDebtCents: 3000, availableCents: null });
 
     it('sem política conhecida: o disponível', () => {
         expect(withdrawCapCents(10000, null)).toBe(10000);
@@ -63,6 +72,6 @@ describe('withdrawCapCents', () => {
     });
 
     it('teto fracionado cai para o centavo inteiro de baixo', () => {
-        expect(withdrawCapCents(10000, { policy: 'FREE', withdrawableCents: 1234.5, openDebtCents: 0 })).toBe(1234);
+        expect(withdrawCapCents(10000, { policy: 'FREE', withdrawableCents: 1234.5, openDebtCents: 0, availableCents: null })).toBe(1234);
     });
 });
