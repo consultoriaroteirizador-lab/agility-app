@@ -63,6 +63,31 @@ const FREIGHT_CANCEL: TypeConfig = {
     label: 'Frete cancelado', icon: 'close-circle', iconColor: '#F44336', bgColor: '#FFEBEE', category: 'freight',
     movement: 'Frete a liberar → Cancelado',
 };
+/**
+ * Redistribuição do frete entre as parcelas da mesma rota (F3, troca de motorista). Move o
+ * BLOQUEADO antes da liberação: o acréscimo entra em "Frete a liberar"; a redução sai de lá
+ * e é estornada no mesmo gesto. Sem estes desvios a redução aparecia como "Frete liberado"
+ * e o estorno como "Débito da empresa".
+ */
+const REDISTRIBUTION_IN: TypeConfig = {
+    label: 'Frete redistribuído (acréscimo)', icon: 'swap-horizontal', iconColor: '#9C27B0', bgColor: '#F3E5F5', category: 'freight',
+    movement: 'Fica em "Frete a liberar" até a empresa liberar',
+};
+const REDISTRIBUTION_RELEASE: TypeConfig = {
+    label: 'Frete redistribuído (redução)', icon: 'swap-horizontal', iconColor: '#FF9800', bgColor: '#FFF3E0', category: 'freight',
+    movement: 'Sai de "Frete a liberar" e é estornado',
+};
+const REDISTRIBUTION_REVERSAL: TypeConfig = {
+    label: 'Estorno da redistribuição', icon: 'return-down-back', iconColor: '#F44336', bgColor: '#FFEBEE', category: 'freight',
+};
+
+/** A origem decide antes do tipo: o mesmo `type` serve a gestos diferentes. */
+const BY_SOURCE: Partial<Record<string, TypeConfig>> = {
+    [LedgerSourceType.FREIGHT_SHARE_REVERSAL]: FREIGHT_REVERSAL,
+    [LedgerSourceType.FREIGHT_SHARE_REDISTRIBUTION_IN]: REDISTRIBUTION_IN,
+    [LedgerSourceType.FREIGHT_SHARE_REDISTRIBUTION_RELEASE]: REDISTRIBUTION_RELEASE,
+    [LedgerSourceType.FREIGHT_SHARE_REDISTRIBUTION_REVERSAL]: REDISTRIBUTION_REVERSAL,
+};
 const UNKNOWN: TypeConfig = { label: 'Movimentação', icon: 'swap-horizontal', iconColor: '#607D8B', bgColor: '#ECEFF1', category: 'other' };
 
 const STATUS_BADGE: Partial<Record<TransactionStatus, StatusColorConfig>> = {
@@ -95,7 +120,8 @@ export interface TransactionDisplay {
 }
 
 function configOf(tx: Pick<TransactionResponse, 'type' | 'sourceType' | 'metadata'>): TypeConfig {
-    if (tx.sourceType === LedgerSourceType.FREIGHT_SHARE_REVERSAL) return FREIGHT_REVERSAL;
+    const porOrigem = BY_SOURCE[tx.sourceType];
+    if (porOrigem) return porOrigem;
     if (tx.type === TransactionType.FREIGHT_RELEASE && tx.metadata?.action === 'CANCEL') return FREIGHT_CANCEL;
     return TYPE_CONFIG[tx.type] ?? UNKNOWN;
 }
