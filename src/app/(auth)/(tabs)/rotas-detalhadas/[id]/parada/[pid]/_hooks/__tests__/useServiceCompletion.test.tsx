@@ -62,6 +62,9 @@ jest.mock('../getCurrentCoords', () => ({
     getCurrentCoords: jest.fn().mockResolvedValue(undefined),
 }));
 
+const mockShowToast = jest.fn();
+jest.mock('@/services/Toast/useToast', () => ({ useToastService: () => ({ showToast: mockShowToast }) }));
+
 // `useParada` real devolve dezenas de campos; o mock so precisa dos que
 // `useServiceCompletion` e `useServiceUpload` (chamado por baixo) leem.
 // `as unknown as jest.Mock` porque o objeto mockado nao satisfaz o tipo
@@ -118,12 +121,16 @@ interface ParadaOverrides {
     } | null;
     /** O pedido tem formulario proprio vinculado (`service.formGroupIds`). */
     hasFormGroups?: boolean;
+    /** Pedido carregado no contexto (só os campos que o hook lê). */
+    service?: Record<string, unknown> | null;
+    paymentAmount?: string;
+    paymentMethod?: string | null;
 }
 
 /** Contexto mínimo que `useServiceCompletion` + `useServiceUpload` precisam. */
 function makeParadaContext(overrides: ParadaOverrides = {}) {
     return {
-        service: null,
+        service: overrides.service ?? null,
         serviceId: 'service-1',
         rotaId: 'rota-1',
         recipient: overrides.recipient ?? null,
@@ -134,8 +141,8 @@ function makeParadaContext(overrides: ParadaOverrides = {}) {
         setShowSuccess: jest.fn(),
         resetState: jest.fn(),
         photos: overrides.photos ?? [],
-        paymentAmount: '',
-        paymentMethod: null,
+        paymentAmount: overrides.paymentAmount ?? '',
+        paymentMethod: overrides.paymentMethod ?? null,
         pickupEvidence: overrides.pickupEvidence ?? null,
         deliveryCode: '',
         bypassReasonCode: null,
@@ -175,6 +182,7 @@ describe('useServiceCompletion — regra unica de conclusao', () => {
     afterEach(() => {
         mockedUseParada.mockReset();
         mockCompleteServiceWithDetailsAsync.mockReset();
+        mockShowToast.mockReset();
     });
 
     it('tudo REQUIRED e estado vazio: canFinalize falso e missing com os quatro rotulos', () => {
@@ -542,6 +550,53 @@ describe('useServiceCompletion — regra unica de conclusao', () => {
     // F5 (correção do review): `moneyChangedKeys()` saiu de `routeStopChangedKeys` (que
     // roda a cada reprojeção de ETA) e passou a ser chamada só nos pontos de
     // conclusão/insucesso — `invalidateQueries` deste hook é um deles.
+    describe('cobrança na entrega (F5b)', () => {
+        const comCobranca = (over: ParadaOverrides = {}) =>
+            makeParadaContext({
+                completionRequirements: ALL_HIDDEN,
+                hasFormGroups: true,
+                photos: [{ uri: 'a.jpg' }],
+                signature: 'sig.png',
+                service: { id: 'service-1', requiresPayment: true },
+                paymentAmount: 'R$ 1.234,56',
+                paymentMethod: 'CASH',
+                ...over,
+            });
+
+        it('valor em CENTAVOS inteiros e a forma de pagamento vão no completion-details', async () => {
+            mockedUseParada.mockReturnValue(comCobranca());
+            const result = runHook('entrega');
+
+            await act(async () => {
+                await result.handleFinalizar();
+            });
+
+            expect(mockCompleteServiceWithDetailsAsync).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    id: 'service-1',
+                    details: expect.objectContaining({ receivedValue: 123456, paymentMethod: 'CASH' }),
+                }),
+            );
+        });
+
+        it('back recusa a conclusão: o toast mostra a frase do back, não o genérico', async () => {
+            const frase =
+                'Este pedido tem cobrança na entrega: conclua pela finalização com detalhes, informando o valor recebido e a forma de pagamento.';
+            mockCompleteServiceWithDetailsAsync.mockRejectedValue({
+                success: false,
+                error: { code: 'SERVICE_REQUIRES_PAYMENT_DETAILS', message: frase },
+            });
+            mockedUseParada.mockReturnValue(comCobranca());
+            const result = runHook('entrega');
+
+            await act(async () => {
+                await result.handleFinalizar();
+            });
+
+            expect(mockShowToast).toHaveBeenCalledWith({ message: frase, type: 'error' });
+        });
+    });
+
     describe('invalidação de dinheiro na conclusão (Task F5)', () => {
         it('invalidateQueries invalida carteira e financeiro, além das chaves da parada/rota', () => {
             const queryClient = new QueryClient();

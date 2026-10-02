@@ -8,13 +8,13 @@ import { SignatureCanvas } from '@/components/SignatureCanvas';
 import { requirementsForServiceType } from '@/domain/agility/company/completionRequirements';
 import { resolveCodeRequirement } from '@/domain/agility/service/codeGate';
 import { PaymentMethodType } from '@/domain/agility/service/dto/types';
-import { useAuthCredentialsService } from '@/services';
 import { measure } from '@/theme';
 import { formatCurrency } from '@/utils/formatCurrency';
 import { parseBRLToCents } from '@/utils/parseCurrency';
 
 import { useParada } from '../../_context/ParadaContext';
 import { useServiceCompletion } from '../../_hooks/useServiceCompletion';
+import { CASH_DEBT_WARNING_TEXT, showsCashDebtWarning } from '../../_utils/cashDebtWarning';
 import { resolvePreviousStep } from '../../_utils/completionStep';
 
 interface SharedEtapaFinalizacaoProps {
@@ -182,11 +182,8 @@ export function SharedEtapaFinalizacao({ serviceType }: SharedEtapaFinalizacaoPr
   const deliveryCodePending =
     deliveryCodeRequired && !deliveryCodeFilled && !(deliveryCodeAllowBypass && bypassReasonValid);
 
-  // Inferência: se o user tem collaboratorId no JWT, é colaborador (funcionário CLT).
-  // Cash recebido por colaborador vira dívida na wallet (backend cria DriverAdvance automaticamente).
-  const { userAuth } = useAuthCredentialsService();
-  const isCollaborator = !!userAuth?.collaboratorId;
-  const showCashDebtWarning = isCollaborator && paymentMethod === PaymentMethodType.CASH;
+  // Spec 4.3: dinheiro em mão vira dívida para todo motorista, não só o funcionário.
+  const showCashDebtWarning = showsCashDebtWarning(paymentMethod);
 
   return (
     <ScreenBase
@@ -637,7 +634,7 @@ export function SharedEtapaFinalizacao({ serviceType }: SharedEtapaFinalizacaoPr
                   Atenção: dinheiro em mão
                 </Text>
                 <Text preset="text12" color="white" marginTop="t4">
-                  Esse valor é da empresa. Vai aparecer como dívida na sua carteira até você devolver ao escritório.
+                  {CASH_DEBT_WARNING_TEXT}
                 </Text>
               </Box>
             )}
