@@ -9,6 +9,8 @@ import { useFindMyRoutings } from '@/domain/agility/routing/useCase';
 import { measure } from '@/theme';
 import { formatDate, formatDateOnly } from '@/utils/formatDate';
 
+import { routeValueLabel } from './_utils/routeValue';
+
 // --- Helpers ---
 
 const STATUS_LABEL: Record<RoutingStatus, string> = {
@@ -23,11 +25,6 @@ const STATUS_LABEL: Record<RoutingStatus, string> = {
 };
 
 const HISTORY_STATUSES = [RoutingStatus.COMPLETED, RoutingStatus.CANCELLED];
-
-function formatPrice(value?: number | null): string {
-  if (!value) return 'R$ 0,00';
-  return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-}
 
 function formatDistance(km?: number | null): string {
   if (!km) return '0 km';
@@ -137,7 +134,7 @@ function RouteCard({ rota, onPress }: RouteCardProps) {
       {/* Métricas */}
       <Box flexDirection="row" flexWrap="wrap" gap="x12">
         <Text preset="text14" color="gray600">{rota.totalServices ?? 0} paradas</Text>
-        <Text preset="text14" color="gray600">{formatPrice(rota.totalValue)}</Text>
+        <Text preset="text14" color="gray600">{routeValueLabel(rota.totalValue)}</Text>
         <Text preset="text14" color="gray600">{formatDistance(rota.totalDistanceKm)}</Text>
         <Text preset="text14" color="gray600">{formatDuration(rota.totalDurationMinutes)}</Text>
       </Box>

@@ -17,6 +17,7 @@ import { countLedgerOnly } from '../../../rotas-detalhadas/[id]/_utils/routeNonD
 import { Map } from '../../../rotas-detalhadas/[id]/parada/[pid]/_components/shared/Map';
 import { RouteMapLegend } from '../../../rotas-detalhadas/[id]/parada/[pid]/_components/shared/RouteMapLegend';
 import { useRouteMapView } from '../../../rotas-detalhadas/[id]/parada/[pid]/_components/shared/useRouteMapView';
+import { routeValueLabel } from '../_utils/routeValue';
 
 function mapRoutingStatus(status: RoutingStatus): string {
   const map: Record<RoutingStatus, string> = {
@@ -89,11 +90,6 @@ export default function HistoricoDetalhesScreen() {
   } = useRouteMapView(routeId || '');
 
   const isLoading = isLoadingRouting || isLoadingServices || isLoadingMapData;
-
-  const formatarPreco = (valor: number | null | undefined): string => {
-    if (!valor) return 'R$ 0,00';
-    return `R$ ${valor.toFixed(2).replace('.', ',')}`;
-  };
 
   const formatarDistancia = (km: number | null | undefined): string => {
     if (!km) return '0 km';
@@ -264,7 +260,7 @@ export default function HistoricoDetalhesScreen() {
               borderColor="primary20"
             >
               <Text preset="text14" color="gray600">
-                {formatarPreco(routing.totalValue)}
+                {routeValueLabel(routing.totalValue)}
               </Text>
             </Box>
 
