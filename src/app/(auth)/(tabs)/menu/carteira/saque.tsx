@@ -16,7 +16,8 @@ import { useToastService } from '@/services/Toast/useToast';
 import { measure } from '@/theme';
 import { formatCurrency } from '@/utils/formatCurrency';
 
-import { maxWithdrawalFromError, policyNoticeColor, withdrawalErrorMessage, withdrawalPolicyNotice } from './_utils/debtPolicy';
+import { PolicyNoticeBox } from './_components/PolicyNoticeBox';
+import { maxWithdrawalFromError, withdrawalErrorMessage, withdrawalPolicyNotice } from './_utils/debtPolicy';
 import { pixKeyChangeNotice } from './_utils/pixKeyNotice';
 import { walletDestination } from './_utils/withdrawalDisplay';
 
@@ -184,24 +185,7 @@ export default function SaqueScreen() {
                         </Text>
                     </Box>
 
-                    {policyNotice && (
-                        <TouchableOpacityBox
-                            testID="aviso-politica-divida"
-                            mt="t16"
-                            p="m16"
-                            borderRadius="s12"
-                            backgroundColor="gray50"
-                            onPress={goToDebts}
-                            accessibilityRole="button"
-                        >
-                            <Text testID="aviso-politica-divida-texto" fontSize={measure.m13} color={policyNoticeColor(policyNotice.tone)}>
-                                {policyNotice.text}
-                            </Text>
-                            <Text mt="t4" fontSize={measure.m12} color="colorTextPrimary">
-                                Ver o que devo à empresa
-                            </Text>
-                        </TouchableOpacityBox>
-                    )}
+                    {policyNotice && <PolicyNoticeBox notice={policyNotice} onPress={goToDebts} linkText="Ver o que devo à empresa" />}
 
                     <Box mt="t24">
                         <Text fontSize={measure.m14} fontWeightPreset="semibold" mb="b8">

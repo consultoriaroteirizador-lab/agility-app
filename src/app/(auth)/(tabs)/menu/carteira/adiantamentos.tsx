@@ -6,7 +6,7 @@ import { FlatList, RefreshControl } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 import { ActivityIndicator, Box, ButtonBack, ScreenBase, Text, TouchableOpacityBox } from '@/components';
-import { useGetAdvancesSummary, useInfiniteAdvances } from '@/domain/agility/wallet';
+import { useGetAdvancesSummary, useInfiniteAdvances, useWithdrawalAllowance } from '@/domain/agility/wallet';
 import type { AdvanceResponse } from '@/domain/agility/wallet/dto';
 import { AdvanceStatus } from '@/domain/agility/wallet/dto/types';
 import { measure, StatusColorConfig } from '@/theme';
@@ -14,7 +14,9 @@ import { colors } from '@/theme/colors';
 import { formatCurrency } from '@/utils/formatCurrency';
 import { formatDate } from '@/utils/formatDate';
 
-import { advanceDueText, advanceOverdueText, advanceTitle } from './_utils/advanceDisplay';
+import { PolicyNoticeBox } from './_components/PolicyNoticeBox';
+import { advanceCancelText, advanceDueText, advanceOverdueText, advanceTitle } from './_utils/advanceDisplay';
+import { withdrawalPolicyNotice } from './_utils/debtPolicy';
 
 const STATUS_CONFIG: Record<AdvanceStatus, StatusColorConfig> = {
     [AdvanceStatus.PENDING]: { label: 'Pendente', textColor: 'yellow100', bgColor: 'yellow20' },
@@ -27,6 +29,7 @@ function AdvanceItem({ item }: { item: AdvanceResponse }) {
     const config = STATUS_CONFIG[item.status] ?? STATUS_CONFIG[AdvanceStatus.PENDING];
     const due = advanceDueText(item);
     const open = item.status === AdvanceStatus.PENDING || item.status === AdvanceStatus.PARTIAL;
+    const cancelText = advanceCancelText(item);
 
     return (
         <Box p="m16" borderRadius="s12" mb="b12" borderWidth={1} borderColor="borderColor">
@@ -73,6 +76,12 @@ function AdvanceItem({ item }: { item: AdvanceResponse }) {
                     </Text>
                 </Box>
             )}
+
+            {cancelText && (
+                <Text testID={`cancelamento-${item.id}`} mt="t12" fontSize={measure.m12} color="colorTextSecondary">
+                    {cancelText}
+                </Text>
+            )}
         </Box>
     );
 }
@@ -80,6 +89,10 @@ function AdvanceItem({ item }: { item: AdvanceResponse }) {
 export default function AdiantamentosScreen() {
     const { items, isLoading, isError, isFetchNextPageError, isFetchingNextPage, loadMore, refetch, isRefreshing } = useInfiniteAdvances();
     const { summary, isError: isSummaryError, refetch: refetchSummary } = useGetAdvancesSummary();
+
+    const { allowance } = useWithdrawalAllowance();
+    const policyNotice = withdrawalPolicyNotice(allowance, summary?.overdueCount ?? null);
+    const aviso = policyNotice ? <PolicyNoticeBox notice={policyNotice} /> : null;
 
     const resumo = !summary ? (
         isSummaryError ? (
@@ -116,6 +129,7 @@ export default function AdiantamentosScreen() {
 
     return (
         <ScreenBase buttonLeft={<ButtonBack />} title={<Text preset="textTitleScreen">Adiantamentos</Text>}>
+            {aviso}
             {resumo}
             <FlatList
                 data={items}
