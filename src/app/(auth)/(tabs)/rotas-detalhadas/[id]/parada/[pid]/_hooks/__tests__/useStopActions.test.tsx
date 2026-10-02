@@ -1,11 +1,7 @@
 /**
- * F5 (correção do review): `moneyChangedKeys()` saiu de `routeStopChangedKeys` (que roda
- * a cada `routing_updated`/`service_updated` do `/monitoring`, inclusive na reprojeção de
- * ETA — sem nenhuma mudança de dinheiro) e passou a ser chamada só nos pontos de
- * conclusão/insucesso. `useStopActions` é um deles: `handleCompleteService` conclui a
- * parada — uma cobrança em dinheiro pendente pode ter virado dívida (carteira) e
- * pagamento (cobranças) no mesmo gesto. `handleStartService`/`handleStartAttendance` NÃO
- * concluem nada, então não devem disparar a invalidação de dinheiro.
+ * `useStopActions` só inicia parada e atendimento: nenhum dos dois conclui nada, então não
+ * invalidam o dinheiro. A conclusão mora em `useServiceCompletion` (completion-details), o
+ * único caminho que leva o valor recebido (F5b, R8).
  */
 import React from 'react';
 
@@ -26,7 +22,6 @@ jest.mock('../getCurrentCoords', () => ({ getCurrentCoords: jest.fn().mockResolv
 
 let startSuccess: (() => void) | undefined;
 let attendanceSuccess: (() => void) | undefined;
-let completeSuccess: (() => void) | undefined;
 
 jest.mock('@/domain/agility/service/useCase', () => ({
     useStartService: (options?: { onSuccess?: () => void }) => {
@@ -36,10 +31,6 @@ jest.mock('@/domain/agility/service/useCase', () => ({
     useStartAttendance: (options?: { onSuccess?: () => void }) => {
         attendanceSuccess = options?.onSuccess;
         return { startAttendanceAsync: jest.fn(), isLoading: false };
-    },
-    useCompleteService: (options?: { onSuccess?: () => void }) => {
-        completeSuccess = options?.onSuccess;
-        return { completeService: jest.fn(), isLoading: false };
     },
 }));
 
@@ -72,25 +63,11 @@ describe('useStopActions — invalidação de dinheiro (Task F5)', () => {
     afterEach(() => {
         startSuccess = undefined;
         attendanceSuccess = undefined;
-        completeSuccess = undefined;
         jest.clearAllMocks();
     });
 
-    it('handleCompleteService (conclusão): invalida carteira e financeiro', async () => {
-        const queryClient = new QueryClient();
-        seedMoneyCache(queryClient);
-        const tree = montar(queryClient);
-
-        await act(async () => {
-            await completeSuccess?.();
-        });
-
-        expect(isMoneyInvalidated(queryClient)).toBe(true);
-
-        act(() => tree.unmount());
-        queryClient.clear();
-    });
-
+    // O controle positivo da conclusão (invalida carteira e financeiro) vive em
+    // `useServiceCompletion.test.tsx`; aqui só se prova que iniciar não invalida.
     it('start service concluído (NÃO é conclusão de parada): não invalida dinheiro', async () => {
         const queryClient = new QueryClient();
         seedMoneyCache(queryClient);

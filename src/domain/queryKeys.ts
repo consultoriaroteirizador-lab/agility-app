@@ -64,8 +64,8 @@ export const PUSH_INVALIDATED_KEYS: readonly string[] = [
  * dívida e o pagamento; concluir a rota cria a parcela de frete (F2). Além do push
  * (ROUTE_COMPLETED/PAYMENT_RECEIVED, ver `PUSH_INVALIDATED_KEYS`), quem conclui invalida
  * direto — cobre o caso de app em foreground sem passar pelo listener de notificação.
- * Chamada só nos pontos de conclusão/insucesso (`useServiceCompletion`, `dados-entrega`,
- * `useStopActions`, `insucesso`, `useCompleteRouting`) — NUNCA dentro de
+ * Chamada só nos pontos de conclusão/insucesso (`useServiceCompletion`, `insucesso`,
+ * `useCompleteRouting`) — NUNCA dentro de
  * `routeStopChangedKeys`, que também roda a cada `routing_updated`/`service_updated` do
  * `/monitoring` (reprojeção de ETA, sem nenhuma mudança de dinheiro).
  */

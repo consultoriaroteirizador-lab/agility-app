@@ -122,11 +122,9 @@ function StopDetailContent() {
   const {
     handleGoToLocation,
     handleStartAttendance,
-    handleCompleteService,
     handleMarkAsFailed,
     isStarting,
     isStartingAttendance,
-    isCompleting,
   } = useStopActions({
     serviceId,
     routeId,

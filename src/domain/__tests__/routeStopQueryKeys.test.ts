@@ -83,8 +83,8 @@ describe('invalidação após mudança de status de parada', () => {
      * F5 (correção do review): `routeStopChangedKeys` roda a cada `routing_updated`/
      * `service_updated` do `/monitoring` (`useRouteLiveSync`), inclusive na reprojeção de
      * ETA por atraso — que não move dinheiro nenhum. `moneyChangedKeys()` saiu daqui e
-     * passou a ser chamada só nos pontos de conclusão/insucesso (`useServiceCompletion`,
-     * `dados-entrega`, `useStopActions`, `insucesso`, `useCompleteRouting`).
+     * passou a ser chamada só nos pontos de conclusão/insucesso (`useServiceCompletion`, `insucesso`,
+     * `useCompleteRouting`).
      */
     it('NÃO invalida o dinheiro do motorista (isso ia refazer a carteira a cada reprojeção de ETA)', () => {
         const queryClient = new QueryClient()
