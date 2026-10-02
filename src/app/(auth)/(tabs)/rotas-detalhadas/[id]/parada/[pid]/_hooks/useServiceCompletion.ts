@@ -99,8 +99,12 @@ export function useServiceCompletion(serviceType: ServiceFlowType) {
         };
     }, []);
 
-    // Hook para enviar detalhes de conclusão
-    const { completeServiceWithDetailsAsync, isLoading: isCompletingWithDetails } = useCompleteServiceWithDetails();
+    // Hook para enviar detalhes de conclusão. `onError` vazio de propósito: sem ele o
+    // `useMutationService` abre o modal de erro com a mesma frase que o toast do catch de
+    // `handleFinalizar` já mostra (a recusa do back aparecia duas vezes).
+    const { completeServiceWithDetailsAsync, isLoading: isCompletingWithDetails } = useCompleteServiceWithDetails({
+        onError: () => undefined,
+    });
 
     // Reset defensivo: se o consumer (ex: SharedEtapaFinalizacao) monta com
     // `finalizing=true` no contexto MAS não há mutation em voo, é resíduo de

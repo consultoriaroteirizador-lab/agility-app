@@ -44,12 +44,24 @@ jest.mock('../../_context/ParadaContext', () => ({
 // manda para a API sem bater em rede de verdade.
 const mockCompleteServiceWithDetailsAsync = jest.fn();
 
-jest.mock('@/domain/agility/service/useCase', () => ({
-    useCompleteServiceWithDetails: () => ({
-        completeServiceWithDetailsAsync: mockCompleteServiceWithDetailsAsync,
-        isLoading: false,
-    }),
+// O hook de mutação é o REAL (com o `useMutationService` por baixo): a recusa do back passa
+// pelo `onError` dele, e só assim dá para provar que a frase aparece numa superfície só
+// (achado 4 da revisão final). A rede é o `serviceService`, que repassa ao mock no
+// formato `{ id, details }` que os testes abaixo já conferem. Sem valor configurado, responde
+// o envelope de sucesso (o `onSuccess` do `useMutationService` lê `data.message`).
+jest.mock('@/domain/agility/service/serviceService', () => ({
+    serviceService: {
+        completeWithDetails: async (id: string, details: unknown) =>
+            (await mockCompleteServiceWithDetailsAsync({ id, details })) ?? { success: true, result: {} },
+    },
 }));
+jest.mock('@/domain/agility/service/useCase', () => ({
+    useCompleteServiceWithDetails: jest.requireActual('@/domain/agility/service/useCase/useCompleteServiceWithDetails')
+        .useCompleteServiceWithDetails,
+}));
+
+const mockOpenModal = jest.fn();
+jest.mock('@/services/modalError/useModalErrorService', () => ({ useModalErrorService: () => ({ openModal: mockOpenModal }) }));
 
 // `handleFinalizar` sobe fotos/assinatura e le GPS antes de montar o payload —
 // nenhum dos tres precisa (nem pode, sem NativeModules) rodar de verdade aqui.
@@ -183,6 +195,7 @@ describe('useServiceCompletion — regra unica de conclusao', () => {
         mockedUseParada.mockReset();
         mockCompleteServiceWithDetailsAsync.mockReset();
         mockShowToast.mockReset();
+        mockOpenModal.mockReset();
     });
 
     it('tudo REQUIRED e estado vazio: canFinalize falso e missing com os quatro rotulos', () => {
@@ -594,6 +607,23 @@ describe('useServiceCompletion — regra unica de conclusao', () => {
             });
 
             expect(mockShowToast).toHaveBeenCalledWith({ message: frase, type: 'error' });
+        });
+
+        // Achado 4 da revisão final: o modal de erro do `useMutationService` repetia a frase
+        // que o toast já mostra. Uma superfície só: o toast.
+        it('back recusa a conclusão: a frase aparece uma vez só (toast), sem o modal de erro', async () => {
+            const frase = 'receivedValue é obrigatório para pedido com cobrança.';
+            mockCompleteServiceWithDetailsAsync.mockRejectedValue({ success: false, error: { code: 'BAD_REQUEST', message: frase } });
+            mockedUseParada.mockReturnValue(comCobranca());
+            const result = runHook('entrega');
+
+            await act(async () => {
+                await result.handleFinalizar();
+            });
+
+            expect(mockOpenModal).not.toHaveBeenCalled();
+            const comFrase = mockShowToast.mock.calls.filter(([arg]) => arg?.message === frase);
+            expect(comFrase).toEqual([[{ message: frase, type: 'error' }]]);
         });
     });
 
