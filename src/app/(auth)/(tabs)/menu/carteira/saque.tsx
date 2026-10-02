@@ -38,8 +38,9 @@ export default function SaqueScreen() {
     // Teto = menor entre o disponível e o que a política de dívida deixa (F3). Sem o resumo
     // (carregando, erro, back sem F3), o teto é o disponível e o back decide (R3).
     const cap = withdrawCapCents(availableBalance, allowance);
-    // Só há "regra de dívidas" quando há política: sem ela (allowance null) o teto é o disponível.
-    const limitedByDebt = allowance !== null && cap < withdrawCapCents(availableBalance, null);
+    // Só há "regra de dívidas" quando há política que limita: sem ela (allowance null) o teto é o
+    // disponível, e com FREE um teto menor é só o resumo de outro momento que o /wallet.
+    const limitedByDebt = allowance !== null && allowance.policy !== 'FREE' && cap < withdrawCapCents(availableBalance, null);
     const value = amountCents ?? 0;
     const policyNotice = withdrawalPolicyNotice(allowance, debts?.overdueCount ?? null);
     const pixNotice = pixKeyChangeNotice(wallet);
@@ -162,10 +163,12 @@ export default function SaqueScreen() {
                     : null;
 
     // Destino e alerta de chave (F3): o motorista confere PARA ONDE vai antes de confirmar (R9).
-    // O destino vem do GET /wallet em cache: é a chave ATUAL da carteira, e o texto diz isso.
+    // O destino vem do GET /wallet em cache: é a chave (ou a conta, no TED) ATUAL da carteira, e o texto diz isso.
     const confirmText = [
         `Deseja solicitar o saque de ${formatCurrency(value)}?`,
-        wallet ? `Destino: ${walletDestination(wallet)}\n(a chave atual da sua carteira)` : null,
+        wallet
+            ? `Destino: ${walletDestination(wallet)}\n${wallet.pixKey ? '(a chave atual da sua carteira)' : '(os dados atuais da sua carteira)'}`
+            : null,
         pixNotice?.recent ? `Atenção: ${pixNotice.text}` : null,
         'O valor sai do disponível e fica em "Saque pendente" até o pagamento.',
     ]

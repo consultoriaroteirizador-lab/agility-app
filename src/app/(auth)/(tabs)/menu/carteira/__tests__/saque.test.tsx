@@ -51,6 +51,9 @@ type MockWallet =
           pixKey?: string | null;
           pixKeyChangedAt?: string | null;
           previousPixKeyMasked?: string | null;
+          bankName?: string | null;
+          bankAgency?: string | null;
+          bankAccount?: string | null;
       }
     | undefined;
 const mockUseGetWallet = jest.fn<
@@ -331,6 +334,19 @@ describe('Saque — política de dívida (F3)', () => {
         expect(tree.root.findAllByProps({ children: 'Valor maior que o saldo disponível' }).length).toBeGreaterThan(0);
     });
 
+    // Achado 2 da revisão final: /wallet e /wallet/summary são de momentos diferentes; com
+    // política FREE o teto menor é só atraso do resumo, nunca "regra de dívidas".
+    it('política FREE com o resumo atrasado (teto < disponível): acima do teto diz "saldo insuficiente", nunca "regra de dívidas"', () => {
+        mockUseWithdrawalAllowance.mockReturnValue({ allowance: { policy: 'FREE', withdrawableCents: 7000, openDebtCents: 0, availableCents: 7000 } });
+        const tree = render();
+        digitarEPedir(tree, 8000);
+
+        expect(mockModalProps?.isVisible).toBe(false);
+        expect(mockShowToast).toHaveBeenCalledWith({ message: 'Saldo insuficiente para este saque', type: 'error' });
+        expect(tree.root.findAllByProps({ children: `Máximo pela regra de dívidas: ${formatCurrency(7000)}` })).toHaveLength(0);
+        expect(tree.root.findAllByProps({ children: 'Valor maior que o saldo disponível' }).length).toBeGreaterThan(0);
+    });
+
     it('teto baixa com o modal aberto: Confirmar não manda o POST', async () => {
         mockUseWithdrawalAllowance.mockReturnValue({ allowance: { policy: 'EXCESS_ONLY', withdrawableCents: 7000, openDebtCents: 3000 } });
         const tree = render();
@@ -375,6 +391,31 @@ describe('Saque — política de dívida (F3)', () => {
 
         expect(mockModalProps?.isVisible).toBe(true);
         expect(mockModalProps?.text).toContain('Destino: PIX: nova@exemplo.com');
+        expect(mockModalProps?.text).toContain('(a chave atual da sua carteira)');
         expect(mockModalProps?.text).toContain('Atenção: A chave PIX da sua carteira foi alterada em');
+    });
+
+    // Achado 3 da revisão final: destino TED não é "chave".
+    it('destino TED: o modal fala dos dados atuais da carteira, não da chave', () => {
+        mockUseGetWallet.mockReturnValue({
+            wallet: {
+                availableBalance: 10000,
+                hasBankInfo: true,
+                balance: 10000,
+                pixKey: null,
+                bankName: 'Banco X',
+                bankAgency: '0001',
+                bankAccount: '12345-6',
+            },
+            isLoading: false,
+            isError: false,
+            refetch: mockRefetchWallet,
+        });
+        const tree = render();
+        digitarEPedir(tree, 5000);
+
+        expect(mockModalProps?.isVisible).toBe(true);
+        expect(mockModalProps?.text).toContain('Destino: TED: Banco X · Ag. 0001 · Conta 12345-6\n(os dados atuais da sua carteira)');
+        expect(mockModalProps?.text).not.toContain('chave atual');
     });
 });
