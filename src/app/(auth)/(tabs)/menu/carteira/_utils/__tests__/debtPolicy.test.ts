@@ -91,10 +91,13 @@ describe('withdrawalErrorMessage', () => {
 });
 
 describe('maxWithdrawalFromError', () => {
-    it('só devolve o máximo da recusa EXCESS_ONLY, inteiro e > 0', () => {
+    it('só devolve o máximo da recusa EXCESS_ONLY, finito e > 0 (fracionado cai para o centavo de baixo)', () => {
         expect(maxWithdrawalFromError({ error: { code: 'WITHDRAWAL_EXCEEDS_AMOUNT_ABOVE_DEBT', maxAmountCents: 4000 } })).toBe(4000);
         expect(maxWithdrawalFromError({ error: { code: 'WITHDRAWAL_EXCEEDS_AMOUNT_ABOVE_DEBT', maxAmountCents: 0 } })).toBeNull();
-        expect(maxWithdrawalFromError({ error: { code: 'WITHDRAWAL_EXCEEDS_AMOUNT_ABOVE_DEBT', maxAmountCents: 40.5 } })).toBeNull();
+        expect(maxWithdrawalFromError({ error: { code: 'WITHDRAWAL_EXCEEDS_AMOUNT_ABOVE_DEBT', maxAmountCents: 40.5 } })).toBe(40);
+        expect(maxWithdrawalFromError({ error: { code: 'WITHDRAWAL_EXCEEDS_AMOUNT_ABOVE_DEBT', maxAmountCents: 0.5 } })).toBeNull();
+        expect(maxWithdrawalFromError({ error: { code: 'WITHDRAWAL_EXCEEDS_AMOUNT_ABOVE_DEBT', maxAmountCents: -1 } })).toBeNull();
+        expect(maxWithdrawalFromError({ error: { code: 'WITHDRAWAL_EXCEEDS_AMOUNT_ABOVE_DEBT', maxAmountCents: Infinity } })).toBeNull();
         expect(maxWithdrawalFromError({ error: { code: 'WITHDRAWAL_BLOCKED_BY_OVERDUE_DEBT', maxAmountCents: 4000 } })).toBeNull();
         expect(maxWithdrawalFromError(undefined)).toBeNull();
     });

@@ -8,6 +8,7 @@ import { ThemeProvider } from '@shopify/restyle';
 import TestRenderer, { act } from 'react-test-renderer';
 
 import { theme } from '@/theme';
+import { formatCurrency } from '@/utils/formatCurrency';
 
 jest.mock('react-native-webview', () => ({ WebView: () => null }));
 jest.mock('@react-native-async-storage/async-storage', () =>
@@ -30,10 +31,11 @@ const mockShowToast = jest.fn();
 jest.mock('@/services/Toast/useToast', () => ({ useToastService: () => ({ showToast: mockShowToast }) }));
 
 // O modal real depende de ModalComponent; aqui ele só guarda as props para o teste tocar.
-let mockModalProps: { isVisible: boolean; onPress?: () => Promise<void> | void; onClose: () => void } | null = null;
+type ModalProps = { isVisible: boolean; text?: string; onPress?: () => Promise<void> | void; onClose: () => void };
+let mockModalProps: ModalProps | null = null;
 jest.mock('@/components/Modal/Modal', () => ({
     __esModule: true,
-    default: (props: { isVisible: boolean; onPress?: () => Promise<void> | void; onClose: () => void }) => {
+    default: (props: ModalProps) => {
         mockModalProps = props;
         return null;
     },
@@ -41,7 +43,16 @@ jest.mock('@/components/Modal/Modal', () => ({
 
 const mockRequestWithdrawal = jest.fn();
 const mockRefetchWallet = jest.fn();
-type MockWallet = { availableBalance: number; hasBankInfo: boolean; balance: number } | undefined;
+type MockWallet =
+    | {
+          availableBalance: number;
+          hasBankInfo: boolean;
+          balance: number;
+          pixKey?: string | null;
+          pixKeyChangedAt?: string | null;
+          previousPixKeyMasked?: string | null;
+      }
+    | undefined;
 const mockUseGetWallet = jest.fn<
     { wallet: MockWallet; isLoading: boolean; isError: boolean; refetch: typeof mockRefetchWallet },
     []
@@ -51,9 +62,13 @@ const mockUseGetWallet = jest.fn<
     isError: false,
     refetch: mockRefetchWallet,
 }));
+const mockUseWithdrawalAllowance = jest.fn<{ allowance: unknown }, []>(() => ({ allowance: null }));
+const mockUseGetAdvancesSummary = jest.fn<{ summary: unknown }, []>(() => ({ summary: undefined }));
 jest.mock('@/domain/agility/wallet', () => ({
     useGetWallet: () => mockUseGetWallet(),
     useRequestWithdrawal: () => ({ requestWithdrawal: mockRequestWithdrawal, isPending: false }),
+    useWithdrawalAllowance: () => mockUseWithdrawalAllowance(),
+    useGetAdvancesSummary: () => mockUseGetAdvancesSummary(),
 }));
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -73,6 +88,9 @@ function render() {
 
 const botao = (tree: TestRenderer.ReactTestRenderer) => tree.root.findAllByProps({ title: 'Solicitar Saque' })[0];
 
+const campo = (tree: TestRenderer.ReactTestRenderer) => tree.root.findAll((n) => typeof n.props.onChangeCents === 'function')[0];
+const texto = (tree: TestRenderer.ReactTestRenderer, testID: string) => tree.root.findAllByProps({ testID })[0]?.props.children;
+
 function digitarEPedir(tree: TestRenderer.ReactTestRenderer, cents: number) {
     act(() => {
         tree.root.findAll((n) => typeof n.props.onChangeCents === 'function')[0].props.onChangeCents(cents);
@@ -91,6 +109,8 @@ beforeEach(() => {
         isError: false,
         refetch: mockRefetchWallet,
     });
+    mockUseWithdrawalAllowance.mockReturnValue({ allowance: null });
+    mockUseGetAdvancesSummary.mockReturnValue({ summary: undefined });
 });
 
 describe('Saque', () => {
@@ -181,5 +201,114 @@ describe('Saque', () => {
         await act(async () => {
             responder({ id: 'wd-1' });
         });
+    });
+});
+
+describe('Saque — política de dívida (F3)', () => {
+    it('EXCESS_ONLY: o teto do campo e o "Sacar tudo" são o máximo da política, com o aviso', () => {
+        mockUseWithdrawalAllowance.mockReturnValue({ allowance: { policy: 'EXCESS_ONLY', withdrawableCents: 7000, openDebtCents: 3000 } });
+        const tree = render();
+
+        expect(campo(tree).props.maxCents).toBe(7000);
+        expect(tree.root.findAllByProps({ testID: 'sacar-tudo' })[0].props.disabled).toBe(false);
+        expect(texto(tree, 'aviso-politica-divida-texto')).toBe(
+            `Com ${formatCurrency(3000)} em dívidas abertas, você pode sacar até ${formatCurrency(7000)}.`,
+        );
+    });
+
+    it('valor acima do teto da política: não abre o modal e diz o máximo', () => {
+        mockUseWithdrawalAllowance.mockReturnValue({ allowance: { policy: 'EXCESS_ONLY', withdrawableCents: 7000, openDebtCents: 3000 } });
+        const tree = render();
+        digitarEPedir(tree, 8000);
+
+        expect(mockModalProps?.isVisible).toBe(false);
+        expect(mockShowToast).toHaveBeenCalledWith({
+            message: `Pela regra de dívidas da empresa, o máximo agora é ${formatCurrency(7000)}`,
+            type: 'error',
+        });
+    });
+
+    it('back recusa pela política com o máximo: mensagem com o valor, ação que só preenche o campo', async () => {
+        mockRequestWithdrawal.mockRejectedValue({
+            success: false,
+            error: { code: 'WITHDRAWAL_EXCEEDS_AMOUNT_ABOVE_DEBT', message: 'Com R$ 60,00 em dívidas abertas, o saque máximo é R$ 40,00.', maxAmountCents: 4000 },
+        });
+        const tree = render();
+        digitarEPedir(tree, 5000);
+
+        await act(async () => {
+            await mockModalProps!.onPress!();
+        });
+
+        const toast = mockShowToast.mock.calls[mockShowToast.mock.calls.length - 1][0];
+        expect(toast.message).toBe(`Você tem dívidas em aberto com a empresa. O máximo que pode sacar agora é ${formatCurrency(4000)}.`);
+        expect(toast.type).toBe('error');
+        expect(toast.action.title).toBe('Usar o máximo');
+
+        act(() => {
+            toast.action.onPress();
+        });
+        expect(campo(tree).props.valueCents).toBe(4000);
+        expect(mockRequestWithdrawal).toHaveBeenCalledTimes(1);
+        expect(mockRouter.replace).not.toHaveBeenCalled();
+        expect(mockShowToast).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'success' }));
+        expect(botao(tree).props.disabled).toBe(false);
+    });
+
+    it('BLOCK_IF_OVERDUE com dívida vencida: aviso de bloqueio, "Sacar tudo" e o botão travados', () => {
+        mockUseWithdrawalAllowance.mockReturnValue({ allowance: { policy: 'BLOCK_IF_OVERDUE', withdrawableCents: 0, openDebtCents: 5000 } });
+        mockUseGetAdvancesSummary.mockReturnValue({ summary: { totalPending: 5000, count: 1, overdueCount: 1 } });
+        const tree = render();
+
+        expect(texto(tree, 'aviso-politica-divida-texto')).toBe(
+            'Saque bloqueado: você tem 1 dívida(s) vencida(s) com a empresa. Devolva o valor para liberar o saque.',
+        );
+        expect(tree.root.findAllByProps({ testID: 'sacar-tudo' })[0].props.disabled).toBe(true);
+        act(() => {
+            campo(tree).props.onChangeCents(5000);
+        });
+        expect(botao(tree).props.disabled).toBe(true);
+    });
+
+    // P10: ao lado do bloqueio não aparece "Valor mínimo..." (nem outro motivo de botão travado).
+    it('BLOCK_IF_OVERDUE sem valor digitado: não mostra "Valor mínimo" ao lado do bloqueio', () => {
+        mockUseWithdrawalAllowance.mockReturnValue({ allowance: { policy: 'BLOCK_IF_OVERDUE', withdrawableCents: 0, openDebtCents: 5000 } });
+        mockUseGetAdvancesSummary.mockReturnValue({ summary: { totalPending: 5000, count: 1, overdueCount: 1 } });
+        const tree = render();
+        expect(tree.root.findAllByProps({ children: `Valor mínimo: ${formatCurrency(100)}` })).toHaveLength(0);
+    });
+
+    it('sem aviso de bloqueio: o "Valor mínimo" continua aparecendo', () => {
+        const tree = render();
+        expect(tree.root.findAllByProps({ children: `Valor mínimo: ${formatCurrency(100)}` }).length).toBeGreaterThan(0);
+    });
+
+    it('resumo da política indisponível: teto é o disponível e nenhum aviso inventado', () => {
+        mockUseWithdrawalAllowance.mockReturnValue({ allowance: null });
+        const tree = render();
+        expect(campo(tree).props.maxCents).toBe(10000);
+        expect(tree.root.findAllByProps({ testID: 'aviso-politica-divida' })).toHaveLength(0);
+    });
+
+    it('modal mostra o destino e o alerta de chave trocada recentemente', () => {
+        mockUseGetWallet.mockReturnValue({
+            wallet: {
+                availableBalance: 10000,
+                hasBankInfo: true,
+                balance: 10000,
+                pixKey: 'nova@exemplo.com',
+                pixKeyChangedAt: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
+                previousPixKeyMasked: '*******1234',
+            },
+            isLoading: false,
+            isError: false,
+            refetch: mockRefetchWallet,
+        });
+        const tree = render();
+        digitarEPedir(tree, 5000);
+
+        expect(mockModalProps?.isVisible).toBe(true);
+        expect(mockModalProps?.text).toContain('Destino: PIX: nova@exemplo.com');
+        expect(mockModalProps?.text).toContain('Atenção: A chave PIX da sua carteira foi alterada em');
     });
 });

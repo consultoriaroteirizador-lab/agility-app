@@ -46,10 +46,13 @@ type ErroSaque = { error?: { code?: unknown; maxAmountCents?: unknown } } | unde
 const BLOCKED = 'WITHDRAWAL_BLOCKED_BY_OVERDUE_DEBT';
 const EXCEEDS = 'WITHDRAWAL_EXCEEDS_AMOUNT_ABOVE_DEBT';
 
-/** `maxAmountCents` só chega se o adaptador repassar os extras (Task 1). */
+/**
+ * `maxAmountCents` só chega se o adaptador repassar os extras (Task 1). Aceita finito >= 0 e
+ * arredonda para baixo (Decimal(12,2) do back pode vir fracionado; nunca promete 1 centavo a mais).
+ */
 function maxOf(error: unknown): number | null {
     const max = (error as ErroSaque)?.error?.maxAmountCents;
-    return typeof max === 'number' && Number.isInteger(max) && max >= 0 ? max : null;
+    return typeof max === 'number' && Number.isFinite(max) && max >= 0 ? Math.floor(max) : null;
 }
 
 /** Mensagem do saque recusado. Os dois códigos da política têm texto do app (R4). */

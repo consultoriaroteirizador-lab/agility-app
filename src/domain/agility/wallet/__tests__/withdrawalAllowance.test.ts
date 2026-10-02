@@ -48,6 +48,11 @@ describe('withdrawCapCents', () => {
         expect(withdrawCapCents(5000, politica(7000))).toBe(5000);
     });
 
+    it('disponível fracionado cai para o centavo inteiro de baixo', () => {
+        expect(withdrawCapCents(10000.7, null)).toBe(10000);
+        expect(withdrawCapCents(10000.7, politica(20000))).toBe(10000);
+    });
+
     it('disponível negativo legado vira 0', () => {
         expect(withdrawCapCents(-500, null)).toBe(0);
     });

@@ -35,6 +35,7 @@ export function toWithdrawalAllowance(s: Partial<WalletSummaryResponse> | null |
 
 /** Teto do campo de saque: o menor entre o disponível e o que a política deixa. */
 export function withdrawCapCents(availableCents: number, allowance: WithdrawalAllowance | null): number {
-    const disponivel = Math.max(0, availableCents);
+    // Decimal(12,2) do back pode vir fracionado: o disponível também cai para o centavo inteiro.
+    const disponivel = Math.floor(Math.max(0, availableCents));
     return allowance ? Math.min(disponivel, Math.floor(allowance.withdrawableCents)) : disponivel;
 }
