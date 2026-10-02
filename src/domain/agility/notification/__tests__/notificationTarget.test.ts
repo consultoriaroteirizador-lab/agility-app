@@ -2,6 +2,7 @@ import type { NotificationResponse } from '../dto';
 import { NotificationStatus, NotificationType, UserType } from '../dto';
 import {
     caminhoComparavelDoDestino,
+    ehAvisoDeChavePix,
     iconeDaNotificacao,
     normalizarCaminho,
     resolverDestinoDaNotificacao,
@@ -105,5 +106,34 @@ describe('iconeDaNotificacao', () => {
 describe('iconeDaNotificacao — local corrigido', () => {
     it('usa edit-location', () => {
         expect(iconeDaNotificacao(NotificationType.ROUTE_STOP_RELOCATED)).toBe('edit-location');
+    });
+});
+
+describe('aviso de troca da chave PIX (F3)', () => {
+    const metadata = { walletId: 'w-1', changedAt: '2026-10-01T14:00:00.000Z', previousPixKeyMasked: '*******1234' };
+
+    it('SYSTEM_ALERT com walletId e changedAt, sem linkUrl, leva à carteira', () => {
+        expect(resolverDestinoDaNotificacao(notificacao({ type: NotificationType.SYSTEM_ALERT, metadata }))).toEqual({
+            tipo: 'caminho',
+            caminho: '/menu/carteira',
+        });
+    });
+
+    it('linkUrl explícito do back continua ganhando', () => {
+        expect(resolverDestinoDaNotificacao(notificacao({ metadata, linkUrl: '/menu/carteira/saques' }))).toEqual({
+            tipo: 'caminho',
+            caminho: '/menu/carteira/saques',
+        });
+    });
+
+    it('SYSTEM_ALERT sem os campos da carteira segue sem destino', () => {
+        expect(resolverDestinoDaNotificacao(notificacao({ metadata: { foo: 1 } }))).toBeNull();
+    });
+
+    it('ehAvisoDeChavePix lê os dados achatados do push', () => {
+        expect(ehAvisoDeChavePix({ type: 'SYSTEM_ALERT', walletId: 'w-1', changedAt: '2026-10-01T14:00:00.000Z' })).toBe(true);
+        expect(ehAvisoDeChavePix({ type: 'ROUTE_COMPLETED', walletId: 'w-1', changedAt: '2026-10-01T14:00:00.000Z' })).toBe(false);
+        expect(ehAvisoDeChavePix({ type: 'SYSTEM_ALERT', walletId: 'w-1' })).toBe(false);
+        expect(ehAvisoDeChavePix(undefined)).toBe(false);
     });
 });

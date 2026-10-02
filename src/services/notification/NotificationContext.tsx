@@ -15,6 +15,7 @@ import * as Notifications from "expo-notifications";
 import { router } from "expo-router";
 
 import { isDevelopment } from "@/config/environment";
+import { ehAvisoDeChavePix } from "@/domain/agility/notification/notificationTarget";
 import { useRegisterUserNotification } from "@/domain/notificationService/useCase/useRegisterUserNotification";
 import { PUSH_INVALIDATED_KEYS } from "@/domain/queryKeys";
 import { getDeviceFingerprint } from "@/functions/getDeviceFingerprint";
@@ -278,6 +279,12 @@ export const NotificationProvider: React.FC<NotificationProviderProps> = ({
 
       if (isOfferPush) {
         data = { ...data, route: "ofertas", params: { ...data.params, id: routingId } };
+      }
+
+      // Aviso de troca da chave PIX (F3): o back não manda `route`, e os dados vêm achatados
+      // do metadata (`walletId`, `changedAt`). Leva à carteira, onde está o alerta.
+      if (!data.route && !data.screen && ehAvisoDeChavePix(data)) {
+        data = { ...data, route: "carteira" };
       }
 
       // Prioriza 'route' sobre 'screen'

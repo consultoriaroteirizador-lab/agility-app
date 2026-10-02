@@ -15,6 +15,15 @@ export type DestinoNotificacao =
     | { tipo: 'caminho'; caminho: string }
     | { tipo: 'nomeada'; rota: string; params?: Record<string, any> };
 
+/**
+ * Aviso de troca da chave PIX (F3, `notification.listener.ts` `handlePixKeyChanged` no back):
+ * `SYSTEM_ALERT` sem `linkUrl`, com `walletId` e `changedAt` no metadata. No push, os mesmos
+ * campos vêm achatados em `data` (R10).
+ */
+export function ehAvisoDeChavePix(dados: { type?: unknown; walletId?: unknown; changedAt?: unknown } | null | undefined): boolean {
+    return dados?.type === NotificationType.SYSTEM_ALERT && typeof dados.walletId === 'string' && typeof dados.changedAt === 'string';
+}
+
 export function resolverDestinoDaNotificacao(notification: NotificationResponse): DestinoNotificacao | null {
     const routingId = notification.metadata?.routingId;
     const serviceId = notification.metadata?.serviceId;
@@ -50,6 +59,10 @@ export function resolverDestinoDaNotificacao(notification: NotificationResponse)
 
         case NotificationType.SYSTEM_ALERT:
         default:
+            // `type` depois do spread: um `metadata.type` nunca substitui o tipo da notificação.
+            if (!notification.linkUrl && ehAvisoDeChavePix({ ...(notification.metadata ?? {}), type: notification.type })) {
+                return caminho('/menu/carteira');
+            }
             if (notification.linkUrl?.startsWith('/')) return caminho(notification.linkUrl);
             if (notification.linkUrl) {
                 // `linkUrl` também pode ser um NOME de rota ('suporte', 'ofertas'), o mesmo

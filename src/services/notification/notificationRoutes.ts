@@ -82,6 +82,8 @@ export const notificationRoutes: Record<string, (params?: any) => void> = {
 
     // Menu
     menu: () => router.navigate('/(auth)/(tabs)/menu' as Href),
+    // Carteira: push da troca de chave PIX (F3), que não traz `route` do back.
+    carteira: () => router.navigate('/(auth)/(tabs)/menu/carteira' as Href),
     // Nome antigo de push de mensagem: a tela `menu/chat` foi removida, e este handler
     // só sobrevive para pushes ainda em trânsito. Leva sempre à conversa de suporte.
     chat: (params?: any) => goToSupportChat(params),
