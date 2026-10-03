@@ -187,6 +187,11 @@ describe('stopKeyOf — paridade com o backend', () => {
             .toBe(stopKeyOf({ id: 's2', addressId: 'addr-1', customerId: 'cli-1' }))
     })
 
+    it('[backend: "locationKey nula na copia cai no addressId"] formato real do backend', () => {
+        expect(stopKeyOf({ id: 's1', addressId: 'addr-1', customerId: 'cli-1', address: { locationKey: null } }))
+            .toBe(stopKeyOf({ id: 's2', addressId: 'addr-1', customerId: 'cli-1' }))
+    })
+
     it('TRANSFER com locationKey continua sem agrupar', () => {
         const a = stopKeyOf({ id: 's1', addressId: 'addr-1', serviceType: 'TRANSFER', address: { locationKey: 'k' } })
         const b = stopKeyOf({ id: 's2', addressId: 'addr-1', serviceType: 'TRANSFER', address: { locationKey: 'k' } })

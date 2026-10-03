@@ -33,8 +33,8 @@ export interface ServicePointResponse {
      *
      * `addressId` vem do acessor cru da entidade (`string | undefined`), então a
      * chave pode estar AUSENTE do JSON — daí ser opcional de verdade, e não só
-     * "às vezes null". `customerId` não é enviado: o cliente é aproximado por
-     * `fantasyName ?? responsible`, os mesmos fallbacks da lista de paradas.
+     * "às vezes null". `customerId` não é enviado e o mapa não usa cliente: agrupa
+     * por `locationKey ?? addressId` + sentido (ver `mapPointStopKeyOf`).
      */
     addressId?: string | null
 
