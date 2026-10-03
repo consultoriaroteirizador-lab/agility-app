@@ -32,6 +32,12 @@ import { ServiceType } from '@/domain/agility/service/dto/types'
 export interface StopKeyInput {
     id: string
     addressId?: string | null
+    /**
+     * Cópia do endereço no pedido. Só `locationKey` interessa aqui: a chave do
+     * LUGAR é `locationKey ?? addressId` (ADR-0002, R3). O app nunca calcula a
+     * `locationKey` — lê o que o backend mandou; `null`/ausente cai no `addressId`.
+     */
+    address?: { locationKey?: string | null } | null
     customerId?: string | null
     /** CNPJ/CPF do recebedor. ÚLTIMO degrau da cascata de cliente — ver `customerKeyOf`. */
     taxNumber?: string | null
@@ -96,7 +102,8 @@ function customerKeyOf(customerId?: string | null, taxNumber?: string | null): s
 }
 
 /**
- * Chave da parada de um pedido: `(endereço, cliente, sentido)`. Pedidos com a
+ * Chave da parada de um pedido: `(lugar, cliente, sentido)`, onde o lugar é
+ * `address.locationKey ?? addressId` (mesmo fallback do backend, ADR-0002 R3). Pedidos com a
  * MESMA chave e CONTÍGUOS formam uma parada só.
  *
  * Espelha `stopKeyOf` do backend — mesma fórmula, forma de entrada adaptada (um
@@ -111,7 +118,11 @@ function customerKeyOf(customerId?: string | null, taxNumber?: string | null): s
  * sentido próprio e nunca se misturam com entrega no mesmo endereço.
  */
 export function stopKeyOf(service: StopKeyInput): string {
-    const addressPart = addressPartOf(service.addressId, service.serviceType, service.id)
+    const addressPart = addressPartOf(
+        service.address?.locationKey ?? service.addressId,
+        service.serviceType,
+        service.id,
+    )
     const customerPart = customerKeyOf(service.customerId, service.taxNumber)
     return `${addressPart}|${customerPart}|${senseOf(service.serviceType)}`
 }
@@ -196,12 +207,15 @@ export interface MapPointKeyInput {
     serviceType?: string | null
     /** Endereço do pedido. Pode vir ausente do payload (ver acima). */
     addressId?: string | null
+    /** Chave do lugar calculada pelo backend; `null`/ausente → cai no `addressId`. */
+    locationKey?: string | null
     fantasyName?: string | null
     responsible?: string | null
 }
 
 /**
- * Chave de parada para os PONTOS DO MAPA: `addressId` + sentido — SEM cliente e
+ * Chave de parada para os PONTOS DO MAPA: `locationKey ?? addressId` + sentido
+ * (mesmo fallback do backend, ADR-0002 R3) — SEM cliente e
  * SEM o fallback por coordenada+título que a Camada 2 tinha.
  *
  * Simplificação da Camada 3: como o cliente anônimo agora agrupa por endereço
@@ -218,6 +232,10 @@ export interface MapPointKeyInput {
  * que fundir duas portas distintas.
  */
 export function mapPointStopKeyOf(point: MapPointKeyInput): string {
-    const addressPart = addressPartOf(point.addressId, point.serviceType, point.id)
+    const addressPart = addressPartOf(
+        point.locationKey ?? point.addressId,
+        point.serviceType,
+        point.id,
+    )
     return `${addressPart}|${senseOf(point.serviceType)}`
 }

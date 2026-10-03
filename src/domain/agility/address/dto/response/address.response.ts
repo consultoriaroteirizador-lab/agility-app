@@ -6,6 +6,9 @@ export interface AddressResponse {
     /** Address unique identifier */
     id: string;
 
+    /** Chave do lugar calculada pelo backend (ADR-0002). Ausente/null quando o pedido não tem cópia do endereço ou a cópia não gera chave (CEP, número ou rua vazios); o app só lê, nunca calcula. */
+    locationKey?: string | null;
+
     /** Street name */
     street: string;
 

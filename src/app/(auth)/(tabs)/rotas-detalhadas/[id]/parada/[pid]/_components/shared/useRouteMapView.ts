@@ -129,7 +129,7 @@ export function useRouteMapView(routeId: string): RouteMapView {
 
         // Um pino por PARADA, não por pedido: cinco notas na mesma porta viravam
         // cinco pinos empilhados com números diferentes. `mapPointStopKeyOf` usa a
-        // MESMA identidade da lista (endereço + cliente), então o agrupamento
+        // MESMA chave de lugar da lista (`locationKey ?? addressId`) + sentido, então o agrupamento
         // concorda com o dos cards.
         //
         // A NUMERAÇÃO, porém, não é garantida idêntica à da lista, e não afirmamos
