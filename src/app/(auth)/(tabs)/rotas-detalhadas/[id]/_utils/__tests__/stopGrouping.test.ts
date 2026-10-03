@@ -169,6 +169,29 @@ describe('stopKeyOf — paridade com o backend', () => {
         const delivery = stopKeyOf({ id: 'svc-2', addressId: 'addr-1', customerId: 'cli-1', serviceType: ServiceType.DELIVERY })
         expect(transfer).not.toBe(delivery)
     })
+
+    it('[backend: "locationKey igual agrupa mesmo com addressId diferente"]', () => {
+        const a = stopKeyOf({ id: 's1', addressId: 'addr-1', customerId: 'cli-1', address: { locationKey: 'addr:01310100|1|Rua A' } })
+        const b = stopKeyOf({ id: 's2', addressId: 'addr-2', customerId: 'cli-1', address: { locationKey: 'addr:01310100|1|Rua A' } })
+        expect(a).toBe(b)
+    })
+
+    it('[backend: "locationKey diferente separa mesmo com addressId igual"]', () => {
+        const a = stopKeyOf({ id: 's1', addressId: 'addr-1', customerId: 'cli-1', address: { locationKey: 'addr:01310100|1|Rua A' } })
+        const b = stopKeyOf({ id: 's2', addressId: 'addr-1', customerId: 'cli-1', address: { locationKey: 'addr:01310100|2|Rua A' } })
+        expect(a).not.toBe(b)
+    })
+
+    it('[backend: "chave do backend com locationKey ausente cai no addressId"]', () => {
+        expect(stopKeyOf({ id: 's1', addressId: 'addr-1', customerId: 'cli-1', address: null }))
+            .toBe(stopKeyOf({ id: 's2', addressId: 'addr-1', customerId: 'cli-1' }))
+    })
+
+    it('TRANSFER com locationKey continua sem agrupar', () => {
+        const a = stopKeyOf({ id: 's1', addressId: 'addr-1', serviceType: 'TRANSFER', address: { locationKey: 'k' } })
+        const b = stopKeyOf({ id: 's2', addressId: 'addr-1', serviceType: 'TRANSFER', address: { locationKey: 'k' } })
+        expect(a).not.toBe(b)
+    })
 })
 
 describe('groupContiguousStops', () => {
@@ -307,5 +330,36 @@ describe('mapPointStopKeyOf', () => {
 
         expect(groupContiguousBy(pontos, mapPointStopKeyOf)).toHaveLength(1)
         expect(groupContiguousStops(servicos)).toHaveLength(1)
+    })
+
+    describe('locationKey', () => {
+        it('mesmo locationKey com addressId diferente → mesmo pino', () => {
+            expect(mapPointStopKeyOf(ponto({ id: 'a', addressId: 'addr-1', locationKey: 'k1' })))
+                .toBe(mapPointStopKeyOf(ponto({ id: 'b', addressId: 'addr-2', locationKey: 'k1' })))
+        })
+
+        it('locationKey diferente com addressId igual → pinos distintos', () => {
+            expect(mapPointStopKeyOf(ponto({ id: 'a', addressId: 'addr-1', locationKey: 'k1' })))
+                .not.toBe(mapPointStopKeyOf(ponto({ id: 'b', addressId: 'addr-1', locationKey: 'k2' })))
+        })
+
+        it('ponto sem locationKey cai no addressId', () => {
+            expect(mapPointStopKeyOf(ponto({ id: 'a', addressId: 'addr-1', locationKey: null })))
+                .toBe(mapPointStopKeyOf(ponto({ id: 'b', addressId: 'addr-1' })))
+        })
+
+        it('TRANSFER com locationKey continua sem agrupar', () => {
+            expect(mapPointStopKeyOf(ponto({ id: 't1', serviceType: ServiceType.TRANSFER, locationKey: 'k' })))
+                .not.toBe(mapPointStopKeyOf(ponto({ id: 't2', serviceType: ServiceType.TRANSFER, locationKey: 'k' })))
+        })
+
+        it('mapa e lista concordam com locationKey (addressId diferentes, mesma porta)', () => {
+            const pontos = [0, 1, 2].map((i) => ponto({ id: `n${i}`, addressId: `addr-${i}`, locationKey: 'k1' }))
+            const servicos = [0, 1, 2].map((i) =>
+                svc({ id: `n${i}`, addressId: `addr-${i}`, customerId: null, taxNumber: null, address: { locationKey: 'k1' } }),
+            )
+            expect(groupContiguousBy(pontos, mapPointStopKeyOf)).toHaveLength(1)
+            expect(groupContiguousStops(servicos)).toHaveLength(1)
+        })
     })
 })

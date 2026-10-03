@@ -38,6 +38,9 @@ export interface ServicePointResponse {
      */
     addressId?: string | null
 
+    /** Chave do lugar calculada pelo backend (ADR-0002); null cai no `addressId`. O app só lê. */
+    locationKey?: string | null
+
     /** Nome fantasia do cliente (identifica o recebedor no mapa). */
     fantasyName?: string | null
 

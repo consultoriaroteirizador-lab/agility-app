@@ -6,6 +6,9 @@ export interface AddressResponse {
     /** Address unique identifier */
     id: string;
 
+    /** Chave do lugar calculada pelo backend (ADR-0002); null sem cópia de endereço. O app só lê. */
+    locationKey?: string | null;
+
     /** Street name */
     street: string;
 
