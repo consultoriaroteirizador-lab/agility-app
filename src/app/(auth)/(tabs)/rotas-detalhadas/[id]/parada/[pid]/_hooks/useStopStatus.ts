@@ -19,7 +19,9 @@ interface Service {
     // Identificam a PARADA (a porta), não o pedido. Opcionais: um caller que não
     // os passe cai no comportamento antigo (cada pedido é a sua própria parada).
     addressId?: string | null;
+    address?: { locationKey?: string | null } | null;
     customerId?: string | null;
+    taxNumber?: string | null;
     fantasyName?: string | null;
     responsible?: string | null;
     serviceType?: string | null;
