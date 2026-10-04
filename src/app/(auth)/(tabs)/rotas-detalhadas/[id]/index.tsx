@@ -179,6 +179,9 @@ function AndamentoList({
       ItemSeparatorComponent={ItemSeparator}
       contentContainerStyle={{ paddingBottom: 32 }}
       showsVerticalScrollIndicator={false}
+      // A lista precisa de altura delimitada para rolar: sem `flex: 1`, com muitas
+      // paradas ela cresce até o conteúdo e o ScrollView não rola (corta na borda).
+      style={{ flex: 1 }}
     />
   )
 }
@@ -288,6 +291,9 @@ function ConcluidasList({
       ItemSeparatorComponent={ItemSeparator}
       contentContainerStyle={{ paddingBottom: 32 }}
       showsVerticalScrollIndicator={false}
+      // Mesma regra da lista de "Em andamento": sem altura delimitada, a SectionList
+      // não rola quando há muitas paradas concluídas.
+      style={{ flex: 1 }}
     />
   )
 }

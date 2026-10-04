@@ -1,5 +1,6 @@
 import type { NotificationResponse } from '@/domain/agility/notification/dto';
 import { NotificationStatus, NotificationType, UserType } from '@/domain/agility/notification/dto';
+import { chaveDaNotificacao } from '@/domain/agility/notification/notificationGrouping';
 
 import {
     ESTADO_INICIAL_BANNER,
@@ -10,7 +11,6 @@ import {
     reduzirBanner,
 } from '../bannerQueue';
 import type { ContextoDoBanner, EstadoDoBanner } from '../bannerQueue';
-import { chaveDaNotificacao } from '@/domain/agility/notification/notificationGrouping';
 
 const AGORA = Date.parse('2026-09-26T12:00:00.000Z');
 
