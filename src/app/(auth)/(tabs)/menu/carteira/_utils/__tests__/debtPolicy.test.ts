@@ -1,6 +1,6 @@
 import { formatCurrency } from '@/utils/formatCurrency';
 
-import { maxWithdrawalFromError, policyNoticeColor, withdrawalErrorMessage, withdrawalPolicyNotice } from '../debtPolicy';
+import { isWithdrawalKeyReused, maxWithdrawalFromError, policyNoticeColor, withdrawalErrorMessage, withdrawalPolicyNotice } from '../debtPolicy';
 
 type Allowance = NonNullable<Parameters<typeof withdrawalPolicyNotice>[0]>;
 const politica = (over: Partial<Allowance>): Allowance => ({ policy: 'FREE', withdrawableCents: 10000, openDebtCents: 0, availableCents: null, ...over });
@@ -130,5 +130,24 @@ describe('maxWithdrawalFromError', () => {
         expect(maxWithdrawalFromError({ error: { code: 'WITHDRAWAL_EXCEEDS_AMOUNT_ABOVE_DEBT', maxAmountCents: Infinity } })).toBeNull();
         expect(maxWithdrawalFromError({ error: { code: 'WITHDRAWAL_BLOCKED_BY_OVERDUE_DEBT', maxAmountCents: 4000 } })).toBeNull();
         expect(maxWithdrawalFromError(undefined)).toBeNull();
+    });
+});
+
+describe('erros da F6 no saque', () => {
+    const erro = (code: string, extra: Record<string, unknown> = {}) => ({ success: false, error: { code, message: 'texto do back', ...extra } });
+
+    it('IDEMPOTENCY_KEY_REUSED manda conferir Meus saques', () => {
+        expect(withdrawalErrorMessage(erro('IDEMPOTENCY_KEY_REUSED'), 'fallback')).toBe(
+            'Esta tela já enviou um pedido de saque com outro valor. Confira em Meus saques antes de pedir de novo.',
+        );
+        expect(isWithdrawalKeyReused(erro('IDEMPOTENCY_KEY_REUSED'))).toBe(true);
+        expect(isWithdrawalKeyReused(erro('WITHDRAWAL_BLOCKED_BY_OVERDUE_DEBT'))).toBe(false);
+        expect(isWithdrawalKeyReused(undefined)).toBe(false);
+    });
+
+    it('WALLET_INVARIANT_VIOLATION (409) não repete o texto do back, que é do operador', () => {
+        const msg = withdrawalErrorMessage(erro('WALLET_INVARIANT_VIOLATION', { constraint: 'driver_wallets_balance_non_negative' }), 'fallback');
+        expect(msg).toBe('Sua carteira está com o saldo em revisão e não aceitou o saque agora. Nada foi descontado. Fale com a central.');
+        expect(msg).not.toContain('driver_wallets');
     });
 });
