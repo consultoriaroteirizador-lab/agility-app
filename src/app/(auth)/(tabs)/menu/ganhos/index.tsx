@@ -8,7 +8,8 @@ import { useFocusEffect, useRouter } from 'expo-router';
 
 import { ActivityIndicator, Box, ScreenBase, Text, TouchableOpacityBox } from '@/components';
 import { ButtonBack } from '@/components/Button/ButtonBack';
-import { useFreightEarnings, useGetWallet } from '@/domain/agility/wallet';
+import { useDriverFreightShares, useFreightEarnings, useGetWallet } from '@/domain/agility/wallet';
+import { FreightShareStatus } from '@/domain/agility/wallet/dto/types';
 import EarningsChart from '@/EarningsChart';
 import { measure } from '@/theme';
 import { formatCurrency } from '@/utils/formatCurrency';
@@ -61,11 +62,23 @@ export default function GanhosScreen() {
     const startDate = useMemo(() => periodStart(period, now).toISOString(), [period, now]);
     const { wallet } = useGetWallet();
     const { earnings, isLoading, isError, refetch, isRefetching } = useFreightEarnings(startDate);
+    // A tela é dona das duas consultas: puxar para atualizar recarrega os ganhos e os fretes a liberar.
+    const pendingFreight = useDriverFreightShares({ status: FreightShareStatus.A_LIBERAR });
     const chartData = useMemo(() => chartDataFor(earnings?.items ?? [], period), [earnings, period]);
 
     return (
         <ScreenBase buttonLeft={<ButtonBack />} title={<Text preset="textTitleScreen">Meus Ganhos</Text>}>
-            <ScrollView refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={() => void refetch()} />}>
+            <ScrollView
+                refreshControl={
+                    <RefreshControl
+                        refreshing={isRefetching}
+                        onRefresh={() => {
+                            void refetch();
+                            void pendingFreight.refetch();
+                        }}
+                    />
+                }
+            >
                 <Text preset="text14" color="secondaryTextColor" marginBottom="y12">
                     Fretes que a empresa liberou para você. O que você recebeu de clientes fica em Cobranças.
                 </Text>
@@ -197,7 +210,7 @@ export default function GanhosScreen() {
                     </>
                 ) : null}
 
-                <PendingFreightByRoute />
+                <PendingFreightByRoute query={pendingFreight} />
 
                 <TouchableOpacityBox
                     marginTop="y24"

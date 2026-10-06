@@ -21,20 +21,16 @@ jest.mock('react-native-background-geolocation', () => ({
 jest.mock('@/components/Icon/LocalIcon', () => ({ LocalIcon: () => null }));
 jest.mock('@expo/vector-icons', () => ({ Ionicons: () => null }));
 
-const mockUseDriverFreightShares = jest.fn();
-jest.mock('@/domain/agility/wallet', () => ({
-    useDriverFreightShares: (...args: unknown[]) => mockUseDriverFreightShares(...args),
-}));
-
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { PendingFreightByRoute } = require('../_components/PendingFreightByRoute');
 
-function render() {
+// A consulta é da tela (Ganhos); o componente só desenha o estado que recebe.
+function render(query: unknown) {
     let tree!: TestRenderer.ReactTestRenderer;
     act(() => {
         tree = TestRenderer.create(
             <ThemeProvider theme={theme}>
-                <PendingFreightByRoute />
+                <PendingFreightByRoute query={query} />
             </ThemeProvider>,
         );
     });
@@ -57,18 +53,11 @@ const textos = (tree: TestRenderer.ReactTestRenderer) =>
 beforeEach(() => jest.clearAllMocks());
 
 describe('PendingFreightByRoute', () => {
-    it('pede só as parcelas A_LIBERAR', () => {
-        mockUseDriverFreightShares.mockReturnValue({ page: null, isLoading: true, isError: false, refetch: jest.fn() });
-        render();
-        expect(mockUseDriverFreightShares).toHaveBeenCalledWith({ status: 'A_LIBERAR' });
-    });
-
     it('lista rota, paradas e valor bloqueado; nunca ids', () => {
-        mockUseDriverFreightShares.mockReturnValue({
+        const t = textos(render({
             page: { data: [parcela], meta: { page: 1, totalPages: 1, total: 1 } },
             isLoading: false, isError: false, refetch: jest.fn(),
-        });
-        const t = textos(render());
+        }));
         expect(t).toContain('Fretes a liberar por rota');
         expect(t).toContain('Zona Sul');
         expect(t).toContain('8 de 10 paradas');
@@ -78,19 +67,16 @@ describe('PendingFreightByRoute', () => {
 
     it('mais do que a página: "Mostrando 50 de 73"', () => {
         const data = Array.from({ length: 50 }, (_, i) => ({ ...parcela, id: `s-${i}` }));
-        mockUseDriverFreightShares.mockReturnValue({ page: { data, meta: { page: 1, totalPages: 2, total: 73 } }, isLoading: false, isError: false, refetch: jest.fn() });
-        expect(textos(render())).toContain('Mostrando 50 de 73.');
+        expect(textos(render({ page: { data, meta: { page: 1, totalPages: 2, total: 73 } }, isLoading: false, isError: false, refetch: jest.fn() }))).toContain('Mostrando 50 de 73.');
     });
 
     it('vazio diz que nada espera liberação', () => {
-        mockUseDriverFreightShares.mockReturnValue({ page: { data: [], meta: { page: 1, totalPages: 1, total: 0 } }, isLoading: false, isError: false, refetch: jest.fn() });
-        expect(textos(render())).toContain('Nenhum frete esperando liberação.');
+        expect(textos(render({ page: { data: [], meta: { page: 1, totalPages: 1, total: 0 } }, isLoading: false, isError: false, refetch: jest.fn() }))).toContain('Nenhum frete esperando liberação.');
     });
 
     it('erro: avisa e tenta de novo no toque, nunca "nenhum"', () => {
         const refetch = jest.fn();
-        mockUseDriverFreightShares.mockReturnValue({ page: null, isLoading: false, isError: true, refetch });
-        const tree = render();
+        const tree = render({ page: null, isLoading: false, isError: true, refetch });
         expect(textos(tree)).not.toContain('Nenhum frete');
         act(() => tree.root.findAllByProps({ testID: 'a-liberar-erro' })[0].props.onPress());
         expect(refetch).toHaveBeenCalled();

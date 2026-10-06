@@ -2,16 +2,19 @@
 import React from 'react';
 
 import { ActivityIndicator, Box, Text, TouchableOpacityBox } from '@/components';
-import { useDriverFreightShares } from '@/domain/agility/wallet';
-import { FreightShareStatus } from '@/domain/agility/wallet/dto/types';
+import type { useDriverFreightShares } from '@/domain/agility/wallet';
 import { measure } from '@/theme';
 import { formatCurrency } from '@/utils/formatCurrency';
 
 import { describeFreightShare } from '../_utils/freightShareDisplay';
 
+type Props = {
+    /** As parcelas A_LIBERAR. A consulta é da tela, para o puxar para atualizar recarregá-la junto com os ganhos. */
+    query: Pick<ReturnType<typeof useDriverFreightShares>, 'page' | 'isLoading' | 'isError' | 'refetch'>;
+};
+
 /** De quais rotas vem o "Frete a liberar" (F6, R10 da F5c). Não depende do período: é o bloqueado agora. */
-export function PendingFreightByRoute() {
-    const { page, isLoading, isError, refetch } = useDriverFreightShares({ status: FreightShareStatus.A_LIBERAR });
+export function PendingFreightByRoute({ query: { page, isLoading, isError, refetch } }: Props) {
     const total = page?.meta.total ?? 0;
 
     return (
