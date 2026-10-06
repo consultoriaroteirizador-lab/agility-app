@@ -70,7 +70,7 @@ describe('useRequestWithdrawal', () => {
             await expect(saque.requestWithdrawal({ amount: 5000, idempotencyKey: '7d6c1f3e-0000-4000-8000-000000000002' })).resolves.toEqual({ id: 'wd-1', amount: 5000 });
         });
 
-        expect(mockRequestWithdrawal).toHaveBeenCalledWith({ amount: 5000 });
+        expect(mockRequestWithdrawal).toHaveBeenCalledWith({ amount: 5000, idempotencyKey: '7d6c1f3e-0000-4000-8000-000000000002' });
         expect(queryClient.getQueryState([KEY_WALLET, 'balance'])?.isInvalidated).toBe(true);
     });
 });
