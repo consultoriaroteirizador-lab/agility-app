@@ -1,4 +1,4 @@
-import { mensagemDaApi } from '@/api/apiErrorMessage';
+import { erroDeRede, mensagemDaApi } from '@/api/apiErrorMessage';
 import type { WithdrawalAllowance } from '@/domain/agility/wallet/withdrawalAllowance';
 import { formatCurrency } from '@/utils/formatCurrency';
 
@@ -83,6 +83,11 @@ export function withdrawalErrorMessage(error: unknown, fallback: string): string
                 : 'Você tem dívidas em aberto com a empresa e, por enquanto, não há valor liberado para saque.';
         }
     }
+    if (erroDeRede(error)) {
+        // Sem resposta: o pedido pode ter sido gravado. Com a mesma chave o back não duplica, mas o
+        // saldo já pode ter caído pelo bloqueio, e a tela recusaria a nova tentativa pelo teto.
+        return 'Não deu para confirmar o pedido de saque. Ele pode ter chegado: confira em Meus saques antes de pedir de novo.';
+    }
     if (code === KEY_REUSED) {
         return 'Esta tela já enviou um pedido de saque com outro valor. Confira em Meus saques antes de pedir de novo.';
     }
@@ -105,4 +110,9 @@ export function maxWithdrawalFromError(error: unknown): number | null {
  */
 export function isWithdrawalKeyReused(error: unknown): boolean {
     return (error as ErroSaque)?.error?.code === KEY_REUSED;
+}
+
+/** O resultado do pedido é incerto (sem resposta) ou já existe outro com esta chave: a tela leva a Meus saques. */
+export function withdrawalNeedsCheck(error: unknown): boolean {
+    return erroDeRede(error) || isWithdrawalKeyReused(error);
 }

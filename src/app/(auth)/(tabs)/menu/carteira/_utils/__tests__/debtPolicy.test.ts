@@ -1,6 +1,13 @@
 import { formatCurrency } from '@/utils/formatCurrency';
 
-import { isWithdrawalKeyReused, maxWithdrawalFromError, policyNoticeColor, withdrawalErrorMessage, withdrawalPolicyNotice } from '../debtPolicy';
+import {
+    isWithdrawalKeyReused,
+    maxWithdrawalFromError,
+    policyNoticeColor,
+    withdrawalErrorMessage,
+    withdrawalNeedsCheck,
+    withdrawalPolicyNotice,
+} from '../debtPolicy';
 
 type Allowance = NonNullable<Parameters<typeof withdrawalPolicyNotice>[0]>;
 const politica = (over: Partial<Allowance>): Allowance => ({ policy: 'FREE', withdrawableCents: 10000, openDebtCents: 0, availableCents: null, ...over });
@@ -149,5 +156,22 @@ describe('erros da F6 no saque', () => {
         const msg = withdrawalErrorMessage(erro('WALLET_INVARIANT_VIOLATION', { constraint: 'driver_wallets_balance_non_negative' }), 'fallback');
         expect(msg).toBe('Sua carteira está com o saldo em revisão e não aceitou o saque agora. Nada foi descontado. Fale com a central.');
         expect(msg).not.toContain('driver_wallets');
+    });
+});
+
+describe('saque sem resposta do servidor (revisão final da F5c)', () => {
+    const semRede = { success: false, error: { code: 'AU-000', message: 'Sem conexão com o servidor' } };
+
+    it('o pedido pode ter chegado: manda conferir Meus saques antes de pedir de novo', () => {
+        expect(withdrawalErrorMessage(semRede, 'fallback')).toBe(
+            'Não deu para confirmar o pedido de saque. Ele pode ter chegado: confira em Meus saques antes de pedir de novo.',
+        );
+    });
+
+    it('withdrawalNeedsCheck: sem rede ou chave repetida levam a Meus saques; recusa de regra não', () => {
+        expect(withdrawalNeedsCheck(semRede)).toBe(true);
+        expect(withdrawalNeedsCheck({ error: { code: 'IDEMPOTENCY_KEY_REUSED' } })).toBe(true);
+        expect(withdrawalNeedsCheck({ error: { code: 'WITHDRAWAL_BLOCKED_BY_OVERDUE_DEBT' } })).toBe(false);
+        expect(withdrawalNeedsCheck(undefined)).toBe(false);
     });
 });

@@ -18,7 +18,7 @@ import { measure } from '@/theme';
 import { formatCurrency } from '@/utils/formatCurrency';
 
 import { PolicyNoticeBox } from './_components/PolicyNoticeBox';
-import { isWithdrawalKeyReused, maxWithdrawalFromError, withdrawalErrorMessage, withdrawalPolicyNotice } from './_utils/debtPolicy';
+import { maxWithdrawalFromError, withdrawalErrorMessage, withdrawalNeedsCheck, withdrawalPolicyNotice } from './_utils/debtPolicy';
 import { pixKeyChangeNotice } from './_utils/pixKeyNotice';
 import { walletDestination } from './_utils/withdrawalDisplay';
 import { withdrawalSubmitToast } from './_utils/withdrawalSubmit';
@@ -108,7 +108,7 @@ export default function SaqueScreen() {
                 // O valor digitado fica. A recusa pela política de dívida (F3) traz o máximo: a
                 // mensagem diz o número e a ação SÓ preenche o campo — enviar é outro toque.
                 const max = maxWithdrawalFromError(error);
-                const action = isWithdrawalKeyReused(error)
+                const action = withdrawalNeedsCheck(error)
                     ? { title: 'Meus saques', onPress: () => router.replace('/menu/carteira/saques') }
                     : max !== null
                       ? { title: 'Usar o máximo', onPress: () => setAmountCents(max) }

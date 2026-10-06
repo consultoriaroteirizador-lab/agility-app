@@ -495,3 +495,20 @@ describe('Saque — chave de idempotência (F6)', () => {
         expect(mockRouter.replace).toHaveBeenCalledWith('/menu/carteira/saques');
     });
 });
+
+describe('Saque — resposta perdida (revisão final da F5c)', () => {
+    it('sem rede: avisa que o pedido pode ter chegado e oferece "Meus saques"', async () => {
+        mockRequestWithdrawal.mockRejectedValue({ success: false, error: { code: 'AU-000', message: 'Sem conexão com o servidor' } });
+        const tree = render();
+        digitarEPedir(tree, 5000);
+        await act(async () => {
+            await mockModalProps!.onPress!();
+        });
+
+        const toast = mockShowToast.mock.calls.at(-1)![0];
+        expect(toast.message).toContain('Ele pode ter chegado');
+        expect(toast.action.title).toBe('Meus saques');
+        act(() => toast.action.onPress());
+        expect(mockRouter.replace).toHaveBeenCalledWith('/menu/carteira/saques');
+    });
+});
