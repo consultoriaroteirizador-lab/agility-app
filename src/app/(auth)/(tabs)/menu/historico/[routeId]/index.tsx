@@ -11,6 +11,7 @@ import { ServiceStatus, ServiceType } from '@/domain/agility/service/dto/types';
 import { useFindServicesByRoutingId } from '@/domain/agility/service/useCase';
 import { colors, measure } from '@/theme';
 import { formatDate, formatDateOnly } from '@/utils/formatDate';
+import { routeTitle } from '@/utils/routeTitle';
 
 import { MapaParadasModal } from '../../../rotas-detalhadas/[id]/_components/MapaParadasModal';
 import { countLedgerOnly } from '../../../rotas-detalhadas/[id]/_utils/routeNonDelivered';
@@ -162,7 +163,7 @@ export default function HistoricoDetalhesScreen() {
 
   return (
     <ScreenBase buttonLeft={<ButtonBack />} title={<Text preset="textTitleScreen">
-      {routing.name || `Rota ${routing.code || routing.id}`}
+      {routeTitle(routing)}
     </Text>}>
       <Box flex={1} backgroundColor="white" scrollable>
         <Box paddingTop="y12" paddingBottom="y16">

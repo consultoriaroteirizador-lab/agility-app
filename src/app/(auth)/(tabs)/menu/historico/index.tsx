@@ -8,6 +8,7 @@ import { RoutingStatus } from '@/domain/agility/routing/dto/types';
 import { useFindMyRoutings } from '@/domain/agility/routing/useCase';
 import { measure } from '@/theme';
 import { formatDate, formatDateOnly } from '@/utils/formatDate';
+import { routeTitle } from '@/utils/routeTitle';
 
 import { routeValueLabel } from './_utils/routeValue';
 
@@ -97,7 +98,7 @@ function RouteCard({ rota, onPress }: RouteCardProps) {
       {/* Cabeçalho: nome + badge de status */}
       <Box flexDirection="row" justifyContent="space-between" alignItems="flex-start" mb="y12" gap="x8">
         <Text preset="text16" fontWeightPreset='semibold' color="colorTextPrimary" flex={1} numberOfLines={2}>
-          {rota.name ?? `Rota ${rota.code ?? rota.id}`}
+          {routeTitle(rota)}
         </Text>
         <Box
           backgroundColor={getStatusBgColor(rota.status)}
