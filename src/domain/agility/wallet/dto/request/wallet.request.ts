@@ -16,6 +16,12 @@ export interface UpdateBankInfoRequest {
 
 export interface CreateWithdrawalRequest {
     amount: number;
+    /**
+     * Trava de toque duplo (F6). UMA por montagem da tela de saque, reenviada em toda tentativa
+     * daquela tela (R1 da F5c). Repetição devolve o saque já gravado; outro valor = 400
+     * IDEMPOTENCY_KEY_REUSED. Só pode ir para o ar com o back da F6 no ambiente (forbidNonWhitelisted).
+     */
+    idempotencyKey: string;
 }
 
 export interface ListTransactionsRequest {

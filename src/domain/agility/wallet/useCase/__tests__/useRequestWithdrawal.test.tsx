@@ -51,7 +51,7 @@ describe('useRequestWithdrawal — invalidação no settle', () => {
         const tree = montar();
 
         await act(async () => {
-            await hook.requestWithdrawal({ amount: 1000 });
+            await hook.requestWithdrawal({ amount: 1000, idempotencyKey: '7d6c1f3e-0000-4000-8000-000000000001' });
         });
 
         expect(queryClient.getQueryState([KEY_WALLET, 'balance'])?.isInvalidated).toBe(true);
@@ -69,7 +69,7 @@ describe('useRequestWithdrawal — invalidação no settle', () => {
         const tree = montar();
 
         await act(async () => {
-            await expect(hook.requestWithdrawal({ amount: 1000 })).rejects.toBeTruthy();
+            await expect(hook.requestWithdrawal({ amount: 1000, idempotencyKey: '7d6c1f3e-0000-4000-8000-000000000001' })).rejects.toBeTruthy();
         });
 
         expect(queryClient.getQueryState([KEY_WALLET, 'balance'])?.isInvalidated).toBe(true);

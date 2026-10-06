@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { ScrollView } from 'react-native';
 
 import { Ionicons } from '@expo/vector-icons';
+import * as Crypto from 'expo-crypto';
 import { useRouter } from 'expo-router';
 
 import { ActivityIndicator, Box, BRLInput, Button, ScreenBase, Text, TouchableOpacityBox } from '@/components';
@@ -17,9 +18,10 @@ import { measure } from '@/theme';
 import { formatCurrency } from '@/utils/formatCurrency';
 
 import { PolicyNoticeBox } from './_components/PolicyNoticeBox';
-import { maxWithdrawalFromError, withdrawalErrorMessage, withdrawalPolicyNotice } from './_utils/debtPolicy';
+import { isWithdrawalKeyReused, maxWithdrawalFromError, withdrawalErrorMessage, withdrawalPolicyNotice } from './_utils/debtPolicy';
 import { pixKeyChangeNotice } from './_utils/pixKeyNotice';
 import { walletDestination } from './_utils/withdrawalDisplay';
+import { withdrawalSubmitToast } from './_utils/withdrawalSubmit';
 
 const MIN_WITHDRAWAL_CENTS = 100; // R$ 1,00, o mesmo @Min(100) do CreateWithdrawalDto
 
@@ -33,6 +35,9 @@ export default function SaqueScreen() {
     const { summary: debts } = useGetAdvancesSummary();
     const { requestWithdrawal } = useRequestWithdrawal();
     const { run, isSubmitting, isLocked } = useSubmitLock();
+    // Uma chave por abertura da tela (R1 da F5c): toda tentativa daqui reenvia a mesma, inclusive
+    // com outro valor. Abrir "Dados bancários" por cima não desmonta a tela; o sucesso a substitui.
+    const [idempotencyKey] = useState(() => Crypto.randomUUID());
 
     const availableBalance = wallet?.availableBalance ?? 0;
     // Teto = menor entre o disponível e o que a política de dívida deixa (F3). Sem o resumo
@@ -94,18 +99,24 @@ export default function SaqueScreen() {
         }
         await run(async () => {
             try {
-                await requestWithdrawal({ amount: value });
-                showToast({ message: 'Saque solicitado. Acompanhe em Meus saques.', type: 'success' });
+                const saque = await requestWithdrawal({ amount: value, idempotencyKey });
+                // Repetição com a mesma chave devolve o saque no estado atual (F6): o toast diz qual.
+                showToast(withdrawalSubmitToast(saque));
                 // `replace`: voltar não reabre o formulário preenchido (R10).
                 router.replace('/menu/carteira/saques');
             } catch (error) {
                 // O valor digitado fica. A recusa pela política de dívida (F3) traz o máximo: a
                 // mensagem diz o número e a ação SÓ preenche o campo — enviar é outro toque.
                 const max = maxWithdrawalFromError(error);
+                const action = isWithdrawalKeyReused(error)
+                    ? { title: 'Meus saques', onPress: () => router.replace('/menu/carteira/saques') }
+                    : max !== null
+                      ? { title: 'Usar o máximo', onPress: () => setAmountCents(max) }
+                      : null;
                 showToast({
                     message: withdrawalErrorMessage(error, 'Não foi possível solicitar o saque. Tente novamente.'),
                     type: 'error',
-                    ...(max !== null ? { action: { title: 'Usar o máximo', onPress: () => setAmountCents(max) } } : {}),
+                    ...(action ? { action } : {}),
                 });
             }
         });
