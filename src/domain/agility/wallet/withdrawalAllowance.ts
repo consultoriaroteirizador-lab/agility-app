@@ -45,3 +45,12 @@ export function withdrawCapCents(availableCents: number, allowance: WithdrawalAl
     const disponivel = Math.floor(Math.max(0, availableCents));
     return allowance ? Math.min(disponivel, Math.floor(allowance.withdrawableCents)) : disponivel;
 }
+
+/** O back limita a [0, 365] (`finance-settings.util.ts`). Fora disso, não confia no número. */
+const CASH_RETURN_DUE_DAYS_MAX = 365;
+
+/** Prazo de devolução do dinheiro vivo (F6). `null` = não sabe: o aviso não promete número (R5). */
+export function cashReturnDueDaysOf(s: Pick<WalletSummaryResponse, 'cashReturnDueDays'> | null | undefined): number | null {
+    const dias = s?.cashReturnDueDays;
+    return typeof dias === 'number' && Number.isInteger(dias) && dias >= 0 && dias <= CASH_RETURN_DUE_DAYS_MAX ? dias : null;
+}

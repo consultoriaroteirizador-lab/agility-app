@@ -163,4 +163,9 @@ export interface WalletSummaryResponse {
     withdrawalWithDebtPolicy: WithdrawalWithDebtPolicy;
     /** Quanto a política deixa sacar agora, em centavos (a mesma conta do pedido de saque). */
     withdrawableBalance: number;
+    /**
+     * Prazo de devolução do dinheiro vivo, em dias (F6): inteiro em [0, 365], padrão 7 no back.
+     * Ausente = back sem a F6. O vencimento é agora + N×24h (0 = vence na hora).
+     */
+    cashReturnDueDays?: number;
 }

@@ -9,7 +9,7 @@ import TestRenderer, { act } from 'react-test-renderer';
 
 import { KEY_WALLET, moneyChangedKeys } from '@/domain/queryKeys';
 
-import { useWithdrawalAllowance } from '../useWithdrawalAllowance';
+import { useCashReturnDueDays, useWithdrawalAllowance } from '../useWithdrawalAllowance';
 
 const mockGetSummary = jest.fn();
 jest.mock('../../walletAPI', () => ({
@@ -121,6 +121,59 @@ it('resumo sem os campos da F3: allowance null, sem erro', async () => {
 
     expect(resultado.allowance).toBeNull();
     expect(resultado.isError).toBe(false);
+
+    act(() => tree.unmount());
+    queryClient.clear();
+});
+
+it('política e prazo leem o MESMO resumo cru: uma busca só, cada hook com a sua forma', async () => {
+    mockGetSummary.mockResolvedValue({
+        availableBalance: 10000, pendingAdvances: 0, withdrawalWithDebtPolicy: 'FREE', withdrawableBalance: 10000, cashReturnDueDays: 3,
+    });
+    let dias: number | null = null;
+    function ProbeDias() {
+        dias = useCashReturnDueDays();
+        return null;
+    }
+    const queryClient = novoClient();
+    let tree!: TestRenderer.ReactTestRenderer;
+    act(() => {
+        tree = TestRenderer.create(
+            <QueryClientProvider client={queryClient}>
+                <Probe />
+                <ProbeDias />
+            </QueryClientProvider>,
+        );
+    });
+    await settle();
+
+    expect(mockGetSummary).toHaveBeenCalledTimes(1);
+    expect(resultado.allowance).toEqual({ policy: 'FREE', withdrawableCents: 10000, openDebtCents: 0, availableCents: 10000 });
+    expect(dias).toBe(3);
+
+    act(() => tree.unmount());
+    queryClient.clear();
+});
+
+it('enabled: false não busca o resumo', async () => {
+    let dias: number | null = 99;
+    function ProbeDias() {
+        dias = useCashReturnDueDays({ enabled: false });
+        return null;
+    }
+    const queryClient = novoClient();
+    let tree!: TestRenderer.ReactTestRenderer;
+    act(() => {
+        tree = TestRenderer.create(
+            <QueryClientProvider client={queryClient}>
+                <ProbeDias />
+            </QueryClientProvider>,
+        );
+    });
+    await settle();
+
+    expect(mockGetSummary).not.toHaveBeenCalled();
+    expect(dias).toBeNull();
 
     act(() => tree.unmount());
     queryClient.clear();

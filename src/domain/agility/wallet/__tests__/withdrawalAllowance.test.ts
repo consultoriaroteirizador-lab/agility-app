@@ -2,7 +2,7 @@
  * Teto do saque pela política de dívida (F3, `GET /wallet/summary`). Back sem a F3 ou
  * resposta fora do contrato vira `null`: a tela cai no disponível e o back decide (R3).
  */
-import { toWithdrawalAllowance, withdrawCapCents } from '../withdrawalAllowance';
+import { cashReturnDueDaysOf, toWithdrawalAllowance, withdrawCapCents } from '../withdrawalAllowance';
 
 type Resumo = Parameters<typeof toWithdrawalAllowance>[0];
 
@@ -73,5 +73,21 @@ describe('withdrawCapCents', () => {
 
     it('teto fracionado cai para o centavo inteiro de baixo', () => {
         expect(withdrawCapCents(10000, { policy: 'FREE', withdrawableCents: 1234.5, openDebtCents: 0, availableCents: null })).toBe(1234);
+    });
+});
+
+describe('cashReturnDueDaysOf', () => {
+    it('inteiro entre 0 e 365 passa', () => {
+        expect(cashReturnDueDaysOf({ cashReturnDueDays: 7 })).toBe(7);
+        expect(cashReturnDueDaysOf({ cashReturnDueDays: 0 })).toBe(0);
+        expect(cashReturnDueDaysOf({ cashReturnDueDays: 365 })).toBe(365);
+    });
+
+    it('ausente (back sem a F6), fora da faixa ou quebrado vira null: o texto não promete número', () => {
+        expect(cashReturnDueDaysOf({})).toBeNull();
+        expect(cashReturnDueDaysOf(null)).toBeNull();
+        expect(cashReturnDueDaysOf({ cashReturnDueDays: -1 })).toBeNull();
+        expect(cashReturnDueDaysOf({ cashReturnDueDays: 2.5 })).toBeNull();
+        expect(cashReturnDueDaysOf({ cashReturnDueDays: 400 })).toBeNull();
     });
 });
