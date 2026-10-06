@@ -17,6 +17,7 @@ import { countLedgerOnly } from '../../../rotas-detalhadas/[id]/_utils/routeNonD
 import { Map } from '../../../rotas-detalhadas/[id]/parada/[pid]/_components/shared/Map';
 import { RouteMapLegend } from '../../../rotas-detalhadas/[id]/parada/[pid]/_components/shared/RouteMapLegend';
 import { useRouteMapView } from '../../../rotas-detalhadas/[id]/parada/[pid]/_components/shared/useRouteMapView';
+import { RouteFreightShareCard } from '../_components/RouteFreightShareCard';
 import { routeValueLabel } from '../_utils/routeValue';
 
 function mapRoutingStatus(status: RoutingStatus): string {
@@ -291,6 +292,9 @@ export default function HistoricoDetalhesScreen() {
             </Box>
           </Box>
         </Box>
+
+        {/* Sua parte nesta rota (F6): valor, paradas e status da parcela do motorista */}
+        <RouteFreightShareCard routingId={routeId || ''} />
 
         {/* Contadores */}
         <Box marginBottom="y16">
