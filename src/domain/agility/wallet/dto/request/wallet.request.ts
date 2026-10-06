@@ -1,6 +1,6 @@
 // src/domain/agility/wallet/dto/request/wallet.request.ts
 
-import { PixKeyType } from '../types';
+import { FreightShareStatus, PixKeyType } from '../types';
 
 /**
  * `PATCH /wallet/bank-info`. `undefined` = não mexe; `null` = APAGA (o `@IsOptional` do
@@ -31,4 +31,12 @@ export interface ListTransactionsRequest {
     status?: string;
     startDate?: string;
     endDate?: string;
+}
+
+/** `GET /wallet/freight-shares` (F6). `status` é UM valor; `limit` ≤ 100. */
+export interface ListDriverFreightSharesRequest {
+    routingId?: string;
+    status?: FreightShareStatus;
+    page?: number;
+    limit?: number;
 }

@@ -7,3 +7,4 @@ export * from './useUpdateBankInfo';
 export * from './useInfiniteWalletLists';
 export * from './useFreightEarnings';
 export * from './useWithdrawalAllowance';
+export * from './useDriverFreightShares';

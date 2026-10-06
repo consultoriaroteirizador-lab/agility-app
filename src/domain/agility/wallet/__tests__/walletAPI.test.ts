@@ -1,4 +1,4 @@
-import { AdvanceStatus } from '../dto/types';
+import { AdvanceStatus, FreightShareStatus } from '../dto/types';
 import { walletAPI } from '../walletAPI';
 
 const mockPost = jest.fn();
@@ -34,5 +34,19 @@ describe('walletAPI.getAdvances', () => {
         mockGet.mockResolvedValue({ data: { success: true, result: { data: [], meta: { page: 1, totalPages: 1 } } } });
         await walletAPI.getAdvances(1, 20, [AdvanceStatus.PENDING, AdvanceStatus.PARTIAL]);
         expect(mockGet).toHaveBeenCalledWith('/wallet/advances', { params: { page: 1, limit: 20, status: 'PENDING,PARTIAL' } });
+    });
+});
+
+describe('walletAPI.getFreightShares', () => {
+    it('manda só os filtros preenchidos', async () => {
+        mockGet.mockResolvedValue({ data: { success: true, result: { data: [], meta: { page: 1, totalPages: 1, total: 0 } } } });
+        await walletAPI.getFreightShares({ routingId: 'r-1', page: 1, limit: 50 });
+        expect(mockGet).toHaveBeenCalledWith('/wallet/freight-shares', { params: { routingId: 'r-1', page: 1, limit: 50 } });
+    });
+
+    it('status único', async () => {
+        mockGet.mockResolvedValue({ data: { success: true, result: { data: [], meta: { page: 1, totalPages: 1, total: 0 } } } });
+        await walletAPI.getFreightShares({ status: FreightShareStatus.A_LIBERAR, page: 1, limit: 50 });
+        expect(mockGet).toHaveBeenCalledWith('/wallet/freight-shares', { params: { status: 'A_LIBERAR', page: 1, limit: 50 } });
     });
 });
