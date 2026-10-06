@@ -41,6 +41,21 @@ function PaymentItem({ item }: { item: PaymentResponse }) {
                     {`Rota: ${d.route}`}
                 </Text>
             )}
+            {d.method && (
+                <Text fontSize={measure.m12} color="colorTextSecondary" mt="t2">
+                    {`Forma: ${d.method}`}
+                </Text>
+            )}
+            {d.cancelText && (
+                <Text fontSize={measure.m12} color="colorTextSecondary" mt="t2">
+                    {d.cancelText}
+                </Text>
+            )}
+            {d.debt && (
+                <Text testID={`divida-${item.id}`} fontSize={measure.m12} color={d.debt.overdue ? 'colorTextError' : 'colorTextWarning'} mt="t2">
+                    {d.debt.text}
+                </Text>
+            )}
             <Box flexDirection="row" justifyContent="space-between" mt="t8">
                 <Text fontSize={measure.m12} color="colorTextSecondary">
                     {formatDate(d.date)}

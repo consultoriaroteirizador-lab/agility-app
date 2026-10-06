@@ -1,4 +1,6 @@
 // src/app/(auth)/(tabs)/menu/ganhos/_utils/__tests__/paymentDisplay.test.ts
+import { formatCurrency } from '@/utils/formatCurrency';
+
 import { debtCardState, describePayment } from '../paymentDisplay';
 
 type P = Parameters<typeof describePayment>[0];
@@ -69,5 +71,58 @@ describe('debtCardState', () => {
 
     it('carregando', () => {
         expect(debtCardState(undefined, false)).toEqual({ kind: 'loading' });
+    });
+});
+
+describe('describePayment — F6', () => {
+    it('forma de pagamento por nome', () => {
+        expect(describePayment(pagamento({ paymentMethod: 'CASH' as P['paymentMethod'] })).method).toBe('Dinheiro');
+        expect(describePayment(pagamento({ paymentMethod: 'CARD_CREDIT' as P['paymentMethod'] })).method).toBe('Cartão de crédito');
+        expect(describePayment(pagamento({ paymentMethod: null })).method).toBeNull();
+    });
+
+    it('REJECTED com cancelledAt é "Cancelado" com o motivo; sem, continua "Recusado"', () => {
+        const cancelado = describePayment(pagamento({ status: 'REJECTED' as P['status'], cancelledAt: '2026-10-05T15:00:00.000Z', cancelReason: 'estorno' }));
+        expect(cancelado.status.label).toBe('Cancelado');
+        expect(cancelado.cancelText).toBe('Cancelado pela empresa: estorno');
+        const recusado = describePayment(pagamento({ status: 'REJECTED' as P['status'] }));
+        expect(recusado.status.label).toBe('Recusado');
+        expect(recusado.cancelText).toBeNull();
+    });
+
+    it('cancelado sem motivo', () => {
+        expect(describePayment(pagamento({ status: 'REJECTED' as P['status'], cancelledAt: '2026-10-05T15:00:00.000Z' })).cancelText).toBe(
+            'Cancelado pela empresa.',
+        );
+    });
+
+    const divida = (over: Record<string, unknown>) => ({
+        advanceId: 'a-1', status: 'PENDING', amountCents: 15000, returnedAmountCents: 0, pendingAmountCents: 15000,
+        dueDate: '2026-10-12T15:00:00.000Z', isOverdue: false, ...over,
+    }) as P['debt'];
+
+    it('dívida aberta: quanto falta e o vencimento', () => {
+        expect(describePayment(pagamento({ debt: divida({}) })).debt).toEqual({ text: `A devolver: ${formatCurrency(15000)} · Vence em 12/10/2026`, overdue: false });
+    });
+
+    it('dívida vencida e parcial', () => {
+        const d = describePayment(pagamento({ debt: divida({ status: 'PARTIAL', pendingAmountCents: 5000, isOverdue: true }) })).debt;
+        expect(d).toEqual({ text: `A devolver: ${formatCurrency(5000)} · Venceu em 12/10/2026`, overdue: true });
+    });
+
+    it('devolvida e cancelada', () => {
+        expect(describePayment(pagamento({ debt: divida({ status: 'RETURNED', pendingAmountCents: 0 }) })).debt).toEqual({ text: 'Devolvido à empresa', overdue: false });
+        expect(describePayment(pagamento({ debt: divida({ status: 'CANCELLED', pendingAmountCents: 0, isOverdue: true }) })).debt).toEqual({
+            text: 'Devolução cancelada pela empresa',
+            overdue: false,
+        });
+    });
+
+    it('sem dívida (null) ou back antigo (ausente): nenhuma linha, nenhuma forma inventada', () => {
+        expect(describePayment(pagamento({ debt: null })).debt).toBeNull();
+        const antigo = describePayment(pagamento());
+        expect(antigo.debt).toBeNull();
+        expect(antigo.method).toBeNull();
+        expect(antigo.cancelText).toBeNull();
     });
 });
