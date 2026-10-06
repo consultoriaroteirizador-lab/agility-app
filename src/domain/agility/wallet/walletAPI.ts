@@ -12,6 +12,7 @@ import {
     ListTransactionsRequest,
     WalletSummaryResponse,
 } from './dto';
+import { AdvanceStatus } from './dto/types';
 
 const BASE_URL = '/wallet';
 
@@ -59,9 +60,10 @@ export const walletAPI = {
     },
 
     // Advances
-    async getAdvances(page: number = 1, limit: number = 20): Promise<PagedResponse<AdvanceResponse>> {
+    /** `status` (F6): um ou mais, enviados com vírgula (`PENDING,PARTIAL`). Sem ele, todos. */
+    async getAdvances(page: number = 1, limit: number = 20, status?: AdvanceStatus[]): Promise<PagedResponse<AdvanceResponse>> {
         const response = await apiAgility.get(`${BASE_URL}/advances`, {
-            params: { page, limit },
+            params: { page, limit, ...(status?.length ? { status: status.join(',') } : {}) },
         });
         return unwrap<PagedResponse<AdvanceResponse>>(response.data);
     },

@@ -29,7 +29,7 @@ const mockUseInfiniteAdvances = jest.fn();
 const mockUseGetAdvancesSummary = jest.fn();
 const mockUseWithdrawalAllowance = jest.fn();
 jest.mock('@/domain/agility/wallet', () => ({
-    useInfiniteAdvances: () => mockUseInfiniteAdvances(),
+    useInfiniteAdvances: (...args: unknown[]) => mockUseInfiniteAdvances(...args),
     useGetAdvancesSummary: () => mockUseGetAdvancesSummary(),
     useWithdrawalAllowance: () => mockUseWithdrawalAllowance(),
 }));
@@ -161,5 +161,44 @@ describe('Adiantamentos', () => {
     it('política livre ou não carregada: sem aviso', () => {
         const tree = render({ items: [] }, { summary: { totalPending: 5000, count: 1, overdueCount: 1 }, isError: false });
         expect(existe(tree, 'aviso-politica-divida')).toBe(false);
+    });
+});
+
+describe('Dívidas — filtro e nomes (F6)', () => {
+    it('abre em "Em aberto"; "Todas" troca o filtro', () => {
+        const tree = render({}, { summary: undefined });
+        expect(mockUseInfiniteAdvances).toHaveBeenLastCalledWith('open');
+
+        act(() => {
+            tree.root.findAllByProps({ testID: 'filtro-todas' })[0].props.onPress();
+        });
+        expect(mockUseInfiniteAdvances).toHaveBeenLastCalledWith('all');
+    });
+
+    it('vazio em "Em aberto" diz "Nenhuma dívida em aberto."', () => {
+        const tree = render({}, { summary: undefined });
+        expect(tree.root.findAllByProps({ children: 'Nenhuma dívida em aberto.' }).length).toBeGreaterThan(0);
+    });
+
+    it('dívida mostra cliente e rota por nome, nunca o id do pedido', () => {
+        const tree = render(
+            {
+                items: [{
+                    id: 'a-1', driverId: 'd-1', amount: 15000, returnedAmount: 0, pendingAmount: 15000, status: 'PENDING',
+                    description: 'Dinheiro recebido no service 2f6c1c8e-1111-2222-3333-a1b2c3d4e5f6 — devolução pendente',
+                    isOverdue: false, origin: 'CASH_COLLECTION', paymentId: 'p-1', createdAt: '2026-10-05T12:00:00.000Z',
+                    customerName: 'Mercado Sol', routingName: 'Zona Sul', routingCode: 'LMR-1',
+                }],
+            },
+            { summary: undefined },
+        );
+
+        expect(tree.root.findAllByProps({ children: 'Cliente: Mercado Sol' }).length).toBeGreaterThan(0);
+        expect(tree.root.findAllByProps({ children: 'Rota: Zona Sul' }).length).toBeGreaterThan(0);
+        const textos = tree.root
+            .findAll((n) => typeof n.props.children === 'string')
+            .map((n) => n.props.children as string)
+            .join(' | ');
+        expect(textos).not.toMatch(/2f6c1c8e|\bp-1\b/);
     });
 });

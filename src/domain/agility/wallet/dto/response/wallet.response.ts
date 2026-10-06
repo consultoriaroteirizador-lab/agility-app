@@ -152,6 +152,10 @@ export interface AdvanceResponse {
     cancelledAt?: string | null;
     /** Motivo do cancelamento, escrito pela empresa (UC15). `cancelledBy` é id: não é tipado de propósito. */
     cancelReason?: string | null;
+    /** Rótulos da lista (F6), por nome. `customerName` vem do pagamento ligado (adiantamento = null). */
+    routingCode?: string | null;
+    routingName?: string | null;
+    customerName?: string | null;
     createdAt: string;
 }
 

@@ -1,4 +1,4 @@
-import { advanceCancelText, advanceDueText, advanceOverdueText, advanceTitle } from '../advanceDisplay';
+import { advanceCancelText, advanceContext, advanceDueText, advanceOverdueText, advanceTitle } from '../advanceDisplay';
 
 describe('advanceTitle', () => {
     it('dívida de cobrança em dinheiro não mostra o id do serviço', () => {
@@ -77,5 +77,19 @@ describe('advanceCancelText (UC15)', () => {
 
     it('não cancelada: null', () => {
         expect(advanceCancelText({ status: 'PENDING' as never, cancelReason: 'x' })).toBeNull();
+    });
+});
+
+describe('advanceContext', () => {
+    it('cliente e rota por nome (rota cai no código sem nome)', () => {
+        expect(advanceContext({ customerName: 'Mercado Sol', routingName: 'Zona Sul', routingCode: 'LMR-1' })).toEqual({
+            customer: 'Mercado Sol',
+            route: 'Zona Sul',
+        });
+        expect(advanceContext({ customerName: null, routingName: null, routingCode: 'LMR-1' })).toEqual({ customer: null, route: 'LMR-1' });
+    });
+
+    it('sem rótulos (adiantamento, back antigo): nada', () => {
+        expect(advanceContext({})).toEqual({ customer: null, route: null });
     });
 });

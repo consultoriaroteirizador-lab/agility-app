@@ -4,6 +4,7 @@ import { KEY_WALLET } from '@/domain/queryKeys';
 import { useAuthCredentialsService } from '@/services';
 
 import type { AdvanceResponse, ListTransactionsRequest, TransactionResponse, WithdrawalResponse } from '../dto';
+import { AdvanceStatus } from '../dto/types';
 import { walletAPI } from '../walletAPI';
 
 export const TRANSACTIONS_PAGE_SIZE = 20;
@@ -37,12 +38,17 @@ export function useInfiniteWithdrawals() {
     );
 }
 
-/** Adiantamentos e dívidas de cobrança, todos os status (`GET /wallet/advances`). */
-export function useInfiniteAdvances() {
+/** Filtro da tela de dívidas (F5c R6): `open` = PENDING e PARTIAL. */
+export type AdvancesFilter = 'open' | 'all';
+
+const OPEN_STATUSES = [AdvanceStatus.PENDING, AdvanceStatus.PARTIAL];
+
+/** Adiantamentos e dívidas de cobrança (`GET /wallet/advances`). */
+export function useInfiniteAdvances(filter: AdvancesFilter = 'all') {
     const enabled = useIsAuthenticated();
     return useInfinitePagedList<AdvanceResponse>(
-        [KEY_WALLET, 'advances', 'infinite'],
-        (page) => walletAPI.getAdvances(page, ADVANCES_PAGE_SIZE),
+        [KEY_WALLET, 'advances', 'infinite', filter],
+        (page) => walletAPI.getAdvances(page, ADVANCES_PAGE_SIZE, filter === 'open' ? OPEN_STATUSES : undefined),
         { enabled },
     );
 }

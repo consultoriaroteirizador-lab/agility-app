@@ -63,3 +63,13 @@ export function advanceOverdueText(a: Pick<AdvanceResponse, 'dueDate'>): string 
     const dia = formatDueDay(a.dueDate);
     return dia ? `Venceu em ${dia}` : null;
 }
+
+/** Cliente e rota da dívida por nome (F6). A rota cai no código quando não tem nome. */
+export function advanceContext(
+    a: Partial<Pick<AdvanceResponse, 'customerName' | 'routingName' | 'routingCode'>>,
+): { customer: string | null; route: string | null } {
+    return {
+        customer: a.customerName?.trim() || null,
+        route: a.routingName?.trim() || a.routingCode?.trim() || null,
+    };
+}
