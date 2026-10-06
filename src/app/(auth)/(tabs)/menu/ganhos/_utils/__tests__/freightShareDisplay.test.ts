@@ -1,5 +1,5 @@
-import { FreightShareStatus } from '@/domain/agility/wallet/dto/types';
 import type { DriverFreightShareResponse } from '@/domain/agility/wallet/dto/response/wallet.response';
+import { FreightShareStatus } from '@/domain/agility/wallet/dto/types';
 
 import { describeFreightShare } from '../freightShareDisplay';
 
