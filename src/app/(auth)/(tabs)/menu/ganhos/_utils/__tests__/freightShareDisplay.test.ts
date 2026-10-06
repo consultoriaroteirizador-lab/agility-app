@@ -35,10 +35,11 @@ describe('describeFreightShare', () => {
         expect(d.note).toBe('Cancelado pela empresa: rota refeita');
     });
 
-    it('sem valor: R$ 0 e a redistribuição', () => {
+    it('sem valor: ainda aberta (a empresa pode liberar), sem R$ 0,00 nem causa inventada', () => {
+        // SEM_VALOR nasce quase sempre de rota sem valor, e continua na fila do operador.
         const d = describeFreightShare(parcela({ status: FreightShareStatus.SEM_VALOR, amountToReleaseCents: 0 }));
-        expect(d.amountCents).toBe(0);
-        expect(d.note).toBe('Sem valor nesta rota: a empresa redistribuiu o frete');
+        expect(d.amountCents).toBeNull();
+        expect(d.note).toBe('A empresa ainda não definiu um valor para a sua parte nesta rota.');
     });
 
     it('rota sem nome cai no código; sem os dois, nunca o id', () => {

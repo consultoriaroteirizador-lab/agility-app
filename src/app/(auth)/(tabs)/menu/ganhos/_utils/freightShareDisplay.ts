@@ -13,7 +13,7 @@ export interface FreightShareDisplay {
     /** Nome da rota, ou o código. Nunca o id. */
     route: string;
     status: StatusColorConfig;
-    /** Centavos. `null` = não mostrar valor (cancelada). */
+    /** Centavos. `null` = não mostrar valor (cancelada, ou sem valor definido). */
     amountCents: number | null;
     stops: string | null;
     note: string | null;
@@ -38,7 +38,8 @@ export function describeFreightShare(s: DriverFreightShareResponse): FreightShar
             return { ...base, amountCents: null, note: motivo ? `Cancelado pela empresa: ${motivo}` : 'Cancelado pela empresa.', date: null };
         }
         case FreightShareStatus.SEM_VALOR:
-            return { ...base, amountCents: 0, note: 'Sem valor nesta rota: a empresa redistribuiu o frete', date: null };
+            // Rota sem valor (o caso comum) ou parcela zerada; continua na fila do operador.
+            return { ...base, amountCents: null, note: 'A empresa ainda não definiu um valor para a sua parte nesta rota.', date: null };
         default:
             return { ...base, amountCents: s.amountToReleaseCents, note: 'Esperando a empresa liberar', date: null };
     }
