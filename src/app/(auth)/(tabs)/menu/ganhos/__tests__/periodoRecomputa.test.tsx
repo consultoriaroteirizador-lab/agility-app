@@ -65,6 +65,7 @@ jest.mock('@/domain/agility/wallet', () => ({
     useGetWallet: () => ({ wallet: undefined }),
     useFreightEarnings: (startDate: string) => mockUseFreightEarnings(startDate),
     useGetAdvancesSummary: () => ({ summary: undefined, isError: false, refetch: jest.fn() }),
+    useDriverFreightShares: () => ({ page: null, isLoading: false, isError: false, refetch: jest.fn() }),
 }));
 jest.mock('@/domain/agility/finance', () => ({
     useInfinitePayments: (range: unknown) => mockUseInfinitePayments(range),

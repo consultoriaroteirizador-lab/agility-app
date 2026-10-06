@@ -14,6 +14,7 @@ import { measure } from '@/theme';
 import { formatCurrency } from '@/utils/formatCurrency';
 import { formatDate } from '@/utils/formatDate';
 
+import { PendingFreightByRoute } from './_components/PendingFreightByRoute';
 import { chartDataFor, Period, periodLabel, PERIODS, periodStart } from './_utils/period';
 
 function StatCard({ title, value, subtitle, testID }: { title: string; value: string; subtitle?: string; testID: string }) {
@@ -195,6 +196,8 @@ export default function GanhosScreen() {
                         )}
                     </>
                 ) : null}
+
+                <PendingFreightByRoute />
 
                 <TouchableOpacityBox
                     marginTop="y24"
