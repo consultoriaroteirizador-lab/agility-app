@@ -62,7 +62,9 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
 
   web: {
     bundler: 'metro',
-    output: 'static',
+    // 'static' renderiza no servidor e quebra no import dos modulos nativos; o
+    // smoke no navegador (npm run web:smoke) usa SPA.
+    output: process.env.EXPO_WEB_SMOKE === '1' ? 'single' : 'static',
     favicon: './assets/images/favicon.png',
   },
 
