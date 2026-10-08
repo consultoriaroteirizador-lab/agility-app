@@ -1,6 +1,6 @@
 // src/app/(auth)/(tabs)/menu/carteira/adiantamentos.tsx
 
-import React from 'react';
+import React, { useState } from 'react';
 import { FlatList, RefreshControl } from 'react-native';
 
 import { Ionicons } from '@expo/vector-icons';
@@ -9,13 +9,14 @@ import { ActivityIndicator, Box, ButtonBack, ScreenBase, Text, TouchableOpacityB
 import { useGetAdvancesSummary, useInfiniteAdvances, useWithdrawalAllowance } from '@/domain/agility/wallet';
 import type { AdvanceResponse } from '@/domain/agility/wallet/dto';
 import { AdvanceStatus } from '@/domain/agility/wallet/dto/types';
+import type { AdvancesFilter } from '@/domain/agility/wallet/useCase/useInfiniteWalletLists';
 import { measure, StatusColorConfig } from '@/theme';
 import { colors } from '@/theme/colors';
 import { formatCurrency } from '@/utils/formatCurrency';
 import { formatDate } from '@/utils/formatDate';
 
 import { PolicyNoticeBox } from './_components/PolicyNoticeBox';
-import { advanceCancelText, advanceDueText, advanceOverdueText, advanceTitle } from './_utils/advanceDisplay';
+import { advanceCancelText, advanceContext, advanceDueText, advanceOverdueText, advanceTitle } from './_utils/advanceDisplay';
 import { withdrawalPolicyNotice } from './_utils/debtPolicy';
 
 const STATUS_CONFIG: Record<AdvanceStatus, StatusColorConfig> = {
@@ -30,6 +31,7 @@ function AdvanceItem({ item }: { item: AdvanceResponse }) {
     const due = advanceDueText(item);
     const open = item.status === AdvanceStatus.PENDING || item.status === AdvanceStatus.PARTIAL;
     const cancelText = advanceCancelText(item);
+    const contexto = advanceContext(item);
 
     return (
         <Box p="m16" borderRadius="s12" mb="b12" borderWidth={1} borderColor="borderColor">
@@ -41,6 +43,16 @@ function AdvanceItem({ item }: { item: AdvanceResponse }) {
                     <Text fontSize={measure.m12} color="colorTextSecondary" mt="t4">
                         {formatDate(item.createdAt)}
                     </Text>
+                    {contexto.customer && (
+                        <Text fontSize={measure.m12} color="colorTextSecondary" mt="t2" numberOfLines={1}>
+                            {`Cliente: ${contexto.customer}`}
+                        </Text>
+                    )}
+                    {contexto.route && (
+                        <Text fontSize={measure.m12} color="colorTextSecondary" mt="t2" numberOfLines={1}>
+                            {`Rota: ${contexto.route}`}
+                        </Text>
+                    )}
                 </Box>
                 <Box px="x8" py="y4" borderRadius="s4" bg={config.bgColor}>
                     <Text fontSize={measure.m12} fontWeightPreset="semibold" color={config.textColor}>
@@ -87,7 +99,9 @@ function AdvanceItem({ item }: { item: AdvanceResponse }) {
 }
 
 export default function AdiantamentosScreen() {
-    const { items, isLoading, isError, isFetchNextPageError, isFetchingNextPage, loadMore, refetch, isRefreshing } = useInfiniteAdvances();
+    // F5c R6: abre nas dívidas em aberto; "Todas" mostra o histórico (devolvidas e canceladas).
+    const [filtro, setFiltro] = useState<AdvancesFilter>('open');
+    const { items, isLoading, isError, isFetchNextPageError, isFetchingNextPage, loadMore, refetch, isRefreshing } = useInfiniteAdvances(filtro);
     const { summary, isError: isSummaryError, refetch: refetchSummary } = useGetAdvancesSummary();
 
     const { allowance } = useWithdrawalAllowance();
@@ -131,6 +145,27 @@ export default function AdiantamentosScreen() {
         <ScreenBase buttonLeft={<ButtonBack />} title={<Text preset="textTitleScreen">Adiantamentos</Text>}>
             {aviso}
             {resumo}
+            <Box flexDirection="row" gap="x8" px="x16" mt="t16">
+                {([['open', 'Em aberto'], ['all', 'Todas']] as const).map(([valor, rotulo]) => (
+                    <TouchableOpacityBox
+                        key={valor}
+                        testID={valor === 'open' ? 'filtro-em-aberto' : 'filtro-todas'}
+                        onPress={() => setFiltro(valor)}
+                        accessibilityRole="button"
+                        accessibilityState={{ selected: filtro === valor }}
+                        px="x12"
+                        py="y8"
+                        borderRadius="s20"
+                        borderWidth={1}
+                        borderColor={filtro === valor ? 'primary100' : 'borderColor'}
+                        backgroundColor={filtro === valor ? 'primary10' : undefined}
+                    >
+                        <Text fontSize={measure.m13} fontWeightPreset={filtro === valor ? 'semibold' : undefined}>
+                            {rotulo}
+                        </Text>
+                    </TouchableOpacityBox>
+                ))}
+            </Box>
             <FlatList
                 data={items}
                 keyExtractor={(item) => item.id}
@@ -165,7 +200,7 @@ export default function AdiantamentosScreen() {
                         <Box testID="adiantamentos-vazio" py="y32" alignItems="center">
                             <Ionicons name="checkmark-circle-outline" size={48} color={colors.greenSuccess} />
                             <Text mt="t12" color="colorTextSecondary" textAlign="center">
-                                Nenhum adiantamento.
+                                {filtro === 'open' ? 'Nenhuma dívida em aberto.' : 'Nenhum adiantamento.'}
                             </Text>
                         </Box>
                     )

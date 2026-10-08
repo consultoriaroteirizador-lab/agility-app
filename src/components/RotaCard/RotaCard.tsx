@@ -1,6 +1,7 @@
 import { Box, Text, TouchableOpacityBox } from '@/components';
 import { RoutingStatus } from '@/domain/agility/routing/dto/types';
 import { measure, StatusColorConfig } from '@/theme';
+import { routeTitle } from '@/utils/routeTitle';
 
 export interface RotaCardData {
   id: string;
@@ -71,7 +72,7 @@ export function RotaCard({ rota, onPress, showStatus = true, isHighlight = false
       {/* Header com nome e status */}
       <Box flexDirection="row" justifyContent="space-between" alignItems="center" marginBottom="y12">
         <Text preset="text16" fontWeightPreset="semibold" color="colorTextPrimary" flex={1}>
-          {rota.name || `Rota ${rota.code || rota.id}`}
+          {routeTitle(rota)}
         </Text>
 
         {showStatus && (

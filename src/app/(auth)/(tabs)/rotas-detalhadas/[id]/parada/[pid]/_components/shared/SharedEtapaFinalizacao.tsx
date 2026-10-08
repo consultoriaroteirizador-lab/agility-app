@@ -8,13 +8,14 @@ import { SignatureCanvas } from '@/components/SignatureCanvas';
 import { requirementsForServiceType } from '@/domain/agility/company/completionRequirements';
 import { resolveCodeRequirement } from '@/domain/agility/service/codeGate';
 import { PaymentMethodType } from '@/domain/agility/service/dto/types';
+import { useCashReturnDueDays } from '@/domain/agility/wallet/useCase/useWithdrawalAllowance';
 import { measure } from '@/theme';
 import { formatCurrency } from '@/utils/formatCurrency';
 import { parseBRLToCents } from '@/utils/parseCurrency';
 
 import { useParada } from '../../_context/ParadaContext';
 import { useServiceCompletion } from '../../_hooks/useServiceCompletion';
-import { CASH_DEBT_WARNING_TEXT, showsCashDebtWarning } from '../../_utils/cashDebtWarning';
+import { cashDebtWarningText, showsCashDebtWarning } from '../../_utils/cashDebtWarning';
 import { resolvePreviousStep } from '../../_utils/completionStep';
 
 interface SharedEtapaFinalizacaoProps {
@@ -184,6 +185,8 @@ export function SharedEtapaFinalizacao({ serviceType }: SharedEtapaFinalizacaoPr
 
   // Spec 4.3: dinheiro em mão vira dívida para todo motorista, não só o funcionário.
   const showCashDebtWarning = showsCashDebtWarning(paymentMethod);
+  // Só busca o resumo quando o aviso aparece (pagamento em dinheiro). Offline = texto sem número.
+  const cashReturnDueDays = useCashReturnDueDays({ enabled: showCashDebtWarning });
 
   return (
     <ScreenBase
@@ -634,7 +637,7 @@ export function SharedEtapaFinalizacao({ serviceType }: SharedEtapaFinalizacaoPr
                   Atenção: dinheiro em mão
                 </Text>
                 <Text preset="text12" color="white" marginTop="t4">
-                  {CASH_DEBT_WARNING_TEXT}
+                  {cashDebtWarningText(cashReturnDueDays)}
                 </Text>
               </Box>
             )}

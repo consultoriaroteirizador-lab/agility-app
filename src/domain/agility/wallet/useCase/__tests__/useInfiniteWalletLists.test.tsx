@@ -3,11 +3,15 @@ import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import TestRenderer, { act } from 'react-test-renderer';
 
-import { useInfiniteTransactions } from '../useInfiniteWalletLists';
+import { useInfiniteAdvances, useInfiniteTransactions } from '../useInfiniteWalletLists';
 
 const mockGetTransactions = jest.fn();
+const mockGetAdvances = jest.fn();
 jest.mock('../../walletAPI', () => ({
-    walletAPI: { getTransactions: (...args: unknown[]) => mockGetTransactions(...args) },
+    walletAPI: {
+        getTransactions: (...args: unknown[]) => mockGetTransactions(...args),
+        getAdvances: (...args: unknown[]) => mockGetAdvances(...args),
+    },
 }));
 jest.mock('@/services', () => ({
     useAuthCredentialsService: () => ({ authCredentials: { accessToken: 't', tenantId: 'c-1' } }),
@@ -42,6 +46,35 @@ it('pede a página 1 com o tamanho fixo e repassa os filtros', async () => {
 
     expect(mockGetTransactions).toHaveBeenCalledWith({ type: 'FREIGHT', page: 1, limit: 20 });
     expect(resultado.items).toEqual([{ id: 'tx-1' }]);
+
+    act(() => tree.unmount());
+    queryClient.clear();
+});
+
+it('useInfiniteAdvances("open") pede só PENDING e PARTIAL; sem filtro, todos', async () => {
+    mockGetAdvances.mockResolvedValue({ data: [], meta: { page: 1, limit: 20, total: 0, totalPages: 1 } });
+    function ProbeAbertas() {
+        useInfiniteAdvances('open');
+        return null;
+    }
+    function ProbeTodas() {
+        useInfiniteAdvances();
+        return null;
+    }
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity } } });
+    let tree!: TestRenderer.ReactTestRenderer;
+    act(() => {
+        tree = TestRenderer.create(
+            <QueryClientProvider client={queryClient}>
+                <ProbeAbertas />
+                <ProbeTodas />
+            </QueryClientProvider>,
+        );
+    });
+    await settle();
+
+    expect(mockGetAdvances).toHaveBeenCalledWith(1, 20, ['PENDING', 'PARTIAL']);
+    expect(mockGetAdvances).toHaveBeenCalledWith(1, 20, undefined);
 
     act(() => tree.unmount());
     queryClient.clear();

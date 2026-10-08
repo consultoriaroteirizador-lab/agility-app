@@ -24,6 +24,9 @@ jest.mock('@expo/vector-icons', () => ({ Ionicons: () => null }));
 // O teste só lê as props do campo; o Input real arrasta máscara e teclado.
 jest.mock('@/components/Input/Input', () => ({ Input: () => null }));
 
+let mockUuidSeq = 0;
+jest.mock('expo-crypto', () => ({ randomUUID: () => `uuid-${++mockUuidSeq}` }));
+
 const mockRouter = { push: jest.fn(), back: jest.fn(), replace: jest.fn() };
 jest.mock('expo-router', () => ({ useRouter: () => mockRouter, router: mockRouter }));
 
@@ -161,7 +164,7 @@ describe('Saque', () => {
             await mockModalProps!.onPress!();
         });
 
-        expect(mockRequestWithdrawal).toHaveBeenCalledWith({ amount: 5000 });
+        expect(mockRequestWithdrawal).toHaveBeenCalledWith({ amount: 5000, idempotencyKey: expect.stringMatching(/^uuid-\d+$/) });
         expect(mockShowToast).toHaveBeenCalledWith(expect.objectContaining({ type: 'success' }));
         expect(mockRouter.replace).toHaveBeenCalledWith('/menu/carteira/saques');
     });
@@ -417,5 +420,95 @@ describe('Saque — política de dívida (F3)', () => {
         expect(mockModalProps?.isVisible).toBe(true);
         expect(mockModalProps?.text).toContain('Destino: TED: Banco X · Ag. 0001 · Conta 12345-6\n(os dados atuais da sua carteira)');
         expect(mockModalProps?.text).not.toContain('chave atual');
+    });
+});
+
+describe('Saque — chave de idempotência (F6)', () => {
+    it('recusa e nova tentativa na mesma tela reenviam a MESMA chave, mesmo com outro valor', async () => {
+        mockRequestWithdrawal
+            .mockRejectedValueOnce({ success: false, error: { code: 'WITHDRAWAL_EXCEEDS_AMOUNT_ABOVE_DEBT', maxAmountCents: 3000 } })
+            .mockResolvedValueOnce({ id: 'wd-1', status: 'PENDING' });
+        const tree = render();
+
+        digitarEPedir(tree, 5000);
+        await act(async () => {
+            await mockModalProps!.onPress!();
+        });
+        digitarEPedir(tree, 3000);
+        await act(async () => {
+            await mockModalProps!.onPress!();
+        });
+
+        const [primeira, segunda] = mockRequestWithdrawal.mock.calls.map((c) => c[0]);
+        expect(primeira.idempotencyKey).toMatch(/^uuid-\d+$/);
+        expect(primeira.idempotencyKey).toBe(segunda.idempotencyKey);
+        expect(segunda.amount).toBe(3000);
+    });
+
+    it('abrir a tela de novo (nova montagem) gera outra chave', async () => {
+        mockRequestWithdrawal.mockResolvedValue({ id: 'wd-1', status: 'PENDING' });
+        const t1 = render();
+        digitarEPedir(t1, 5000);
+        await act(async () => {
+            await mockModalProps!.onPress!();
+        });
+        act(() => t1.unmount());
+
+        const t2 = render();
+        digitarEPedir(t2, 5000);
+        await act(async () => {
+            await mockModalProps!.onPress!();
+        });
+
+        const [a, b] = mockRequestWithdrawal.mock.calls.map((c) => c[0].idempotencyKey);
+        expect(a).not.toBe(b);
+    });
+
+    it('repetição de um saque que a empresa já recusou: diz isso, sem "Saque solicitado", e vai para Meus saques', async () => {
+        mockRequestWithdrawal.mockResolvedValue({ id: 'wd-1', status: 'CANCELLED' });
+        const tree = render();
+        digitarEPedir(tree, 5000);
+        await act(async () => {
+            await mockModalProps!.onPress!();
+        });
+
+        expect(mockShowToast).toHaveBeenCalledWith({
+            message: 'Este saque foi recusado pela empresa. Veja o motivo em Meus saques.',
+            type: 'error',
+        });
+        expect(mockShowToast).not.toHaveBeenCalledWith(expect.objectContaining({ message: expect.stringContaining('Saque solicitado') }));
+        expect(mockRouter.replace).toHaveBeenCalledWith('/menu/carteira/saques');
+    });
+
+    it('IDEMPOTENCY_KEY_REUSED: toast com a ação "Meus saques", que leva à lista', async () => {
+        mockRequestWithdrawal.mockRejectedValue({ success: false, error: { code: 'IDEMPOTENCY_KEY_REUSED', message: 'x' } });
+        const tree = render();
+        digitarEPedir(tree, 5000);
+        await act(async () => {
+            await mockModalProps!.onPress!();
+        });
+
+        const toast = mockShowToast.mock.calls.at(-1)![0];
+        expect(toast.message).toContain('Confira em Meus saques');
+        expect(toast.action.title).toBe('Meus saques');
+        act(() => toast.action.onPress());
+        expect(mockRouter.replace).toHaveBeenCalledWith('/menu/carteira/saques');
+    });
+});
+
+describe('Saque — resposta perdida (revisão final da F5c)', () => {
+    it('sem rede: avisa que o pedido pode ter chegado e oferece "Meus saques"', async () => {
+        mockRequestWithdrawal.mockRejectedValue({ success: false, error: { code: 'AU-000', message: 'Sem conexão com o servidor' } });
+        const tree = render();
+        digitarEPedir(tree, 5000);
+        await act(async () => {
+            await mockModalProps!.onPress!();
+        });
+
+        const toast = mockShowToast.mock.calls.at(-1)![0];
+        expect(toast.message).toContain('Ele pode ter chegado');
+        expect(toast.action.title).toBe('Meus saques');
+        act(() => toast.action.onPress());
+        expect(mockRouter.replace).toHaveBeenCalledWith('/menu/carteira/saques');
     });
 });

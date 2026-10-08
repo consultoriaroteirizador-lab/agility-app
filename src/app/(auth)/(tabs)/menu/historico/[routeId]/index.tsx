@@ -11,12 +11,14 @@ import { ServiceStatus, ServiceType } from '@/domain/agility/service/dto/types';
 import { useFindServicesByRoutingId } from '@/domain/agility/service/useCase';
 import { colors, measure } from '@/theme';
 import { formatDate, formatDateOnly } from '@/utils/formatDate';
+import { routeTitle } from '@/utils/routeTitle';
 
 import { MapaParadasModal } from '../../../rotas-detalhadas/[id]/_components/MapaParadasModal';
 import { countLedgerOnly } from '../../../rotas-detalhadas/[id]/_utils/routeNonDelivered';
 import { Map } from '../../../rotas-detalhadas/[id]/parada/[pid]/_components/shared/Map';
 import { RouteMapLegend } from '../../../rotas-detalhadas/[id]/parada/[pid]/_components/shared/RouteMapLegend';
 import { useRouteMapView } from '../../../rotas-detalhadas/[id]/parada/[pid]/_components/shared/useRouteMapView';
+import { RouteFreightShareCard } from '../_components/RouteFreightShareCard';
 import { routeValueLabel } from '../_utils/routeValue';
 
 function mapRoutingStatus(status: RoutingStatus): string {
@@ -161,7 +163,7 @@ export default function HistoricoDetalhesScreen() {
 
   return (
     <ScreenBase buttonLeft={<ButtonBack />} title={<Text preset="textTitleScreen">
-      {routing.name || `Rota ${routing.code || routing.id}`}
+      {routeTitle(routing)}
     </Text>}>
       <Box flex={1} backgroundColor="white" scrollable>
         <Box paddingTop="y12" paddingBottom="y16">
@@ -291,6 +293,9 @@ export default function HistoricoDetalhesScreen() {
             </Box>
           </Box>
         </Box>
+
+        {/* Sua parte nesta rota (F6): valor, paradas e status da parcela do motorista */}
+        <RouteFreightShareCard routingId={routeId || ''} />
 
         {/* Contadores */}
         <Box marginBottom="y16">

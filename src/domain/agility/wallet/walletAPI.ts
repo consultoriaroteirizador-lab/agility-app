@@ -11,7 +11,10 @@ import {
     CreateWithdrawalRequest,
     ListTransactionsRequest,
     WalletSummaryResponse,
+    ListDriverFreightSharesRequest,
+    DriverFreightShareResponse,
 } from './dto';
+import { AdvanceStatus } from './dto/types';
 
 const BASE_URL = '/wallet';
 
@@ -59,9 +62,10 @@ export const walletAPI = {
     },
 
     // Advances
-    async getAdvances(page: number = 1, limit: number = 20): Promise<PagedResponse<AdvanceResponse>> {
+    /** `status` (F6): um ou mais, enviados com vírgula (`PENDING,PARTIAL`). Sem ele, todos. */
+    async getAdvances(page: number = 1, limit: number = 20, status?: AdvanceStatus[]): Promise<PagedResponse<AdvanceResponse>> {
         const response = await apiAgility.get(`${BASE_URL}/advances`, {
-            params: { page, limit },
+            params: { page, limit, ...(status?.length ? { status: status.join(',') } : {}) },
         });
         return unwrap<PagedResponse<AdvanceResponse>>(response.data);
     },
@@ -69,6 +73,19 @@ export const walletAPI = {
     async getAdvancesSummary(): Promise<{ totalPending: number; count: number; overdueCount: number }> {
         const response = await apiAgility.get(`${BASE_URL}/advances/summary`);
         return unwrap<{ totalPending: number; count: number; overdueCount: number }>(response.data);
+    },
+
+    /** Parcelas do próprio motorista (F6). O back recorta pelo token: rota de outro = lista vazia. */
+    async getFreightShares(params: ListDriverFreightSharesRequest): Promise<PagedResponse<DriverFreightShareResponse>> {
+        const response = await apiAgility.get(`${BASE_URL}/freight-shares`, {
+            params: {
+                ...(params.routingId && { routingId: params.routingId }),
+                ...(params.status && { status: params.status }),
+                page: params.page ?? 1,
+                limit: params.limit ?? 20,
+            },
+        });
+        return unwrap<PagedResponse<DriverFreightShareResponse>>(response.data);
     },
 
     /** Resumo (F3): política de saque com dívida e o teto que ela deixa (`withdrawableBalance`). */

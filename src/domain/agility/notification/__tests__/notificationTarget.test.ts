@@ -126,6 +126,12 @@ describe('aviso de troca da chave PIX (F3)', () => {
         });
     });
 
+    it('F6: o back manda linkUrl "carteira" e o destino é a rota nomeada que o mapa compartilhado resolve', () => {
+        expect(
+            resolverDestinoDaNotificacao(notificacao({ type: NotificationType.SYSTEM_ALERT, linkUrl: 'carteira', metadata })),
+        ).toEqual({ tipo: 'nomeada', rota: 'carteira', params: metadata });
+    });
+
     it('SYSTEM_ALERT sem os campos da carteira segue sem destino', () => {
         expect(resolverDestinoDaNotificacao(notificacao({ metadata: { foo: 1 } }))).toBeNull();
     });

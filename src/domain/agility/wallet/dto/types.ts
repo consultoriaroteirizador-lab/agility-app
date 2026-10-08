@@ -90,3 +90,11 @@ export type WithdrawalWithDebtPolicy = 'FREE' | 'BLOCK_IF_OVERDUE' | 'EXCESS_ONL
 
 /** Origem da dívida (`DriverAdvanceEntity.origin()`, F3): com `paymentId` é cobrança em dinheiro. */
 export type AdvanceOrigin = 'CASH_COLLECTION' | 'ADVANCE';
+
+/** Status da parcela de frete por rota × motorista (F2/F3; `GET /wallet/freight-shares`, F6). */
+export enum FreightShareStatus {
+    A_LIBERAR = 'A_LIBERAR',
+    LIBERADA = 'LIBERADA',
+    CANCELADA = 'CANCELADA',
+    SEM_VALOR = 'SEM_VALOR',
+}

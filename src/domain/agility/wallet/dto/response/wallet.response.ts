@@ -3,6 +3,7 @@
 import {
     AdvanceOrigin,
     AdvanceStatus,
+    FreightShareStatus,
     LedgerDirection,
     PixKeyType,
     TransactionStatus,
@@ -152,6 +153,10 @@ export interface AdvanceResponse {
     cancelledAt?: string | null;
     /** Motivo do cancelamento, escrito pela empresa (UC15). `cancelledBy` é id: não é tipado de propósito. */
     cancelReason?: string | null;
+    /** Rótulos da lista (F6), por nome. `customerName` vem do pagamento ligado (adiantamento = null). */
+    routingCode?: string | null;
+    routingName?: string | null;
+    customerName?: string | null;
     createdAt: string;
 }
 
@@ -163,4 +168,33 @@ export interface WalletSummaryResponse {
     withdrawalWithDebtPolicy: WithdrawalWithDebtPolicy;
     /** Quanto a política deixa sacar agora, em centavos (a mesma conta do pedido de saque). */
     withdrawableBalance: number;
+    /**
+     * Prazo de devolução do dinheiro vivo, em dias (F6): inteiro em [0, 365], padrão 7 no back.
+     * Ausente = back sem a F6. O vencimento é agora + N×24h (0 = vence na hora).
+     */
+    cashReturnDueDays?: number;
+}
+
+/**
+ * A parte do motorista numa rota (F6, `GET /wallet/freight-shares`). Valores em centavos.
+ * Ele NÃO vê o sugerido, o proporcional nem a política (R10 da F6).
+ */
+export interface DriverFreightShareResponse {
+    id: string;
+    routingId: string;
+    routingCode: string | null;
+    routingName: string | null;
+    status: FreightShareStatus;
+    stopsCompleted: number;
+    stopsTotal: number;
+    valueMode: string;
+    fullAmountCents: number;
+    /** Bloqueado esperando a empresa; 0 fora de A_LIBERAR. */
+    amountToReleaseCents: number;
+    releasedAmountCents: number | null;
+    releasedAt: string | null;
+    adjustReason: string | null;
+    cancelledAt: string | null;
+    cancelReason: string | null;
+    createdAt: string | null;
 }

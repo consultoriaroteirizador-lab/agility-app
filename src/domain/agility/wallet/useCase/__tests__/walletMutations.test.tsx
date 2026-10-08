@@ -59,7 +59,7 @@ describe('useRequestWithdrawal', () => {
         mockRequestWithdrawal.mockRejectedValue(erro);
 
         await act(async () => {
-            await expect(saque.requestWithdrawal({ amount: 5000 })).rejects.toBe(erro);
+            await expect(saque.requestWithdrawal({ amount: 5000, idempotencyKey: '7d6c1f3e-0000-4000-8000-000000000002' })).rejects.toBe(erro);
         });
     });
 
@@ -67,10 +67,10 @@ describe('useRequestWithdrawal', () => {
         mockRequestWithdrawal.mockResolvedValue({ id: 'wd-1', amount: 5000 });
 
         await act(async () => {
-            await expect(saque.requestWithdrawal({ amount: 5000 })).resolves.toEqual({ id: 'wd-1', amount: 5000 });
+            await expect(saque.requestWithdrawal({ amount: 5000, idempotencyKey: '7d6c1f3e-0000-4000-8000-000000000002' })).resolves.toEqual({ id: 'wd-1', amount: 5000 });
         });
 
-        expect(mockRequestWithdrawal).toHaveBeenCalledWith({ amount: 5000 });
+        expect(mockRequestWithdrawal).toHaveBeenCalledWith({ amount: 5000, idempotencyKey: '7d6c1f3e-0000-4000-8000-000000000002' });
         expect(queryClient.getQueryState([KEY_WALLET, 'balance'])?.isInvalidated).toBe(true);
     });
 });
