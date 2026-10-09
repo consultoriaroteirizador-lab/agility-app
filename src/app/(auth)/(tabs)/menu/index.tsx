@@ -6,6 +6,7 @@ import { isBiometricPendingNextLogin } from '@/app/(public)/LoginScreen/_utils/a
 import { Box, Text, TouchableOpacityBox, Button, Image, BiometricToggle } from '@/components';
 import Modal from '@/components/Modal/Modal';
 import ProfilePhotoPicker from '@/components/ProfilePhotoPicker';
+import { useFuelEntryContext } from '@/domain/agility/fuelEntry';
 import { useAuthCredentialsService } from '@/services';
 import { measure } from '@/theme';
 
@@ -22,6 +23,10 @@ export default function MenuScreen() {
   const router = useRouter();
   const { userAuth, removeCredentials } = useAuthCredentialsService();
   const [popupSair, setPopupSair] = useState(false);
+  // "Abastecer" só com veículo associado (spec §6): o contexto dá 422 sem veículo, com veículo de
+  // outra filial e com elétrico. Carregando ou com erro, o item não aparece.
+  const { context: fuelContext } = useFuelEntryContext();
+  const podeAbastecer = !!fuelContext && !fuelContext.rechargeOnly;
 
   const userName = userAuth?.fullname || userAuth?.nickname || 'Usuário';
 
@@ -51,6 +56,15 @@ export default function MenuScreen() {
       href: '/(auth)/(tabs)/menu/carteira',
       icon: require('@/assets/images/agility/menu/simbulo-ganhos-menu.png'),
     },
+    ...(podeAbastecer
+      ? [
+          {
+            label: 'Abastecer',
+            href: '/(auth)/(tabs)/menu/abastecimento',
+            icon: require('@/assets/images/agility/menu/simbulo-ganhos-menu.png'), // Reutilizando ícone: sem asset de combustível em menu/
+          },
+        ]
+      : []),
     {
       label: 'Avaliações',
       href: '/(auth)/(tabs)/menu/avaliacoes',
