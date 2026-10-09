@@ -97,7 +97,8 @@ describe('buildDevolucaoList', () => {
 
 // Rodada de 09/10/2026: rota sem parada de retorno dizia "Entregue na parada de retorno" e
 // concluía sem avisar que a mercadoria continuava com a motorista. Decisão: avisar e deixar
-// concluir; o pedido segue pendente de devolução para a central.
+// concluir. Concluir a rota sem parada de retorno registra a devolução no CD da rota
+// (back: resolveAwaitingAttemptsOfRouting, ROUTE_COMPLETED); a central não confirma depois.
 describe('devolucaoInstrucao', () => {
     it('com parada de retorno, manda entregar lá', () => {
         expect(devolucaoInstrucao(1, true)).toBe('Esta mercadoria ainda está com você. Entregue na parada de retorno.')
@@ -106,10 +107,10 @@ describe('devolucaoInstrucao', () => {
 
     it('sem parada de retorno, manda devolver na base', () => {
         expect(devolucaoInstrucao(1, false)).toBe(
-            'Esta mercadoria ainda está com você. Devolva na base; a central confirma a devolução.',
+            'Esta mercadoria ainda está com você. Devolva no CD antes de concluir a rota: ao concluir, a devolução fica registrada.',
         )
         expect(devolucaoInstrucao(3, false)).toBe(
-            'Estas mercadorias ainda estão com você. Devolva na base; a central confirma a devolução.',
+            'Estas mercadorias ainda estão com você. Devolva no CD antes de concluir a rota: ao concluir, a devolução fica registrada.',
         )
     })
 })
@@ -121,7 +122,7 @@ describe('textoConcluirRota', () => {
 
     it('com mercadoria a devolver, lista os pedidos e diz onde devolver', () => {
         expect(textoConcluirRota(['ETQ-1'], false)).toBe(
-            'Você ainda está com 1 pedido para devolver: ETQ-1. Devolva na base; a central confirma a devolução. Concluir a rota mesmo assim?',
+            'Você ainda está com 1 pedido para devolver: ETQ-1. Ao concluir, a devolução fica registrada no CD. Já entregou a mercadoria lá?',
         )
         expect(textoConcluirRota(['ETQ-1', 'ETQ-2'], true)).toBe(
             'Você ainda está com 2 pedidos para devolver: ETQ-1, ETQ-2. Entregue na parada de retorno. Concluir a rota mesmo assim?',
