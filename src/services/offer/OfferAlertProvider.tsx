@@ -8,6 +8,7 @@ import { useUserLocation } from '@/app/(auth)/(tabs)/rotas-detalhadas/[id]/parad
 import { Box, Button, Text, TextButton } from '@/components';
 import { useFindOneDriver } from '@/domain/agility/driver/useCase';
 import { segundosAteExpirar } from '@/domain/agility/offer/offerExpiry';
+import { resumoDaOferta } from '@/domain/agility/offer/resumoOferta';
 import {
   activeOffer,
   addOffer,
@@ -28,19 +29,6 @@ import { measure } from '@/theme';
 
 // ─── Formatadores ────────────────────────────────────────────────────────────
 // Replicados minimamente de `(tabs)/ofertas/index.tsx` (não exportados de lá).
-
-function formatarDistancia(km: number | null | undefined): string {
-  if (!km) return '0 km';
-  return `${km.toFixed(1).replace('.', ',')} km`;
-}
-
-function formatarTempo(minutos: number | null | undefined): string {
-  if (!minutos) return '0min';
-  if (minutos < 60) return `${Math.round(minutos)}min`;
-  const horas = Math.floor(minutos / 60);
-  const mins = Math.round(minutos % 60);
-  return mins > 0 ? `${horas}h ${mins}min` : `${horas}h`;
-}
 
 function formatarPreco(valor: number | null | undefined): string {
   // null = frete não informado (oferta interna pode não ter). "R$ 0,00" afirmava um valor que não existe.
@@ -279,7 +267,7 @@ export function OfferAlertProvider({ children }: { children: React.ReactNode }) 
                   Nova oferta de rota
                 </Text>
                 <Text preset="text14" color="gray400" mb="y12">
-                  {current.totalServices ?? 0} paradas · {formatarDistancia(current.totalDistanceKm)} · {formatarTempo(current.totalDurationMinutes)}
+                  {resumoDaOferta(current)}
                 </Text>
                 <Text preset="text24" color="primary100" fontWeight="700" mb="y20">
                   {formatarPreco(current.totalValue)}

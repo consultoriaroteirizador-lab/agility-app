@@ -18,13 +18,15 @@
 import { Box, Text } from '@/components'
 import { measure } from '@/theme'
 
-import type { DevolucaoRow } from '../_utils'
+import { devolucaoInstrucao, type DevolucaoRow } from '../_utils'
 
 export interface DevolucaoAoCdCardProps {
     rows: DevolucaoRow[]
+    /** Sem parada de retorno, a instrução é devolver na base (a central confirma). */
+    temParadaDeRetorno: boolean
 }
 
-export function DevolucaoAoCdCard({ rows }: DevolucaoAoCdCardProps) {
+export function DevolucaoAoCdCard({ rows, temParadaDeRetorno }: DevolucaoAoCdCardProps) {
     if (rows.length === 0) return null
 
     return (
@@ -56,9 +58,7 @@ export function DevolucaoAoCdCard({ rows }: DevolucaoAoCdCardProps) {
             </Box>
 
             <Text preset="text13" color="gray400">
-                {rows.length === 1
-                    ? 'Esta mercadoria ainda está com você. Entregue na parada de retorno.'
-                    : 'Estas mercadorias ainda estão com você. Entregue na parada de retorno.'}
+                {devolucaoInstrucao(rows.length, temParadaDeRetorno)}
             </Text>
 
             {rows.map((row) => (

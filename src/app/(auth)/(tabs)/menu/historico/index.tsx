@@ -10,6 +10,7 @@ import { measure } from '@/theme';
 import { formatDate, formatDateOnly } from '@/utils/formatDate';
 import { routeTitle } from '@/utils/routeTitle';
 
+import { rotasDoHistorico } from './_utils/rotasDoHistorico';
 import { routeValueLabel } from './_utils/routeValue';
 
 // --- Helpers ---
@@ -24,8 +25,6 @@ const STATUS_LABEL: Record<RoutingStatus, string> = {
   [RoutingStatus.COMPLETED]: 'Concluída',
   [RoutingStatus.CANCELLED]: 'Cancelada',
 };
-
-const HISTORY_STATUSES = [RoutingStatus.COMPLETED, RoutingStatus.CANCELLED];
 
 function formatDistance(km?: number | null): string {
   if (!km) return '0 km';
@@ -148,9 +147,10 @@ function RouteCard({ rota, onPress }: RouteCardProps) {
 export default function HistoricoRotasScreen() {
   const router = useRouter();
 
-  const { routings, isLoading } = useFindMyRoutings({ status: RoutingStatus.COMPLETED });
+  // Sem filtro de status: o histórico tem concluídas E canceladas (antes só pedia COMPLETED).
+  const { routings, isLoading } = useFindMyRoutings();
 
-  const rotasFiltradas = routings.filter((r) => HISTORY_STATUSES.includes(r.status));
+  const rotasFiltradas = rotasDoHistorico(routings);
 
   return (
     <ScreenBase
@@ -163,7 +163,7 @@ export default function HistoricoRotasScreen() {
     >
       <Box flex={1} backgroundColor="white" pt="y12" pb="y2">
         <Text preset="text15" color="gray500" mb="y16">
-          Veja todas as rotas concluídas, canceladas ou já iniciadas.
+          Veja todas as rotas concluídas ou canceladas.
         </Text>
 
         <Box

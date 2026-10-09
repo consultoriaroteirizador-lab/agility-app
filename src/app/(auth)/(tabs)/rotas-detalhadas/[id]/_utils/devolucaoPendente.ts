@@ -94,3 +94,36 @@ export function buildDevolucaoList(
     }
     return rows
 }
+
+// ============================================
+// TEXTOS
+// ============================================
+
+const DEVOLVER_NO_RETORNO = 'Entregue na parada de retorno.'
+// Sem parada de retorno, a devolução é registrada pela central
+// (`POST /services/:id/return-confirmation`): o pedido segue pendente até lá.
+const DEVOLVER_NA_BASE = 'Devolva na base; a central confirma a devolução.'
+
+/**
+ * O que fazer com a mercadoria que ainda está com a motorista. Rota sem parada de retorno não
+ * pode mandar "entregar na parada de retorno" (rodada de 09/10/2026).
+ */
+export function devolucaoInstrucao(quantidade: number, temParadaDeRetorno: boolean): string {
+    const comVoce = quantidade === 1
+        ? 'Esta mercadoria ainda está com você.'
+        : 'Estas mercadorias ainda estão com você.'
+    return `${comVoce} ${temParadaDeRetorno ? DEVOLVER_NO_RETORNO : DEVOLVER_NA_BASE}`
+}
+
+/**
+ * Confirmação de "Concluir rota". Com mercadoria a devolver, avisa e deixa concluir
+ * (decisão de 09/10/2026); antes concluía sem falar dela.
+ */
+export function textoConcluirRota(titulosADevolver: string[], temParadaDeRetorno: boolean): string {
+    if (titulosADevolver.length === 0) {
+        return 'Deseja realmente concluir esta rota? Esta ação não pode ser desfeita.'
+    }
+    const quantos = titulosADevolver.length === 1 ? '1 pedido' : `${titulosADevolver.length} pedidos`
+    const onde = temParadaDeRetorno ? DEVOLVER_NO_RETORNO : DEVOLVER_NA_BASE
+    return `Você ainda está com ${quantos} para devolver: ${titulosADevolver.join(', ')}. ${onde} Concluir a rota mesmo assim?`
+}

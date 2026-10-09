@@ -34,7 +34,12 @@ import { MapaParadasModal } from './_components/MapaParadasModal'
 import { TransferLegExecution } from './_components/TransferLegExecution'
 import { RotaProvider, useRota } from './_context/RotaContext'
 import type { RotaTabType, Parada } from './_types/rota.types'
-import type { InsucessoRow } from './_utils'
+import { textoConcluirRota, type InsucessoRow } from './_utils'
+
+/** Rota com parada de retorno: a mercadoria a devolver volta nela, não na base. */
+function temParadaDeRetorno(routing: { returnServiceId?: string | null } | null | undefined, paradas: Parada[]): boolean {
+  return !!routing?.returnServiceId || paradas.some((p) => p.isRetorno === true)
+}
 
 // ============================================
 // COMPONENTE DE TABS
@@ -106,7 +111,7 @@ interface ListHeaderProps {
 }
 
 function ListHeader({ aba, setAba, proximaParada }: ListHeaderProps) {
-  const { routing, devolucaoRows } = useRota()
+  const { routing, devolucaoRows, paradas } = useRota()
 
   return (
     <>
@@ -115,7 +120,7 @@ function ListHeader({ aba, setAba, proximaParada }: ListHeaderProps) {
       <RotaTabs aba={aba} setAba={setAba} />
       {/* Abaixo das abas, nas DUAS: o que volta no caminhão não pertence a uma
           aba — é obrigação da rota, e o pedido cancelado nem parada tem mais. */}
-      <DevolucaoAoCdCard rows={devolucaoRows} />
+      <DevolucaoAoCdCard rows={devolucaoRows} temParadaDeRetorno={temParadaDeRetorno(routing, paradas)} />
       {aba === 'andamento' && proximaParada && (
         <Text preset="text14" color="gray600" marginBottom="y8">
           Próxima parada
@@ -386,6 +391,7 @@ function RotaDetalhadaContent() {
     paradasConcluidasSucesso,
     paradasConcluidasInsucesso,
     insucessoRows,
+    devolucaoRows,
     nenhumAndamento,
     isCompleting,
     popupConcluirRota,
@@ -446,6 +452,9 @@ function RotaDetalhadaContent() {
           onPress={() => setMapaVisible(true)}
         />
       </Box>
+      {/* Prévia da rota a iniciar: as paradas aparecem abaixo e o início fica à mão, no topo.
+          No rodapé, o RouteActions só aparece quando não sobra parada pendente. */}
+      {routing.isAssigned && !routing.isInProgress && <RouteActions />}
       {aba === 'andamento' ? (
         <AndamentoList
           aba={aba}
@@ -469,7 +478,7 @@ function RotaDetalhadaContent() {
         isVisible={popupConcluirRota}
         preset="action"
         title="Concluir rota"
-        text="Deseja realmente concluir esta rota? Esta ação não pode ser desfeita."
+        text={textoConcluirRota(devolucaoRows.map((r) => r.titulo), temParadaDeRetorno(routing, paradas))}
         buttonActionTitle={isCompleting ? 'Concluindo...' : 'Concluir'}
         buttonCloseTitle="Cancelar"
         onPress={concluirRota}

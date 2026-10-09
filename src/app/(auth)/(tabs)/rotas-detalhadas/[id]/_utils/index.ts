@@ -95,6 +95,8 @@ export {
     type DevolucaoRow,
     buildDevolucaoList,
     devolucaoDesfechoLabel,
+    devolucaoInstrucao,
+    textoConcluirRota,
 } from './devolucaoPendente'
 
 // ============================================
