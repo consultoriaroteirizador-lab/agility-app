@@ -35,3 +35,28 @@ export function supportChatHref(chatId: string, returnTo?: string) {
         params: returnTo ? { id: chatId, returnTo } : { id: chatId },
     };
 }
+
+/** Id da conversa ainda não criada: "Nova conversa" abre aqui e o protocolo nasce no 1º envio. */
+const RASCUNHO = 'novo';
+
+export function isRascunhoDeSuporte(id: string | null | undefined): boolean {
+    return id === RASCUNHO;
+}
+
+/**
+ * Rota do rascunho de conversa. Nada é criado no backend até a motorista mandar a primeira
+ * mensagem (decisão de 09/10/2026): antes, o toque em "Nova conversa" já abria um protocolo
+ * na central, vazio quando o toque era sem querer. Assunto e serviço vão nos params para o
+ * find-or-create do primeiro envio.
+ */
+export function supportDraftHref(params: { subject?: string; serviceId?: string; returnTo?: string }) {
+    return {
+        pathname: '/(auth)/(tabs)/menu/suporte/[id]' as const,
+        params: {
+            id: RASCUNHO,
+            ...(params.subject ? { assunto: params.subject } : {}),
+            ...(params.serviceId ? { servico: params.serviceId } : {}),
+            ...(params.returnTo ? { returnTo: params.returnTo } : {}),
+        },
+    };
+}

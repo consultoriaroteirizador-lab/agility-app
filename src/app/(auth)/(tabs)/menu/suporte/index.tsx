@@ -12,6 +12,7 @@ import { useFindActiveChatByUser } from '@/domain/agility/chat/useCase';
 import {
   findOrCreateSupportChatId,
   supportChatHref,
+  supportDraftHref,
   supportSubjectForService,
 } from '@/domain/agility/chat/useCase/openSupportChat';
 import { ServiceStatus } from '@/domain/agility/service/dto/types';
@@ -106,6 +107,15 @@ export default function SuporteScreen() {
       } else if (selectedSubject?.value) {
         finalSubject = selectedSubject.value;
       }
+    }
+
+    // Sem conversa aberta: abre o rascunho, e o protocolo só nasce na primeira mensagem
+    // (decisão de 09/10/2026). Antes, o toque já criava um atendimento na central.
+    if (!hasActive) {
+      setSelectedSubject(undefined);
+      setCustomSubject('');
+      router.push(supportDraftHref({ subject: finalSubject, serviceId }));
+      return;
     }
 
     isCreatingChatRef.current = true;
