@@ -16,6 +16,13 @@ export type NotificationRoute =
     | string; // Para rotas customizadas
 
 /**
+ * Link de notificação cai numa tela dentro da pilha de uma aba (Menu, Suporte, Ofertas). Sem
+ * `withAnchor`, a pilha nasce só com essa tela: o voltar sai da aba e a aba fica presa nela até
+ * recarregar o app. Com ela, entra a home da pilha por baixo (`unstable_settings.anchor`).
+ */
+const COM_ANCORA = { withAnchor: true } as const;
+
+/**
  * Abre a conversa de suporte. Aceita `id` ou `chatId` porque o push de mensagem antigo
  * mandava `chatId` — sem isso, uma notificação já em trânsito cairia numa rota sem param.
  * Sem nenhum dos dois, cai na lista de conversas em vez de abrir uma tela quebrada.
@@ -24,14 +31,14 @@ function goToSupportChat(params?: any) {
     const chatId = params?.id ?? params?.chatId;
 
     if (!chatId) {
-        router.navigate('/(auth)/(tabs)/menu/suporte' as Href);
+        router.navigate('/(auth)/(tabs)/menu/suporte' as Href, COM_ANCORA);
         return;
     }
 
     router.navigate({
         pathname: '/(auth)/(tabs)/menu/suporte/[id]' as any,
         params: { ...params, id: chatId },
-    });
+    }, COM_ANCORA);
 }
 
 export const notificationRoutes: Record<string, (params?: any) => void> = {
@@ -77,13 +84,13 @@ export const notificationRoutes: Record<string, (params?: any) => void> = {
 
     // Ofertas (oferta de rota em tempo real)
     ofertas: (params?: any) => params?.id
-        ? router.navigate({ pathname: '/(auth)/(tabs)/ofertas/[id]' as any, params })
-        : router.navigate('/(auth)/(tabs)/ofertas' as any),
+        ? router.navigate({ pathname: '/(auth)/(tabs)/ofertas/[id]' as any, params }, COM_ANCORA)
+        : router.navigate('/(auth)/(tabs)/ofertas' as any, COM_ANCORA),
 
     // Menu
     menu: () => router.navigate('/(auth)/(tabs)/menu' as Href),
     // Carteira: push da troca de chave PIX (F3), que não traz `route` do back.
-    carteira: () => router.navigate('/(auth)/(tabs)/menu/carteira' as Href),
+    carteira: () => router.navigate('/(auth)/(tabs)/menu/carteira' as Href, COM_ANCORA),
     // Nome antigo de push de mensagem: a tela `menu/chat` foi removida, e este handler
     // só sobrevive para pushes ainda em trânsito. Leva sempre à conversa de suporte.
     chat: (params?: any) => goToSupportChat(params),
@@ -113,7 +120,7 @@ export const notificationRoutes: Record<string, (params?: any) => void> = {
 export function abrirDestinoDaNotificacao(destino: DestinoNotificacao | null) {
     if (!destino) return;
     if (destino.tipo === 'caminho') {
-        router.push(destino.caminho as Href);
+        router.push(destino.caminho as Href, COM_ANCORA);
         return;
     }
     navigateToNotificationRoute(destino.rota, destino.params);
