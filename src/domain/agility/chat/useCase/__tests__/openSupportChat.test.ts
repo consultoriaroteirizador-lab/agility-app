@@ -1,4 +1,10 @@
-import { findOrCreateSupportChatId, supportChatHref, supportSubjectForService } from '../openSupportChat';
+import {
+    findOrCreateSupportChatId,
+    isRascunhoDeSuporte,
+    supportChatHref,
+    supportDraftHref,
+    supportSubjectForService,
+} from '../openSupportChat';
 
 const mockCreate = jest.fn();
 jest.mock('../../chatService', () => ({
@@ -47,5 +53,28 @@ describe('supportChatHref', () => {
 describe('supportSubjectForService', () => {
     it('mesmo formato da tela de Suporte', () => {
         expect(supportSubjectForService('svc-1')).toBe('Problema no serviço #svc-1');
+    });
+});
+
+// "Nova conversa" não cria o protocolo no toque: abre o rascunho, e o protocolo nasce na
+// primeira mensagem (decisão de 09/10/2026; antes um toque sem querer chegava à central).
+describe('supportDraftHref', () => {
+    it('rascunho leva assunto e serviço, e não chama a API', () => {
+        expect(supportDraftHref({ subject: 'Problema no app', serviceId: 'svc-1' })).toEqual({
+            pathname: '/(auth)/(tabs)/menu/suporte/[id]',
+            params: { id: 'novo', assunto: 'Problema no app', servico: 'svc-1' },
+        });
+        expect(mockCreate).not.toHaveBeenCalled();
+    });
+
+    it('sem assunto nem serviço, só o rascunho; returnTo segue valendo', () => {
+        expect(supportDraftHref({})).toEqual({ pathname: '/(auth)/(tabs)/menu/suporte/[id]', params: { id: 'novo' } });
+        expect(supportDraftHref({ returnTo: '/rotas' }).params).toEqual({ id: 'novo', returnTo: '/rotas' });
+    });
+
+    it('isRascunhoDeSuporte reconhece o id do rascunho', () => {
+        expect(isRascunhoDeSuporte('novo')).toBe(true);
+        expect(isRascunhoDeSuporte('2c8026ab-105b-44ef-b0b5-8e56af5b40a8')).toBe(false);
+        expect(isRascunhoDeSuporte(undefined)).toBe(false);
     });
 });

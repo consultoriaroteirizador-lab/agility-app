@@ -38,6 +38,8 @@ export interface Ticket {
   // Campos adicionais
   transferDescription?: string
   resolutionDescription?: string
+  /** true quando o próprio solicitante encerrou (PATCH /tickets/:id/resolve-by-requester). */
+  resolvedByRequester?: boolean
 
   // Metadata
   createdBy?: string

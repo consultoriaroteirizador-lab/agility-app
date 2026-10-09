@@ -32,7 +32,11 @@ import {
 import { getChatService, markChatReadService } from '@/domain/agility/chat/chatService';
 import type { AttachmentType, ChatSendOutcome, OutgoingAttachment } from '@/domain/agility/chat/dto/types';
 import { upsertMessagesInCache } from '@/domain/agility/chat/useCase/messagesCache';
-import { findOrCreateSupportChatId, supportChatHref } from '@/domain/agility/chat/useCase/openSupportChat';
+import {
+  findOrCreateSupportChatId,
+  isRascunhoDeSuporte,
+  supportDraftHref,
+} from '@/domain/agility/chat/useCase/openSupportChat';
 import {
   attachmentMessageFields,
   normalizeAttachmentName,
@@ -53,6 +57,8 @@ import { useToastService } from '@/services/Toast/useToast';
 import { measure } from '@/theme';
 
 import { EncerrarAtendimentoPrompt } from './_components/EncerrarAtendimentoPrompt';
+import { textoAtendimentoEncerrado } from './_utils/atendimentoEncerrado';
+import { chatParaEnviar } from './_utils/chatParaEnviar';
 import { resolveChatBodyState } from './_utils/chatBodyState';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -271,8 +277,15 @@ function MessageItem({ item, prevItem, isOwnMessage, peerReadAt, peerDeliveredAt
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function SuporteChatPage() {
-  const { id, returnTo } = useLocalSearchParams<{ id?: string; returnTo?: string }>();
-  const chatId = id ? String(id) : undefined;
+  const { id, returnTo, assunto, servico } = useLocalSearchParams<{
+    id?: string;
+    returnTo?: string;
+    assunto?: string;
+    servico?: string;
+  }>();
+  // Rascunho ("Nova conversa"): ainda não existe chat nem protocolo; os dois nascem no 1º envio.
+  const rascunho = isRascunhoDeSuporte(id);
+  const chatId = id && !rascunho ? String(id) : undefined;
   const router = useRouter();
 
   const { userAuth, authCredentials } = useAuthCredentialsService();
@@ -452,6 +465,9 @@ export default function SuporteChatPage() {
   const [erroEncerrar, setErroEncerrar] = useState<string | undefined>(undefined);
   const resolveByRequester = useResolveByRequester();
   const podeEncerrar = podeEncerrarComoSolicitante(ticket?.status, isChatClosed);
+  // Quem encerrou: a motorista nesta tela, ou o que o protocolo diz (ver textoAtendimentoEncerrado).
+  const [encerradoNestaTela, setEncerradoNestaTela] = useState(false);
+  const avisoEncerrado = textoAtendimentoEncerrado({ encerradoNestaTela, ticket });
 
   const handleConfirmarEncerrar = useCallback(() => {
     if (!ticket?.id) return;
@@ -462,6 +478,7 @@ export default function SuporteChatPage() {
         onSuccess: () => {
           setIsEncerrarVisible(false);
           setMotivoEncerrar('');
+          setEncerradoNestaTela(true);
           // markClosedLocally já invalida chats e protocolos; o `chat_closed` do
           // socket chega em seguida e cai no mesmo estado.
           markClosedLocally();
@@ -529,7 +546,8 @@ export default function SuporteChatPage() {
       const text = Array.isArray(raw) ? raw.join(' ') : String(raw);
       if (/encerrad|fechad|closed/i.test(text)) {
         markClosedLocally();
-        showToast({ message: 'Este atendimento foi finalizado pelo operador.', type: 'error' });
+        // Não diz quem encerrou: o envio recusado não informa, e o banner abaixo já diz.
+        showToast({ message: 'Este atendimento já foi encerrado.', type: 'error' });
         return;
       }
       // Recusa do /chats/upload por tipo ou tamanho: dizer o motivo, não "não foi possível".
@@ -552,45 +570,20 @@ export default function SuporteChatPage() {
     router.back();
   }, [returnTo, router]);
 
-  const [isStartingNew, setIsStartingNew] = useState(false);
-  // Guard síncrono contra duplo-tap: `isStartingNew` só desabilita o botão no próximo
-  // render. Um 2º toque não cria outro chat (o find-or-create do backend roda sob trava
-  // no Redis), mas a chamada concorrente recebe 400 e mostraria um toast de erro falso.
-  const isStartingNewRef = useRef(false);
+  // "Novo atendimento" depois de encerrado: abre o rascunho, e o protocolo só nasce na primeira
+  // mensagem (decisão de 09/10/2026). replace: a conversa encerrada não fica na pilha.
+  const handleNovoAtendimento = useCallback(() => {
+    router.replace(supportDraftHref({ returnTo }));
+  }, [router, returnTo]);
 
-  const handleNovoAtendimento = useCallback(async () => {
-    if (isStartingNewRef.current) return;
-    if (!userAuth?.id) {
-      showToast({ message: 'Usuário não identificado', type: 'error' });
-      return;
-    }
-    isStartingNewRef.current = true;
-    setIsStartingNew(true);
-    try {
-      const newChatId = await findOrCreateSupportChatId({ driverId: userAuth.id });
-      await queryClient.invalidateQueries({ queryKey: [KEY_CHATS] });
-      if (newChatId === chatId) {
-        // O backend reaproveitou esta conversa (protocolo reaberto): destrava a tela.
-        setChatStatus(ChatStatus.ACTIVE);
-        // chatInfo também: se o loadChatInfo falhar, o aviso de encerrado não fica preso.
-        setChatInfo((prev) => (prev ? { ...prev, status: ChatStatus.ACTIVE } : prev));
-        loadChatInfo();
-        return;
-      }
-      // replace: a conversa encerrada não fica na pilha; returnTo segue valendo.
-      router.replace(supportChatHref(newChatId, returnTo));
-    } catch {
-      showToast({ message: 'Não foi possível abrir um novo atendimento', type: 'error' });
-    } finally {
-      isStartingNewRef.current = false;
-      setIsStartingNew(false);
-    }
-  }, [userAuth?.id, chatId, queryClient, loadChatInfo, router, returnTo, showToast]);
+  // Guard síncrono do 1º envio do rascunho: dois toques em enviar não abrem dois protocolos
+  // (o find-or-create do backend roda sob trava no Redis e a chamada concorrente recebe 400).
+  const isCreatingDraftRef = useRef(false);
 
   // Um passo da fila: texto puro, ou um anexo (bolha local -> upload -> mensagem com a chave).
+  // O chat vem por parâmetro: no 1º envio do rascunho ele acabou de nascer e ainda não está na rota.
   const sendStep = useCallback(
-    async (step: ChatSendStep) => {
-      if (!chatId) throw new Error('CHAT_ID_MISSING');
+    async (step: ChatSendStep, chatId: string) => {
       const senderId = currentUserSenderId ?? undefined;
 
       if (!step.attachment) {
@@ -634,17 +627,47 @@ export default function SuporteChatPage() {
         throw error;
       }
     },
-    [chatId, currentUserSenderId, postMessage, uploadAttachments, addOptimisticMessage, removeOptimisticMessage],
+    [currentUserSenderId, postMessage, uploadAttachments, addOptimisticMessage, removeOptimisticMessage],
   );
 
   const handleSendMessage = useCallback(
     async (content: string, attachments?: OutgoingAttachment[]): Promise<ChatSendOutcome> => {
       const pending = attachments ?? [];
-      if (!chatId || isChatClosed) {
-        return { unsentText: content, unsentAttachments: pending };
-      }
+      const naoEnviado = { unsentText: content, unsentAttachments: pending };
+      if (isChatClosed) return naoEnviado;
+      if (!chatId && isCreatingDraftRef.current) return naoEnviado;
 
-      const outcome = await runChatSends(content, pending, sendStep);
+      let alvo: { chatId: string; criado: boolean } | null;
+      isCreatingDraftRef.current = !chatId;
+      try {
+        alvo = await chatParaEnviar({
+          chatId,
+          rascunho,
+          criar: () => {
+            if (!userAuth?.id) throw new Error('USER_NOT_IDENTIFIED');
+            return findOrCreateSupportChatId({ driverId: userAuth.id, subject: assunto, serviceId: servico });
+          },
+        });
+      } catch {
+        isCreatingDraftRef.current = false;
+        showToast({ message: 'Não foi possível abrir o atendimento. Tente de novo.', type: 'error' });
+        return naoEnviado;
+      }
+      if (!alvo) {
+        isCreatingDraftRef.current = false;
+        return naoEnviado;
+      }
+      const destino = alvo.chatId;
+
+      const outcome = await runChatSends(content, pending, (step) => sendStep(step, destino));
+
+      if (alvo.criado) {
+        // O protocolo nasceu: a tela vira a conversa de verdade (mensagens, protocolo, socket).
+        // Vale também com falha no envio, para o reenvio cair neste chat e não abrir outro.
+        void queryClient.invalidateQueries({ queryKey: [KEY_CHATS] });
+        router.setParams({ id: destino, assunto: undefined, servico: undefined });
+        isCreatingDraftRef.current = false;
+      }
 
       if (outcome.error) {
         const sentCount = pending.length - outcome.unsentAttachments.length;
@@ -657,7 +680,7 @@ export default function SuporteChatPage() {
       }
       return outcome;
     },
-    [chatId, isChatClosed, sendStep, handleSendFailure],
+    [chatId, rascunho, isChatClosed, userAuth?.id, assunto, servico, sendStep, handleSendFailure, queryClient, router, showToast],
   );
 
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -740,7 +763,7 @@ export default function SuporteChatPage() {
 
   const headerTitle = chatInfo?.routeId
     ? `Rota ${chatInfo.routeId}`
-    : tituloDaConversa(chatInfo?.subject);
+    : tituloDaConversa(chatInfo?.subject ?? assunto);
 
   const headerSubtitle = chatInfo?.serviceId
     ? `Servico #${chatInfo.serviceId}`
@@ -902,13 +925,12 @@ export default function SuporteChatPage() {
         {isChatClosed && (
           <Box backgroundColor="gray100" px="x16" py="y12" alignItems="center" gap="y8">
             <Text preset="text13" color="gray600" textAlign="center">
-              Atendimento finalizado pelo operador.
+              {avisoEncerrado}
             </Text>
             <Button
-              title={isStartingNew ? 'Abrindo...' : 'Novo atendimento'}
+              title="Novo atendimento"
               preset="outline"
               onPress={handleNovoAtendimento}
-              disabled={isStartingNew}
               width={measure.x300}
             />
           </Box>
