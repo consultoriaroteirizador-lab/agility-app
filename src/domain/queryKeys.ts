@@ -16,6 +16,7 @@ export const KEY_FORM_GROUP_ANSWERS = 'form-group-answers'
 export const KEY_DISTRIBUTION_CENTERS = 'distribution-centers'
 export const KEY_OCCURRENCE_REASONS = 'order-occurrence-reasons'
 export const KEY_TEAMS = 'teams'
+export const KEY_FUEL_ENTRIES = 'fuel-entries'
 
 /**
  * Chaves invalidadas a cada push recebido ou tocado (ver `NotificationContext`).
