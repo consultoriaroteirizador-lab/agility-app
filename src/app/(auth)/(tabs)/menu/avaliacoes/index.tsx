@@ -14,6 +14,8 @@ import type { DriverRating, RatingReason } from '@/domain/agility/rating';
 import { useAuthCredentialsService } from '@/services';
 import { measure } from '@/theme';
 
+import { notaMedia } from './_utils/nota';
+
 function StarDisplay({ score, size = 16 }: { score: number; size?: number }) {
     return (
         <Box flexDirection="row" alignItems="center">
@@ -157,13 +159,13 @@ export default function AvaliacoesScreen() {
                         color="colorTextPrimary"
                         fontWeight="bold"
                         marginLeft="x8">
-                        {averageScore.toFixed(1)}
+                        {notaMedia(averageScore)}
                     </Text>
                     <Text
                         preset="text16"
                         color="secondaryTextColor"
                         marginLeft="x4">
-                        / 5.0
+                        / 5
                     </Text>
                 </Box>
 
