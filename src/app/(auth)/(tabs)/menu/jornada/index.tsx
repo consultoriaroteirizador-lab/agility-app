@@ -20,6 +20,7 @@ import type {
   JornadaTrabalho,
   UpdateJornadaRequest,
 } from '@/domain/agility/jornada/types';
+import { useGetMe } from '@/domain/agility/driver/useCase';
 import { parseWorkDaysFromBackend } from '@/domain/agility/jornada/types';
 import { useGetMyJourney, useUpdateMyJourney } from '@/domain/agility/jornada/useCase';
 import { KEY_JOURNEY } from '@/domain/queryKeys';
@@ -32,6 +33,9 @@ export default function JornadaScreen() {
   const { showToast } = useToastService();
   // Buscar jornada do backend
   const { jornada: jornadaData, isLoading: isLoadingJourney } = useGetMyJourney();
+  // Motorista própria só vê o regime (é da empresa); o terceirizado edita.
+  const { me } = useGetMe();
+  const regimeSomenteLeitura = me?.linkType === 'COLLABORATOR';
 
   // Mutation para salvar jornada
   const { updateJourney, isLoading: isSaving } = useUpdateMyJourney({
@@ -225,6 +229,7 @@ export default function JornadaScreen() {
               <PeriodSelector
                 selectedPeriod={jornada.tipo}
                 onPeriodSelect={handlePeriodSelect}
+                somenteLeitura={regimeSomenteLeitura}
                 disabled={isSaving}
               />
 
