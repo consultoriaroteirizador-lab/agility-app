@@ -15,4 +15,7 @@ config.resolver = {
   sourceExts: [...resolver.sourceExts, 'svg'],
 };
 
+// Smoke no navegador (npm run web:smoke): ver web-smoke/README.md.
+if (process.env.EXPO_WEB_SMOKE === '1') require('./web-smoke/metro')(config, __dirname);
+
 module.exports = config
