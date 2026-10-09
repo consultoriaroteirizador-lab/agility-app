@@ -10,7 +10,7 @@ import Modal from '@/components/Modal/Modal';
 import { formatAddress } from '@/domain/agility/address/dto/response/address.response';
 import { useFindOneAddress } from '@/domain/agility/address/useCase';
 import { useGetMe } from '@/domain/agility/driver/useCase';
-import { useCompleteRouting } from '@/domain/agility/routing/useCase';
+import { useCompleteRouting, usePendingReturns } from '@/domain/agility/routing/useCase';
 import { ServiceType } from '@/domain/agility/service/dto/types';
 import { useFindOneService, useFindServicesByRoutingId, useStartAttendance } from '@/domain/agility/service/useCase';
 import { KEY_ROUTINGS, KEY_SERVICES } from '@/domain/queryKeys';
@@ -20,6 +20,7 @@ import { measure } from '@/theme';
 
 import { TransferOrderList } from '../../_components/TransferOrderList';
 import {
+  buildDevolucaoList,
   formatNotasLabel,
   formatResumoDaNota,
   mapGrupoToParada,
@@ -28,6 +29,7 @@ import {
   resolveParadaAtendida,
   resolvePedidosDaParada,
   resolveTemEtapaPropriaAntesDoAtendimento,
+  textoConcluirRota,
 } from '../../_utils';
 
 import { EquipmentList, StopActions, StopTabs } from './_components';
@@ -53,6 +55,13 @@ function StopDetailContent() {
   // Fetch service data
   const { service, isLoading, isError, refetch } = useFindOneService(serviceId || '');
   const { services: allServices, isLoading: isLoadingServices } = useFindServicesByRoutingId(routeId || '');
+  // A confirmação de concluir a rota lista o que ainda volta com a motorista (rodada 09/10/2026).
+  const { pendentes } = usePendingReturns(routeId || '');
+  const textoConcluir = useMemo(() => {
+    const aDevolver = buildDevolucaoList(pendentes, allServices.map((s) => s.id));
+    const temRetorno = allServices.some((s) => s.serviceType === ServiceType.RETURN);
+    return textoConcluirRota(aDevolver.map((r) => r.titulo), temRetorno);
+  }, [pendentes, allServices]);
 
   // Get address from service list as fallback
   const serviceFromList = allServices.find((s) => s.id === serviceId);
@@ -744,7 +753,7 @@ function StopDetailContent() {
         isVisible={showConcluirRotaModal}
         preset="action"
         title="Concluir rota"
-        text="Deseja realmente concluir esta rota? Esta ação não pode ser desfeita."
+        text={textoConcluir}
         buttonActionTitle={isCompletingRouting ? 'Concluindo...' : 'Concluir'}
         buttonCloseTitle="Cancelar"
         onPress={confirmCompleteRouting}

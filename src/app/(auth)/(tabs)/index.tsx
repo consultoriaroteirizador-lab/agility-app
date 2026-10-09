@@ -53,17 +53,11 @@ export default function RoutesScreen() {
     isError,
     routes,
     isUpdatingAvailability,
-    isStartingRoute,
     refreshing,
-    startRoutePopup,
-    routeAlreadyStartedPopup,
     unavailablePopup,
     handleToggleAvailability,
-    openStartRoutePopup,
-    closeStartRoutePopup,
-    closeRouteAlreadyStartedPopup,
+    openRoute,
     closeUnavailablePopup,
-    confirmStartRoute,
     onRefresh,
   } = useRoutesScreen();
 
@@ -119,7 +113,7 @@ export default function RoutesScreen() {
         <FlatList
           data={routes}
           renderItem={({ item }) => (
-            <RouteItem route={item} onPress={openStartRoutePopup} />
+            <RouteItem route={item} onPress={openRoute} />
           )}
           keyExtractor={(item) => item.id}
           ListEmptyComponent={EmptyList}
@@ -131,13 +125,7 @@ export default function RoutesScreen() {
         />
 
         <RoutesModals
-          startRoutePopup={startRoutePopup}
-          routeAlreadyStartedPopup={routeAlreadyStartedPopup}
           unavailablePopup={unavailablePopup}
-          isStartingRoute={isStartingRoute}
-          onConfirmStartRoute={confirmStartRoute}
-          onCloseStartRoutePopup={closeStartRoutePopup}
-          onCloseRouteAlreadyStartedPopup={closeRouteAlreadyStartedPopup}
           onCloseUnavailablePopup={closeUnavailablePopup}
         />
       </Box>

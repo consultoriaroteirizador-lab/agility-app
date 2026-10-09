@@ -5,7 +5,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 
 import { useFindOneDriver, useUpdateDriver } from '@/domain/agility/driver/useCase';
 import { RoutingStatus } from '@/domain/agility/routing/dto/types';
-import { useFindMyRoutings, useStartRouting } from '@/domain/agility/routing/useCase';
+import { useFindMyRoutings } from '@/domain/agility/routing/useCase';
 import { KEY_DRIVER } from '@/domain/queryKeys';
 import { useAuthCredentialsService } from '@/services';
 import { resolveDisplayedAvailability } from '@/services/location/trackingGate';
@@ -134,35 +134,9 @@ export function useRoutesScreen() {
         toggleAvailability,
     } = useDriverAvailability();
 
-    const { routes, isLoading, isError, refreshing, onRefresh, refetch } = useRoutesList();
+    const { routes, isLoading, isError, refreshing, onRefresh } = useRoutesList();
 
-    const {
-        startRoutePopup,
-        routeAlreadyStartedPopup,
-        unavailablePopup,
-        selectedRoute,
-        openStartRoutePopup,
-        closeStartRoutePopup,
-        closeRouteAlreadyStartedPopup,
-        closeUnavailablePopup,
-        setSelectedRoute,
-    } = useRoutesModals(routes, isAvailable);
-
-    const { startRouting, isLoading: isStartingRoute } = useStartRouting({
-        onSuccess: () => {
-            refetch();
-            closeStartRoutePopup();
-            if (selectedRoute) {
-                setTimeout(() => {
-                    router.push(`/(auth)/(tabs)/rotas-detalhadas/${selectedRoute}`);
-                }, 300);
-            }
-        },
-        onError: (error) => {
-            console.error('[useRoutesScreen] Error starting route:', error);
-            closeStartRoutePopup();
-        },
-    });
+    const { unavailablePopup, openRoute, closeUnavailablePopup } = useRoutesModals(isAvailable);
 
     // O toggle atualiza a disponibilidade para leilão. Isso também
     // liga/desliga o rastreamento (via shouldTrack no LocationTrackingProvider,
@@ -176,11 +150,6 @@ export function useRoutesScreen() {
 
         await toggleAvailability(newAvailability);
     }, [driverId, isAvailable, isUpdatingAvailability, toggleAvailability]);
-
-    const confirmStartRoute = useCallback(() => {
-        if (!selectedRoute) return;
-        startRouting(selectedRoute);
-    }, [selectedRoute, startRouting]);
 
     const navigateToRoute = useCallback(
         (routeId: string) => {
@@ -196,20 +165,13 @@ export function useRoutesScreen() {
         isError,
         routes,
         isUpdatingAvailability,
-        isStartingRoute,
         refreshing,
 
-        startRoutePopup,
-        routeAlreadyStartedPopup,
         unavailablePopup,
-        selectedRoute,
 
         handleToggleAvailability,
-        openStartRoutePopup,
-        closeStartRoutePopup,
-        closeRouteAlreadyStartedPopup,
+        openRoute,
         closeUnavailablePopup,
-        confirmStartRoute,
         navigateToRoute,
         onRefresh,
     };

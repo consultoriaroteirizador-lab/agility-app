@@ -1,6 +1,6 @@
 import type { PendingReturnResponse } from '@/domain/agility/routing/routingAPI'
 
-import { buildDevolucaoList, devolucaoDesfechoLabel } from '../devolucaoPendente'
+import { buildDevolucaoList, devolucaoDesfechoLabel, devolucaoInstrucao, textoConcluirRota } from '../devolucaoPendente'
 
 function pendencia(over: Partial<PendingReturnResponse> & { serviceId: string }): PendingReturnResponse {
     return {
@@ -92,5 +92,39 @@ describe('buildDevolucaoList', () => {
         )
 
         expect(rows[0].motivo).toBe('Recusado pelo cliente')
+    })
+})
+
+// Rodada de 09/10/2026: rota sem parada de retorno dizia "Entregue na parada de retorno" e
+// concluía sem avisar que a mercadoria continuava com a motorista. Decisão: avisar e deixar
+// concluir; o pedido segue pendente de devolução para a central.
+describe('devolucaoInstrucao', () => {
+    it('com parada de retorno, manda entregar lá', () => {
+        expect(devolucaoInstrucao(1, true)).toBe('Esta mercadoria ainda está com você. Entregue na parada de retorno.')
+        expect(devolucaoInstrucao(2, true)).toBe('Estas mercadorias ainda estão com você. Entregue na parada de retorno.')
+    })
+
+    it('sem parada de retorno, manda devolver na base', () => {
+        expect(devolucaoInstrucao(1, false)).toBe(
+            'Esta mercadoria ainda está com você. Devolva na base; a central confirma a devolução.',
+        )
+        expect(devolucaoInstrucao(3, false)).toBe(
+            'Estas mercadorias ainda estão com você. Devolva na base; a central confirma a devolução.',
+        )
+    })
+})
+
+describe('textoConcluirRota', () => {
+    it('sem nada a devolver, mantém a confirmação de sempre', () => {
+        expect(textoConcluirRota([], false)).toBe('Deseja realmente concluir esta rota? Esta ação não pode ser desfeita.')
+    })
+
+    it('com mercadoria a devolver, lista os pedidos e diz onde devolver', () => {
+        expect(textoConcluirRota(['ETQ-1'], false)).toBe(
+            'Você ainda está com 1 pedido para devolver: ETQ-1. Devolva na base; a central confirma a devolução. Concluir a rota mesmo assim?',
+        )
+        expect(textoConcluirRota(['ETQ-1', 'ETQ-2'], true)).toBe(
+            'Você ainda está com 2 pedidos para devolver: ETQ-1, ETQ-2. Entregue na parada de retorno. Concluir a rota mesmo assim?',
+        )
     })
 })
