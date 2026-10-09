@@ -19,6 +19,7 @@ import { KEY_COLLABORATORS } from '@/domain/queryKeys';
 import { useAuthCredentialsService } from '@/services';
 import { useToastService } from '@/services/Toast/useToast';
 
+import { cpfParaExibir, telefoneParaExibir, telefoneParaSalvar } from './_utils/contato';
 import { resolveCanEditProfile } from './_utils/resolveCanEditProfile';
 
 interface FormData {
@@ -89,9 +90,9 @@ export default function PerfilScreen() {
       setFormData({
         fullname: profile.fullName || userAuth?.fullname || '',
         nickname: profile.nickname || '',
-        phone: profile.phone || '',
+        phone: telefoneParaExibir(profile.phone),
         email: profile.email || userAuth?.email || '',
-        document: profile.taxNumber || '',
+        document: cpfParaExibir(profile.taxNumber),
       });
     } else if (me) {
       // Terceirizado: não existe CollaboratorResponse (a rota é exclusiva de
@@ -100,18 +101,18 @@ export default function PerfilScreen() {
       setFormData({
         fullname: `${me.firstName ?? ''} ${me.lastName ?? ''}`.trim() || userAuth?.fullname || '',
         nickname: userAuth?.nickname || '',
-        phone: userAuth?.phone || '',
+        phone: telefoneParaExibir(userAuth?.phone),
         email: me.email || userAuth?.email || '',
-        document: userAuth?.taxNumber || '',
+        document: cpfParaExibir(userAuth?.taxNumber),
       });
     } else if (!isLoadingProfileData && userAuth) {
       // Fallback: use JWT data if profile fetch fails
       setFormData({
         fullname: userAuth.fullname || '',
         nickname: userAuth.nickname || '',
-        phone: userAuth.phone || '',
+        phone: telefoneParaExibir(userAuth.phone),
         email: userAuth.email || '',
-        document: userAuth.taxNumber || '',
+        document: cpfParaExibir(userAuth.taxNumber),
       });
     }
   }, [profile, me, isLoadingProfileData, userAuth]);
@@ -143,7 +144,8 @@ export default function PerfilScreen() {
       firstName,
       lastName,
       nickname: formData.nickname || undefined,
-      phone: formData.phone.replace(/\D/g, '') || undefined,
+      // O campo mostra sem o 55: o número volta com "+55", sem apagar o código do país.
+      phone: telefoneParaSalvar(formData.phone),
     };
 
     updateProfile(payload);
