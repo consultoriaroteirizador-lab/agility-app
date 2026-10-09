@@ -9,6 +9,7 @@ import { Icon } from '@/components/Icon/Icon';
 import Modal from '@/components/Modal/Modal';
 import { TouchableOpacityBox } from '@/components/RestyleComponent/RestyleComponent';
 import { formatAddress } from '@/domain/agility/address/dto';
+import { textoAceitarOferta } from '@/domain/agility/offer/resumoOferta';
 import { payloadDeAceite, useFindOneRouting, useAcceptRouting } from '@/domain/agility/routing/useCase';
 import type { ServiceMaterialResponse } from '@/domain/agility/service/dto';
 import { ServiceType } from '@/domain/agility/service/dto/types';
@@ -439,6 +440,7 @@ export default function OfertaDetalhadaScreen() {
           preset="action"
           buttonActionTitle="Aceitar"
           title="Aceitar oferta"
+          text={textoAceitarOferta({ code: routing?.code, totalParadas: resumo.totalParadas, totalValue: routing?.totalValue })}
           onPress={handleAcceptRouting}
           isVisible={mostrarPopup}
           onClose={() => setMostrarPopup(false)}
