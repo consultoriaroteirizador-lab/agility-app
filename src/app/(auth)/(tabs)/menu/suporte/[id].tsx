@@ -524,7 +524,8 @@ export default function SuporteChatPage() {
       setPeerDeliveredAt(data.deliveredAt || new Date().toISOString());
     },
   });
-  const showOfflineNotice = useDisconnectedNotice(isConnected) && !isChatClosed;
+  // No rascunho não há conversa para conectar: o aviso de "sem conexão" seria falso.
+  const showOfflineNotice = useDisconnectedNotice(isConnected) && !isChatClosed && !rascunho;
 
   // Emite o "read" do motorista via WS quando há mensagens e estamos conectados.
   // O backend repassa 'messages_read' ao operador (em tempo real), além do REST já existente.
@@ -765,13 +766,15 @@ export default function SuporteChatPage() {
     ? `Rota ${chatInfo.routeId}`
     : tituloDaConversa(chatInfo?.subject ?? assunto);
 
-  const headerSubtitle = chatInfo?.serviceId
-    ? `Servico #${chatInfo.serviceId}`
-    : ticket?.ticketNumber
-      ? `Protocolo: ${ticket.ticketNumber}`
-      : isConnected
-        ? 'Online'
-        : 'Offline';
+  const headerSubtitle = rascunho
+    ? 'Nova conversa'
+    : chatInfo?.serviceId
+      ? `Servico #${chatInfo.serviceId}`
+      : ticket?.ticketNumber
+        ? `Protocolo: ${ticket.ticketNumber}`
+        : isConnected
+          ? 'Online'
+          : 'Offline';
 
   const typingIndicatorText =
     typingUsers.length > 0
@@ -812,6 +815,8 @@ export default function SuporteChatPage() {
           </Box>
           <Box flexDirection="row" alignItems="center" gap="x8" mt="y8">
 
+            {/* Rascunho: ainda não há protocolo, então não há status "Em aberto". */}
+            {!rascunho && (
             <Box
               backgroundColor={isChatClosed ? 'gray300' : 'gray200'}
               px="x12"
@@ -826,6 +831,7 @@ export default function SuporteChatPage() {
                 {isChatClosed ? 'Finalizado' : 'Em aberto'}
               </Text>
             </Box>
+            )}
 
             {isConnected && !isChatClosed && (
               <Box flexDirection="row" alignItems="center" gap="x4">
@@ -896,7 +902,9 @@ export default function SuporteChatPage() {
               )}
               {bodyState === 'ready' && (
                 <Text preset="text14" color="gray400" textAlign="center">
-                  Nenhuma mensagem ainda. Envie a primeira mensagem!
+                  {rascunho
+                    ? 'Envie a primeira mensagem para abrir o atendimento.'
+                    : 'Nenhuma mensagem ainda. Envie a primeira mensagem!'}
                 </Text>
               )}
             </Box>
