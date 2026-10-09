@@ -100,9 +100,10 @@ export function buildDevolucaoList(
 // ============================================
 
 const DEVOLVER_NO_RETORNO = 'Entregue na parada de retorno.'
-// Sem parada de retorno, a devolução é registrada pela central
-// (`POST /services/:id/return-confirmation`): o pedido segue pendente até lá.
-const DEVOLVER_NA_BASE = 'Devolva na base; a central confirma a devolução.'
+// Sem parada de retorno, CONCLUIR a rota registra a devolução no CD padrão da rota
+// (back: `resolveAwaitingAttemptsOfRouting`, origem ROUTE_COMPLETED). Ninguém confirma depois:
+// a fila de devoluções da central não recebe esses pedidos (visto no dev em 09/10/2026).
+const DEVOLVER_NO_CD = 'Devolva no CD antes de concluir a rota: ao concluir, a devolução fica registrada.'
 
 /**
  * O que fazer com a mercadoria que ainda está com a motorista. Rota sem parada de retorno não
@@ -112,18 +113,21 @@ export function devolucaoInstrucao(quantidade: number, temParadaDeRetorno: boole
     const comVoce = quantidade === 1
         ? 'Esta mercadoria ainda está com você.'
         : 'Estas mercadorias ainda estão com você.'
-    return `${comVoce} ${temParadaDeRetorno ? DEVOLVER_NO_RETORNO : DEVOLVER_NA_BASE}`
+    return `${comVoce} ${temParadaDeRetorno ? DEVOLVER_NO_RETORNO : DEVOLVER_NO_CD}`
 }
 
 /**
  * Confirmação de "Concluir rota". Com mercadoria a devolver, avisa e deixa concluir
- * (decisão de 09/10/2026); antes concluía sem falar dela.
+ * (decisão de 09/10/2026); antes concluía sem falar dela. Sem parada de retorno, concluir
+ * registra a devolução no CD, então a pergunta é se a mercadoria já foi entregue lá.
  */
 export function textoConcluirRota(titulosADevolver: string[], temParadaDeRetorno: boolean): string {
     if (titulosADevolver.length === 0) {
         return 'Deseja realmente concluir esta rota? Esta ação não pode ser desfeita.'
     }
     const quantos = titulosADevolver.length === 1 ? '1 pedido' : `${titulosADevolver.length} pedidos`
-    const onde = temParadaDeRetorno ? DEVOLVER_NO_RETORNO : DEVOLVER_NA_BASE
-    return `Você ainda está com ${quantos} para devolver: ${titulosADevolver.join(', ')}. ${onde} Concluir a rota mesmo assim?`
+    const lista = `Você ainda está com ${quantos} para devolver: ${titulosADevolver.join(', ')}.`
+    return temParadaDeRetorno
+        ? `${lista} ${DEVOLVER_NO_RETORNO} Concluir a rota mesmo assim?`
+        : `${lista} Ao concluir, a devolução fica registrada no CD. Já entregou a mercadoria lá?`
 }
