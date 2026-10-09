@@ -13,7 +13,7 @@ import { useToastService } from '@/services/Toast/useToast';
 import { measure } from '@/theme';
 import { formatDate } from '@/utils/formatDate';
 
-import { describeTransaction, EXTRATO_FILTERS, ExtratoFilter, filterTransactions } from './_utils/transactionDisplay';
+import { describeTransaction, EXTRATO_FILTERS, ExtratoFilter, filterTransactions, transactionTitle } from './_utils/transactionDisplay';
 
 function TransactionItem({ item }: { item: TransactionResponse }) {
     const display = describeTransaction(item);
@@ -48,8 +48,8 @@ function TransactionItem({ item }: { item: TransactionResponse }) {
                 </Box>
 
                 <Box flex={1} ml="l12">
-                    <Text fontSize={measure.m14} fontWeightPreset="semibold" numberOfLines={1}>
-                        {item.description}
+                    <Text testID={`titulo-${item.id}`} fontSize={measure.m14} fontWeightPreset="semibold" numberOfLines={1}>
+                        {transactionTitle(item.description, display.label)}
                     </Text>
                     <Text fontSize={measure.m12} color="colorTextSecondary" mt="t2">
                         {`${display.label} • ${formatDate(item.createdAt)}`}

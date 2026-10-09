@@ -171,3 +171,20 @@ export function filterTransactions<T extends Pick<TransactionResponse, 'type' | 
     if (filter === 'all') return list;
     return list.filter((tx) => categoryOf(tx) === filter);
 }
+
+const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi;
+// "Saque #03b2509a": o back grava os 8 primeiros caracteres do id do saque.
+const ID_CURTO = /\s#[0-9a-f]{8}\b/gi;
+
+/**
+ * Título da linha do extrato. O livro-razão guarda a descrição com o id da origem
+ * ("Reconciliation: Payment <uuid>", "Saque #03b2509a solicitado"), e a motorista não faz nada
+ * com o id: o tipo já diz de onde veio. Mesma regra do painel (`finance/lib/ledgerView.ts`,
+ * PR #661), mais o id curto do saque. Sem descrição, usa o rótulo do tipo.
+ */
+export function transactionTitle(raw: string | null | undefined, fallback: string): string {
+    const d = (raw ?? '').trim();
+    if (/^Reconciliation: Payment\s+[0-9a-f-]{36}$/i.test(d)) return 'Cobrança creditada pela conciliação antiga';
+    const limpa = d.replace(UUID, '').replace(ID_CURTO, '').replace(/\s{2,}/g, ' ').replace(/[\s:·–-]+$/, '').trim();
+    return limpa || fallback;
+}

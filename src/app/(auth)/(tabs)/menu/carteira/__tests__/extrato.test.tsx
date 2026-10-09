@@ -204,3 +204,18 @@ describe('Extrato — sinal, status e estados', () => {
         expect(mockLoadMore).toHaveBeenCalled();
     });
 });
+
+it('a linha mostra a descrição sem o id da origem (rodada 09/10/2026)', () => {
+    const tree = renderExtrato([
+        transacao({
+            id: 'tx-conc',
+            type: 'PAYMENT_CREDIT',
+            direction: 'IN',
+            description: 'Reconciliation: Payment 5d72680d-fa2f-440f-a3b8-b10a3a79a8e1',
+        }),
+        transacao({ id: 'tx-saque', description: 'Saque #03b2509a solicitado' }),
+    ]);
+
+    expect(texto(tree, 'titulo-tx-conc')).toBe('Cobrança creditada pela conciliação antiga');
+    expect(texto(tree, 'titulo-tx-saque')).toBe('Saque solicitado');
+});
