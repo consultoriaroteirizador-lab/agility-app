@@ -1,6 +1,6 @@
 import { formatCurrency } from '@/utils/formatCurrency';
 
-import { categoryOf, describeTransaction, filterTransactions } from '../transactionDisplay';
+import { categoryOf, describeTransaction, filterTransactions, transactionTitle } from '../transactionDisplay';
 
 type Tx = Parameters<typeof describeTransaction>[0];
 
@@ -201,5 +201,33 @@ describe('redistribuição entre motoristas da mesma rota (F3)', () => {
         expect(describeTransaction(linha).amountText).toBe(`-${formatCurrency(5000)}`);
         expect(filterTransactions([linha], 'freight')).toHaveLength(1);
         expect(filterTransactions([linha], 'adjustments')).toHaveLength(0);
+    });
+});
+
+// O livro-razão guarda a descrição com o id da origem. O painel já limpava (#661); o app
+// mostrava "Reconciliation: Payment <uuid>" e "Saque #03b2509a solicitado" (rodada 09/10/2026).
+describe('transactionTitle', () => {
+    it('cobrança creditada pela conciliação antiga ganha texto em português, sem o id', () => {
+        expect(transactionTitle('Reconciliation: Payment 5d72680d-fa2f-440f-a3b8-b10a3a79a8e1', 'Cobrança'))
+            .toBe('Cobrança creditada pela conciliação antiga');
+    });
+
+    it('tira o pedaço de id do saque', () => {
+        expect(transactionTitle('Saque #03b2509a solicitado', 'Saque')).toBe('Saque solicitado');
+        expect(transactionTitle('Saque #03b2509a', 'Saque')).toBe('Saque');
+    });
+
+    it('tira uuid solto e a pontuação que sobra no fim', () => {
+        expect(transactionTitle('Frete da rota 247e99d6-b68c-402a-b386-57c13fe4ab51 -', 'Frete')).toBe('Frete da rota');
+    });
+
+    it('descrição vazia cai no rótulo do tipo', () => {
+        expect(transactionTitle('', 'Saque')).toBe('Saque');
+        expect(transactionTitle(null, 'Saque')).toBe('Saque');
+        expect(transactionTitle('Reconciliation: Payment', 'Cobrança')).toBe('Reconciliation: Payment');
+    });
+
+    it('descrição comum passa intacta', () => {
+        expect(transactionTitle('Saque pago', 'Saque')).toBe('Saque pago');
     });
 });

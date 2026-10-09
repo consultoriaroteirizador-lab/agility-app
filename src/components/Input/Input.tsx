@@ -60,9 +60,12 @@ export function Input({
   // ele usa 120 (ideal para 4 linhas) se for multiline, ou y44 se for linha única.
   const resolvedHeight = height ? height : (multiline ? 120 : measure.y44);
 
+  // Campo só de leitura (CPF e e-mail no perfil) não pode parecer editável.
+  const somenteLeitura = TextInputBoxProps.editable === false;
+
   const inputTextStyle: TextStyle = {
     ...theme.textVariants[textPreset],
-    color: isFocused ? theme.colors.gray700 : theme.colors.gray700,
+    color: somenteLeitura ? theme.colors.gray500 : theme.colors.gray700,
   };
 
   return (
@@ -71,7 +74,9 @@ export function Input({
         {title && <Text color='gray600' preset='text14' fontWeightPreset='semibold'>{title}</Text>}
       </Box>
       <Box
+        testID="input-campo"
         flexDirection="row"
+        backgroundColor={somenteLeitura ? 'gray100' : undefined}
         borderRadius="s8"
         alignItems={alignItems}
         justifyContent={justifyContent}

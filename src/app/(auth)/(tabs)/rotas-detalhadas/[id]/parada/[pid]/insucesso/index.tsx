@@ -420,7 +420,7 @@ function FalhaScreenContent() {
                 </Box>
               </Box>
               <Text preset="text13" color="gray400">
-                Máximo 10 photos permitidas
+                Máximo de 10 fotos
               </Text>
             </Box>
 
