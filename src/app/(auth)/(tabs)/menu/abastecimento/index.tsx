@@ -13,6 +13,7 @@ import {
     FUEL_LABEL,
     FUEL_TYPES,
     formatKm,
+    fuelContextErrorMessage,
     fuelEntryErrorMessage,
     fuelEntrySuccessToast,
     useCreateFuelEntry,
@@ -54,7 +55,7 @@ function Chip({ selected, label, onPress }: { selected: boolean; label: string; 
 export default function AbastecerScreen() {
     const router = useRouter();
     const { showToast } = useToastService();
-    const { context, isLoading, isError, error, refetch } = useFuelEntryContext();
+    const { context, isLoading, error, refetch } = useFuelEntryContext();
     const { createFuelEntry } = useCreateFuelEntry();
     const { run, isSubmitting } = useSubmitLock();
     const [campos, setCampos] = useState<Campos>(INICIAL);
@@ -74,13 +75,15 @@ export default function AbastecerScreen() {
     }
 
     // Sem contexto não há placa nem veículo: o 422 do back diz o motivo (sem veículo, outra filial, elétrico).
-    if (isError || !context) {
+    // Só sem contexto, nunca por `isError`: o envio invalida a chave, e sem rede a nova busca falha com o
+    // contexto antigo ainda em `data`. Trocar o formulário pelo painel aí some com o que foi digitado.
+    if (!context) {
         return (
             <ScreenBase buttonLeft={<ButtonBack />} title={titulo}>
                 <Box flex={1} justifyContent="center" alignItems="center" p="m24">
                     <Ionicons name="alert-circle" size={40} color="#F44336" />
                     <Text mt="t16" color="colorTextSecondary" textAlign="center">
-                        {fuelEntryErrorMessage(error)}
+                        {fuelContextErrorMessage(error)}
                     </Text>
                     <TouchableOpacityBox testID="abastecer-contexto-erro" accessibilityRole="button" mt="t16" p="m12" onPress={() => refetch()}>
                         <Text color="colorTextPrimary" fontWeightPreset="semibold">

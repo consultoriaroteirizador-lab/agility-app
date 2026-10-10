@@ -45,6 +45,13 @@ export function fuelEntryErrorMessage(error: unknown): string {
     return mensagemDaApi(error, FALLBACK);
 }
 
+const CONTEXT_FALLBACK = 'Não foi possível carregar os dados do seu veículo. Tente novamente.';
+
+/** Painel da tela sem contexto: nada foi digitado ainda, então sem rede vale a frase da conexão, não a do envio. */
+export function fuelContextErrorMessage(error: unknown): string {
+    return mensagemDaApi(error, CONTEXT_FALLBACK);
+}
+
 export function fuelEntrySuccessToast(e: Pick<FuelEntry, 'odometerInconsistent' | 'previousOdometerKm'>) {
     const message = e.odometerInconsistent && e.previousOdometerKm !== null
         ? `Abastecimento registrado, mas o odômetro está abaixo do último (${formatKm(e.previousOdometerKm)}). A central vai revisar.`
