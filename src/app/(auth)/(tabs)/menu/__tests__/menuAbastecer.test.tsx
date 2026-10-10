@@ -22,7 +22,7 @@ jest.mock('@/components/Icon/LocalIcon', () => ({ LocalIcon: () => null }));
 jest.mock('@expo/vector-icons', () => ({ Ionicons: () => null }));
 
 const mockRouter = { push: jest.fn(), back: jest.fn(), replace: jest.fn() };
-jest.mock('expo-router', () => ({ useRouter: () => mockRouter, router: mockRouter }));
+jest.mock('expo-router', () => ({ useRouter: () => mockRouter, router: mockRouter, useFocusEffect: jest.fn() }));
 
 // O que o menu desenha além da lista (foto, digital, modal de saída) não entra neste teste.
 jest.mock('@/components/ProfilePhotoPicker', () => ({ __esModule: true, default: () => null }));
