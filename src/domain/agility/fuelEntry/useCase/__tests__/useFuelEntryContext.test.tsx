@@ -88,6 +88,12 @@ it('refetchIfFailed: com o contexto carregado, não busca de novo', async () => 
     render();
     await ate(() => hook.context !== undefined);
     act(() => hook.refetchIfFailed());
-    await ate(() => false);
+    // Poucos ciclos bastam: uma busca disparada aqui sairia no primeiro. `ate(() => false)` (100 ciclos)
+    // estourava os 5 s do jest com a suíte em paralelo.
+    for (let i = 0; i < 5; i++) {
+        await act(async () => {
+            await new Promise((r) => setTimeout(r, 10));
+        });
+    }
     expect(fuelEntryAPI.getContext).toHaveBeenCalledTimes(1);
 });
