@@ -1,5 +1,5 @@
 import {
-    formatDecimalBR, formatFilledAt, formatKm, formatLiters, fuelEntryErrorMessage, fuelEntrySuccessToast, inconsistencyText, OFFLINE_MESSAGE, TIMEOUT_MESSAGE,
+    formatDecimalBR, formatFilledAt, formatKm, formatLiters, fuelEntryErrorMessage, fuelEntrySuccessToast, inconsistencyText, OFFLINE_MESSAGE, PHOTO_TOO_LARGE_MESSAGE, TIMEOUT_MESSAGE,
 } from '../fuelEntryDisplay';
 
 describe('formatDecimalBR', () => {
@@ -31,6 +31,12 @@ describe('fuelEntryErrorMessage', () => {
         expect(fuelEntryErrorMessage({ success: false, error: { message: 'A requisição demorou demais.', code: 'AU-000', timeout: true } })).toBe(TIMEOUT_MESSAGE);
         expect(TIMEOUT_MESSAGE).toContain('Meus abastecimentos');
         expect(TIMEOUT_MESSAGE).not.toBe(OFFLINE_MESSAGE);
+    });
+    it('foto grande demais (413): a frase em português, nunca o "File too large" do back', () => {
+        // A compressão que falha manda a original, e acima de 5 MB o multer do back recusa em inglês.
+        const r = fuelEntryErrorMessage({ success: false, error: { message: 'File too large', code: 'N/A', validationErrors: [] }, response: { status: 413 } });
+        expect(r).toBe(PHOTO_TOO_LARGE_MESSAGE);
+        expect(r).not.toContain('File too large');
     });
     it('validação: as frases de cada campo, nunca o genérico', () => {
         expect(fuelEntryErrorMessage({

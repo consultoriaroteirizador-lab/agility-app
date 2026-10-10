@@ -9,6 +9,8 @@ export const OFFLINE_MESSAGE = 'Sem internet. O que você digitou continua aqui:
 // Timeout: a request saiu e pode ter sido gravada. "Toque em Enviar de novo" criaria um segundo lançamento.
 export const TIMEOUT_MESSAGE =
     'O envio demorou demais e não deu para confirmar se o abastecimento foi registrado. Confira em Meus abastecimentos antes de enviar de novo.';
+// 413: a compressão falhou e a original passou dos 5 MB; o multer do back recusa em inglês ("File too large").
+export const PHOTO_TOO_LARGE_MESSAGE = 'A foto da nota ficou grande demais para enviar. Tire outra foto e toque em Enviar de novo.';
 const FALLBACK = 'Não foi possível registrar o abastecimento. Tente novamente.';
 
 /** Sem Intl.NumberFormat: o Hermes de aparelho antigo não garante o locale pt-BR. */
@@ -36,12 +38,13 @@ export function inconsistencyText(e: Pick<FuelEntry, 'odometerInconsistent' | 'p
     return `Odômetro abaixo do anterior (${formatKm(e.previousOdometerKm)}): a central vai revisar.`;
 }
 
-type ErroComCampos = { error?: { validationErrors?: { message?: string }[] } };
+type ErroComCampos = { error?: { validationErrors?: { message?: string }[] }; response?: { status?: number } };
 
 /** Sem rede, a frase própria; recusa do DTO, a frase de cada campo; senão a mensagem do back. */
 export function fuelEntryErrorMessage(error: unknown): string {
     if (erroDeTimeout(error)) return TIMEOUT_MESSAGE;
     if (erroDeRede(error)) return OFFLINE_MESSAGE;
+    if ((error as ErroComCampos | undefined)?.response?.status === 413) return PHOTO_TOO_LARGE_MESSAGE;
     const campos = (error as ErroComCampos | undefined)?.error?.validationErrors
         ?.map((v) => v.message)
         .filter((m): m is string => !!m);
