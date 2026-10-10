@@ -3,7 +3,7 @@
  * não um `Error` — `error instanceof Error` nunca casa e a mensagem do backend se perdia.
  * `response.status` é preservado à parte pelo mesmo interceptor (`apiConfig.ts:107`).
  */
-type ErroApi = { error?: { message?: string; code?: string }; message?: string; response?: { status?: number } };
+type ErroApi = { error?: { message?: string; code?: string; timeout?: boolean }; message?: string; response?: { status?: number } };
 
 // `baseResponseAdapter.toBaseResponseError` (linhas 35/63) preenche a mensagem
 // com este texto fixo quando o servidor não manda nenhuma — não é uma
@@ -20,6 +20,14 @@ export function mensagemDaApi(error: unknown, fallback: string): string {
 /** Sem resposta do servidor (sem internet, timeout, DNS) — `baseResponseAdapter.ts:53`. */
 export function erroDeRede(error: unknown): boolean {
     return (error as ErroApi | undefined)?.error?.code === 'AU-000';
+}
+
+/**
+ * O subconjunto de `erroDeRede` em que a request saiu e a resposta não chegou a tempo: o servidor pode ter
+ * gravado. Num envio, "toque de novo" aqui pode duplicar o registro.
+ */
+export function erroDeTimeout(error: unknown): boolean {
+    return erroDeRede(error) && (error as ErroApi).error?.timeout === true;
 }
 
 /**

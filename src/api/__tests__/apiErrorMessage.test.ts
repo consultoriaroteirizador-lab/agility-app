@@ -1,4 +1,12 @@
-import { erroDeRede, erroTransitorio, mensagemDaApi } from '../apiErrorMessage';
+import { erroDeRede, erroDeTimeout, erroTransitorio, mensagemDaApi } from '../apiErrorMessage';
+
+it('timeout é erro de rede E é reconhecido à parte; sem rede não é timeout', () => {
+    const timeout = { success: false, error: { code: 'AU-000', message: 'A requisição demorou demais.', timeout: true } };
+    expect(erroDeRede(timeout)).toBe(true);
+    expect(erroDeTimeout(timeout)).toBe(true);
+    expect(erroDeTimeout({ success: false, error: { code: 'AU-000', message: 'Sem conexão' } })).toBe(false);
+    expect(erroDeTimeout(undefined)).toBe(false);
+});
 
 it('lê a mensagem do formato que o interceptor rejeita ({ error: { message } })', () => {
     expect(mensagemDaApi({ success: false, error: { message: 'Rota sem valor de frete' } }, 'x'))

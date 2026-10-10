@@ -52,4 +52,14 @@ describe('toBaseResponseError', () => {
             error: { message: 'Sem conexão com o servidor. Verifique sua internet e tente novamente.', code: 'AU-000' },
         });
     });
+
+    it('timeout: continua AU-000 (quem trata como rede não muda) e leva a marca `timeout`', () => {
+        // Sem resposta pode ter sido gravado no servidor: quem envia precisa distinguir de "não saiu do aparelho".
+        const config = { headers: new AxiosHeaders() };
+        const r = baseResponseAdapter.toBaseResponseError(new AxiosError('timeout of 60000ms exceeded', 'ECONNABORTED', config));
+        expect(r).toEqual({
+            success: false,
+            error: { message: 'A requisição demorou demais. Verifique sua conexão e tente novamente.', code: 'AU-000', timeout: true },
+        });
+    });
 });

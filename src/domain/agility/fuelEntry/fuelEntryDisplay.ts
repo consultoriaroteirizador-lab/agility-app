@@ -1,4 +1,4 @@
-import { erroDeRede, mensagemDaApi } from '@/api/apiErrorMessage';
+import { erroDeRede, erroDeTimeout, mensagemDaApi } from '@/api/apiErrorMessage';
 import { appDayKey, formatHHmm } from '@/functions/dateFunctions';
 
 import type { FuelEntry, FuelType } from './dto/types';
@@ -6,6 +6,9 @@ import type { FuelEntry, FuelType } from './dto/types';
 export const FUEL_LABEL: Record<FuelType, string> = { DIESEL: 'Diesel', GASOLINE: 'Gasolina', ETHANOL: 'Etanol' };
 
 export const OFFLINE_MESSAGE = 'Sem internet. O que você digitou continua aqui: conecte-se e toque em Enviar de novo.';
+// Timeout: a request saiu e pode ter sido gravada. "Toque em Enviar de novo" criaria um segundo lançamento.
+export const TIMEOUT_MESSAGE =
+    'O envio demorou demais e não deu para confirmar se o abastecimento foi registrado. Confira em Meus abastecimentos antes de enviar de novo.';
 const FALLBACK = 'Não foi possível registrar o abastecimento. Tente novamente.';
 
 /** Sem Intl.NumberFormat: o Hermes de aparelho antigo não garante o locale pt-BR. */
@@ -37,6 +40,7 @@ type ErroComCampos = { error?: { validationErrors?: { message?: string }[] } };
 
 /** Sem rede, a frase própria; recusa do DTO, a frase de cada campo; senão a mensagem do back. */
 export function fuelEntryErrorMessage(error: unknown): string {
+    if (erroDeTimeout(error)) return TIMEOUT_MESSAGE;
     if (erroDeRede(error)) return OFFLINE_MESSAGE;
     const campos = (error as ErroComCampos | undefined)?.error?.validationErrors
         ?.map((v) => v.message)

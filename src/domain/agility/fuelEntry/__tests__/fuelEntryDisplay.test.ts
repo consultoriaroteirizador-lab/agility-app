@@ -1,5 +1,5 @@
 import {
-    formatDecimalBR, formatFilledAt, formatKm, formatLiters, fuelEntryErrorMessage, fuelEntrySuccessToast, inconsistencyText, OFFLINE_MESSAGE,
+    formatDecimalBR, formatFilledAt, formatKm, formatLiters, fuelEntryErrorMessage, fuelEntrySuccessToast, inconsistencyText, OFFLINE_MESSAGE, TIMEOUT_MESSAGE,
 } from '../fuelEntryDisplay';
 
 describe('formatDecimalBR', () => {
@@ -26,6 +26,11 @@ it('inconsistência só quando marcada e com o anterior', () => {
 describe('fuelEntryErrorMessage', () => {
     it('sem rede: a frase de que precisa de internet', () => {
         expect(fuelEntryErrorMessage({ success: false, error: { message: 'Sem conexão com o servidor.', code: 'AU-000' } })).toBe(OFFLINE_MESSAGE);
+    });
+    it('timeout: o envio pode ter sido gravado, então manda conferir antes de enviar de novo', () => {
+        expect(fuelEntryErrorMessage({ success: false, error: { message: 'A requisição demorou demais.', code: 'AU-000', timeout: true } })).toBe(TIMEOUT_MESSAGE);
+        expect(TIMEOUT_MESSAGE).toContain('Meus abastecimentos');
+        expect(TIMEOUT_MESSAGE).not.toBe(OFFLINE_MESSAGE);
     });
     it('validação: as frases de cada campo, nunca o genérico', () => {
         expect(fuelEntryErrorMessage({
