@@ -19,6 +19,8 @@ export type MultiPhotoPickerProps = {
   uploadProgress?: Map<number, UploadProgress>;
   label?: string;
   allowCamera?: boolean;
+  /** false esconde o "+" da galeria: a foto só sai da câmera (nota do abastecimento). */
+  allowGallery?: boolean;
   labelPreset?: keyof Theme['textVariants'];
   padding?: string;
   backgroundColor?: string;
@@ -36,6 +38,7 @@ export default function MultiPhotoPicker({
   uploadProgress,
   label = 'Fotos',
   allowCamera = true,
+  allowGallery = true,
   labelPreset = 'textParagraph',
   padding = 'm12',
   backgroundColor = 'transparent',
@@ -219,7 +222,7 @@ export default function MultiPhotoPicker({
   };
 
   const renderAddButton = () => {
-    if (photos.length >= maxPhotos) return null;
+    if (!allowGallery || photos.length >= maxPhotos) return null;
 
     return (
       <TouchableOpacity

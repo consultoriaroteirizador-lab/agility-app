@@ -54,7 +54,10 @@ function toBaseResponseError(error: AxiosError<BaseResponseAPI<any>>): BaseRespo
             success: false,
             error: {
                 message,
-                code: "AU-000"
+                code: "AU-000",
+                // Mesmo código (quem trata timeout como rede não muda), mas sem resposta o servidor pode ter
+                // gravado: quem envia precisa distinguir de "não saiu do aparelho" (`erroDeTimeout`).
+                ...(isTimeout ? { timeout: true } : {}),
             }
         };
     }
