@@ -2,7 +2,7 @@ import { useCallback } from 'react';
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 
-import { erroTransitorio } from '@/api/apiErrorMessage';
+import { erroDeTimeout, erroTransitorio } from '@/api/apiErrorMessage';
 import { KEY_FUEL_ENTRIES } from '@/domain/queryKeys';
 import { useAuthCredentialsService } from '@/services';
 
@@ -12,8 +12,10 @@ const CONTEXT_KEY = [KEY_FUEL_ENTRIES, 'context'];
 
 /**
  * Placa, combustível sugerido e último odômetro. 422 (sem veículo, veículo de outra filial, elétrico) é
- * resposta definitiva: sem retry, e o menu esconde o "Abastecer". Sem rede, timeout ou 5xx, tenta de novo:
+ * resposta definitiva: sem retry, e o menu esconde o "Abastecer". Sem rede ou 5xx, tenta de novo:
  * o QueryClient do app não tem retry, foco nem onlineManager, e uma falha passageira virava definitiva.
+ * Timeout não: cada tentativa espera os 60 s do `apiAgility`, e a tela Abastecer ficaria ~3 min no spinner.
+ * Voltar ao Menu (`refetchIfFailed`) ou o "Tentar novamente" da tela buscam de novo.
  */
 export function useFuelEntryContext() {
     const queryClient = useQueryClient();
@@ -23,7 +25,7 @@ export function useFuelEntryContext() {
         queryKey: CONTEXT_KEY,
         queryFn: () => fuelEntryAPI.getContext(),
         enabled: isAuthenticated,
-        retry: (failureCount, error) => erroTransitorio(error) && failureCount < 2,
+        retry: (failureCount, error) => erroTransitorio(error) && !erroDeTimeout(error) && failureCount < 2,
         staleTime: 1000 * 60 * 5,
     });
     // Para o foco de tela (a aba do menu não desmonta): busca de novo só se a última busca falhou. Lê o estado
