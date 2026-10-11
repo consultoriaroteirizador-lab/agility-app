@@ -16,6 +16,7 @@ const CONTEXTO = { vehicleId: 'v1', plate: 'ABC1D23', defaultFuelType: 'DIESEL',
 const SEM_REDE = { success: false, error: { message: 'Sem conexão com o servidor.', code: 'AU-000' } };
 const FORA_DO_AR = { success: false, error: { message: 'Erro interno', code: 'N/A' }, response: { status: 503 } };
 const SEM_VEICULO = { success: false, error: { message: 'Você não tem veículo associado. Fale com a central.', code: 'N/A' }, response: { status: 422 } };
+const TIMEOUT = { success: false, error: { message: 'A requisição demorou demais.', code: 'AU-000', timeout: true } };
 
 let queryClient: QueryClient;
 let tree: TestRenderer.ReactTestRenderer;
@@ -67,6 +68,14 @@ it.each([
 
 it('422 (sem veículo, outra filial, elétrico) é resposta definitiva: uma busca só', async () => {
     fuelEntryAPI.getContext.mockRejectedValue(SEM_VEICULO);
+    render();
+    await ate(() => hook.isError);
+    expect(hook.isError).toBe(true);
+    expect(fuelEntryAPI.getContext).toHaveBeenCalledTimes(1);
+});
+
+it('timeout não tenta de novo: cada tentativa espera os 60 s do apiAgility, e a tela Abastecer ficava ~3 min no spinner', async () => {
+    fuelEntryAPI.getContext.mockRejectedValue(TIMEOUT);
     render();
     await ate(() => hook.isError);
     expect(hook.isError).toBe(true);
