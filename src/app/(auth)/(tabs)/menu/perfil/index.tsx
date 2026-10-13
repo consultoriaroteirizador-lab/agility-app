@@ -131,11 +131,6 @@ export default function PerfilScreen() {
       return;
     }
 
-    if (!formData.email.trim()) {
-      showToast({ message: 'E-mail é obrigatório', type: 'error' });
-      return;
-    }
-
     const names = formData.fullname.trim().split(' ');
     const firstName = names[0] || '';
     const lastName = names.slice(1).join(' ') || '';
