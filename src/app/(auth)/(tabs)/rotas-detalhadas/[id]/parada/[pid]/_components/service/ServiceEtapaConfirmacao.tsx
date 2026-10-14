@@ -140,7 +140,7 @@ export function ServiceEtapaConfirmacao() {
                                 </Box>
                             </Box>
                             {lines.length > 0 && (
-                                <Box mt='t6' justifyContent='center' gap='x8' padding='m14' borderRadius='s18' backgroundColor='gray50' width={measure.x150} flexDirection='row' height={measure.y50}>
+                                <Box mt='t6' justifyContent='center' gap='x8' padding='m14' borderRadius='s18' backgroundColor='gray50' minWidth={measure.x150} flexDirection='row' height={measure.y50}>
                                     <TouchableOpacityBox flexDirection='row' gap='x8' onPress={() => setShowMaterialModal(true)}>
                                         <Text preset="text13">🔧</Text>
                                         <Text preset="text13" color="gray700">{linesTitle(service?.serviceType, lines.length)}</Text>

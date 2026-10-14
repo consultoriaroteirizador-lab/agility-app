@@ -13,7 +13,7 @@ import { textoAceitarOferta } from '@/domain/agility/offer/resumoOferta';
 import { payloadDeAceite, useFindOneRouting, useAcceptRouting } from '@/domain/agility/routing/useCase';
 import type { ServiceLine } from '@/domain/agility/service/dto';
 import { ServiceType } from '@/domain/agility/service/dto/types';
-import { serviceLines, splitByDirection } from '@/domain/agility/service/serviceLines';
+import { linesTitle, serviceLines, splitByDirection } from '@/domain/agility/service/serviceLines';
 import { useFindServicesByRoutingId } from '@/domain/agility/service/useCase';
 import { useAppSafeArea } from '@/hooks';
 import { useToastService } from '@/services/Toast/useToast';
@@ -461,7 +461,7 @@ export default function OfertaDetalhadaScreen() {
           onClose={() => setMateriaisAbertos(null)}
           lines={materiaisAbertos?.lines ?? []}
           serviceType={materiaisAbertos?.serviceType}
-          title="Itens da parada"
+          title={`${linesTitle(materiaisAbertos?.serviceType)} da parada`}
         />
       </Box>
     </ScreenBase>

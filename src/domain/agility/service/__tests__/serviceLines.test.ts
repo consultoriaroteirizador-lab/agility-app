@@ -116,4 +116,8 @@ describe('lineGroups', () => {
         expect(lineGroups(null, ServiceType.SERVICE)).toEqual([])
         expect(lineGroups(undefined, ServiceType.DELIVERY)).toEqual([])
     })
+
+    it('tipo com nome de propriedade do Object (constructor): cai em Entregar', () => {
+        expect(lineGroups([ENTREGA], 'constructor')).toEqual([{ title: 'Entregar', lines: [ENTREGA] }])
+    })
 })
