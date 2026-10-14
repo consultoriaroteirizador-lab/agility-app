@@ -488,6 +488,9 @@ export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderPr
   const linhasDoServico = useMemo(() => serviceLines(service), [service]);
   // As linhas como o servidor as tem: a volta de um check que falha vai para elas, não para a tela.
   const confirmedLinesRef = useRef(new Map<string, ServiceLine>());
+  // Nao limpar este mapa no reset por serviceId: na montagem os dois efeitos rodam no mesmo
+  // commit e o reset, declarado depois, apagaria o que este acabou de preencher. As chaves sao
+  // ids de linha (unicos entre servicos), entao sobra de outro servico e inofensiva.
   useEffect(() => {
     if (linhasDoServico && linhasDoServico.length > 0) {
       confirmedLinesRef.current = new Map(linhasDoServico.map((l) => [l.id, l]));
@@ -811,7 +814,6 @@ export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderPr
   useEffect(() => {
     hydratedRef.current = null;
     linesFetchedRef.current = null;
-    confirmedLinesRef.current = new Map();
   }, [serviceId]);
 
   // Hidratação: roda 1x por serviceId, quando o draft do backend já chegou (ou falhou).
