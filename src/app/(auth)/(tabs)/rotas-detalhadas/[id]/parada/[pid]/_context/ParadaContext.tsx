@@ -44,6 +44,7 @@ import { parseBRLToCents } from '@/utils/parseCurrency';
 import { resolveParadaAtendidaElegivel, resolvePedidosDaParada } from '../../../_utils';
 import { useStopStatus } from '../_hooks/useStopStatus';
 import { resolveCompanyRules } from '../_utils/companyRules';
+import { deliveredFromDraftEtapa, formAnsweredOnServer } from '../_utils/draftResume';
 import {
   draftHasAnyValue,
   draftToPickupEvidence,
@@ -51,7 +52,6 @@ import {
   pickupEvidenceToDraft,
   recipientToDraft,
 } from '../_utils/paradaDraftMapping';
-import { deliveredFromDraftEtapa, formAnsweredOnServer } from '../_utils/draftResume';
 
 // Tipos
 // Era uma uniao fixa ('cliente' | 'porteiro' | ...); com as opcoes vindo da
