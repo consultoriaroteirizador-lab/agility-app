@@ -73,7 +73,7 @@ export function lineGroups(lines: readonly ServiceLine[] | null | undefined, ser
     if (serviceType === ServiceType.SERVICE) return [{ title: 'Equipamentos', lines: [...lines] }]
     const { delivery, pickup } = splitByDirection(lines)
     const groups: LineGroup[] = []
-    if (delivery.length > 0) groups.push({ title: serviceType && Object.hasOwn(TITULO_PRINCIPAL, serviceType) ? TITULO_PRINCIPAL[serviceType]! : 'Entregar', lines: delivery })
+    if (delivery.length > 0) groups.push({ title: serviceType && Object.prototype.hasOwnProperty.call(TITULO_PRINCIPAL, serviceType) ? TITULO_PRINCIPAL[serviceType]! : 'Entregar', lines: delivery })
     if (pickup.length > 0) groups.push({ title: 'Recolher', lines: pickup })
     return groups
 }
