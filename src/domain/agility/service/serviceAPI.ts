@@ -26,6 +26,8 @@ import type {
     BatchMaterialCheckRequest,
     BatchMaterialCheckResponse,
 } from './dto/response/service-line.response'
+import type { ServiceType } from './dto/types'
+import { lineRoute } from './serviceLines'
 
 
 // Export ServiceResponse as ServiceItem for backward compatibility
@@ -229,6 +231,31 @@ async function checkMaterialsBatch(
 }
 
 // ============================================
+// LINHAS (itens do pedido e materiais do SERVICE), fase 3C
+// ============================================
+
+/** As linhas pela rota da família: o pedido em `/items`, o SERVICE em `/materials` (`lineRoute`). */
+async function getLines(serviceId: Id, serviceType: ServiceType | null | undefined): Promise<BaseResponse<ServiceLine[]>> {
+    const { data } = await apiAgility.get<BaseResponse<ServiceLine[]>>(
+        `/services/${serviceId}/${lineRoute(serviceType)}`
+    )
+    return data
+}
+
+async function checkLine(
+    serviceId: Id,
+    serviceType: ServiceType | null | undefined,
+    lineId: Id,
+    payload: MaterialCheckRequest
+): Promise<BaseResponse<MaterialCheckResponse>> {
+    const { data } = await apiAgility.patch<BaseResponse<MaterialCheckResponse>>(
+        `/services/${serviceId}/${lineRoute(serviceType)}/${lineId}/check`,
+        payload
+    )
+    return data
+}
+
+// ============================================
 // DRAFT (in-progress evidence) API
 // ============================================
 
@@ -277,6 +304,9 @@ export const serviceAPI = {
     getMaterials,
     checkMaterial,
     checkMaterialsBatch,
+    // Linhas (fase 3C)
+    getLines,
+    checkLine,
     // Draft
     saveDraft,
     getDraft,

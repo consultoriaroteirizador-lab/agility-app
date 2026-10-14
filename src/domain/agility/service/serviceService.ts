@@ -22,6 +22,7 @@ import type {
     MaterialCheckRequest,
     MaterialCheckResponse,
 } from './dto/response/service-line.response'
+import type { ServiceType } from './dto/types'
 import { serviceAPI, type ServiceItem, type StartAttendanceOptions } from './serviceAPI'
 
 /**
@@ -134,6 +135,20 @@ async function checkMaterial(
     return serviceAPI.checkMaterial(serviceId, materialId, payload)
 }
 
+// Linhas (fase 3C)
+async function getLines(serviceId: Id, serviceType: ServiceType | null | undefined): Promise<BaseResponse<ServiceLine[]>> {
+    return serviceAPI.getLines(serviceId, serviceType)
+}
+
+async function checkLine(
+    serviceId: Id,
+    serviceType: ServiceType | null | undefined,
+    lineId: Id,
+    payload: MaterialCheckRequest
+): Promise<BaseResponse<MaterialCheckResponse>> {
+    return serviceAPI.checkLine(serviceId, serviceType, lineId, payload)
+}
+
 async function saveDraft(
     id: Id,
     draft: ServiceDraftData,
@@ -171,6 +186,9 @@ export const serviceService = {
     // Materials
     getMaterials,
     checkMaterial,
+    // Linhas (fase 3C)
+    getLines,
+    checkLine,
     // Draft
     saveDraft,
     getDraft,
