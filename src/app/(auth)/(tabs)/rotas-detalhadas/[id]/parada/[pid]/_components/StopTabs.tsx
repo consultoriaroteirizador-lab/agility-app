@@ -3,13 +3,14 @@ import { Box, Text, TouchableOpacityBox } from '@/components';
 import { StopTabsProps } from '../_types/stop.types';
 
 /**
- * Tab component for switching between Local and Equipment views
+ * Tab component for switching between Local and the stop lines (items or equipment)
  */
 export const StopTabs = ({
     activeTab,
     onTabChange,
     localContent,
     equipmentContent,
+    linesTabLabel,
 }: StopTabsProps) => {
     return (
         <>
@@ -40,7 +41,7 @@ export const StopTabs = ({
                         color={activeTab === 'equipment' ? 'primary100' : 'gray400'}
                         fontWeight={activeTab === 'equipment' ? '600' : '400'}
                     >
-                        Equipamentos
+                        {linesTabLabel}
                     </Text>
                 </TouchableOpacityBox>
             </Box>

@@ -1,10 +1,9 @@
-import { useCallback, useState } from 'react';
+import { useCallback } from 'react';
 
 import { router } from 'expo-router';
 
 import { Box, Button, ScreenBase, Text } from '@/components';
 import { ButtonBack } from '@/components/Button/ButtonBack';
-import { TouchableOpacityBox } from '@/components/RestyleComponent/RestyleComponent';
 import { formatAddressFull, formatAddressStreetNumber } from '@/domain/agility/address/dto';
 import { resolveCodeRequirement } from '@/domain/agility/service/codeGate';
 import { formatHHmm } from '@/functions';
@@ -13,7 +12,7 @@ import { measure } from '@/theme';
 
 import { useParada } from '../../_context/ParadaContext';
 import { useStopActions } from '../../_hooks/useStopActions';
-import { MaterialsModal } from '../shared/MaterialsModal';
+import { ServiceLinesTag } from '../shared/ServiceLinesTag';
 import { PickupCodeCard } from '../shared/PickupCodeCard';
 import { StopRouteMap } from '../shared/StopRouteMap';
 
@@ -24,7 +23,6 @@ import { StopRouteMap } from '../shared/StopRouteMap';
 export function ColetaEtapaInicial() {
     const { service, effectiveAddress, setEtapa, rotaId, startBlockReason, pickupCode, pickupBypassReasonCode, pickupBypassReasonText } = useParada();
     const { showToast } = useToastService();
-    const [showVolumesModal, setShowVolumesModal] = useState(false);
 
     // Código de confirmação de retirada (T4) — exigido/bypass conforme configuração da empresa.
     const pickupGate = resolveCodeRequirement(service, 'PICKUP');
@@ -147,27 +145,7 @@ export function ColetaEtapaInicial() {
                                 </Box>
                             </Box>
 
-                            {/* Tags de volumes — toca para abrir a lista de itens */}
-                            {service?.materials && service.materials.length > 0 && (
-                                <Box flexDirection="row" gap="x8" marginTop="y8">
-                                    <TouchableOpacityBox
-                                        flexDirection="row"
-                                        alignItems="center"
-                                        gap="x4"
-                                        paddingHorizontal="x12"
-                                        paddingVertical="y6"
-                                        backgroundColor="gray100"
-                                        borderRadius="s20"
-                                        onPress={() => setShowVolumesModal(true)}
-                                    >
-                                        <Text preset="text13">📦</Text>
-                                        <Text preset="text13" color="gray700">
-                                            {service.materials.length > 1 ? 'Volumes' : 'Volume'}
-                                        </Text>
-                                        <Text preset="text13" color="primary100">({service.materials.length})</Text>
-                                    </TouchableOpacityBox>
-                                </Box>
-                            )}
+                            <ServiceLinesTag service={service} />
 
                             {/* Endereço completo (header mantém só rua + número) */}
                             {effectiveAddress && (
@@ -211,13 +189,6 @@ export function ColetaEtapaInicial() {
                     </Box>
                 </Box>
             </Box>
-
-            <MaterialsModal
-                isVisible={showVolumesModal}
-                onClose={() => setShowVolumesModal(false)}
-                materials={service?.materials || []}
-                title="Volumes"
-            />
         </ScreenBase >
 
     );

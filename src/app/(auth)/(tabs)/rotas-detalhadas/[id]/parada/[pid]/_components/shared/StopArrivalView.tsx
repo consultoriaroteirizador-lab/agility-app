@@ -1,14 +1,11 @@
-import { useState } from 'react';
-
 import { Box, Button, Text } from '@/components';
-import { TouchableOpacityBox } from '@/components/RestyleComponent/RestyleComponent';
 import type { AddressResponse } from '@/domain/agility/address/dto';
 import { formatAddressFull } from '@/domain/agility/address/dto';
 import type { ServiceResponse } from '@/domain/agility/service/dto';
 import { formatHHmm } from '@/functions';
 import { measure } from '@/theme';
 
-import { MaterialsModal } from './MaterialsModal';
+import { ServiceLinesTag } from './ServiceLinesTag';
 import { StopRouteMap } from './StopRouteMap';
 
 export interface StopArrivalViewProps {
@@ -63,7 +60,6 @@ export function StopArrivalView({
     onArrived,
     notasBadge,
 }: StopArrivalViewProps) {
-    const [showVolumesModal, setShowVolumesModal] = useState(false);
 
     const nomeCliente = service?.fantasyName || service?.responsible || 'Cliente';
 
@@ -113,27 +109,7 @@ export function StopArrivalView({
                         </Box>
                     </Box>
 
-                    {/* Tags de volumes — toca para abrir a lista de itens */}
-                    {service?.materials && service.materials.length > 0 && (
-                        <Box flexDirection="row" gap="x8" marginTop="y8">
-                            <TouchableOpacityBox
-                                flexDirection="row"
-                                alignItems="center"
-                                gap="x4"
-                                paddingHorizontal="x12"
-                                paddingVertical="y6"
-                                backgroundColor="gray100"
-                                borderRadius="s20"
-                                onPress={() => setShowVolumesModal(true)}
-                            >
-                                <Text preset="text13">📦</Text>
-                                <Text preset="text13" color="gray700">
-                                    {service.materials.length > 1 ? 'Volumes' : 'Volume'}
-                                </Text>
-                                <Text preset="text13" color="primary100">({service.materials.length})</Text>
-                            </TouchableOpacityBox>
-                        </Box>
-                    )}
+                    <ServiceLinesTag service={service} />
 
                     {/* Endereço completo (header mantém só rua + número) */}
                     {effectiveAddress && (
@@ -173,13 +149,6 @@ export function StopArrivalView({
                     )}
                 </Box>
             </Box>
-
-            <MaterialsModal
-                isVisible={showVolumesModal}
-                onClose={() => setShowVolumesModal(false)}
-                materials={service?.materials || []}
-                title="Volumes"
-            />
         </>
     );
 }

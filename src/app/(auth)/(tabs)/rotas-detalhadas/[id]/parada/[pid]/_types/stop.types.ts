@@ -74,15 +74,13 @@ export interface NavigationModalProps {
     showAppleMaps: boolean;
 }
 
-export interface EquipmentListProps {
-    materials: ServiceLine[];
-}
-
 export interface StopTabsProps {
     activeTab: TabType;
     onTabChange: (tab: TabType) => void;
     localContent: React.ReactNode;
     equipmentContent: React.ReactNode;
+    /** "Itens" no pedido, "Equipamentos" no SERVICE (`linesTitle`). */
+    linesTabLabel: string;
 }
 
 export interface MapErrorBoundaryState {
