@@ -17,27 +17,29 @@ export function linesStateOf(lines: ServiceLine[], loading = false): LinesState 
     return { lines, loading, allChecked: lines.every((l) => l.status !== 'PENDING') };
 }
 
+/** A linha com a marcação aplicada sobre `base`. O `marker` vai no `checkedAt` e identifica a chamada. */
+export function checkedLine(base: ServiceLine, data: LineCheckData, marker: string): ServiceLine {
+    return {
+        ...base,
+        status: data.status,
+        actualQuantity: data.actualQuantity,
+        checkNotes: data.notes,
+        checkPhotoProof: data.photoProof,
+        checkedAt: marker,
+    };
+}
+
 /** A marcação otimista. O `marker` vai no `checkedAt` e identifica esta chamada para o `revertCheck`. */
 export function applyCheck(state: LinesState, lineId: string, data: LineCheckData, marker: string): LinesState {
-    const lines = state.lines.map((l) =>
-        l.id === lineId
-            ? {
-                ...l,
-                status: data.status,
-                actualQuantity: data.actualQuantity,
-                checkNotes: data.notes,
-                checkPhotoProof: data.photoProof,
-                checkedAt: marker,
-            }
-            : l,
-    );
+    const lines = state.lines.map((l) => (l.id === lineId ? checkedLine(l, data, marker) : l));
     return linesStateOf(lines, state.loading);
 }
 
 /**
- * Desfaz a marcação de uma chamada que falhou: a linha volta a ser como era antes dela. Só se a linha
- * ainda estiver como esta chamada a deixou (`checkedAt === marker`): um re-check posterior, ou dados
- * novos do servidor, ganham da falha atrasada.
+ * Desfaz a marcação de uma chamada que falhou: a linha volta ao último estado CONFIRMADO pelo servidor
+ * (`previous`), nunca ao que a tela mostrava, que pode trazer a marca de outra chamada ainda no ar.
+ * Só se a linha ainda estiver como esta chamada a deixou (`checkedAt === marker`): um re-check
+ * posterior, ou dados novos do servidor, ganham da falha atrasada.
  */
 export function revertCheck(state: LinesState, lineId: string, previous: ServiceLine, marker: string): LinesState {
     const atual = state.lines.find((l) => l.id === lineId);
@@ -48,8 +50,10 @@ export function revertCheck(state: LinesState, lineId: string, previous: Service
 type RunLineCheckArgs = {
     lineId: string;
     data: LineCheckData;
-    /** A linha antes da marcação; sem ela não há o que devolver. */
-    previous: ServiceLine | undefined;
+    /** A linha como o servidor a tem, avaliada na hora (no sucesso e na falha); sem ela não há o que devolver. */
+    confirmed: () => ServiceLine | undefined;
+    /** Chamada no sucesso com a linha que o servidor passou a ter. */
+    onConfirmed: (line: ServiceLine) => void;
     marker: string;
     update: (fn: (state: LinesState) => LinesState) => void;
     send: () => Promise<unknown>;
@@ -57,13 +61,16 @@ type RunLineCheckArgs = {
 };
 
 /** O check inteiro (fase 3C, C5): marca, envia e, na falha, desfaz só esta marcação e avisa uma vez. */
-export async function runLineCheck({ lineId, data, previous, marker, update, send, notifyError }: RunLineCheckArgs): Promise<boolean> {
+export async function runLineCheck({ lineId, data, confirmed, onConfirmed, marker, update, send, notifyError }: RunLineCheckArgs): Promise<boolean> {
     update((state) => applyCheck(state, lineId, data, marker));
     try {
         await send();
+        const base = confirmed();
+        if (base) onConfirmed(checkedLine(base, data, marker));
         return true;
     } catch (error) {
-        if (previous) update((state) => revertCheck(state, lineId, previous, marker));
+        const base = confirmed();
+        if (base) update((state) => revertCheck(state, lineId, base, marker));
         notifyError(mensagemDaApi(error, CHECK_FALLBACK_MESSAGE));
         return false;
     }

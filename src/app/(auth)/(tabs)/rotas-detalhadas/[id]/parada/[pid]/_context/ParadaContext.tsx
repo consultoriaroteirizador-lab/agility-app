@@ -53,6 +53,7 @@ import {
   recipientToDraft,
 } from '../_utils/paradaDraftMapping';
 import { linesStateOf, runLineCheck, type LineCheckData, type LinesState } from '../_utils/lineCheckState';
+import type { ServiceLine } from '@/domain/agility/service/dto/response/service-line.response';
 
 // Tipos
 // Era uma uniao fixa ('cliente' | 'porteiro' | ...); com as opcoes vindo da
@@ -485,8 +486,11 @@ export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderPr
 
   // As linhas que já vêm na resposta do serviço (evita chamada extra)
   const linhasDoServico = useMemo(() => serviceLines(service), [service]);
+  // As linhas como o servidor as tem: a volta de um check que falha vai para elas, não para a tela.
+  const confirmedLinesRef = useRef(new Map<string, ServiceLine>());
   useEffect(() => {
     if (linhasDoServico && linhasDoServico.length > 0) {
+      confirmedLinesRef.current = new Map(linhasDoServico.map((l) => [l.id, l]));
       setLinesState(linesStateOf(linhasDoServico));
     }
   }, [linhasDoServico]);
@@ -584,6 +588,7 @@ export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderPr
 
     // Se já temos as linhas do serviço, não precisa buscar novamente
     if (linhasDoServico && linhasDoServico.length > 0) {
+      confirmedLinesRef.current = new Map(linhasDoServico.map((l) => [l.id, l]));
       setLinesState(linesStateOf(linhasDoServico));
       return;
     }
@@ -601,6 +606,7 @@ export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderPr
     try {
       const response = await serviceService.getLines(serviceId, service.serviceType);
       if (response.success && response.result) {
+        confirmedLinesRef.current = new Map(response.result.map((l) => [l.id, l]));
         setLinesState(linesStateOf(response.result));
       } else {
         setLinesState(prev => ({ ...prev, loading: false }));
@@ -629,7 +635,8 @@ export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderPr
     void runLineCheck({
       lineId,
       data,
-      previous: linesState.lines.find((l) => l.id === lineId),
+      confirmed: () => confirmedLinesRef.current.get(lineId),
+      onConfirmed: (line) => { confirmedLinesRef.current.set(lineId, line); },
       marker: new Date().toISOString(),
       update: setLinesState,
       send: () => checkLineAsync({ serviceId, serviceType, lineId, data }),
@@ -637,7 +644,7 @@ export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderPr
     });
 
     return true;
-  }, [serviceId, service?.serviceType, linesState.lines, checkLineAsync, showToast]);
+  }, [serviceId, service?.serviceType, checkLineAsync, showToast]);
 
   // Função para marcar check como completo
   const completeCheck = useCallback(() => {
@@ -804,6 +811,7 @@ export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderPr
   useEffect(() => {
     hydratedRef.current = null;
     linesFetchedRef.current = null;
+    confirmedLinesRef.current = new Map();
   }, [serviceId]);
 
   // Hidratação: roda 1x por serviceId, quando o draft do backend já chegou (ou falhou).
@@ -1129,6 +1137,7 @@ export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderPr
       loading: false,
       allChecked: false,
     });
+    confirmedLinesRef.current = new Map();
     setPaymentAmount('');
     setPaymentMethod(null);
     setShowPaymentModal(false);

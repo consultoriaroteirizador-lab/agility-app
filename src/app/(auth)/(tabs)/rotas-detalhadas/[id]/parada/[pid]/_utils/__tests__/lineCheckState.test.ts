@@ -3,6 +3,7 @@ import type { ServiceLine } from '@/domain/agility/service/dto/response/service-
 import {
     applyCheck,
     CHECK_FALLBACK_MESSAGE,
+    checkedLine,
     linesStateOf,
     revertCheck,
     runLineCheck,
@@ -80,28 +81,40 @@ describe('revertCheck', () => {
     });
 });
 
+describe('checkedLine', () => {
+    it('aplica status, quantidade, nota, foto e marcador sem mexer nos outros campos', () => {
+        const base = linha({ id: 'a', material: 'Caixa', quantity: 3, direction: 'PICKUP', checkNotes: 'velha' });
+        const r = checkedLine(base, { status: 'PARTIAL', actualQuantity: 2, notes: 'faltou 1', photoProof: 'f' }, 'm9');
+        expect(r).toEqual({ ...base, status: 'PARTIAL', actualQuantity: 2, checkNotes: 'faltou 1', checkPhotoProof: 'f', checkedAt: 'm9' });
+        expect(base.checkNotes).toBe('velha');
+    });
+});
+
 describe('runLineCheck', () => {
     it('sucesso: a marcação fica e ninguém é avisado', async () => {
-        const h = harness(estado([linha({ id: 'a' })]));
+        const confirmada = linha({ id: 'a' });
+        const h = harness(estado([confirmada]));
         const notifyError = jest.fn();
-        const ok = await runLineCheck({ lineId: 'a', data: { status: 'CHECKED' }, previous: h.get().lines[0], marker: 'm1', update: h.update, send: async () => ({ success: true }), notifyError });
+        const ok = await runLineCheck({ lineId: 'a', data: { status: 'CHECKED' }, confirmed: () => confirmada, onConfirmed: jest.fn(), marker: 'm1', update: h.update, send: async () => ({ success: true }), notifyError });
         expect(ok).toBe(true);
         expect(h.get().lines[0].status).toBe('CHECKED');
         expect(notifyError).not.toHaveBeenCalled();
     });
 
     it('a marcação aparece antes da resposta', async () => {
-        const h = harness(estado([linha({ id: 'a' })]));
+        const confirmada = linha({ id: 'a' });
+        const h = harness(estado([confirmada]));
         const pendente = adiada();
-        void runLineCheck({ lineId: 'a', data: { status: 'CHECKED' }, previous: h.get().lines[0], marker: 'm1', update: h.update, send: () => pendente.promise, notifyError: jest.fn() });
+        void runLineCheck({ lineId: 'a', data: { status: 'CHECKED' }, confirmed: () => confirmada, onConfirmed: jest.fn(), marker: 'm1', update: h.update, send: () => pendente.promise, notifyError: jest.fn() });
         expect(h.get().lines[0].status).toBe('CHECKED');
         pendente.reject(ERRO_DO_BACK);
     });
 
     it('recusa do back: desfaz e avisa uma vez com a mensagem do back', async () => {
-        const h = harness(estado([linha({ id: 'a' })]));
+        const confirmada = linha({ id: 'a' });
+        const h = harness(estado([confirmada]));
         const notifyError = jest.fn();
-        const ok = await runLineCheck({ lineId: 'a', data: { status: 'CHECKED' }, previous: h.get().lines[0], marker: 'm1', update: h.update, send: () => Promise.reject(ERRO_DO_BACK), notifyError });
+        const ok = await runLineCheck({ lineId: 'a', data: { status: 'CHECKED' }, confirmed: () => confirmada, onConfirmed: jest.fn(), marker: 'm1', update: h.update, send: () => Promise.reject(ERRO_DO_BACK), notifyError });
         expect(ok).toBe(false);
         expect(h.get().lines[0].status).toBe('PENDING');
         expect(h.get().allChecked).toBe(false);
@@ -110,26 +123,29 @@ describe('runLineCheck', () => {
     });
 
     it('sem rede: avisa com a mensagem do adapter, não com o texto padrão', async () => {
-        const h = harness(estado([linha({ id: 'a' })]));
+        const confirmada = linha({ id: 'a' });
+        const h = harness(estado([confirmada]));
         const notifyError = jest.fn();
-        await runLineCheck({ lineId: 'a', data: { status: 'CHECKED' }, previous: h.get().lines[0], marker: 'm1', update: h.update, send: () => Promise.reject(SEM_REDE), notifyError });
+        await runLineCheck({ lineId: 'a', data: { status: 'CHECKED' }, confirmed: () => confirmada, onConfirmed: jest.fn(), marker: 'm1', update: h.update, send: () => Promise.reject(SEM_REDE), notifyError });
         expect(notifyError).toHaveBeenCalledWith('Sem conexão com o servidor. Verifique sua internet e tente novamente.');
     });
 
     it('sem mensagem útil: o texto padrão', async () => {
-        const h = harness(estado([linha({ id: 'a' })]));
+        const confirmada = linha({ id: 'a' });
+        const h = harness(estado([confirmada]));
         const notifyError = jest.fn();
-        await runLineCheck({ lineId: 'a', data: { status: 'CHECKED' }, previous: h.get().lines[0], marker: 'm1', update: h.update, send: () => Promise.reject(SEM_MENSAGEM), notifyError });
+        await runLineCheck({ lineId: 'a', data: { status: 'CHECKED' }, confirmed: () => confirmada, onConfirmed: jest.fn(), marker: 'm1', update: h.update, send: () => Promise.reject(SEM_MENSAGEM), notifyError });
         expect(notifyError).toHaveBeenCalledWith(CHECK_FALLBACK_MESSAGE);
         expect(CHECK_FALLBACK_MESSAGE).toBe('Não foi possível conferir o item. Tente de novo.');
     });
 
     it('uma falha atrasada não apaga o re-check que já deu certo', async () => {
-        const h = harness(estado([linha({ id: 'a' })]));
+        const confirmada = linha({ id: 'a' });
+        const h = harness(estado([confirmada]));
         const primeira = adiada();
         const notifyError = jest.fn();
-        const r1 = runLineCheck({ lineId: 'a', data: { status: 'MISSING' }, previous: h.get().lines[0], marker: 'm1', update: h.update, send: () => primeira.promise, notifyError });
-        await runLineCheck({ lineId: 'a', data: { status: 'CHECKED' }, previous: h.get().lines[0], marker: 'm2', update: h.update, send: async () => ({ success: true }), notifyError });
+        const r1 = runLineCheck({ lineId: 'a', data: { status: 'MISSING' }, confirmed: () => confirmada, onConfirmed: jest.fn(), marker: 'm1', update: h.update, send: () => primeira.promise, notifyError });
+        await runLineCheck({ lineId: 'a', data: { status: 'CHECKED' }, confirmed: () => confirmada, onConfirmed: jest.fn(), marker: 'm2', update: h.update, send: async () => ({ success: true }), notifyError });
         primeira.reject(ERRO_DO_BACK);
         await r1;
         expect(h.get().lines[0]).toMatchObject({ status: 'CHECKED', checkedAt: 'm2' });
@@ -137,10 +153,47 @@ describe('runLineCheck', () => {
     });
 
     it('linha que não está na lista: nada a desfazer, mas avisa', async () => {
-        const h = harness(estado([linha({ id: 'a' })]));
+        const confirmada = linha({ id: 'a' });
+        const h = harness(estado([confirmada]));
         const notifyError = jest.fn();
-        await runLineCheck({ lineId: 'zz', data: { status: 'CHECKED' }, previous: undefined, marker: 'm1', update: h.update, send: () => Promise.reject(ERRO_DO_BACK), notifyError });
+        await runLineCheck({ lineId: 'zz', data: { status: 'CHECKED' }, confirmed: () => undefined, onConfirmed: jest.fn(), marker: 'm1', update: h.update, send: () => Promise.reject(ERRO_DO_BACK), notifyError });
         expect(h.get().lines[0].status).toBe('PENDING');
         expect(notifyError).toHaveBeenCalledTimes(1);
+    });
+
+    it('duas falhas sobrepostas voltam à linha CONFIRMADA pelo servidor, não à marca da outra chamada', async () => {
+        const confirmada = linha({ id: 'a' });
+        const h = harness(estado([confirmada]));
+        const p1 = adiada();
+        const p2 = adiada();
+        const notifyError = jest.fn();
+        const r1 = runLineCheck({ lineId: 'a', data: { status: 'MISSING' }, confirmed: () => confirmada, onConfirmed: jest.fn(), marker: 'm1', update: h.update, send: () => p1.promise, notifyError });
+        const r2 = runLineCheck({ lineId: 'a', data: { status: 'CHECKED' }, confirmed: () => confirmada, onConfirmed: jest.fn(), marker: 'm2', update: h.update, send: () => p2.promise, notifyError });
+        p1.reject(ERRO_DO_BACK);
+        await r1;
+        p2.reject(ERRO_DO_BACK);
+        await r2;
+        expect(h.get().lines[0]).toEqual(confirmada);
+        expect(h.get().allChecked).toBe(false);
+        expect(notifyError).toHaveBeenCalledTimes(2);
+    });
+
+    it('falha depois de um sucesso volta à marcação confirmada (a que o sucesso gravou)', async () => {
+        const mapa = new Map<string, ServiceLine>([['a', linha({ id: 'a' })]]);
+        const h = harness(estado([mapa.get('a')!]));
+        const onConfirmed = jest.fn((l: ServiceLine) => { mapa.set(l.id, l); });
+        const args = { lineId: 'a', confirmed: () => mapa.get('a'), onConfirmed, update: h.update, notifyError: jest.fn() };
+        await runLineCheck({ ...args, data: { status: 'MISSING', notes: 'sumiu' }, marker: 'm1', send: async () => ({ success: true }) });
+        expect(onConfirmed).toHaveBeenCalledWith(expect.objectContaining({ id: 'a', status: 'MISSING', checkNotes: 'sumiu', checkedAt: 'm1' }));
+        await runLineCheck({ ...args, data: { status: 'CHECKED' }, marker: 'm2', send: () => Promise.reject(ERRO_DO_BACK) });
+        expect(h.get().lines[0]).toMatchObject({ status: 'MISSING', checkNotes: 'sumiu', checkedAt: 'm1' });
+    });
+
+    it('falha não chama onConfirmed', async () => {
+        const confirmada = linha({ id: 'a' });
+        const h = harness(estado([confirmada]));
+        const onConfirmed = jest.fn();
+        await runLineCheck({ lineId: 'a', data: { status: 'CHECKED' }, confirmed: () => confirmada, onConfirmed, marker: 'm1', update: h.update, send: () => Promise.reject(ERRO_DO_BACK), notifyError: jest.fn() });
+        expect(onConfirmed).not.toHaveBeenCalled();
     });
 });
