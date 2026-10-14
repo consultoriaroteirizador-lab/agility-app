@@ -122,19 +122,6 @@ async function removeBatch(ids: string[]): Promise<BaseResponse<BatchDeleteResul
     return serviceAPI.removeBatch(ids)
 }
 
-// Materials
-async function getMaterials(serviceId: Id): Promise<BaseResponse<ServiceLine[]>> {
-    return serviceAPI.getMaterials(serviceId)
-}
-
-async function checkMaterial(
-    serviceId: Id,
-    materialId: Id,
-    payload: MaterialCheckRequest
-): Promise<BaseResponse<MaterialCheckResponse>> {
-    return serviceAPI.checkMaterial(serviceId, materialId, payload)
-}
-
 // Linhas (fase 3C)
 async function getLines(serviceId: Id, serviceType: ServiceType | null | undefined): Promise<BaseResponse<ServiceLine[]>> {
     return serviceAPI.getLines(serviceId, serviceType)
@@ -183,9 +170,6 @@ export const serviceService = {
     findAttempts,
     remove,
     removeBatch,
-    // Materials
-    getMaterials,
-    checkMaterial,
     // Linhas (fase 3C)
     getLines,
     checkLine,

@@ -58,24 +58,6 @@ export interface MaterialCheckRequest {
 }
 
 /**
- * Item para check em lote
- */
-export interface MaterialCheckItem {
-  materialId: string
-  status: MaterialStatus
-  actualQuantity?: number
-  notes?: string
-  photoProof?: string
-}
-
-/**
- * Request para check em lote
- */
-export interface BatchMaterialCheckRequest {
-  items: MaterialCheckItem[]
-}
-
-/**
  * Resposta do check de material
  */
 export interface MaterialCheckResponse {
@@ -89,24 +71,4 @@ export interface MaterialCheckResponse {
     pending: number
     withIssues: number
   }
-}
-
-/**
- * Resultado de check individual
- */
-export interface MaterialCheckResult {
-  materialId: string
-  success: boolean
-  error?: string
-  status?: MaterialStatus
-}
-
-/**
- * Resposta do check em lote
- */
-export interface BatchMaterialCheckResponse {
-  successCount: number
-  errorCount: number
-  results: MaterialCheckResult[]
-  allMaterialsChecked: boolean
 }

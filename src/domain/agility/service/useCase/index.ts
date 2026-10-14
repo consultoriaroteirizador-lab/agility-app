@@ -14,9 +14,6 @@ export { useCompleteServiceWithDetails } from './useCompleteServiceWithDetails'
 export { useFailService } from './useFailService'
 export { useRegisterOccurrence } from './useRegisterOccurrence'
 export { useRemoveService } from './useRemoveService'
-// Materials
-export { useCheckMaterial } from './useCheckMaterial'
-export { useGetMaterials } from './useGetMaterials'
 // Linhas (fase 3C)
 export { useCheckLine } from './useCheckLine'
 export { useGetServiceLines } from './useGetServiceLines'

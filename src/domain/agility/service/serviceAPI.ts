@@ -23,8 +23,6 @@ import type {
     ServiceLine,
     MaterialCheckRequest,
     MaterialCheckResponse,
-    BatchMaterialCheckRequest,
-    BatchMaterialCheckResponse,
 } from './dto/response/service-line.response'
 import type { ServiceType } from './dto/types'
 import { lineRoute } from './serviceLines'
@@ -197,40 +195,6 @@ async function removeBatch(ids: string[]): Promise<BaseResponse<BatchDeleteResul
 }
 
 // ============================================
-// MATERIALS API
-// ============================================
-
-async function getMaterials(serviceId: Id): Promise<BaseResponse<ServiceLine[]>> {
-    const { data } = await apiAgility.get<BaseResponse<ServiceLine[]>>(
-        `/services/${serviceId}/materials`
-    )
-    return data
-}
-
-async function checkMaterial(
-    serviceId: Id,
-    materialId: Id,
-    payload: MaterialCheckRequest
-): Promise<BaseResponse<MaterialCheckResponse>> {
-    const { data } = await apiAgility.patch<BaseResponse<MaterialCheckResponse>>(
-        `/services/${serviceId}/materials/${materialId}/check`,
-        payload
-    )
-    return data
-}
-
-async function checkMaterialsBatch(
-    serviceId: Id,
-    payload: BatchMaterialCheckRequest
-): Promise<BaseResponse<BatchMaterialCheckResponse>> {
-    const { data } = await apiAgility.post<BaseResponse<BatchMaterialCheckResponse>>(
-        `/services/${serviceId}/materials/check-batch`,
-        payload
-    )
-    return data
-}
-
-// ============================================
 // LINHAS (itens do pedido e materiais do SERVICE), fase 3C
 // ============================================
 
@@ -300,10 +264,6 @@ export const serviceAPI = {
     findAttempts,
     remove,
     removeBatch,
-    // Materials
-    getMaterials,
-    checkMaterial,
-    checkMaterialsBatch,
     // Linhas (fase 3C)
     getLines,
     checkLine,
