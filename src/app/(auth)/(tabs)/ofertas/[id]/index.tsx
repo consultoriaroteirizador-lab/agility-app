@@ -11,7 +11,7 @@ import { TouchableOpacityBox } from '@/components/RestyleComponent/RestyleCompon
 import { formatAddress } from '@/domain/agility/address/dto';
 import { textoAceitarOferta } from '@/domain/agility/offer/resumoOferta';
 import { payloadDeAceite, useFindOneRouting, useAcceptRouting } from '@/domain/agility/routing/useCase';
-import type { ServiceMaterialResponse } from '@/domain/agility/service/dto';
+import type { ServiceLine } from '@/domain/agility/service/dto';
 import { ServiceType } from '@/domain/agility/service/dto/types';
 import { useFindServicesByRoutingId } from '@/domain/agility/service/useCase';
 import { useAppSafeArea } from '@/hooks';
@@ -96,7 +96,7 @@ export default function OfertaDetalhadaScreen() {
   const safeArea = useAppSafeArea();
   const [mostrarPopup, setMostrarPopup] = useState(false);
   const [mostrarMapa, setMostrarMapa] = useState(false);
-  const [materiaisAbertos, setMateriaisAbertos] = useState<ServiceMaterialResponse[] | null>(null);
+  const [materiaisAbertos, setMateriaisAbertos] = useState<ServiceLine[] | null>(null);
 
   // Bloqueia o segundo toque ANTES do primeiro re-render: `isAccepting`
   // (estado da mutation) só atualiza depois que o React processa o dispatch,

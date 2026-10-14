@@ -6,7 +6,7 @@ import { Box, Button, ScreenBase, Text, ActivityIndicator } from '@/components';
 import { ButtonBack } from '@/components/Button/ButtonBack';
 import { ItemCheckCard } from '@/components/ItemCheckCard';
 import { ItemCheckModal } from '@/components/ItemCheckModal';
-import type { ServiceMaterialResponse, MaterialStatus } from '@/domain/agility/service/dto/response/service-material.response';
+import type { ServiceLine, MaterialStatus } from '@/domain/agility/service/dto/response/service-line.response';
 import { measure } from '@/theme';
 
 import { useParada } from '../../_context/ParadaContext';
@@ -28,11 +28,11 @@ export function ServiceEtapaCheckEquipamento() {
         completeCheck,
     } = useParada();
 
-    const [selectedItem, setSelectedItem] = useState<ServiceMaterialResponse | null>(null);
+    const [selectedItem, setSelectedItem] = useState<ServiceLine | null>(null);
     const [modalVisible, setModalVisible] = useState(false);
     const [checking, setChecking] = useState(false);
 
-    const handleOpenCheck = useCallback((item: ServiceMaterialResponse) => {
+    const handleOpenCheck = useCallback((item: ServiceLine) => {
         setSelectedItem(item);
         setModalVisible(true);
     }, []);

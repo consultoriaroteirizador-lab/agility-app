@@ -6,7 +6,7 @@
  * carga, ou se a soma engolir um campo nulo virando `NaN`, a tela mostra número
  * errado em silêncio. Aqui a derivação é pura e coberta.
  */
-import type { ServiceMaterialResponse, ServiceResponse } from '@/domain/agility/service/dto'
+import type { ServiceLine, ServiceResponse } from '@/domain/agility/service/dto'
 import { ServiceType } from '@/domain/agility/service/dto/types'
 
 import { distanciaLinhaReta, itensDaParada, resumirCarga } from '../cargaOferta'
@@ -15,8 +15,8 @@ function servico(over: Partial<ServiceResponse>): ServiceResponse {
     return { requiresPayment: false, ...over } as unknown as ServiceResponse
 }
 
-function material(over: Partial<ServiceMaterialResponse>): ServiceMaterialResponse {
-    return { id: 'm', material: 'Item', quantity: 1, status: 'PENDING', ...over } as ServiceMaterialResponse
+function material(over: Partial<ServiceLine>): ServiceLine {
+    return { id: 'm', material: 'Item', quantity: 1, status: 'PENDING', ...over } as ServiceLine
 }
 
 describe('itensDaParada', () => {

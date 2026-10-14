@@ -18,10 +18,10 @@ import type {
     DeliveryAttemptResponse,
 } from './dto'
 import type {
-    ServiceMaterialResponse,
+    ServiceLine,
     MaterialCheckRequest,
     MaterialCheckResponse,
-} from './dto/response/service-material.response'
+} from './dto/response/service-line.response'
 import { serviceAPI, type ServiceItem, type StartAttendanceOptions } from './serviceAPI'
 
 /**
@@ -122,7 +122,7 @@ async function removeBatch(ids: string[]): Promise<BaseResponse<BatchDeleteResul
 }
 
 // Materials
-async function getMaterials(serviceId: Id): Promise<BaseResponse<ServiceMaterialResponse[]>> {
+async function getMaterials(serviceId: Id): Promise<BaseResponse<ServiceLine[]>> {
     return serviceAPI.getMaterials(serviceId)
 }
 

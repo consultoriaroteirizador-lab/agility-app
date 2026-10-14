@@ -4,7 +4,7 @@ import { Box, Button, ScreenBase, Text, ActivityIndicator } from '@/components';
 import { ButtonBack } from '@/components/Button/ButtonBack';
 import { ItemCheckCard } from '@/components/ItemCheckCard';
 import { ItemCheckModal } from '@/components/ItemCheckModal';
-import type { ServiceMaterialResponse, MaterialStatus, MaterialDirection } from '@/domain/agility/service/dto/response/service-material.response';
+import type { ServiceLine, MaterialStatus, MaterialDirection } from '@/domain/agility/service/dto/response/service-line.response';
 import { measure } from '@/theme';
 
 import { useParada } from '../../_context/ParadaContext';
@@ -51,7 +51,7 @@ export function EtapaCheckItens({
         goToPreviousStep,
     } = useParada();
 
-    const [selectedItem, setSelectedItem] = useState<ServiceMaterialResponse | null>(null);
+    const [selectedItem, setSelectedItem] = useState<ServiceLine | null>(null);
     const [modalVisible, setModalVisible] = useState(false);
     const [checking, setChecking] = useState(false);
 
@@ -65,7 +65,7 @@ export function EtapaCheckItens({
         [materialsState.materials, direction],
     );
 
-    const handleOpenCheck = useCallback((item: ServiceMaterialResponse) => {
+    const handleOpenCheck = useCallback((item: ServiceLine) => {
         setSelectedItem(item);
         setModalVisible(true);
     }, []);

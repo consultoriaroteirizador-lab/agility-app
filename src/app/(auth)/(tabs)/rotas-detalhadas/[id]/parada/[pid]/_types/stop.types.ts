@@ -1,6 +1,6 @@
 import * as Location from 'expo-location';
 
-import type { ServiceMaterialResponse } from '@/domain/agility/service/dto'
+import type { ServiceLine } from '@/domain/agility/service/dto'
 
 export type TabType = 'local' | 'equipment';
 
@@ -75,7 +75,7 @@ export interface NavigationModalProps {
 }
 
 export interface EquipmentListProps {
-    materials: ServiceMaterialResponse[];
+    materials: ServiceLine[];
 }
 
 export interface StopTabsProps {
@@ -94,5 +94,5 @@ export interface MapErrorBoundaryProps {
 }
 
 export interface MaterialListProps {
-    materials: ServiceMaterialResponse[];
+    materials: ServiceLine[];
 }

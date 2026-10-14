@@ -1,6 +1,6 @@
 import { Box, Button } from '@/components';
 import Modal from '@/components/Modal/Modal';
-import type { ServiceMaterialResponse } from '@/domain/agility/service/dto';
+import type { ServiceLine } from '@/domain/agility/service/dto';
 import { measure } from '@/theme';
 
 import { MaterialList } from '../MaterialList';
@@ -8,7 +8,7 @@ import { MaterialList } from '../MaterialList';
 interface MaterialsModalProps {
     isVisible: boolean;
     onClose: () => void;
-    materials: ServiceMaterialResponse[];
+    materials: ServiceLine[];
     /** Título do modal (default: "Materiais"). Use "Volumes" no contexto de carga. */
     title?: string;
 }

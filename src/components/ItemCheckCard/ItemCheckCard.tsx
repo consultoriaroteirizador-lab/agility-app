@@ -1,5 +1,5 @@
 import { Box, Text, TouchableOpacityBox } from '@/components';
-import type { ServiceMaterialResponse, MaterialStatus } from '@/domain/agility/service/dto/response/service-material.response';
+import type { ServiceLine, MaterialStatus } from '@/domain/agility/service/dto/response/service-line.response';
 import { measure } from '@/theme';
 
 const statusConfig: Record<MaterialStatus, { bg: string; text: string; label: string }> = {
@@ -12,7 +12,7 @@ const statusConfig: Record<MaterialStatus, { bg: string; text: string; label: st
 };
 
 export interface ItemCheckCardProps {
-    item: ServiceMaterialResponse;
+    item: ServiceLine;
     onCheck: () => void;
 }
 

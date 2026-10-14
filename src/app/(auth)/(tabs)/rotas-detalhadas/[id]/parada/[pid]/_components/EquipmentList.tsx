@@ -5,7 +5,7 @@ import { EquipmentListProps } from '../_types/stop.types';
 
 /**
  * Lista de itens/materiais da parada. No back, "equipamento" do serviço é o
- * próprio material já mapeado (ServiceMaterialResponse).
+ * próprio material já mapeado (ServiceLine).
  */
 export const EquipmentList = ({ materials }: EquipmentListProps) => {
     if (materials && materials.length > 0) {

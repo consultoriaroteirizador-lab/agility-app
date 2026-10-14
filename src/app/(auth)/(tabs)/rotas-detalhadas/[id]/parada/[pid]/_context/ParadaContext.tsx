@@ -22,7 +22,7 @@ import { formGroupService } from '@/domain/agility/form-group/formGroupService';
 import { FormEntityType } from '@/domain/agility/form-group-answer/dto/create-form-group-answer.request';
 import { useCreateFormGroupAnswer } from '@/domain/agility/form-group-answer/useCase/useCreateFormGroupAnswer';
 import type { ServiceDraftData, ServiceResponse } from '@/domain/agility/service/dto';
-import type { ServiceMaterialResponse, MaterialStatus } from '@/domain/agility/service/dto/response/service-material.response';
+import type { ServiceLine, MaterialStatus } from '@/domain/agility/service/dto/response/service-line.response';
 import { PaymentMethodType, ServiceStatus, ServiceType } from '@/domain/agility/service/dto/types';
 import { serviceService } from '@/domain/agility/service/serviceService';
 import { uploadMultipleServicePhotos, uploadBase64Signature } from '@/domain/agility/service/serviceUploadUtils';
@@ -94,7 +94,7 @@ export interface PickupEvidence {
 }
 
 export interface MaterialsState {
-  materials: ServiceMaterialResponse[];
+  materials: ServiceLine[];
   loading: boolean;
   allChecked: boolean;
 }
@@ -180,7 +180,7 @@ interface ParadaContextValue {
   materialsState: MaterialsState;
   fetchMaterials: () => Promise<void>;
   checkMaterial: (materialId: string, data: { status: MaterialStatus; actualQuantity?: number; notes?: string; photoProof?: string }) => Promise<boolean>;
-  setMaterials: (materials: ServiceMaterialResponse[]) => void;
+  setMaterials: (materials: ServiceLine[]) => void;
   checkCompleted: boolean;
   completeCheck: () => void;
 
@@ -678,7 +678,7 @@ export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderPr
     return true;
   }, [serviceId, checkMaterialMutation]);
 
-  const setMaterials = useCallback((materials: ServiceMaterialResponse[]) => {
+  const setMaterials = useCallback((materials: ServiceLine[]) => {
     const allChecked = materials.every(m => m.status !== 'PENDING');
     setMaterialsState({
       materials,

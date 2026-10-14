@@ -1,7 +1,7 @@
 import { BaseResponse, MutationOptions, useMutationService } from '@/api'
 import type { Id } from '@/types/base'
 
-import type { MaterialCheckResponse, MaterialCheckRequest } from '../dto/response/service-material.response'
+import type { MaterialCheckResponse, MaterialCheckRequest } from '../dto/response/service-line.response'
 import { serviceService } from '../serviceService'
 
 export function useCheckMaterial(options?: MutationOptions<BaseResponse<MaterialCheckResponse>>) {

@@ -20,12 +20,12 @@ import type {
     DeliveryAttemptResponse,
 } from './dto'
 import type {
-    ServiceMaterialResponse,
+    ServiceLine,
     MaterialCheckRequest,
     MaterialCheckResponse,
     BatchMaterialCheckRequest,
     BatchMaterialCheckResponse,
-} from './dto/response/service-material.response'
+} from './dto/response/service-line.response'
 
 
 // Export ServiceResponse as ServiceItem for backward compatibility
@@ -198,8 +198,8 @@ async function removeBatch(ids: string[]): Promise<BaseResponse<BatchDeleteResul
 // MATERIALS API
 // ============================================
 
-async function getMaterials(serviceId: Id): Promise<BaseResponse<ServiceMaterialResponse[]>> {
-    const { data } = await apiAgility.get<BaseResponse<ServiceMaterialResponse[]>>(
+async function getMaterials(serviceId: Id): Promise<BaseResponse<ServiceLine[]>> {
+    const { data } = await apiAgility.get<BaseResponse<ServiceLine[]>>(
         `/services/${serviceId}/materials`
     )
     return data

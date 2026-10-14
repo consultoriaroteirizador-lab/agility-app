@@ -3,7 +3,7 @@ import type { FormGroupAnswerResponse } from '@/domain/agility/form-group-answer
 
 import type { ServiceStatus, ServiceType, PriorityLevel, PersonType, VehicleRequirements } from '../types'
 
-import type { ServiceMaterialResponse } from './service-material.response'
+import type { ServiceLine } from './service-line.response'
 
 /**
  * Service response DTO
@@ -218,7 +218,7 @@ export interface ServiceResponse {
     } | null
 
     /** Materials list for this service (delivery/pickup items) */
-    materials?: ServiceMaterialResponse[]
+    materials?: ServiceLine[]
 
     /** Routing code */
     routingCode: string | null
