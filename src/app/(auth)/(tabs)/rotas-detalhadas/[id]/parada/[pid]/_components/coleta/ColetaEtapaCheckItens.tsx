@@ -17,8 +17,8 @@ type CheckStatus = 'CHECKED' | 'PARTIAL' | 'MISSING' | 'DAMAGED' | 'REFUSED';
  */
 export function ColetaEtapaCheckItens() {
     const {
-        materialsState,
-        checkMaterial,
+        linesState,
+        checkLine,
         completeCheck,
         goToNextStep,
         goToPreviousStep,
@@ -50,7 +50,7 @@ export function ColetaEtapaCheckItens() {
 
         setChecking(true);
         try {
-            const success = await checkMaterial(selectedItem.id, {
+            const success = await checkLine(selectedItem.id, {
                 status: data.status as MaterialStatus,
                 actualQuantity: data.actualQuantity,
                 notes: data.notes,
@@ -64,10 +64,10 @@ export function ColetaEtapaCheckItens() {
         } finally {
             setChecking(false);
         }
-    }, [selectedItem, checkMaterial]);
+    }, [selectedItem, checkLine]);
 
-    const pendingCount = materialsState.materials.filter(m => m.status === 'PENDING').length;
-    const checkedCount = materialsState.materials.filter(m => m.status !== 'PENDING').length;
+    const pendingCount = linesState.lines.filter(m => m.status === 'PENDING').length;
+    const checkedCount = linesState.lines.filter(m => m.status !== 'PENDING').length;
 
     const handleBack = useCallback(() => {
         goToPreviousStep();
@@ -97,27 +97,27 @@ export function ColetaEtapaCheckItens() {
                                     Itens para coleta
                                 </Text>
                                 <Text preset="text20" color="colorTextPrimary" fontWeightPreset="bold">
-                                    {materialsState.materials.length} itens
+                                    {linesState.lines.length} itens
                                 </Text>
                             </Box>
                             <Box
                                 paddingHorizontal="x12"
                                 paddingVertical="y8"
                                 borderRadius="s12"
-                                backgroundColor={materialsState.allChecked ? 'primary10' : 'secondary10'}
+                                backgroundColor={linesState.allChecked ? 'primary10' : 'secondary10'}
                             >
                                 <Text
                                     preset="text14"
-                                    color={materialsState.allChecked ? 'primary100' : 'secondary80'}
+                                    color={linesState.allChecked ? 'primary100' : 'secondary80'}
                                     fontWeightPreset="semibold"
                                 >
-                                    {checkedCount}/{materialsState.materials.length} checados
+                                    {checkedCount}/{linesState.lines.length} checados
                                 </Text>
                             </Box>
                         </Box>
 
                         {/* Loading */}
-                        {materialsState.loading && (
+                        {linesState.loading && (
                             <Box justifyContent="center" alignItems="center" padding="y32">
                                 <ActivityIndicator size="large" />
                                 <Text preset="text14" color="gray400" marginTop="y12">
@@ -127,7 +127,7 @@ export function ColetaEtapaCheckItens() {
                         )}
 
                         {/* Lista de itens */}
-                        {!materialsState.loading && materialsState.materials.length === 0 && (
+                        {!linesState.loading && linesState.lines.length === 0 && (
                             <Box justifyContent="center" alignItems="center" padding="y32">
                                 <Text preset="text16" color="gray400" textAlign="center">
                                     Nenhum item cadastrado para esta coleta
@@ -135,9 +135,9 @@ export function ColetaEtapaCheckItens() {
                             </Box>
                         )}
 
-                        {!materialsState.loading && materialsState.materials.length > 0 && (
+                        {!linesState.loading && linesState.lines.length > 0 && (
                             <Box gap="y0">
-                                {materialsState.materials.map((item) => (
+                                {linesState.lines.map((item) => (
                                     <ItemCheckCard
                                         key={item.id}
                                         item={item}
@@ -148,7 +148,7 @@ export function ColetaEtapaCheckItens() {
                         )}
 
                         {/* Aviso de pendentes */}
-                        {pendingCount > 0 && !materialsState.loading && (
+                        {pendingCount > 0 && !linesState.loading && (
                             <Box
                                 marginTop="y16"
                                 paddingHorizontal="x12"
@@ -170,10 +170,10 @@ export function ColetaEtapaCheckItens() {
                                     completeCheck();
                                     goToNextStep();
                                 }}
-                                disabled={!materialsState.allChecked || materialsState.loading}
+                                disabled={!linesState.allChecked || linesState.loading}
                                 width={measure.x330}
                             />
-                            {!materialsState.allChecked && (
+                            {!linesState.allChecked && (
                                 <Text preset="text12" color="redError" textAlign="center" marginTop="y8">
                                     * Todos os itens devem ser checados antes de prosseguir
                                 </Text>

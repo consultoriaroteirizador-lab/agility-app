@@ -36,9 +36,9 @@ function TransferOrchestrator() {
         showSuccess,
         isLoading,
         isServiceStarted,
-        materialsState,
+        linesState,
         checkCompleted,
-        fetchMaterials,
+        fetchLines,
         transferLeg,
         completionRequirements,
     } = useParada();
@@ -50,14 +50,14 @@ function TransferOrchestrator() {
         service?.isCompleted === true || service?.isCanceled === true || service?.isFailed === true;
 
     useEffect(() => {
-        if (isServiceStarted && materialsState.materials.length === 0 && !materialsState.loading) {
-            fetchMaterials();
+        if (isServiceStarted && linesState.lines.length === 0 && !linesState.loading) {
+            fetchLines();
         }
-    }, [isServiceStarted, materialsState.materials.length, materialsState.loading, fetchMaterials]);
+    }, [isServiceStarted, linesState.lines.length, linesState.loading, fetchLines]);
 
     // Check de itens em AMBAS as pernas: gate por `checkCompleted` (resetado ao trocar
     // de perna), não por allChecked — assim o motorista confere ao carregar E ao entregar.
-    const hasMaterials = materialsState.materials.length > 0;
+    const hasMaterials = linesState.lines.length > 0;
     const needsCheck = hasMaterials && !checkCompleted;
 
     useEffect(() => {

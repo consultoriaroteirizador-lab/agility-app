@@ -23,8 +23,8 @@ const EQUIPMENT_STATUS_LABELS = {
 
 export function ServiceEtapaCheckEquipamento() {
     const {
-        materialsState,
-        checkMaterial,
+        linesState,
+        checkLine,
         completeCheck,
     } = useParada();
 
@@ -52,7 +52,7 @@ export function ServiceEtapaCheckEquipamento() {
 
         setChecking(true);
         try {
-            const success = await checkMaterial(selectedItem.id, {
+            const success = await checkLine(selectedItem.id, {
                 status: data.status as MaterialStatus,
                 actualQuantity: data.actualQuantity,
                 notes: data.notes,
@@ -66,10 +66,10 @@ export function ServiceEtapaCheckEquipamento() {
         } finally {
             setChecking(false);
         }
-    }, [selectedItem, checkMaterial]);
+    }, [selectedItem, checkLine]);
 
-    const pendingCount = materialsState.materials.filter(m => m.status === 'PENDING').length;
-    const checkedCount = materialsState.materials.filter(m => m.status !== 'PENDING').length;
+    const pendingCount = linesState.lines.filter(m => m.status === 'PENDING').length;
+    const checkedCount = linesState.lines.filter(m => m.status !== 'PENDING').length;
 
     const handleBack = useCallback(() => {
         router.back();
@@ -108,7 +108,7 @@ export function ServiceEtapaCheckEquipamento() {
                                     fontWeightPreset="bold"
                                     numberOfLines={1}
                                 >
-                                    {materialsState.materials.length} itens
+                                    {linesState.lines.length} itens
                                 </Text>
                             </Box>
 
@@ -120,22 +120,22 @@ export function ServiceEtapaCheckEquipamento() {
                                 paddingHorizontal="x12"
                                 paddingVertical="y8"
                                 borderRadius="s12"
-                                backgroundColor={materialsState.allChecked ? 'tertiary10' : 'secondary10'}
+                                backgroundColor={linesState.allChecked ? 'tertiary10' : 'secondary10'}
                                 flexShrink={0}
                             >
                                 <Text
                                     preset="text14"
-                                    color={materialsState.allChecked ? 'tertiary100' : 'secondary80'}
+                                    color={linesState.allChecked ? 'tertiary100' : 'secondary80'}
                                     fontWeightPreset="semibold"
                                     numberOfLines={1}
                                 >
-                                    {checkedCount}/{materialsState.materials.length} checados
+                                    {checkedCount}/{linesState.lines.length} checados
                                 </Text>
                             </Box>
                         </Box>
 
                         {/* Loading */}
-                        {materialsState.loading && (
+                        {linesState.loading && (
                             <Box justifyContent="center" alignItems="center" padding="y32">
                                 <ActivityIndicator size="large" />
                                 <Text preset="text14" color="gray400" marginTop="y12">
@@ -145,7 +145,7 @@ export function ServiceEtapaCheckEquipamento() {
                         )}
 
                         {/* Lista vazia */}
-                        {!materialsState.loading && materialsState.materials.length === 0 && (
+                        {!linesState.loading && linesState.lines.length === 0 && (
                             <Box justifyContent="center" alignItems="center" padding="y32">
                                 <Text preset="text16" color="gray400" textAlign="center">
                                     Nenhum equipamento cadastrado para este serviço
@@ -154,9 +154,9 @@ export function ServiceEtapaCheckEquipamento() {
                         )}
 
                         {/* Lista de itens */}
-                        {!materialsState.loading && materialsState.materials.length > 0 && (
+                        {!linesState.loading && linesState.lines.length > 0 && (
                             <Box>
-                                {materialsState.materials.map((item) => (
+                                {linesState.lines.map((item) => (
                                     <ItemCheckCard
                                         key={item.id}
                                         item={item}
@@ -167,7 +167,7 @@ export function ServiceEtapaCheckEquipamento() {
                         )}
 
                         {/* Aviso de pendentes */}
-                        {pendingCount > 0 && !materialsState.loading && (
+                        {pendingCount > 0 && !linesState.loading && (
                             <Box
                                 marginTop="y16"
                                 paddingHorizontal="x12"
@@ -187,10 +187,10 @@ export function ServiceEtapaCheckEquipamento() {
                             <Button
                                 title="Confirmar"
                                 onPress={handleConfirm}
-                                disabled={!materialsState.allChecked || materialsState.loading}
+                                disabled={!linesState.allChecked || linesState.loading}
                                 width={measure.x330}
                             />
-                            {!materialsState.allChecked && (
+                            {!linesState.allChecked && (
                                 <Text
                                     preset="text12"
                                     color="redError"

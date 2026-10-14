@@ -22,14 +22,14 @@ import { formGroupService } from '@/domain/agility/form-group/formGroupService';
 import { FormEntityType } from '@/domain/agility/form-group-answer/dto/create-form-group-answer.request';
 import { useCreateFormGroupAnswer } from '@/domain/agility/form-group-answer/useCase/useCreateFormGroupAnswer';
 import type { ServiceDraftData, ServiceResponse } from '@/domain/agility/service/dto';
-import type { ServiceLine, MaterialStatus } from '@/domain/agility/service/dto/response/service-line.response';
 import { PaymentMethodType, ServiceStatus, ServiceType } from '@/domain/agility/service/dto/types';
 import { serviceService } from '@/domain/agility/service/serviceService';
+import { hasPickupLines, serviceLines } from '@/domain/agility/service/serviceLines';
 import { uploadMultipleServicePhotos, uploadBase64Signature } from '@/domain/agility/service/serviceUploadUtils';
 import {
   useFindOneService,
   useFindServicesByRoutingId,
-  useCheckMaterial,
+  useCheckLine,
   useGetServiceDraft,
   useSaveServiceDraft,
 } from '@/domain/agility/service/useCase';
@@ -40,6 +40,7 @@ import {
   type ParadaDraft,
 } from '@/services/storage/paradaDraftStorage';
 import { parseBRLToCents } from '@/utils/parseCurrency';
+import { useToastService } from '@/services/Toast/useToast';
 
 import { resolveParadaAtendidaElegivel, resolvePedidosDaParada } from '../../../_utils';
 import { useStopStatus } from '../_hooks/useStopStatus';
@@ -51,6 +52,7 @@ import {
   pickupEvidenceToDraft,
   recipientToDraft,
 } from '../_utils/paradaDraftMapping';
+import { linesStateOf, runLineCheck, type LineCheckData, type LinesState } from '../_utils/lineCheckState';
 
 // Tipos
 // Era uma uniao fixa ('cliente' | 'porteiro' | ...); com as opcoes vindo da
@@ -91,12 +93,6 @@ export interface PickupEvidence {
   signatureUrl?: string;
   photoUrls: string[];
   notes?: string;
-}
-
-export interface MaterialsState {
-  materials: ServiceLine[];
-  loading: boolean;
-  allChecked: boolean;
 }
 
 export interface FormState {
@@ -176,11 +172,10 @@ interface ParadaContextValue {
   uploadProgress: Map<number, { loaded: number; total: number; percentage: number }>;
   setUploadProgress: (progress: Map<number, { loaded: number; total: number; percentage: number }> | ((prev: Map<number, { loaded: number; total: number; percentage: number }>) => Map<number, { loaded: number; total: number; percentage: number }>)) => void;
 
-  // Materials check state
-  materialsState: MaterialsState;
-  fetchMaterials: () => Promise<void>;
-  checkMaterial: (materialId: string, data: { status: MaterialStatus; actualQuantity?: number; notes?: string; photoProof?: string }) => Promise<boolean>;
-  setMaterials: (materials: ServiceLine[]) => void;
+  // Linhas da parada (itens do pedido ou equipamentos do SERVICE) e a conferência delas
+  linesState: LinesState;
+  fetchLines: () => Promise<void>;
+  checkLine: (lineId: string, data: LineCheckData) => Promise<boolean>;
   checkCompleted: boolean;
   completeCheck: () => void;
 
@@ -380,8 +375,9 @@ export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderPr
   // comentário lá.
   const isParadaAtendida = resolveParadaAtendidaElegivel(pedidosDaParada);
 
-  // Hook para check de material
-  const checkMaterialMutation = useCheckMaterial();
+  // Check de linha na rota da família (fase 3C): a falha volta pelo checkLineAsync e vira toast
+  const { checkLineAsync } = useCheckLine();
+  const { showToast } = useToastService();
 
   // Hook para criar form group answers
   const createFormGroupAnswerMutation = useCreateFormGroupAnswer();
@@ -413,9 +409,9 @@ export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderPr
   // Estados de modais de mídia
   const [showSignature, setShowSignature] = useState(false);
 
-  // Materials state
-  const [materialsState, setMaterialsState] = useState<MaterialsState>({
-    materials: [],
+  // Linhas da parada e a conferência delas
+  const [linesState, setLinesState] = useState<LinesState>({
+    lines: [],
     loading: false,
     allChecked: false,
   });
@@ -487,18 +483,13 @@ export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderPr
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isServiceStarted]);
 
-  // Efeito para carregar materiais que já vêm do serviço (evita chamada extra)
+  // As linhas que já vêm na resposta do serviço (evita chamada extra)
+  const linhasDoServico = useMemo(() => serviceLines(service), [service]);
   useEffect(() => {
-    if (service?.materials && service.materials.length > 0) {
-      const materials = service.materials;
-      const allChecked = materials.every(m => m.status !== 'PENDING');
-      setMaterialsState({
-        materials,
-        loading: false,
-        allChecked,
-      });
+    if (linhasDoServico && linhasDoServico.length > 0) {
+      setLinesState(linesStateOf(linhasDoServico));
     }
-  }, [service?.materials]);
+  }, [linhasDoServico]);
 
   // Efeito para preencher nome automaticamente quando selecionar "cliente"
   //
@@ -582,110 +573,71 @@ export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderPr
     setSignatureState(data);
   }, []);
 
-  // Materials functions
-  // Marca o serviceId cujos materiais já foram buscados (evita loop de fetch em
-  // serviços sem materiais). Resetado quando o serviceId muda.
-  const materialsFetchedRef = useRef<string | null>(null);
+  // Linhas: busca e conferência
+  // Marca o serviceId cujas linhas já foram buscadas (evita loop de fetch em
+  // serviços sem linhas). Resetado quando o serviceId muda.
+  const linesFetchedRef = useRef<string | null>(null);
 
-  const fetchMaterials = useCallback(async () => {
-    if (!serviceId) return;
+  const fetchLines = useCallback(async () => {
+    // O tipo decide a rota (`/items` ou `/materials`): sem o serviço carregado, não busca.
+    if (!serviceId || !service) return;
 
-    // Se já temos materiais do serviço, não precisa buscar novamente
-    if (service?.materials && service.materials.length > 0) {
-      const materials = service.materials;
-      const allChecked = materials.every(m => m.status !== 'PENDING');
-      setMaterialsState({
-        materials,
-        loading: false,
-        allChecked,
-      });
+    // Se já temos as linhas do serviço, não precisa buscar novamente
+    if (linhasDoServico && linhasDoServico.length > 0) {
+      setLinesState(linesStateOf(linhasDoServico));
       return;
     }
 
-    // Idempotente por serviceId: serviços SEM materiais retornam lista vazia, mantendo
-    // materials.length === 0 — sem este guard, o useEffect que dispara o fetch
+    // Idempotente por serviceId: serviços SEM linhas retornam lista vazia, mantendo
+    // lines.length === 0 — sem este guard, o useEffect que dispara o fetch
     // (condicionado a length===0) re-chamaria infinitamente, gerando storm de
     // requests e 429 (ThrottlerException). Tenta no máximo uma vez por serviceId.
-    if (materialsFetchedRef.current === serviceId) return;
-    materialsFetchedRef.current = serviceId;
+    if (linesFetchedRef.current === serviceId) return;
+    linesFetchedRef.current = serviceId;
 
-    // Se não tem materiais no serviço, busca da API
-    setMaterialsState(prev => ({ ...prev, loading: true }));
+    // Se não tem linhas no serviço, busca da API
+    setLinesState(prev => ({ ...prev, loading: true }));
 
     try {
-      const response = await serviceService.getMaterials(serviceId);
+      const response = await serviceService.getLines(serviceId, service.serviceType);
       if (response.success && response.result) {
-        const materials = response.result;
-        const allChecked = materials.every(m => m.status !== 'PENDING');
-        setMaterialsState({
-          materials,
-          loading: false,
-          allChecked,
-        });
+        setLinesState(linesStateOf(response.result));
       } else {
-        setMaterialsState(prev => ({ ...prev, loading: false }));
+        setLinesState(prev => ({ ...prev, loading: false }));
       }
     } catch (error) {
-      console.error('Error fetching materials:', error);
-      setMaterialsState(prev => ({ ...prev, loading: false }));
+      console.error('Error fetching lines:', error);
+      setLinesState(prev => ({ ...prev, loading: false }));
       // Em ERRO (ex.: 429 transitório, rede), liberamos o guard após um backoff para
       // permitir nova tentativa — mas com atraso, para não reentrar em storm/throttle.
       // (Empty-success NÃO cai aqui: mantém marcado, evitando loop em serviços sem itens.)
       const sid = serviceId;
       setTimeout(() => {
-        if (materialsFetchedRef.current === sid) {
-          materialsFetchedRef.current = null;
+        if (linesFetchedRef.current === sid) {
+          linesFetchedRef.current = null;
         }
       }, 4000);
     }
-  }, [serviceId, service?.materials]);
+  }, [serviceId, service, linhasDoServico]);
 
-  const checkMaterial = useCallback(async (
-    materialId: string,
-    data: { status: MaterialStatus; actualQuantity?: number; notes?: string; photoProof?: string }
-  ): Promise<boolean> => {
+  const checkLine = useCallback(async (lineId: string, data: LineCheckData): Promise<boolean> => {
     if (!serviceId) return false;
+    const serviceType = service?.serviceType ?? null;
 
-    // Optimistic update - atualiza UI imediatamente
-    setMaterialsState(prev => {
-      const updatedMaterials = prev.materials.map(m =>
-        m.id === materialId
-          ? {
-            ...m,
-            status: data.status,
-            actualQuantity: data.actualQuantity,
-            checkNotes: data.notes,
-            checkPhotoProof: data.photoProof,
-            checkedAt: new Date().toISOString(),
-          }
-          : m
-      );
-      const allChecked = updatedMaterials.every(m => m.status !== 'PENDING');
-      return {
-        materials: updatedMaterials,
-        loading: prev.loading,
-        allChecked,
-      };
-    });
-
-    // Dispara mutation
-    checkMaterialMutation.checkMaterial({
-      serviceId,
-      materialId,
+    // Marca na hora e envia; na falha, desfaz só esta marcação e avisa por toast (fase 3C, C5).
+    // Não espera a resposta: o modal de check fecha na hora, como antes.
+    void runLineCheck({
+      lineId,
       data,
+      previous: linesState.lines.find((l) => l.id === lineId),
+      marker: new Date().toISOString(),
+      update: setLinesState,
+      send: () => checkLineAsync({ serviceId, serviceType, lineId, data }),
+      notifyError: (message) => showToast({ message, type: 'error' }),
     });
 
     return true;
-  }, [serviceId, checkMaterialMutation]);
-
-  const setMaterials = useCallback((materials: ServiceLine[]) => {
-    const allChecked = materials.every(m => m.status !== 'PENDING');
-    setMaterialsState({
-      materials,
-      loading: false,
-      allChecked,
-    });
-  }, []);
+  }, [serviceId, service?.serviceType, linesState.lines, checkLineAsync, showToast]);
 
   // Função para marcar check como completo
   const completeCheck = useCallback(() => {
@@ -698,11 +650,8 @@ export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderPr
   }, []);
 
   // `hasReturn`: esta parada tem coleta/devolução no mesmo stop. Fonte de verdade é a
-  // flag do backend; como fallback, inferimos da presença de materiais direction=PICKUP.
-  const hasReturn = !!(
-    service?.hasReturn ||
-    (service?.materials?.some((m) => m.direction === 'PICKUP') ?? false)
-  );
+  // flag do backend; como fallback, inferimos da presença de linhas direction=PICKUP.
+  const hasReturn = !!(service?.hasReturn || hasPickupLines(service));
 
   // TRANSFER: conclui a perna de COLETA na origem. Faz snapshot da evidência atual
   // (recebedor/assinatura/fotos/obs) em `pickupEvidence`, reseta os campos de evidência
@@ -854,7 +803,7 @@ export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderPr
   // Reset do flag de hidratação quando o serviceId muda.
   useEffect(() => {
     hydratedRef.current = null;
-    materialsFetchedRef.current = null;
+    linesFetchedRef.current = null;
   }, [serviceId]);
 
   // Hidratação: roda 1x por serviceId, quando o draft do backend já chegou (ou falhou).
@@ -1175,8 +1124,8 @@ export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderPr
     setTransferLeg('pickup');
     setPickupDone(false);
     setPickupEvidence(null);
-    setMaterialsState({
-      materials: [],
+    setLinesState({
+      lines: [],
       loading: false,
       allChecked: false,
     });
@@ -1282,11 +1231,10 @@ export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderPr
     uploadProgress,
     setUploadProgress,
 
-    // Materials state
-    materialsState,
-    fetchMaterials,
-    checkMaterial,
-    setMaterials,
+    // Linhas e a conferência delas
+    linesState,
+    fetchLines,
+    checkLine,
     checkCompleted,
     completeCheck,
 

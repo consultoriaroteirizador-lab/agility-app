@@ -4,6 +4,7 @@ import { useLocalSearchParams } from 'expo-router';
 
 import { Box, ActivityIndicator, Text } from '@/components';
 import { requirementsForServiceType } from '@/domain/agility/company/completionRequirements';
+import { splitByDirection } from '@/domain/agility/service/serviceLines';
 import { measure } from '@/theme';
 
 import { EtapaCheckItens } from '../_components/entrega/EtapaCheckItens';
@@ -35,9 +36,9 @@ function EntregaOrchestrator() {
         recipient,
         showSuccess,
         isLoading,
-        materialsState,
+        linesState,
         checkCompleted,
-        fetchMaterials,
+        fetchLines,
         hasFormGroups,
         formCompleted,
         hasReturn,
@@ -70,14 +71,13 @@ function EntregaOrchestrator() {
 
     // Buscar materiais quando entrar na etapa de confirmação (para saber se tem materiais)
     useEffect(() => {
-        if (!isLoading && materialsState.materials.length === 0 && !materialsState.loading) {
-            fetchMaterials();
+        if (!isLoading && linesState.lines.length === 0 && !linesState.loading) {
+            fetchLines();
         }
-    }, [isLoading, materialsState.materials.length, materialsState.loading, fetchMaterials]);
+    }, [isLoading, linesState.lines.length, linesState.loading, fetchLines]);
 
     // Materiais separados por direção: entrega (DELIVERY/legado) vs retorno (PICKUP).
-    const deliveryMaterials = materialsState.materials.filter((m) => m.direction !== 'PICKUP');
-    const returnMaterials = materialsState.materials.filter((m) => m.direction === 'PICKUP');
+    const { delivery: deliveryMaterials, pickup: returnMaterials } = splitByDirection(linesState.lines);
 
     const deliveryAllChecked = deliveryMaterials.every((m) => m.status !== 'PENDING');
     const returnAllChecked = returnMaterials.every((m) => m.status !== 'PENDING');
