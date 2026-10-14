@@ -9,9 +9,9 @@ import { EtapaCheckItens } from './EtapaCheckItens';
  * confirmar a entrega e checar os itens entregues, ele confere os itens que está
  * RECOLHENDO (materiais direction=PICKUP, ex.: devolução, casco vazio).
  *
- * Reaproveita o check de materiais (estratégia "via check de material"): cada item
- * de retorno é conferido via PATCH /services/:id/materials/:mid/check, que o app já
- * usa. A finalização única no fim do wizard fecha entrega + retorno.
+ * Reaproveita o check das linhas: cada item de retorno é conferido pelo `checkLine`
+ * do contexto, em PATCH /services/:id/items/:itemId/check (a rota do pedido). A
+ * finalização única no fim do wizard fecha entrega + retorno.
  */
 export function EtapaColetaRetorno() {
     const { completeReturnCheck } = useParada();

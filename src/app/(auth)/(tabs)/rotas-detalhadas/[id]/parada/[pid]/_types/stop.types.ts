@@ -1,7 +1,5 @@
 import * as Location from 'expo-location';
 
-import type { ServiceLine } from '@/domain/agility/service/dto'
-
 export type TabType = 'local' | 'equipment';
 
 export type NavigationApp = 'waze' | 'googleMaps' | 'appleMaps';
@@ -89,8 +87,4 @@ export interface MapErrorBoundaryState {
 
 export interface MapErrorBoundaryProps {
     children: React.ReactNode;
-}
-
-export interface MaterialListProps {
-    materials: ServiceLine[];
 }

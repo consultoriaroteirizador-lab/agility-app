@@ -55,6 +55,7 @@ describe('itensDaParada', () => {
     it('devolve listas vazias para parada sem material', () => {
         expect(itensDaParada(undefined)).toEqual({ entrega: [], retorno: [] })
         expect(itensDaParada([])).toEqual({ entrega: [], retorno: [] })
+        expect(itensDaParada(null)).toEqual({ entrega: [], retorno: [] })
     })
 })
 
