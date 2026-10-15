@@ -96,4 +96,11 @@ describe('ServiceEtapaConfirmacao — Trocar equipamento (fase 3D)', () => {
 
         expect(botaoTrocar(t)).toBeUndefined();
     });
+
+    // O backend recusa a troca da coleta (400 "Só troca equipamento marcado como Levei").
+    it('só uma linha de coleta (PICKUP) "Levei" de quantidade 1: sem o botão', () => {
+        const t = render({ ...SERVICE, materials: [linha({ id: 'c', direction: 'PICKUP' })] });
+
+        expect(botaoTrocar(t)).toBeUndefined();
+    });
 });

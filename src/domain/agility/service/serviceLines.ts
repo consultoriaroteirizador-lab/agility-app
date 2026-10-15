@@ -84,9 +84,14 @@ export function lineGroups(lines: readonly ServiceLine[] | null | undefined, ser
 
 export const SWAP_DESCRIPTION_REQUIRED = 'Código não cadastrado: informe a descrição'
 
-/** As linhas que o motorista pode trocar (D4): "Levei" (CHECKED) e quantidade 1. */
+/**
+ * As linhas que o motorista pode trocar (D4): "Levei" (CHECKED), quantidade 1 e de entrega. A coleta
+ * (PICKUP) o backend recusa; a linha sem `direction` é entrega, como em `splitByDirection`.
+ */
 export function swappableLines(lines: readonly ServiceLine[] | null | undefined): ServiceLine[] {
-    return (lines ?? []).filter((line) => line.status === 'CHECKED' && Number(line.quantity) === 1)
+    return (lines ?? []).filter(
+        (line) => line.status === 'CHECKED' && Number(line.quantity) === 1 && line.direction !== 'PICKUP',
+    )
 }
 
 /** A linha que `line` substituiu (D1); `null` quando `line` não é troca ou a original não veio na lista. */

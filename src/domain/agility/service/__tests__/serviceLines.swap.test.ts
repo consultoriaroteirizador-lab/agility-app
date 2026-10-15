@@ -35,6 +35,19 @@ describe('swappableLines (fase 3D, D4)', () => {
         expect(swappableLines(null)).toEqual([])
         expect(swappableLines(undefined)).toEqual([])
     })
+
+    // O backend recusa a coleta: 400 "Só troca equipamento marcado como Levei".
+    it('coleta (PICKUP) "Levei" de quantidade 1 não é trocável', () => {
+        const coleta = linha({ id: 'p', direction: 'PICKUP' })
+        const entrega = linha({ id: 'd', direction: 'DELIVERY' })
+        expect(swappableLines([coleta, entrega])).toEqual([entrega])
+    })
+
+    it('linha sem direction conta como entrega: trocável', () => {
+        const semDirecao = linha({ id: 's' })
+        expect(semDirecao.direction).toBeUndefined()
+        expect(swappableLines([semDirecao])).toEqual([semDirecao])
+    })
 })
 
 describe('replacedLineOf e replacedLineLabel (fase 3D, D1)', () => {
