@@ -23,6 +23,9 @@ import type {
     ServiceLine,
     MaterialCheckRequest,
     MaterialCheckResponse,
+    EquipmentLookupResponse,
+    SwapLineRequest,
+    SwapLineResponse,
 } from './dto/response/service-line.response'
 import type { ServiceType } from './dto/types'
 import { lineRoute } from './serviceLines'
@@ -220,6 +223,28 @@ async function checkLine(
 }
 
 // ============================================
+// TROCA DE EQUIPAMENTO NA PARADA (fase 3D)
+// Sempre em /materials: só SERVICE troca.
+// ============================================
+
+/** O código no cadastro do dono do pedido. O axios codifica o código na query. */
+async function lookupEquipment(serviceId: Id, code: string): Promise<BaseResponse<EquipmentLookupResponse>> {
+    const { data } = await apiAgility.get<BaseResponse<EquipmentLookupResponse>>(
+        `/services/${serviceId}/materials/equipment-lookup`,
+        { params: { code } }
+    )
+    return data
+}
+
+async function swapLine(serviceId: Id, lineId: Id, payload: SwapLineRequest): Promise<BaseResponse<SwapLineResponse>> {
+    const { data } = await apiAgility.post<BaseResponse<SwapLineResponse>>(
+        `/services/${serviceId}/materials/${lineId}/swap`,
+        payload
+    )
+    return data
+}
+
+// ============================================
 // DRAFT (in-progress evidence) API
 // ============================================
 
@@ -267,6 +292,9 @@ export const serviceAPI = {
     // Linhas (fase 3C)
     getLines,
     checkLine,
+    // Troca de equipamento (fase 3D)
+    lookupEquipment,
+    swapLine,
     // Draft
     saveDraft,
     getDraft,
