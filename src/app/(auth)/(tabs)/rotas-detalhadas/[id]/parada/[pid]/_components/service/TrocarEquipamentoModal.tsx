@@ -202,7 +202,9 @@ export function TrocarEquipamentoModal({ visible, serviceId, lines, onClose }: T
                                         onChangeText={mudar('code')}
                                         onBlur={() => consultar()}
                                         placeholder="Código do equipamento que fica"
-                                        autoCapitalize="characters"
+                                        // O cadastro compara o código como foi digitado: o teclado não o muda.
+                                        autoCapitalize="none"
+                                        autoCorrect={false}
                                         messageError={tentou ? erros.code : undefined}
                                     />
                                     {found === true && lookup?.found ? (
@@ -220,6 +222,7 @@ export function TrocarEquipamentoModal({ visible, serviceId, lines, onClose }: T
                                     onChangeText={mudar('serialNumber')}
                                     placeholder="Nº de série do equipamento que fica"
                                     autoCapitalize="characters"
+                                    autoCorrect={false}
                                     messageError={tentou ? erros.serialNumber : undefined}
                                 />
 

@@ -131,6 +131,16 @@ describe('TrocarEquipamentoModal (fase 3D)', () => {
         expect(campo(t, 'Descrição *')).toBeUndefined();
     });
 
+    // O cadastro compara o código como foi digitado (maiúsculas e minúsculas contam): o teclado não
+    // pode mudar o que o motorista digita.
+    it('Código sem maiúscula automática nem corretor; Nº de série sem corretor', () => {
+        const t = render([A]);
+
+        expect(campo(t, 'Código *').props.autoCapitalize).toBe('none');
+        expect(campo(t, 'Código *').props.autoCorrect).toBe(false);
+        expect(campo(t, 'Nº de série *').props.autoCorrect).toBe(false);
+    });
+
     it('código fora do cadastro: avisa e abre a Descrição', async () => {
         mockLookup.mockResolvedValue(NAO_ACHADO);
         const t = render([A]);
