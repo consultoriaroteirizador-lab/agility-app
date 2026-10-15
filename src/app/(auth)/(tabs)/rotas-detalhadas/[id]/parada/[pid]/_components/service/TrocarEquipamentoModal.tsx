@@ -126,7 +126,11 @@ export function TrocarEquipamentoModal({ visible, serviceId, lines, onClose }: T
                 showToast({ message: SWAP_SUCCESS_MESSAGE, type: 'success' });
                 onClose();
             } catch (error) {
-                showToast({ message: mensagemDaApi(error, SWAP_FALLBACK_MESSAGE), type: 'error' });
+                const mensagem = mensagemDaApi(error, SWAP_FALLBACK_MESSAGE);
+                // Sem a consulta (falhou), a Descrição não aparecia; o 400 do backend diz que o código
+                // está fora do cadastro: abre o campo, com o formulário preenchido.
+                if (mensagem === SWAP_DESCRIPTION_REQUIRED) setLookup({ found: false, code: form.code.trim() });
+                showToast({ message: mensagem, type: 'error' });
             }
         });
 
@@ -226,6 +230,7 @@ export function TrocarEquipamentoModal({ visible, serviceId, lines, onClose }: T
                                         value={form.description}
                                         onChangeText={mudar('description')}
                                         placeholder="Ex.: Modem Wi-Fi"
+                                        messageError={tentou ? erros.description : undefined}
                                     />
                                 ) : null}
 

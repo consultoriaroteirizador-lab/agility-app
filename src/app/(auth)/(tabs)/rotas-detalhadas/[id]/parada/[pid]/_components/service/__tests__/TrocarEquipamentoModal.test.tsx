@@ -225,6 +225,35 @@ describe('TrocarEquipamentoModal (fase 3D)', () => {
         expect(campo(t, 'Descrição *')).toBeDefined();
     });
 
+    // A consulta falhou e o código não está no cadastro: o backend recusa o POST sem descrição, e a
+    // Descrição só aparecia com a consulta dizendo "não achado". O 400 passa a abri-la.
+    it('400 "Código não cadastrado": abre a Descrição com o erro, mantém o formulário, e a nova tentativa leva a descrição', async () => {
+        mockLookup.mockRejectedValueOnce(new Error('sem rede'));
+        mockSwap
+            .mockRejectedValueOnce({ success: false, error: { message: 'Código não cadastrado: informe a descrição', code: 'BAD_REQUEST' } })
+            .mockResolvedValueOnce({ success: true, result: {} });
+        const t = render([A]);
+
+        digitar(t, 'Código *', ' LIVRE-1 ');
+        digitar(t, 'Nº de série *', 'SN-B');
+        await registrar(t);
+
+        expect(mockSwap).toHaveBeenCalledTimes(1);
+        expect(mockShowToast).toHaveBeenCalledWith({ message: 'Código não cadastrado: informe a descrição', type: 'error' });
+        expect(campo(t, 'Descrição *')).toBeDefined();
+        expect(campo(t, 'Descrição *').props.messageError).toBe('Código não cadastrado: informe a descrição');
+        expect(campo(t, 'Código *').props.value).toBe(' LIVRE-1 ');
+        expect(campo(t, 'Nº de série *').props.value).toBe('SN-B');
+
+        digitar(t, 'Descrição *', 'Roteador X');
+        expect(campo(t, 'Descrição *').props.messageError).toBeUndefined();
+        await registrar(t);
+
+        expect(mockSwap).toHaveBeenCalledTimes(2);
+        expect(mockSwap.mock.calls[1][0].data).toEqual({ code: 'LIVRE-1', serialNumber: 'SN-B', description: 'Roteador X' });
+        expect(onClose).toHaveBeenCalledTimes(1);
+    });
+
     // Review Focus 3: rede lenta; o motorista muda o código antes da primeira resposta.
     it('a resposta de uma consulta antiga não vale para o código novo', async () => {
         let responderVelha!: (v: unknown) => void;
