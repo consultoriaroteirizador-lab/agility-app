@@ -390,6 +390,29 @@ describe('TrocarEquipamentoModal (fase 3D)', () => {
         expect(onClose).toHaveBeenCalledTimes(1);
     });
 
+    it('com o POST em voo, Registrar troca mostra o carregando; depois da resposta, volta ao texto', async () => {
+        mockLookup.mockResolvedValue(ACHADO);
+        let rejeitar!: (e: unknown) => void;
+        mockSwap.mockReturnValueOnce(new Promise((_, r) => { rejeitar = r; }));
+        const t = render([A]);
+        digitar(t, 'Código *', 'MOD-NOVO');
+        digitar(t, 'Nº de série *', 'SN-B');
+        await sairDoCodigo(t);
+        expect(botao(t, 'Registrar troca').props.isLoading).toBe(false);
+
+        let envio!: Promise<unknown>;
+        await act(async () => {
+            envio = botao(t, 'Registrar troca').props.onPress();
+        });
+        expect(botao(t, 'Registrar troca').props.isLoading).toBe(true);
+
+        await act(async () => {
+            rejeitar({ success: false, error: { message: 'Instável', code: 'BAD_REQUEST' } });
+            await envio;
+        });
+        expect(botao(t, 'Registrar troca').props.isLoading).toBe(false);
+    });
+
     it('outra linha muda com o modal aberto: a escolhida segue no formulário e o modal não fecha', () => {
         const t = render([A, ROTEADOR]);
         escolher(t, 'ROTEADOR');

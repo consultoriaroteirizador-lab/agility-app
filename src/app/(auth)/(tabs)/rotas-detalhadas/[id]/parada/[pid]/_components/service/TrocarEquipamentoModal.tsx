@@ -246,6 +246,7 @@ export function TrocarEquipamentoModal({ visible, serviceId, lines, onClose }: T
                                             title="Registrar troca"
                                             onPress={registrar}
                                             disabled={isSubmitting}
+                                            isLoading={isSubmitting}
                                             width={measure.x150}
                                         />
                                     </Box>
