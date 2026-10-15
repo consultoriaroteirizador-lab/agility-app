@@ -31,16 +31,21 @@ jest.mock('../TrocarEquipamentoModal', () => ({
 }));
 
 let mockService: unknown;
+let mockIsServiceStarted = true;
 jest.mock('../../../_context/ParadaContext', () => ({
     useParada: () => ({
         service: mockService,
         effectiveAddress: null,
         setEtapa: jest.fn(),
         setDelivered: jest.fn(),
-        isServiceStarted: true,
+        isServiceStarted: mockIsServiceStarted,
         rotaId: 'r1',
     }),
 }));
+
+beforeEach(() => {
+    mockIsServiceStarted = true;
+});
 
 import { ServiceEtapaConfirmacao } from '../ServiceEtapaConfirmacao';
 
@@ -100,6 +105,14 @@ describe('ServiceEtapaConfirmacao — Trocar equipamento (fase 3D)', () => {
     // O backend recusa a troca da coleta (400 "Só troca equipamento marcado como Levei").
     it('só uma linha de coleta (PICKUP) "Levei" de quantidade 1: sem o botão', () => {
         const t = render({ ...SERVICE, materials: [linha({ id: 'c', direction: 'PICKUP' })] });
+
+        expect(botaoTrocar(t)).toBeUndefined();
+    });
+
+    // O backend só registra a troca com o pedido em atendimento.
+    it('atendimento ainda não confirmado: sem o botão, mesmo com equipamento trocável', () => {
+        mockIsServiceStarted = false;
+        const t = render({ ...SERVICE, materials: [linha({ id: 'a' })] });
 
         expect(botaoTrocar(t)).toBeUndefined();
     });

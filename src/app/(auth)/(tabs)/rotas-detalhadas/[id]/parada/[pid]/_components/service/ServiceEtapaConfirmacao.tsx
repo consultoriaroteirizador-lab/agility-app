@@ -21,8 +21,9 @@ export function ServiceEtapaConfirmacao() {
     const [showMaterialModal, setShowMaterialModal] = useState(false);
     const [showTroca, setShowTroca] = useState(false);
     const lines = serviceLines(service) ?? [];
-    // Fase 3D: o botão só aparece com um equipamento "Levei" de quantidade 1.
-    const podeTrocar = swappableLines(lines).length > 0;
+    // Fase 3D: o botão só aparece em atendimento (o backend recusa a troca fora dele) e com um
+    // equipamento trocável ("Levei", quantidade 1, de entrega).
+    const podeTrocar = isServiceStarted && swappableLines(lines).length > 0;
     const pathname = usePathname();
 
     const customerName = service?.fantasyName || service?.responsible || 'Cliente';
