@@ -75,6 +75,8 @@ const campo = (t: Arvore, title: string) =>
 const botao = (t: Arvore, title: string) =>
     t.root.findAll((n) => n.props.title === title && typeof n.props.onPress === 'function')[0];
 const temTexto = (t: Arvore, s: string) => t.root.findAll((n) => n.props.children === s).length > 0;
+// findByType(Modal) não compila: duas cópias divergentes de @types/react (ver ChatInput.test.tsx).
+const modalNativo = (t: Arvore) => t.root.find((n) => (n.type as unknown) === Modal);
 
 function digitar(t: Arvore, title: string, valor: string) {
     act(() => {
@@ -192,7 +194,7 @@ describe('TrocarEquipamentoModal (fase 3D)', () => {
     it('o toast aparece por cima do modal: há um <Toast /> dentro do Modal enquanto ele está aberto', () => {
         const t = render([A]);
 
-        expect(t.root.findByType(Modal).findAllByType(Toast)).toHaveLength(1);
+        expect(modalNativo(t).findAllByType(Toast)).toHaveLength(1);
 
         atualizar(t, false, [A]);
         expect(t.root.findAllByType(Toast)).toHaveLength(0);
@@ -415,7 +417,7 @@ describe('TrocarEquipamentoModal (fase 3D)', () => {
             botaoFechar(t).props.onPress();
         });
         act(() => {
-            t.root.findByType(Modal).props.onRequestClose();
+            modalNativo(t).props.onRequestClose();
         });
         expect(onClose).not.toHaveBeenCalled();
 
