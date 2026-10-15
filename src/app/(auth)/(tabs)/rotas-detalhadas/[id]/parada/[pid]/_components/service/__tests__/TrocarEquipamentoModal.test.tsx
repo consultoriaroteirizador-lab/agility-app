@@ -3,10 +3,12 @@
  * do campo, validação, envio, toast, e as duas armadilhas da rede lenta (consulta atrasada e toque duplo).
  */
 import React from 'react';
+import { Modal } from 'react-native';
 
 import { ThemeProvider } from '@shopify/restyle';
 import TestRenderer, { act } from 'react-test-renderer';
 
+import { Toast } from '@/components/Toast/Toast';
 import type { ServiceLine } from '@/domain/agility/service/dto/response/service-line.response';
 import { theme } from '@/theme';
 
@@ -24,6 +26,8 @@ jest.mock('@expo/vector-icons', () => ({ Ionicons: () => null }));
 // O teste lê e chama as props: o Input real arrasta máscara e teclado.
 jest.mock('@/components/Input/Input', () => ({ Input: () => null }));
 jest.mock('@/hooks/useAppSafeArea', () => ({ useAppSafeArea: () => ({ top: 20, bottom: 20 }) }));
+// O teste só precisa achar o Toast na árvore: o real lê o store e anima.
+jest.mock('@/components/Toast/Toast', () => ({ Toast: function ToastDoApp() { return null; } }));
 
 const mockShowToast = jest.fn();
 jest.mock('@/services/Toast/useToast', () => ({ useToastService: () => ({ showToast: mockShowToast }) }));
@@ -171,6 +175,17 @@ describe('TrocarEquipamentoModal (fase 3D)', () => {
         expect(onClose).not.toHaveBeenCalled();
         expect(campo(t, 'Código *').props.value).toBe('MOD-NOVO');
         expect(campo(t, 'Nº de série *').props.value).toBe('SN-B');
+    });
+
+    // O <Toast /> da raiz (`_layout.tsx`) fica atrás do Modal nativo (Dialog no Android, VC
+    // apresentado no iOS): sem um Toast dentro do Modal, toda falha da troca era muda.
+    it('o toast aparece por cima do modal: há um <Toast /> dentro do Modal enquanto ele está aberto', () => {
+        const t = render([A]);
+
+        expect(t.root.findByType(Modal).findAllByType(Toast)).toHaveLength(1);
+
+        atualizar(t, false, [A]);
+        expect(t.root.findAllByType(Toast)).toHaveLength(0);
     });
 
     it('falha sem mensagem útil: o texto padrão', async () => {

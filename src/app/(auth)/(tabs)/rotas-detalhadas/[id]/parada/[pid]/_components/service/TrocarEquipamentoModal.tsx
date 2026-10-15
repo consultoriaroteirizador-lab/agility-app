@@ -3,6 +3,7 @@ import { KeyboardAvoidingView, Modal, Platform } from 'react-native';
 
 import { mensagemDaApi } from '@/api/apiErrorMessage';
 import { Box, Button, Input, ScreenBase, Text, TouchableOpacityBox } from '@/components';
+import { Toast } from '@/components/Toast/Toast';
 import type { EquipmentLookupResponse, ServiceLine } from '@/domain/agility/service/dto/response/service-line.response';
 import {
     lookupFoundFor,
@@ -241,6 +242,9 @@ export function TrocarEquipamentoModal({ visible, serviceId, lines, onClose }: T
                         )}
                     </ScreenBase>
                 </Box>
+                {/* O <Toast /> da raiz fica atrás do Modal nativo: sem este, a falha da troca era muda.
+                    Os dois leem o mesmo store; este só existe com o modal aberto. */}
+                <Toast />
             </KeyboardAvoidingView>
         </Modal>
     );
