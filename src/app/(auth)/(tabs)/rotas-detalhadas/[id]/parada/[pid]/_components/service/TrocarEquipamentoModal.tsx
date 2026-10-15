@@ -35,8 +35,9 @@ type TrocarEquipamentoModalProps = {
 /**
  * Troca de equipamento na parada (fase 3D). Passo 1: qual equipamento sai (pulado com uma só trocável).
  * Passo 2: código, nº de série, descrição (só com o código fora do cadastro) e motivo. Ao sair do
- * Código, consulta o cadastro do dono do pedido. Sem atualização otimista: o sucesso recarrega o
- * pedido (`useSwapLine`). A trava de envio (`useSubmitLock`) segura o toque duplo.
+ * Código, consulta o cadastro do dono do pedido. Sem atualização otimista: o envio recarrega o
+ * pedido, com sucesso ou falha (`useSwapLine`). A trava de envio (`useSubmitLock`) segura o toque duplo
+ * e o fechar no meio do envio.
  */
 export function TrocarEquipamentoModal({ visible, serviceId, lines, onClose }: TrocarEquipamentoModalProps) {
     const { top } = useAppSafeArea();
@@ -80,6 +81,7 @@ export function TrocarEquipamentoModal({ visible, serviceId, lines, onClose }: T
     }, [escolhidaSaiu, onClose]);
 
     if (!visible || escolhidaSaiu) return null;
+
     const found = lookupFoundFor(form.code, lookup);
     const erros = swapFormErrors({ code: form.code, serialNumber: form.serialNumber, found, description: form.description });
 
