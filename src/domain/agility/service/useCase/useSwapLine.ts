@@ -16,11 +16,13 @@ export type SwapLineVariables = {
 }
 
 /**
- * A troca de equipamento na parada (fase 3D). Sem atualização otimista: no sucesso, recarrega o pedido
+ * A troca de equipamento na parada (fase 3D). Sem atualização otimista: recarrega o pedido
  * (`[KEY_SERVICES, serviceId]`, a chave do `useFindOneService` da parada) para a tela mostrar A
  * "Trocado" e B "No lugar de". A falha volta pela promessa e quem chama mostra o toast; o `onError`
- * vazio impede o modal de erro por cima, como no `useCheckLine`. Invalida só no sucesso: a falha não
- * mudou nada no backend.
+ * vazio impede o modal de erro por cima, como no `useCheckLine`. Recarrega também na falha: um timeout
+ * pode chegar depois de o servidor gravar, e um 400 ("A linha já foi trocada") diz que a tela está velha.
+ * No sucesso, espera o recarregamento (quem chama fecha o modal com a lista já atualizada); na falha,
+ * não espera, para o toast não ficar atrás de um segundo timeout.
  */
 export function useSwapLine() {
     const queryClient = useQueryClient()
@@ -32,8 +34,15 @@ export function useSwapLine() {
 
     const swapLineAsync = useCallback(
         async (variables: SwapLineVariables) => {
-            const response = await mutateAsync(variables)
-            await queryClient.invalidateQueries({ queryKey: [KEY_SERVICES, variables.serviceId] })
+            const recarregar = () => queryClient.invalidateQueries({ queryKey: [KEY_SERVICES, variables.serviceId] })
+            let response: Awaited<ReturnType<typeof mutateAsync>>
+            try {
+                response = await mutateAsync(variables)
+            } catch (error) {
+                void recarregar()
+                throw error
+            }
+            await recarregar()
             return response
         },
         [mutateAsync, queryClient],
