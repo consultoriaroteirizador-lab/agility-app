@@ -263,4 +263,102 @@ describe('TrocarEquipamentoModal (fase 3D)', () => {
         });
         expect(onClose).toHaveBeenCalledTimes(1);
     });
+
+    function escolher(t: Arvore, material: string) {
+        const opcao = t.root.findAll(
+            (n) => typeof n.props.onPress === 'function' && n.findAll((c) => c.props.children === material).length > 0,
+        )[0];
+        act(() => {
+            opcao.props.onPress();
+        });
+    }
+
+    function atualizar(t: Arvore, visible: boolean, lines: ServiceLine[]) {
+        act(() => {
+            t.update(
+                <ThemeProvider theme={theme}>
+                    <TrocarEquipamentoModal visible={visible} serviceId="s1" lines={lines} onClose={onClose} />
+                </ThemeProvider>,
+            );
+        });
+    }
+
+    it('fechar e abrir de novo: o formulário volta vazio e a escolha da linha volta à lista', async () => {
+        mockLookup.mockResolvedValue(ACHADO);
+        const t = render([A, ROTEADOR]);
+        escolher(t, 'ROTEADOR');
+        digitar(t, 'Código *', 'MOD-NOVO');
+        digitar(t, 'Nº de série *', 'SN-B');
+        await sairDoCodigo(t);
+        expect(temTexto(t, '✓ MODEM NOVO')).toBe(true);
+
+        atualizar(t, false, [A, ROTEADOR]);
+        expect(campo(t, 'Código *')).toBeUndefined();
+        atualizar(t, true, [A, ROTEADOR]);
+
+        expect(temTexto(t, 'Qual equipamento você vai trocar?')).toBe(true);
+        escolher(t, 'ROTEADOR');
+        expect(campo(t, 'Código *').props.value).toBe('');
+        expect(campo(t, 'Nº de série *').props.value).toBe('');
+        expect(temTexto(t, '✓ MODEM NOVO')).toBe(false);
+    });
+
+    it('com duas trocáveis, a troca vai para a linha escolhida (não para a primeira)', async () => {
+        mockLookup.mockResolvedValue(ACHADO);
+        mockSwap.mockResolvedValue({ success: true, result: {} });
+        const t = render([A, ROTEADOR]);
+        escolher(t, 'ROTEADOR');
+
+        digitar(t, 'Código *', 'MOD-NOVO');
+        digitar(t, 'Nº de série *', 'SN-B');
+        await sairDoCodigo(t);
+        await registrar(t);
+
+        expect(mockSwap).toHaveBeenCalledTimes(1);
+        expect(mockSwap.mock.calls[0][0].lineId).toBe('r');
+    });
+
+    it('sair do Código duas vezes com o mesmo código: uma consulta só', async () => {
+        mockLookup.mockResolvedValue(ACHADO);
+        const t = render([A]);
+
+        digitar(t, 'Código *', 'MOD-NOVO');
+        await sairDoCodigo(t);
+        await sairDoCodigo(t);
+
+        expect(mockLookup).toHaveBeenCalledTimes(1);
+    });
+
+    it('a consulta falha: o formulário segue e o Registrar ainda envia (o backend decide)', async () => {
+        mockLookup.mockRejectedValue(new Error('sem rede'));
+        mockSwap.mockResolvedValue({ success: true, result: {} });
+        const t = render([A]);
+
+        digitar(t, 'Código *', 'MOD-NOVO');
+        digitar(t, 'Nº de série *', 'SN-B');
+        await sairDoCodigo(t);
+        await registrar(t);
+
+        expect(mockSwap).toHaveBeenCalledTimes(1);
+        expect(onClose).toHaveBeenCalledTimes(1);
+    });
+
+    it('falha seguida de nova tentativa: o segundo toque em Registrar troca faz o segundo POST', async () => {
+        mockLookup.mockResolvedValue(ACHADO);
+        mockSwap
+            .mockRejectedValueOnce({ success: false, error: { message: 'Instável', code: 'BAD_REQUEST' } })
+            .mockResolvedValueOnce({ success: true, result: {} });
+        const t = render([A]);
+
+        digitar(t, 'Código *', 'MOD-NOVO');
+        digitar(t, 'Nº de série *', 'SN-B');
+        await sairDoCodigo(t);
+        await registrar(t);
+        expect(mockSwap).toHaveBeenCalledTimes(1);
+        expect(onClose).not.toHaveBeenCalled();
+
+        await registrar(t);
+        expect(mockSwap).toHaveBeenCalledTimes(2);
+        expect(onClose).toHaveBeenCalledTimes(1);
+    });
 });
