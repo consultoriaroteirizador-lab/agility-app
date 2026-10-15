@@ -45,6 +45,7 @@ import { useToastService } from '@/services/Toast/useToast';
 import { resolveParadaAtendidaElegivel, resolvePedidosDaParada } from '../../../_utils';
 import { useStopStatus } from '../_hooks/useStopStatus';
 import { resolveCompanyRules } from '../_utils/companyRules';
+import { deliveredFromDraftEtapa, formAnsweredOnServer } from '../_utils/draftResume';
 import {
   draftHasAnyValue,
   draftToPickupEvidence,
@@ -810,6 +811,10 @@ export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderPr
     service?.status === ServiceStatus.FAILED ||
     service?.status === ServiceStatus.CANCELED;
 
+  // serviceId cuja hidratação voltou numa etapa posterior à confirmação (ver `draftResume`).
+  // Guarda o id, e não um booleano, para não precisar de reset por serviceId.
+  const [retomadaPosConfirmacao, setRetomadaPosConfirmacao] = useState<string | null>(null);
+
   // Reset do flag de hidratação quando o serviceId muda.
   useEffect(() => {
     hydratedRef.current = null;
@@ -876,7 +881,15 @@ export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderPr
           setPaymentAmount(`R$ ${reais}`);
         }
         if (chosen.paymentMethod) setPaymentMethod(chosen.paymentMethod as PaymentMethodType);
-        if (chosen.etapa) setEtapa(chosen.etapa);
+        if (chosen.etapa) {
+          setEtapa(chosen.etapa);
+          // Etapa ≥ 3 só existe depois da confirmação; sem isto as telas de check
+          // (que exigem `delivered`) eram puladas ao recarregar o app.
+          if (deliveredFromDraftEtapa(chosen.etapa)) {
+            setDelivered(true);
+            setRetomadaPosConfirmacao(serviceId);
+          }
+        }
         if (chosen.formAnswers && Object.keys(chosen.formAnswers).length > 0) {
           setFormState(prev => ({
             ...prev,
@@ -900,6 +913,14 @@ export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderPr
       cancelled = true;
     };
   }, [serviceId, backendDraftFetched, backendDraft, backendDraftUpdatedAt, isTerminalStatus]);
+
+  // Retomada depois da confirmação: o formulário já enviado não volta (o envio é POST
+  // e duplicaria as respostas). Espera o serviço carregar com as respostas gravadas.
+  useEffect(() => {
+    if (retomadaPosConfirmacao !== serviceId) return;
+    if (!formAnsweredOnServer(service)) return;
+    setFormState(prev => (prev.formCompleted ? prev : { ...prev, formCompleted: true }));
+  }, [retomadaPosConfirmacao, serviceId, service]);
 
   // Auto-upload incremental de fotos. Detecta assets adicionados ao array de fotos
   // (via MultiPhotoPicker ou diretamente via setPhotos) que ainda não têm `__s3Url`,
