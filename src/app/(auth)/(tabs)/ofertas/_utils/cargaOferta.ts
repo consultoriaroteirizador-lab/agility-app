@@ -14,7 +14,7 @@
  * banco e é isso que vai aparecer. Não é defeito desta derivação; o dado de
  * origem é que está errado nessas linhas.
  */
-import type { ServiceMaterialResponse, ServiceResponse } from '@/domain/agility/service/dto'
+import type { ServiceLine, ServiceResponse } from '@/domain/agility/service/dto'
 import { ServiceType } from '@/domain/agility/service/dto/types'
 
 /** Linha de item exibida numa parada da oferta. */
@@ -36,15 +36,15 @@ export interface ItensParada {
 /**
  * Itens de uma parada, separados pelo sentido.
  *
- * Os materiais já chegam em `GET /services?routingId=` (o controller anexa em lote),
- * então a oferta não faz chamada extra. `direction` ausente vale como entrega — é o
- * default do backend para material gravado antes de a coleta de retorno existir.
+ * As linhas já chegam em `GET /services?routingId=` (o controller anexa em lote) e são
+ * lidas por `serviceLines`, então a oferta não faz chamada extra. `direction` ausente vale
+ * como entrega — é o default do backend para linha gravada antes de a coleta de retorno existir.
  */
-export function itensDaParada(materials: ServiceMaterialResponse[] | undefined | null): ItensParada {
+export function itensDaParada(lines: readonly ServiceLine[] | undefined | null): ItensParada {
     const itens: ItensParada = { entrega: [], retorno: [] }
-    if (!materials) return itens
+    if (!lines) return itens
 
-    for (const m of materials) {
+    for (const m of lines) {
         const item: ItemOferta = {
             id: m.id,
             nome: m.material?.trim() || 'Item sem descrição',

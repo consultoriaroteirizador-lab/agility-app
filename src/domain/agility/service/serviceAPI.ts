@@ -20,12 +20,12 @@ import type {
     DeliveryAttemptResponse,
 } from './dto'
 import type {
-    ServiceMaterialResponse,
+    ServiceLine,
     MaterialCheckRequest,
     MaterialCheckResponse,
-    BatchMaterialCheckRequest,
-    BatchMaterialCheckResponse,
-} from './dto/response/service-material.response'
+} from './dto/response/service-line.response'
+import type { ServiceType } from './dto/types'
+import { lineRoute } from './serviceLines'
 
 
 // Export ServiceResponse as ServiceItem for backward compatibility
@@ -195,34 +195,25 @@ async function removeBatch(ids: string[]): Promise<BaseResponse<BatchDeleteResul
 }
 
 // ============================================
-// MATERIALS API
+// LINHAS (itens do pedido e materiais do SERVICE), fase 3C
 // ============================================
 
-async function getMaterials(serviceId: Id): Promise<BaseResponse<ServiceMaterialResponse[]>> {
-    const { data } = await apiAgility.get<BaseResponse<ServiceMaterialResponse[]>>(
-        `/services/${serviceId}/materials`
+/** As linhas pela rota da família: o pedido em `/items`, o SERVICE em `/materials` (`lineRoute`). */
+async function getLines(serviceId: Id, serviceType: ServiceType | null | undefined): Promise<BaseResponse<ServiceLine[]>> {
+    const { data } = await apiAgility.get<BaseResponse<ServiceLine[]>>(
+        `/services/${serviceId}/${lineRoute(serviceType)}`
     )
     return data
 }
 
-async function checkMaterial(
+async function checkLine(
     serviceId: Id,
-    materialId: Id,
+    serviceType: ServiceType | null | undefined,
+    lineId: Id,
     payload: MaterialCheckRequest
 ): Promise<BaseResponse<MaterialCheckResponse>> {
     const { data } = await apiAgility.patch<BaseResponse<MaterialCheckResponse>>(
-        `/services/${serviceId}/materials/${materialId}/check`,
-        payload
-    )
-    return data
-}
-
-async function checkMaterialsBatch(
-    serviceId: Id,
-    payload: BatchMaterialCheckRequest
-): Promise<BaseResponse<BatchMaterialCheckResponse>> {
-    const { data } = await apiAgility.post<BaseResponse<BatchMaterialCheckResponse>>(
-        `/services/${serviceId}/materials/check-batch`,
+        `/services/${serviceId}/${lineRoute(serviceType)}/${lineId}/check`,
         payload
     )
     return data
@@ -273,10 +264,9 @@ export const serviceAPI = {
     findAttempts,
     remove,
     removeBatch,
-    // Materials
-    getMaterials,
-    checkMaterial,
-    checkMaterialsBatch,
+    // Linhas (fase 3C)
+    getLines,
+    checkLine,
     // Draft
     saveDraft,
     getDraft,

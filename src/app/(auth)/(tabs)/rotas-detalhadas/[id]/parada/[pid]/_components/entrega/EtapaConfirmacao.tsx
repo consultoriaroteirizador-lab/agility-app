@@ -7,6 +7,7 @@ import { Box, Button, LocalIcon, ScreenBase, Text, TouchableOpacityBox } from '@
 import { ButtonBack } from '@/components/Button/ButtonBack';
 import { Icon } from '@/components/Icon/Icon';
 import { formatAddressComplement, formatAddressStreetNumber } from '@/domain/agility/address/dto';
+import { linesTitle, serviceLines } from '@/domain/agility/service/serviceLines';
 import { measure } from '@/theme';
 
 import { useParada } from '../../_context/ParadaContext';
@@ -18,6 +19,7 @@ import { Map } from '../shared/Map';
  */
 export function EtapaConfirmacao() {
     const { service, effectiveAddress, setEtapa, setDelivered, isServiceStarted, rotaId } = useParada();
+    const lines = serviceLines(service);
     const pathname = usePathname();
 
     const nomeCliente = service?.fantasyName || service?.responsible || 'Cliente';
@@ -146,12 +148,12 @@ export function EtapaConfirmacao() {
                                     )}
                                 </Box>
                             </Box>
-                            {service?.materials &&
+                            {lines &&
                                 <Box alignItems='center' mt='t6' justifyContent='center' gap='x8' padding='m14' borderRadius='s18' backgroundColor='gray50' width={measure.x150} flexDirection='row' height={measure.y50}>
                                     <Text preset="text13">📦</Text>
                                     <Box flexDirection='row' gap='x8' >
-                                        <Text>{service?.materials?.length}</Text>
-                                        <Text>volumes</Text>
+                                        <Text>{lines.length}</Text>
+                                        <Text>{linesTitle(service?.serviceType, lines.length).toLowerCase()}</Text>
                                     </Box>
 
                                 </Box>

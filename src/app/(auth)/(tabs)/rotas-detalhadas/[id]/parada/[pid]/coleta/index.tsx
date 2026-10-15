@@ -31,9 +31,9 @@ function ColetaOrchestrator() {
         recipient,
         showSuccess,
         isLoading,
-        materialsState,
+        linesState,
         checkCompleted,
-        fetchMaterials,
+        fetchLines,
         hasFormGroups,
         formCompleted,
         pedidosDaParada,
@@ -51,14 +51,14 @@ function ColetaOrchestrator() {
 
     // Buscar materiais quando entrar na etapa de confirmação (para saber se tem materiais)
     useEffect(() => {
-        if (!isLoading && materialsState.materials.length === 0 && !materialsState.loading) {
-            fetchMaterials();
+        if (!isLoading && linesState.lines.length === 0 && !linesState.loading) {
+            fetchLines();
         }
-    }, [isLoading, materialsState.materials.length, materialsState.loading, fetchMaterials]);
+    }, [isLoading, linesState.lines.length, linesState.loading, fetchLines]);
 
     // Verificar se tem materiais para check
-    const hasMaterials = materialsState.materials.length > 0;
-    const needsMaterialCheck = hasMaterials && !materialsState.allChecked && !checkCompleted;
+    const hasMaterials = linesState.lines.length > 0;
+    const needsMaterialCheck = hasMaterials && !linesState.allChecked && !checkCompleted;
 
     // Redirecionar após sucesso — Task 5: índice da parada (outra nota por
     // trabalhar) ou lista de paradas da rota (era a última).

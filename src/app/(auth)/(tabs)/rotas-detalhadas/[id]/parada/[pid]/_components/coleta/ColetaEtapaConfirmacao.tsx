@@ -151,7 +151,7 @@ export function ColetaEtapaConfirmacao() {
                                     <Icon name='numbers' />
                                     <Box flexDirection='row' gap='x8' >
                                         <Text>{service.amountItems}</Text>
-                                        <Text>volumes</Text>
+                                        <Text>itens</Text>
                                     </Box>
                                 </Box>
                             }

@@ -17,9 +17,10 @@ export type MaterialStatus =
 export type MaterialDirection = 'DELIVERY' | 'PICKUP'
 
 /**
- * Material do serviço com status de check
+ * Uma linha do serviço com o status da conferência: item do pedido (`items`) ou material/equipamento
+ * do SERVICE (`materials`). O formato é o mesmo nas duas famílias (`toServiceLineResponse` no backend).
  */
-export interface ServiceMaterialResponse {
+export interface ServiceLine {
   id: string
   material: string
   quantity: number
@@ -29,7 +30,11 @@ export interface ServiceMaterialResponse {
   volume?: number
   weight?: number
   notes?: string
-  serialNumber?: string
+  serialNumber?: string | null
+  /** Vínculo com o cadastro de produtos (linha de pedido). */
+  catalogProductId?: string | null
+  /** Vínculo com o cadastro de equipamentos (linha de SERVICE). */
+  catalogEquipmentId?: string | null
   /** Entrega (DELIVERY) ou coleta de retorno (PICKUP). Default tratável como DELIVERY. */
   direction?: MaterialDirection
   status: MaterialStatus
@@ -53,24 +58,6 @@ export interface MaterialCheckRequest {
 }
 
 /**
- * Item para check em lote
- */
-export interface MaterialCheckItem {
-  materialId: string
-  status: MaterialStatus
-  actualQuantity?: number
-  notes?: string
-  photoProof?: string
-}
-
-/**
- * Request para check em lote
- */
-export interface BatchMaterialCheckRequest {
-  items: MaterialCheckItem[]
-}
-
-/**
  * Resposta do check de material
  */
 export interface MaterialCheckResponse {
@@ -84,24 +71,4 @@ export interface MaterialCheckResponse {
     pending: number
     withIssues: number
   }
-}
-
-/**
- * Resultado de check individual
- */
-export interface MaterialCheckResult {
-  materialId: string
-  success: boolean
-  error?: string
-  status?: MaterialStatus
-}
-
-/**
- * Resposta do check em lote
- */
-export interface BatchMaterialCheckResponse {
-  successCount: number
-  errorCount: number
-  results: MaterialCheckResult[]
-  allMaterialsChecked: boolean
 }

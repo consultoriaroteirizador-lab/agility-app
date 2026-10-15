@@ -11,8 +11,9 @@ import { TouchableOpacityBox } from '@/components/RestyleComponent/RestyleCompon
 import { formatAddress } from '@/domain/agility/address/dto';
 import { textoAceitarOferta } from '@/domain/agility/offer/resumoOferta';
 import { payloadDeAceite, useFindOneRouting, useAcceptRouting } from '@/domain/agility/routing/useCase';
-import type { ServiceMaterialResponse } from '@/domain/agility/service/dto';
+import type { ServiceLine } from '@/domain/agility/service/dto';
 import { ServiceType } from '@/domain/agility/service/dto/types';
+import { linesTitle, serviceLines, splitByDirection } from '@/domain/agility/service/serviceLines';
 import { useFindServicesByRoutingId } from '@/domain/agility/service/useCase';
 import { useAppSafeArea } from '@/hooks';
 import { useToastService } from '@/services/Toast/useToast';
@@ -20,7 +21,7 @@ import { measure } from '@/theme';
 import { formatDateOnly } from '@/utils/formatDate';
 
 import { MapaParadasModal } from '../../rotas-detalhadas/[id]/_components/MapaParadasModal';
-import { MaterialsModal } from '../../rotas-detalhadas/[id]/parada/[pid]/_components/shared/MaterialsModal';
+import { ServiceLinesModal } from '../../rotas-detalhadas/[id]/parada/[pid]/_components/shared/ServiceLinesModal';
 import { useUserLocation } from '../../rotas-detalhadas/[id]/parada/[pid]/_hooks/useUserLocation';
 import { distanciaLinhaReta, itensDaParada, resumirCarga, type ItemOferta } from '../_utils/cargaOferta';
 import { motivoDeOfertaEncerrada, ofertaAceitavel } from '../_utils/estadoOferta';
@@ -96,7 +97,7 @@ export default function OfertaDetalhadaScreen() {
   const safeArea = useAppSafeArea();
   const [mostrarPopup, setMostrarPopup] = useState(false);
   const [mostrarMapa, setMostrarMapa] = useState(false);
-  const [materiaisAbertos, setMateriaisAbertos] = useState<ServiceMaterialResponse[] | null>(null);
+  const [materiaisAbertos, setMateriaisAbertos] = useState<{ lines: ServiceLine[]; serviceType: ServiceType | null } | null>(null);
 
   // Bloqueia o segundo toque ANTES do primeiro re-render: `isAccepting`
   // (estado da mutation) só atualiza depois que o React processa o dispatch,
@@ -133,6 +134,8 @@ export default function OfertaDetalhadaScreen() {
       .map((service) => {
         const isTransfer = service.serviceType === ServiceType.TRANSFER
           && (!!service.pickupAddress || !!service.deliveryAddress);
+        const linhas = serviceLines(service);
+        const { delivery, pickup } = splitByDirection(linhas ?? []);
 
         return {
           tipo: service.serviceType
@@ -144,10 +147,11 @@ export default function OfertaDetalhadaScreen() {
           isTransfer,
           enderecoColeta: isTransfer ? formatAddress(service.pickupAddress) : null,
           enderecoEntrega: isTransfer ? formatAddress(service.deliveryAddress) : null,
-          itens: itensDaParada(service.materials),
-          // Materiais crus para o "ver todos", já no mesmo corte de sentido da lista.
-          materiaisEntrega: (service.materials ?? []).filter((m) => m.direction !== 'PICKUP'),
-          materiaisRetorno: (service.materials ?? []).filter((m) => m.direction === 'PICKUP'),
+          serviceType: service.serviceType,
+          itens: itensDaParada(linhas),
+          // Linhas cruas para o "ver todos", já no mesmo corte de sentido da lista.
+          materiaisEntrega: delivery,
+          materiaisRetorno: pickup,
         };
       });
   }, [services]);
@@ -382,12 +386,12 @@ export default function OfertaDetalhadaScreen() {
                 <ItensDaParada
                   titulo="Itens"
                   itens={parada.itens.entrega}
-                  onVerTodos={() => setMateriaisAbertos(parada.materiaisEntrega)}
+                  onVerTodos={() => setMateriaisAbertos({ lines: parada.materiaisEntrega, serviceType: parada.serviceType })}
                 />
                 <ItensDaParada
                   titulo="Recolher no local"
                   itens={parada.itens.retorno}
-                  onVerTodos={() => setMateriaisAbertos(parada.materiaisRetorno)}
+                  onVerTodos={() => setMateriaisAbertos({ lines: parada.materiaisRetorno, serviceType: parada.serviceType })}
                 />
               </Box>
             </Box>
@@ -452,11 +456,12 @@ export default function OfertaDetalhadaScreen() {
           routeId={routingId}
         />
 
-        <MaterialsModal
+        <ServiceLinesModal
           isVisible={materiaisAbertos !== null}
           onClose={() => setMateriaisAbertos(null)}
-          materials={materiaisAbertos ?? []}
-          title="Itens da parada"
+          lines={materiaisAbertos?.lines ?? []}
+          serviceType={materiaisAbertos?.serviceType}
+          title={`${linesTitle(materiaisAbertos?.serviceType)} da parada`}
         />
       </Box>
     </ScreenBase>
@@ -517,7 +522,7 @@ function CardCarga({ peso, volume, itens, composicao, valorCarga, cobranca }: Ca
   const linhas = [
     { rotulo: 'Peso', valor: peso },
     { rotulo: 'Cubagem', valor: volume },
-    { rotulo: 'Volumes', valor: itens },
+    { rotulo: 'Itens', valor: itens },
     { rotulo: 'Composição', valor: composicao },
     { rotulo: 'Valor da carga', valor: valorCarga },
   ].filter((linha): linha is { rotulo: string; valor: string } => !!linha.valor);

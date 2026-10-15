@@ -3,8 +3,6 @@ import type { FormGroupAnswerResponse } from '@/domain/agility/form-group-answer
 
 import type { ServiceStatus, ServiceType, PriorityLevel, PersonType, VehicleRequirements } from '../types'
 
-import type { ServiceMaterialResponse } from './service-material.response'
-
 /**
  * Service response DTO
  * Maps to ServiceEntity.toJson() from backend
@@ -216,9 +214,6 @@ export interface ServiceResponse {
         notes?: string | null
         completedAt?: string | null
     } | null
-
-    /** Materials list for this service (delivery/pickup items) */
-    materials?: ServiceMaterialResponse[]
 
     /** Routing code */
     routingCode: string | null

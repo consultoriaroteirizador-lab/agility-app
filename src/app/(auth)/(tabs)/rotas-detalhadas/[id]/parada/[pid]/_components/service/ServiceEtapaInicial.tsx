@@ -1,10 +1,9 @@
-import { useCallback, useState } from 'react';
+import { useCallback } from 'react';
 
 import { router } from 'expo-router';
 
 import { Box, Button, ScreenBase, Text } from '@/components';
 import { ButtonBack } from '@/components/Button/ButtonBack';
-import { TouchableOpacityBox } from '@/components/RestyleComponent/RestyleComponent';
 import { formatAddressFull, formatAddressStreetNumber } from '@/domain/agility/address/dto';
 import { formatHHmm } from '@/functions';
 import { useToastService } from '@/services/Toast/useToast';
@@ -12,13 +11,12 @@ import { measure } from '@/theme';
 
 import { useParada } from '../../_context/ParadaContext';
 import { useStopActions } from '../../_hooks/useStopActions';
-import { MaterialsModal } from '../shared/MaterialsModal';
+import { ServiceLinesTag } from '../shared/ServiceLinesTag';
 import { StopRouteMap } from '../shared/StopRouteMap';
 
 export function ServiceEtapaInicial() {
     const { service, effectiveAddress, setEtapa, rotaId, startBlockReason } = useParada();
     const { showToast } = useToastService();
-    const [showMaterialModal, setShowMaterialModal] = useState(false);
     const { handleStartService, handleStartAttendance, isStarting, isStartingAttendance } = useStopActions({
         serviceId: service?.id || '',
         routeId: service?.routingId || '',
@@ -99,24 +97,7 @@ export function ServiceEtapaInicial() {
                                 </Box>
                             </Box>
 
-                            {service?.materials && service.materials.length > 0 && (
-                                <Box flexDirection="row" gap="x8" marginTop="y8">
-                                    <TouchableOpacityBox
-                                        flexDirection="row"
-                                        alignItems="center"
-                                        gap="x4"
-                                        paddingHorizontal="x12"
-                                        paddingVertical="y6"
-                                        backgroundColor="gray100"
-                                        borderRadius="s20"
-                                        onPress={() => setShowMaterialModal(true)}
-                                    >
-                                        <Text preset="text13">🔧</Text>
-                                        <Text preset="text13" color="gray700">Materiais</Text>
-                                        <Text preset="text13" color="primary100">({service.materials.length})</Text>
-                                    </TouchableOpacityBox>
-                                </Box>
-                            )}
+                            <ServiceLinesTag service={service} />
 
                             {/* Endereço completo (header mantém só rua + número) */}
                             {effectiveAddress && (
@@ -157,12 +138,6 @@ export function ServiceEtapaInicial() {
                     </Box>
                 </Box>
             </Box>
-
-            <MaterialsModal
-                isVisible={showMaterialModal}
-                onClose={() => setShowMaterialModal(false)}
-                materials={service?.materials || []}
-            />
         </ScreenBase>
 
     );

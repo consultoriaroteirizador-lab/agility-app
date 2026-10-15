@@ -2,7 +2,8 @@ import { useState } from 'react';
 
 import { ActivityIndicator, Box, Text, TouchableOpacityBox } from '@/components';
 import { Icon } from '@/components/Icon/Icon';
-import { useGetMaterials } from '@/domain/agility/service/useCase/useGetMaterials';
+import { ServiceType } from '@/domain/agility/service/dto/types';
+import { useGetServiceLines } from '@/domain/agility/service/useCase/useGetServiceLines';
 import { measure } from '@/theme';
 
 import type { Parada, ParadaStatus } from '../_types/rota.types';
@@ -20,7 +21,7 @@ export type TransferOrderOutcome = {
  * Card de um pedido do lote de transferência. Toca pra expandir e ver os itens
  * (materiais) daquele pedido — read-only, sem conferência (o check de item real
  * acontece no last-mile, não na transferência). A busca dos itens é LAZY: só
- * dispara `useGetMaterials` quando o card é expandido, evitando N requisições de
+ * dispara `useGetServiceLines` quando o card é expandido, evitando N requisições de
  * cara num lote grande.
  *
  * Conferência (Tela 2, comprovante) é ADITIVA e OPCIONAL: quando `onMarkNotReceived`
@@ -56,7 +57,7 @@ export function TransferOrderCard({
     openLabel?: string;
 }) {
     const [expanded, setExpanded] = useState(false);
-    const { materials, isLoading, isError } = useGetMaterials(expanded ? parada.serviceId : undefined);
+    const { lines, isLoading, isError } = useGetServiceLines(expanded ? parada.serviceId : undefined, ServiceType.TRANSFER);
     const isNotReceived = outcome?.outcome === 'NOT_RECEIVED';
 
     // Cabeçalho de NOTA: status à esquerda e nota fiscal à direita na MESMA linha,
@@ -139,10 +140,10 @@ export function TransferOrderCard({
                         </Box>
                     ) : isError ? (
                         <Text preset="text12" color="gray500">Não foi possível carregar os itens deste pedido.</Text>
-                    ) : materials.length === 0 ? (
+                    ) : lines.length === 0 ? (
                         <Text preset="text12" color="gray500">Nenhum item cadastrado neste pedido.</Text>
                     ) : (
-                        materials.map((m) => (
+                        lines.map((m) => (
                             <Box key={m.id} flexDirection="row" alignItems="center" gap="x8">
                                 <Text preset="text13" color="colorTextPrimary" numberOfLines={2} style={{ flex: 1 }}>{m.material}</Text>
                                 <Text preset="text12" color="gray600">x{m.quantity} {m.unit || 'un'}</Text>

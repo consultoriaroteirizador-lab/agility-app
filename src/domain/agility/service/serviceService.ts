@@ -18,10 +18,11 @@ import type {
     DeliveryAttemptResponse,
 } from './dto'
 import type {
-    ServiceMaterialResponse,
+    ServiceLine,
     MaterialCheckRequest,
     MaterialCheckResponse,
-} from './dto/response/service-material.response'
+} from './dto/response/service-line.response'
+import type { ServiceType } from './dto/types'
 import { serviceAPI, type ServiceItem, type StartAttendanceOptions } from './serviceAPI'
 
 /**
@@ -121,17 +122,18 @@ async function removeBatch(ids: string[]): Promise<BaseResponse<BatchDeleteResul
     return serviceAPI.removeBatch(ids)
 }
 
-// Materials
-async function getMaterials(serviceId: Id): Promise<BaseResponse<ServiceMaterialResponse[]>> {
-    return serviceAPI.getMaterials(serviceId)
+// Linhas (fase 3C)
+async function getLines(serviceId: Id, serviceType: ServiceType | null | undefined): Promise<BaseResponse<ServiceLine[]>> {
+    return serviceAPI.getLines(serviceId, serviceType)
 }
 
-async function checkMaterial(
+async function checkLine(
     serviceId: Id,
-    materialId: Id,
+    serviceType: ServiceType | null | undefined,
+    lineId: Id,
     payload: MaterialCheckRequest
 ): Promise<BaseResponse<MaterialCheckResponse>> {
-    return serviceAPI.checkMaterial(serviceId, materialId, payload)
+    return serviceAPI.checkLine(serviceId, serviceType, lineId, payload)
 }
 
 async function saveDraft(
@@ -168,9 +170,9 @@ export const serviceService = {
     findAttempts,
     remove,
     removeBatch,
-    // Materials
-    getMaterials,
-    checkMaterial,
+    // Linhas (fase 3C)
+    getLines,
+    checkLine,
     // Draft
     saveDraft,
     getDraft,

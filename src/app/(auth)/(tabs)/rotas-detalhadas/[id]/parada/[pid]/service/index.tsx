@@ -31,9 +31,9 @@ function ServiceOrchestrator() {
         recipient,
         showSuccess,
         isLoading,
-        materialsState,
+        linesState,
         checkCompleted,
-        fetchMaterials,
+        fetchLines,
         hasFormGroups,
         formCompleted,
         pedidosDaParada,
@@ -49,15 +49,15 @@ function ServiceOrchestrator() {
     const isServiceFinalized =
         service?.isCompleted === true || service?.isCanceled === true || service?.isFailed === true;
 
-    const hasMaterials = materialsState.materials.length > 0;
-    const needsMaterialCheck = hasMaterials && !materialsState.allChecked && !checkCompleted;
+    const hasMaterials = linesState.lines.length > 0;
+    const needsMaterialCheck = hasMaterials && !linesState.allChecked && !checkCompleted;
 
     // Buscar materiais quando o servico estiver iniciado
     useEffect(() => {
-        if (!isLoading && materialsState.materials.length === 0 && !materialsState.loading) {
-            fetchMaterials();
+        if (!isLoading && linesState.lines.length === 0 && !linesState.loading) {
+            fetchLines();
         }
-    }, [isLoading, materialsState.materials.length, materialsState.loading, fetchMaterials]);
+    }, [isLoading, linesState.lines.length, linesState.loading, fetchLines]);
 
     // Redirecionar após sucesso — Task 5: índice da parada (outra nota por
     // trabalhar) ou lista de paradas da rota (era a última).

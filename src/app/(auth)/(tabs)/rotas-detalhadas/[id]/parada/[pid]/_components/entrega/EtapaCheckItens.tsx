@@ -4,7 +4,7 @@ import { Box, Button, ScreenBase, Text, ActivityIndicator } from '@/components';
 import { ButtonBack } from '@/components/Button/ButtonBack';
 import { ItemCheckCard } from '@/components/ItemCheckCard';
 import { ItemCheckModal } from '@/components/ItemCheckModal';
-import type { ServiceMaterialResponse, MaterialStatus, MaterialDirection } from '@/domain/agility/service/dto/response/service-material.response';
+import type { ServiceLine, MaterialStatus, MaterialDirection } from '@/domain/agility/service/dto/response/service-line.response';
 import { measure } from '@/theme';
 
 import { useParada } from '../../_context/ParadaContext';
@@ -44,14 +44,14 @@ export function EtapaCheckItens({
     onComplete,
 }: EtapaCheckItensProps) {
     const {
-        materialsState,
-        checkMaterial,
+        linesState,
+        checkLine,
         completeCheck,
         goToNextStep,
         goToPreviousStep,
     } = useParada();
 
-    const [selectedItem, setSelectedItem] = useState<ServiceMaterialResponse | null>(null);
+    const [selectedItem, setSelectedItem] = useState<ServiceLine | null>(null);
     const [modalVisible, setModalVisible] = useState(false);
     const [checking, setChecking] = useState(false);
 
@@ -59,13 +59,13 @@ export function EtapaCheckItens({
     // são tratados como DELIVERY.
     const items = useMemo(
         () =>
-            materialsState.materials.filter((m) =>
+            linesState.lines.filter((m) =>
                 direction === 'PICKUP' ? m.direction === 'PICKUP' : m.direction !== 'PICKUP',
             ),
-        [materialsState.materials, direction],
+        [linesState.lines, direction],
     );
 
-    const handleOpenCheck = useCallback((item: ServiceMaterialResponse) => {
+    const handleOpenCheck = useCallback((item: ServiceLine) => {
         setSelectedItem(item);
         setModalVisible(true);
     }, []);
@@ -85,7 +85,7 @@ export function EtapaCheckItens({
 
         setChecking(true);
         try {
-            const success = await checkMaterial(selectedItem.id, {
+            const success = await checkLine(selectedItem.id, {
                 status: data.status as MaterialStatus,
                 actualQuantity: data.actualQuantity,
                 notes: data.notes,
@@ -99,7 +99,7 @@ export function EtapaCheckItens({
         } finally {
             setChecking(false);
         }
-    }, [selectedItem, checkMaterial]);
+    }, [selectedItem, checkLine]);
 
     const pendingCount = items.filter(m => m.status === 'PENDING').length;
     const checkedCount = items.filter(m => m.status !== 'PENDING').length;
@@ -167,7 +167,7 @@ export function EtapaCheckItens({
                         </Box>
 
                         {/* Loading */}
-                        {materialsState.loading && (
+                        {linesState.loading && (
                             <Box justifyContent="center" alignItems="center" padding="y32">
                                 <ActivityIndicator size="large" />
                                 <Text preset="text14" color="gray400" marginTop="y12">
@@ -177,7 +177,7 @@ export function EtapaCheckItens({
                         )}
 
                         {/* Lista vazia */}
-                        {!materialsState.loading && items.length === 0 && (
+                        {!linesState.loading && items.length === 0 && (
                             <Box justifyContent="center" alignItems="center" padding="y32">
                                 <Text preset="text16" color="gray400" textAlign="center">
                                     {emptyLabel}
@@ -186,7 +186,7 @@ export function EtapaCheckItens({
                         )}
 
                         {/* Lista de itens */}
-                        {!materialsState.loading && items.length > 0 && (
+                        {!linesState.loading && items.length > 0 && (
                             <Box>
                                 {items.map((item) => (
                                     <ItemCheckCard
@@ -199,7 +199,7 @@ export function EtapaCheckItens({
                         )}
 
                         {/* Aviso de pendentes */}
-                        {pendingCount > 0 && !materialsState.loading && (
+                        {pendingCount > 0 && !linesState.loading && (
                             <Box
                                 marginTop="y16"
                                 paddingHorizontal="x12"
@@ -219,7 +219,7 @@ export function EtapaCheckItens({
                             <Button
                                 title="Próximo"
                                 onPress={handleProximo}
-                                disabled={!allChecked || materialsState.loading}
+                                disabled={!allChecked || linesState.loading}
                                 width={measure.x330}
                             />
                             {!allChecked && (

@@ -12,6 +12,7 @@ import { useFindOneAddress } from '@/domain/agility/address/useCase';
 import { useGetMe } from '@/domain/agility/driver/useCase';
 import { useCompleteRouting, usePendingReturns } from '@/domain/agility/routing/useCase';
 import { ServiceType } from '@/domain/agility/service/dto/types';
+import { linesTitle, serviceLines } from '@/domain/agility/service/serviceLines';
 import { useFindOneService, useFindServicesByRoutingId, useStartAttendance } from '@/domain/agility/service/useCase';
 import { KEY_ROUTINGS, KEY_SERVICES } from '@/domain/queryKeys';
 import { formatHHmm } from '@/functions';
@@ -32,7 +33,7 @@ import {
   textoConcluirRota,
 } from '../../_utils';
 
-import { EquipmentList, StopActions, StopTabs } from './_components';
+import { ServiceLinesList, StopActions, StopTabs } from './_components';
 import { Map } from './_components/shared/Map';
 import { StopArrivalView } from './_components/shared/StopArrivalView';
 import { TentativasAnteriores } from './_components/shared/TentativasAnteriores';
@@ -623,10 +624,10 @@ function StopDetailContent() {
     </Box>
   );
 
-  // Equipment tab content
+  // Aba das linhas: "Itens" no pedido, "Equipamentos" no SERVICE (fase 3C)
   const equipmentContent = (
     <Box gap="y16" pb="y24">
-      <EquipmentList materials={service?.materials || []} />
+      <ServiceLinesList lines={serviceLines(service)} serviceType={service?.serviceType} />
     </Box>
   );
 
@@ -737,6 +738,7 @@ function StopDetailContent() {
             onTabChange={setActiveTab}
             localContent={localContent}
             equipmentContent={equipmentContent}
+            linesTabLabel={linesTitle(service?.serviceType)}
           />
         </Box>
       </Box>

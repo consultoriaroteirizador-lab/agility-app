@@ -7,15 +7,17 @@ import { Box, Button, LocalIcon, ScreenBase, Text, TouchableOpacityBox } from '@
 import { ButtonBack } from '@/components/Button/ButtonBack';
 import { Icon } from '@/components/Icon/Icon';
 import { formatAddressComplement, formatAddressStreetNumber } from '@/domain/agility/address/dto';
+import { linesTitle, serviceLines } from '@/domain/agility/service/serviceLines';
 import { measure } from '@/theme';
 
 import { useParada } from '../../_context/ParadaContext';
 import { Map } from '../shared/Map';
-import { MaterialsModal } from '../shared/MaterialsModal';
+import { ServiceLinesModal } from '../shared/ServiceLinesModal';
 
 export function ServiceEtapaConfirmacao() {
     const { service, effectiveAddress, setEtapa, setDelivered, isServiceStarted, rotaId } = useParada();
     const [showMaterialModal, setShowMaterialModal] = useState(false);
+    const lines = serviceLines(service) ?? [];
     const pathname = usePathname();
 
     const customerName = service?.fantasyName || service?.responsible || 'Cliente';
@@ -137,12 +139,12 @@ export function ServiceEtapaConfirmacao() {
                                     )}
                                 </Box>
                             </Box>
-                            {service?.materials && service.materials.length > 0 && (
-                                <Box mt='t6' justifyContent='center' gap='x8' padding='m14' borderRadius='s18' backgroundColor='gray50' width={measure.x150} flexDirection='row' height={measure.y50}>
+                            {lines.length > 0 && (
+                                <Box mt='t6' justifyContent='center' gap='x8' padding='m14' borderRadius='s18' backgroundColor='gray50' minWidth={measure.x150} flexDirection='row' height={measure.y50}>
                                     <TouchableOpacityBox flexDirection='row' gap='x8' onPress={() => setShowMaterialModal(true)}>
                                         <Text preset="text13">🔧</Text>
-                                        <Text preset="text13" color="gray700">Materiais</Text>
-                                        <Text preset="text13" color="primary100">({service.materials.length})</Text>
+                                        <Text preset="text13" color="gray700">{linesTitle(service?.serviceType, lines.length)}</Text>
+                                        <Text preset="text13" color="primary100">({lines.length})</Text>
                                     </TouchableOpacityBox>
                                 </Box>
                             )}
@@ -177,10 +179,11 @@ export function ServiceEtapaConfirmacao() {
                 </Box>
             </Box>
 
-            <MaterialsModal
+            <ServiceLinesModal
                 isVisible={showMaterialModal}
                 onClose={() => setShowMaterialModal(false)}
-                materials={service?.materials || []}
+                lines={lines}
+                serviceType={service?.serviceType}
             />
         </ScreenBase>
     );

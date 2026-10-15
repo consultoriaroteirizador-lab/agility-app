@@ -10,6 +10,7 @@
 import { formatAddress } from '@/domain/agility/address/dto'
 import type { ServiceResponse } from '@/domain/agility/service/dto'
 import { ServiceType } from '@/domain/agility/service/dto/types'
+import { hasPickupLines } from '@/domain/agility/service/serviceLines'
 import { formatHHmm } from '@/functions'
 import type { StatusColorConfig } from '@/theme'
 
@@ -301,10 +302,7 @@ export function mapGrupoToParada(
     const status = getParadaStatusGrupo(grupo)
     const janela = janelaMaisRestritiva(grupo)
 
-    const hasReturn = grupo.some((s) => !!(
-        s.hasReturn ||
-        (s.materials?.some((m) => m.direction === 'PICKUP') ?? false)
-    ))
+    const hasReturn = grupo.some((s) => !!(s.hasReturn || hasPickupLines(s)))
 
     // Conclusão da PARADA = a do último pedido a fechar.
     const conclusoes = grupo

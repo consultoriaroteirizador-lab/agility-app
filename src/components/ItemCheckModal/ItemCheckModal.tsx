@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { KeyboardAvoidingView, Modal, Platform } from 'react-native';
 
 import { Box, Text, TouchableOpacityBox, Button, Input, ScreenBase } from '@/components';
-import type { ServiceMaterialResponse } from '@/domain/agility/service/dto/response/service-material.response';
+import type { ServiceLine } from '@/domain/agility/service/dto/response/service-line.response';
 import { useAppSafeArea } from '@/hooks';
 import { measure } from '@/theme';
 
@@ -25,7 +25,7 @@ interface StatusLabels {
 
 interface ItemCheckModalProps {
     visible: boolean;
-    item: ServiceMaterialResponse | null;
+    item: ServiceLine | null;
     onClose: () => void;
     onConfirm: (data: CheckData) => void;
     loading?: boolean;

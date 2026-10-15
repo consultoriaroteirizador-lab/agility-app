@@ -1,7 +1,5 @@
 import * as Location from 'expo-location';
 
-import type { ServiceMaterialResponse } from '@/domain/agility/service/dto'
-
 export type TabType = 'local' | 'equipment';
 
 export type NavigationApp = 'waze' | 'googleMaps' | 'appleMaps';
@@ -74,15 +72,13 @@ export interface NavigationModalProps {
     showAppleMaps: boolean;
 }
 
-export interface EquipmentListProps {
-    materials: ServiceMaterialResponse[];
-}
-
 export interface StopTabsProps {
     activeTab: TabType;
     onTabChange: (tab: TabType) => void;
     localContent: React.ReactNode;
     equipmentContent: React.ReactNode;
+    /** "Itens" no pedido, "Equipamentos" no SERVICE (`linesTitle`). */
+    linesTabLabel: string;
 }
 
 export interface MapErrorBoundaryState {
@@ -91,8 +87,4 @@ export interface MapErrorBoundaryState {
 
 export interface MapErrorBoundaryProps {
     children: React.ReactNode;
-}
-
-export interface MaterialListProps {
-    materials: ServiceMaterialResponse[];
 }
