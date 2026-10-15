@@ -148,7 +148,7 @@ export function TrocarEquipamentoModal({ visible, serviceId, lines, onClose }: T
                         mbScreenBase="b0"
                         scrollable
                         buttonLeft={
-                            <TouchableOpacityBox onPress={fechar} padding="x8">
+                            <TouchableOpacityBox onPress={fechar} padding="x8" accessibilityLabel="Fechar">
                                 <Text preset="text20" color="gray400">✕</Text>
                             </TouchableOpacityBox>
                         }

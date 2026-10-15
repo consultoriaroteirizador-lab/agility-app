@@ -397,6 +397,12 @@ describe('TrocarEquipamentoModal (fase 3D)', () => {
     const botaoFechar = (t: Arvore) =>
         t.root.findAll((n) => typeof n.props.onPress === 'function' && n.findAll((c) => c.props.children === '✕').length > 0)[0];
 
+    it('o ✕ tem rótulo de acessibilidade "Fechar"', () => {
+        const t = render([A]);
+
+        expect(botaoFechar(t).props.accessibilityLabel).toBe('Fechar');
+    });
+
     // "Cancelar" já respeitava a trava; o ✕ e o voltar do Android fechavam com o POST em voo.
     it('com o POST em voo, ✕ e o voltar do Android não fecham; depois da falha, o ✕ fecha', async () => {
         mockLookup.mockResolvedValue(ACHADO);
@@ -478,7 +484,8 @@ describe('TrocarEquipamentoModal (fase 3D)', () => {
     });
 
     it('a consulta falha: o formulário segue e o Registrar ainda envia (o backend decide)', async () => {
-        mockLookup.mockRejectedValue(new Error('sem rede'));
+        // Uma falha para a saída do Código e outra para a nova consulta do Registrar; nada vaza para o próximo teste.
+        mockLookup.mockRejectedValueOnce(new Error('sem rede')).mockRejectedValueOnce(new Error('sem rede'));
         mockSwap.mockResolvedValue({ success: true, result: {} });
         const t = render([A]);
 
