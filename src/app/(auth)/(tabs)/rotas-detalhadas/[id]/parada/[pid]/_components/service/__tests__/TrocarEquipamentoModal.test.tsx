@@ -333,6 +333,38 @@ describe('TrocarEquipamentoModal (fase 3D)', () => {
         expect(mockSwap.mock.calls[0][0].lineId).toBe('r');
     });
 
+    // Troca fantasma B→C: o POST da A→B dá timeout depois de o servidor gravar; o recarregamento traz
+    // a A trocada e a B "Levei", e a única trocável passa a ser a B. Com a linha recalculada a cada
+    // render, o formulário (ainda preenchido) passava a mirar a B, e o novo toque trocava a B.
+    it('linhas mudam com o modal aberto: o alvo não passa para a B', async () => {
+        mockLookup.mockResolvedValue(ACHADO);
+        mockSwap.mockResolvedValue({ success: true, result: {} });
+        const t = render([A]);
+        digitar(t, 'Código *', 'MOD-NOVO');
+        digitar(t, 'Nº de série *', 'SN-B');
+        await sairDoCodigo(t);
+
+        const B = linha({ id: 'b', material: 'MODEM NOVO', serialNumber: 'SN-B', replacesMaterialId: 'a' });
+        atualizar(t, true, [{ ...A, status: 'SWAPPED' }, B]);
+
+        expect(onClose).toHaveBeenCalledTimes(1);
+        expect(botao(t, 'Registrar troca')).toBeUndefined();
+        expect(temTexto(t, 'Qual equipamento você vai trocar?')).toBe(false);
+        expect(mockSwap).not.toHaveBeenCalled();
+    });
+
+    it('outra linha muda com o modal aberto: a escolhida segue no formulário e o modal não fecha', () => {
+        const t = render([A, ROTEADOR]);
+        escolher(t, 'ROTEADOR');
+        digitar(t, 'Código *', 'MOD-NOVO');
+
+        atualizar(t, true, [{ ...A, status: 'SWAPPED' }, ROTEADOR]);
+
+        expect(onClose).not.toHaveBeenCalled();
+        expect(temTexto(t, 'S/N: SN-R')).toBe(true);
+        expect(campo(t, 'Código *').props.value).toBe('MOD-NOVO');
+    });
+
     it('sair do Código duas vezes com o mesmo código: uma consulta só', async () => {
         mockLookup.mockResolvedValue(ACHADO);
         const t = render([A]);

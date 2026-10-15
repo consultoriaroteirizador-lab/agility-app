@@ -49,6 +49,8 @@ export function TrocarEquipamentoModal({ visible, serviceId, lines, onClose }: T
     const [tentou, setTentou] = useState(false);
     // O código da consulta mais recente: a resposta de uma consulta anterior que chega depois é descartada.
     const ultimaConsulta = useRef('');
+    // A linha que sai é fixada na abertura (com uma só trocável) e nunca recalculada das linhas atuais.
+    const fixouNaAbertura = useRef(false);
 
     useEffect(() => {
         if (!visible) {
@@ -57,13 +59,27 @@ export function TrocarEquipamentoModal({ visible, serviceId, lines, onClose }: T
             setLookup(null);
             setTentou(false);
             ultimaConsulta.current = '';
+            fixouNaAbertura.current = false;
+            return;
         }
-    }, [visible]);
-
-    if (!visible) return null;
+        if (fixouNaAbertura.current) return;
+        fixouNaAbertura.current = true;
+        const trocaveisNaAbertura = swappableLines(lines);
+        if (trocaveisNaAbertura.length === 1) setEscolhidaId(trocaveisNaAbertura[0].id);
+    }, [visible, lines]);
 
     const trocaveis = swappableLines(lines);
-    const escolhida = trocaveis.find((l) => l.id === escolhidaId) ?? (trocaveis.length === 1 ? trocaveis[0] : null);
+    const escolhida = escolhidaId === null ? null : (trocaveis.find((l) => l.id === escolhidaId) ?? null);
+    // A escolhida deixou de ser trocável com o modal aberto (a troca gravou apesar de um timeout, e o
+    // recarregamento chegou): fecha, e a lista da parada mostra "Trocado" e "No lugar de". Seguir aberto
+    // apontaria o formulário preenchido para outra linha.
+    const escolhidaSaiu = visible && escolhidaId !== null && escolhida === null;
+
+    useEffect(() => {
+        if (escolhidaSaiu) onClose();
+    }, [escolhidaSaiu, onClose]);
+
+    if (!visible || escolhidaSaiu) return null;
     const found = lookupFoundFor(form.code, lookup);
     const erros = swapFormErrors({ code: form.code, serialNumber: form.serialNumber, found, description: form.description });
 
