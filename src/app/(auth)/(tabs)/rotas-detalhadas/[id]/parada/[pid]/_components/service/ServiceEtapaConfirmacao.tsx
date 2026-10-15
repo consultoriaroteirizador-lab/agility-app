@@ -7,17 +7,22 @@ import { Box, Button, LocalIcon, ScreenBase, Text, TouchableOpacityBox } from '@
 import { ButtonBack } from '@/components/Button/ButtonBack';
 import { Icon } from '@/components/Icon/Icon';
 import { formatAddressComplement, formatAddressStreetNumber } from '@/domain/agility/address/dto';
-import { linesTitle, serviceLines } from '@/domain/agility/service/serviceLines';
+import { linesTitle, serviceLines, swappableLines } from '@/domain/agility/service/serviceLines';
 import { measure } from '@/theme';
 
 import { useParada } from '../../_context/ParadaContext';
 import { Map } from '../shared/Map';
 import { ServiceLinesModal } from '../shared/ServiceLinesModal';
 
+import { TrocarEquipamentoModal } from './TrocarEquipamentoModal';
+
 export function ServiceEtapaConfirmacao() {
     const { service, effectiveAddress, setEtapa, setDelivered, isServiceStarted, rotaId } = useParada();
     const [showMaterialModal, setShowMaterialModal] = useState(false);
+    const [showTroca, setShowTroca] = useState(false);
     const lines = serviceLines(service) ?? [];
+    // Fase 3D: o botão só aparece com um equipamento "Levei" de quantidade 1.
+    const podeTrocar = swappableLines(lines).length > 0;
     const pathname = usePathname();
 
     const customerName = service?.fantasyName || service?.responsible || 'Cliente';
@@ -148,6 +153,17 @@ export function ServiceEtapaConfirmacao() {
                                     </TouchableOpacityBox>
                                 </Box>
                             )}
+                            {podeTrocar && service?.id ? (
+                                <Box marginTop="y12" alignItems="center">
+                                    <Button
+                                        width={measure.x330}
+                                        title="Trocar equipamento"
+                                        preset="outline"
+                                        onPress={() => setShowTroca(true)}
+                                        borderRadius='s14'
+                                    />
+                                </Box>
+                            ) : null}
                         </Box>
                         {service?.description &&
                             <Box mb='b14' padding='m14' borderRadius='s10' backgroundColor='gray50' width={"100%"} height={"auto"} gap='y8'>
@@ -185,6 +201,15 @@ export function ServiceEtapaConfirmacao() {
                 lines={lines}
                 serviceType={service?.serviceType}
             />
+
+            {service?.id ? (
+                <TrocarEquipamentoModal
+                    visible={showTroca}
+                    serviceId={service.id}
+                    lines={lines}
+                    onClose={() => setShowTroca(false)}
+                />
+            ) : null}
         </ScreenBase>
     );
 }

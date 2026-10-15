@@ -54,6 +54,19 @@ export function Input({
   const theme = useTheme<Theme>();
   const [isFocused, setIsFocused] = useState(false);
 
+  // O onFocus/onBlur de quem chama roda JUNTO com o da borda. Antes, o do chamador vinha no spread,
+  // depois do da borda, e o substituía: a borda ficava com a cor de foco depois de sair do campo.
+  // Fase 3D: o Código da troca consulta o cadastro ao sair do campo.
+  const { onFocus: onFocusDoChamador, onBlur: onBlurDoChamador } = TextInputBoxProps;
+  const handleFocus = (e: Parameters<NonNullable<InputProps['onFocus']>>[0]) => {
+    setIsFocused(true);
+    onFocusDoChamador?.(e);
+  };
+  const handleBlur = (e: Parameters<NonNullable<InputProps['onBlur']>>[0]) => {
+    setIsFocused(false);
+    onBlurDoChamador?.(e);
+  };
+
   const isWidthAuto = width === 'auto';
 
   // NOVO: Calcula a altura dinamicamente. Se não enviarem 'height' na prop, 
@@ -101,8 +114,6 @@ export function Input({
             paddingVertical="y9"
             placeholder={placeholder}
             placeholderTextColor={theme.colors.gray200}
-            onFocus={() => setIsFocused(true)}
-            onBlur={() => setIsFocused(false)}
             style={[
               inputTextStyle,
               multiline && { minHeight: resolvedHeight } // NOVO: Ajuda a forçar tamanho na máscara se for multiline
@@ -112,6 +123,8 @@ export function Input({
             numberOfLines={numberOfLines} // NOVO: Garantir repasse
             textAlignVertical={multiline ? 'top' : (borderType === 'bottom' ? 'bottom' : 'auto')} // NOVO: Fix para Android
             {...TextInputBoxProps}
+            onFocus={handleFocus}
+            onBlur={handleBlur}
           />
         ) : (
           <TextInputBox
@@ -125,12 +138,12 @@ export function Input({
               !multiline && { height: "100%" as DimensionValue },
               multiline && { minHeight: "100%" as DimensionValue } // NOVO: Garante que o input estique dentro do Box
             ]}
-            onFocus={() => setIsFocused(true)}
-            onBlur={() => setIsFocused(false)}
             multiline={multiline}
             numberOfLines={numberOfLines}
             textAlignVertical={multiline ? 'top' : (borderType === 'bottom' ? 'bottom' : 'auto')}
             {...TextInputBoxProps}
+            onFocus={handleFocus}
+            onBlur={handleBlur}
           />
         )}
       </Box>

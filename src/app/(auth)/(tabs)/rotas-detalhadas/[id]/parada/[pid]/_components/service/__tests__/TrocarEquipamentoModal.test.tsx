@@ -1,0 +1,266 @@
+/**
+ * Troca de equipamento na tela de atendimento (fase 3D): escolha da linha, consulta do código ao sair
+ * do campo, validação, envio, toast, e as duas armadilhas da rede lenta (consulta atrasada e toque duplo).
+ */
+import React from 'react';
+
+import { ThemeProvider } from '@shopify/restyle';
+import TestRenderer, { act } from 'react-test-renderer';
+
+import type { ServiceLine } from '@/domain/agility/service/dto/response/service-line.response';
+import { theme } from '@/theme';
+
+jest.mock('react-native-webview', () => ({ WebView: () => null }));
+jest.mock('@react-native-async-storage/async-storage', () =>
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    require('@react-native-async-storage/async-storage/jest/async-storage-mock'),
+);
+jest.mock('react-native-background-geolocation', () => ({
+    __esModule: true,
+    default: { ready: jest.fn(), onLocation: jest.fn(), removeListeners: jest.fn() },
+}));
+jest.mock('@/components/Icon/LocalIcon', () => ({ LocalIcon: () => null }));
+jest.mock('@expo/vector-icons', () => ({ Ionicons: () => null }));
+// O teste lê e chama as props: o Input real arrasta máscara e teclado.
+jest.mock('@/components/Input/Input', () => ({ Input: () => null }));
+jest.mock('@/hooks/useAppSafeArea', () => ({ useAppSafeArea: () => ({ top: 20, bottom: 20 }) }));
+
+const mockShowToast = jest.fn();
+jest.mock('@/services/Toast/useToast', () => ({ useToastService: () => ({ showToast: mockShowToast }) }));
+const mockSwap = jest.fn();
+jest.mock('@/domain/agility/service/useCase/useSwapLine', () => ({
+    useSwapLine: () => ({ swapLineAsync: mockSwap, isLoading: false }),
+}));
+const mockLookup = jest.fn();
+jest.mock('@/domain/agility/service/serviceService', () => ({
+    serviceService: { lookupEquipment: (...a: unknown[]) => mockLookup(...a) },
+}));
+
+import { SWAP_FALLBACK_MESSAGE, SWAP_SUCCESS_MESSAGE, TrocarEquipamentoModal } from '../TrocarEquipamentoModal';
+
+type Arvore = TestRenderer.ReactTestRenderer;
+
+const linha = (over: Partial<ServiceLine>): ServiceLine =>
+    ({ id: 'l', material: 'Item', quantity: 1, status: 'CHECKED', createdAt: '', updatedAt: '', ...over }) as ServiceLine;
+const A = linha({ id: 'a', material: 'MODEM A', serialNumber: 'SN-A' });
+const ROTEADOR = linha({ id: 'r', material: 'ROTEADOR', serialNumber: 'SN-R' });
+const PENDENTE = linha({ id: 'p', material: 'CABO', status: 'PENDING' });
+const ACHADO = { success: true, result: { found: true, code: 'MOD-NOVO', name: 'MODEM NOVO', unit: 'un' } };
+const NAO_ACHADO = { success: true, result: { found: false, code: 'LIVRE-1' } };
+
+const onClose = jest.fn();
+
+beforeEach(() => {
+    jest.clearAllMocks();
+});
+
+function render(lines: ServiceLine[]): Arvore {
+    let tree!: Arvore;
+    act(() => {
+        tree = TestRenderer.create(
+            <ThemeProvider theme={theme}>
+                <TrocarEquipamentoModal visible serviceId="s1" lines={lines} onClose={onClose} />
+            </ThemeProvider>,
+        );
+    });
+    return tree;
+}
+
+const campo = (t: Arvore, title: string) =>
+    t.root.findAll((n) => n.props.title === title && typeof n.props.onChangeText === 'function')[0];
+const botao = (t: Arvore, title: string) =>
+    t.root.findAll((n) => n.props.title === title && typeof n.props.onPress === 'function')[0];
+const temTexto = (t: Arvore, s: string) => t.root.findAll((n) => n.props.children === s).length > 0;
+
+function digitar(t: Arvore, title: string, valor: string) {
+    act(() => {
+        campo(t, title).props.onChangeText(valor);
+    });
+}
+
+async function sairDoCodigo(t: Arvore) {
+    await act(async () => {
+        await campo(t, 'Código *').props.onBlur();
+    });
+}
+
+async function registrar(t: Arvore) {
+    await act(async () => {
+        await botao(t, 'Registrar troca').props.onPress();
+    });
+}
+
+describe('TrocarEquipamentoModal (fase 3D)', () => {
+    it('com uma só trocável, abre direto no formulário', () => {
+        const t = render([A, PENDENTE]);
+
+        expect(campo(t, 'Código *')).toBeDefined();
+        expect(temTexto(t, 'Qual equipamento você vai trocar?')).toBe(false);
+        expect(temTexto(t, 'MODEM A')).toBe(true);
+    });
+
+    it('com duas, pergunta qual sai; a escolhida vai para o formulário', () => {
+        const t = render([A, ROTEADOR]);
+        expect(temTexto(t, 'Qual equipamento você vai trocar?')).toBe(true);
+        expect(campo(t, 'Código *')).toBeUndefined();
+
+        const opcao = t.root.findAll(
+            (n) => typeof n.props.onPress === 'function' && n.findAll((c) => c.props.children === 'ROTEADOR').length > 0,
+        )[0];
+        act(() => {
+            opcao.props.onPress();
+        });
+
+        expect(campo(t, 'Código *')).toBeDefined();
+        expect(temTexto(t, 'S/N: SN-R')).toBe(true);
+    });
+
+    it('ao sair do Código, consulta o código aparado e mostra o nome do cadastro', async () => {
+        mockLookup.mockResolvedValue(ACHADO);
+        const t = render([A]);
+
+        digitar(t, 'Código *', ' MOD-NOVO ');
+        await sairDoCodigo(t);
+
+        expect(mockLookup).toHaveBeenCalledWith('s1', 'MOD-NOVO');
+        expect(temTexto(t, '✓ MODEM NOVO')).toBe(true);
+        expect(campo(t, 'Descrição *')).toBeUndefined();
+    });
+
+    it('código fora do cadastro: avisa e abre a Descrição', async () => {
+        mockLookup.mockResolvedValue(NAO_ACHADO);
+        const t = render([A]);
+
+        digitar(t, 'Código *', 'LIVRE-1');
+        await sairDoCodigo(t);
+
+        expect(temTexto(t, 'Código não cadastrado: informe a descrição')).toBe(true);
+        expect(campo(t, 'Descrição *')).toBeDefined();
+    });
+
+    it('Registrar troca: manda o corpo aparado, avisa "Troca registrada" e fecha', async () => {
+        mockLookup.mockResolvedValue(ACHADO);
+        mockSwap.mockResolvedValue({ success: true, result: { replaced: { id: 'a' }, installed: { id: 'b' } } });
+        const t = render([A]);
+
+        digitar(t, 'Código *', 'MOD-NOVO');
+        digitar(t, 'Nº de série *', ' SN-B ');
+        digitar(t, 'Motivo', ' não ligava ');
+        await sairDoCodigo(t);
+        await registrar(t);
+
+        expect(mockSwap).toHaveBeenCalledWith({
+            serviceId: 's1', lineId: 'a', data: { code: 'MOD-NOVO', serialNumber: 'SN-B', reason: 'não ligava' },
+        });
+        expect(mockShowToast).toHaveBeenCalledWith({ message: SWAP_SUCCESS_MESSAGE, type: 'success' });
+        expect(SWAP_SUCCESS_MESSAGE).toBe('Troca registrada');
+        expect(onClose).toHaveBeenCalledTimes(1);
+    });
+
+    it('falha: o toast traz a mensagem do backend e o formulário continua preenchido', async () => {
+        mockLookup.mockResolvedValue(ACHADO);
+        mockSwap.mockRejectedValue({ success: false, error: { message: 'A linha já foi trocada', code: 'BAD_REQUEST' } });
+        const t = render([A]);
+
+        digitar(t, 'Código *', 'MOD-NOVO');
+        digitar(t, 'Nº de série *', 'SN-B');
+        await sairDoCodigo(t);
+        await registrar(t);
+
+        expect(mockShowToast).toHaveBeenCalledWith({ message: 'A linha já foi trocada', type: 'error' });
+        expect(onClose).not.toHaveBeenCalled();
+        expect(campo(t, 'Código *').props.value).toBe('MOD-NOVO');
+        expect(campo(t, 'Nº de série *').props.value).toBe('SN-B');
+    });
+
+    it('falha sem mensagem útil: o texto padrão', async () => {
+        mockLookup.mockResolvedValue(ACHADO);
+        mockSwap.mockRejectedValue({ success: false, error: { message: 'Erro desconhecido', code: 'N/A' } });
+        const t = render([A]);
+
+        digitar(t, 'Código *', 'MOD-NOVO');
+        digitar(t, 'Nº de série *', 'SN-B');
+        await sairDoCodigo(t);
+        await registrar(t);
+
+        expect(mockShowToast).toHaveBeenCalledWith({ message: SWAP_FALLBACK_MESSAGE, type: 'error' });
+        expect(SWAP_FALLBACK_MESSAGE).toBe('Não foi possível registrar a troca. Tente de novo.');
+    });
+
+    it('campos vazios: não envia e mostra os erros', async () => {
+        const t = render([A]);
+
+        await registrar(t);
+
+        expect(mockSwap).not.toHaveBeenCalled();
+        expect(campo(t, 'Código *').props.messageError).toBe('Informe o código');
+        expect(campo(t, 'Nº de série *').props.messageError).toBe('Informe o nº de série');
+    });
+
+    it('Registrar sem ter saído do Código: consulta antes e, fora do cadastro, pede a descrição em vez de enviar', async () => {
+        mockLookup.mockResolvedValue(NAO_ACHADO);
+        const t = render([A]);
+
+        digitar(t, 'Código *', 'LIVRE-1');
+        digitar(t, 'Nº de série *', 'SN-B');
+        await registrar(t);
+
+        expect(mockLookup).toHaveBeenCalledWith('s1', 'LIVRE-1');
+        expect(mockSwap).not.toHaveBeenCalled();
+        expect(campo(t, 'Descrição *')).toBeDefined();
+    });
+
+    // Review Focus 3: rede lenta; o motorista muda o código antes da primeira resposta.
+    it('a resposta de uma consulta antiga não vale para o código novo', async () => {
+        let responderVelha!: (v: unknown) => void;
+        mockLookup
+            .mockReturnValueOnce(new Promise((r) => { responderVelha = r; }))
+            .mockResolvedValueOnce(ACHADO);
+        const t = render([A]);
+
+        digitar(t, 'Código *', 'LIVRE-1');
+        act(() => {
+            void campo(t, 'Código *').props.onBlur();
+        });
+        digitar(t, 'Código *', 'MOD-NOVO');
+        await sairDoCodigo(t);
+        await act(async () => {
+            responderVelha(NAO_ACHADO);
+        });
+
+        expect(temTexto(t, '✓ MODEM NOVO')).toBe(true);
+        expect(temTexto(t, 'Código não cadastrado: informe a descrição')).toBe(false);
+        expect(campo(t, 'Descrição *')).toBeUndefined();
+
+        digitar(t, 'Código *', 'MOD-NOVO-2');
+        expect(temTexto(t, '✓ MODEM NOVO')).toBe(false);
+    });
+
+    // Review Focus 4: toque duplo com a rede lenta.
+    it('toque duplo em Registrar troca: um POST só', async () => {
+        mockLookup.mockResolvedValue(ACHADO);
+        let responder!: (v: unknown) => void;
+        mockSwap.mockReturnValue(new Promise((r) => { responder = r; }));
+        const t = render([A]);
+
+        digitar(t, 'Código *', 'MOD-NOVO');
+        digitar(t, 'Nº de série *', 'SN-B');
+        await sairDoCodigo(t);
+
+        const tocar = botao(t, 'Registrar troca').props.onPress;
+        let primeiro!: Promise<unknown>;
+        let segundo!: Promise<unknown>;
+        await act(async () => {
+            primeiro = tocar();
+            segundo = tocar();
+        });
+        expect(mockSwap).toHaveBeenCalledTimes(1);
+
+        await act(async () => {
+            responder({ success: true, result: {} });
+            await primeiro;
+            await segundo;
+        });
+        expect(onClose).toHaveBeenCalledTimes(1);
+    });
+});
