@@ -42,7 +42,7 @@ export function TrocarEquipamentoModal({ visible, serviceId, lines, onClose }: T
     const { top } = useAppSafeArea();
     const { showToast } = useToastService();
     const { swapLineAsync } = useSwapLine();
-    const { run, isSubmitting } = useSubmitLock();
+    const { run, isSubmitting, isLocked } = useSubmitLock();
     const [escolhidaId, setEscolhidaId] = useState<string | null>(null);
     const [form, setForm] = useState<SwapForm>(FORM_VAZIO);
     const [lookup, setLookup] = useState<EquipmentLookupResponse | null>(null);
@@ -85,6 +85,11 @@ export function TrocarEquipamentoModal({ visible, serviceId, lines, onClose }: T
 
     const mudar = (campo: keyof SwapForm) => (valor: string) => setForm((atual) => ({ ...atual, [campo]: valor }));
 
+    /** O ✕ e o voltar do Android, como o "Cancelar": não fecham com a troca em voo. */
+    const fechar = () => {
+        if (!isLocked()) onClose();
+    };
+
     /** Consulta o código do campo; devolve `found`, ou `null` se a consulta falhar ou ficar velha. */
     const consultar = async (): Promise<boolean | null> => {
         const code = form.code.trim();
@@ -126,7 +131,7 @@ export function TrocarEquipamentoModal({ visible, serviceId, lines, onClose }: T
         });
 
     return (
-        <Modal visible={visible} animationType="slide" statusBarTranslucent onRequestClose={onClose}>
+        <Modal visible={visible} animationType="slide" statusBarTranslucent onRequestClose={fechar}>
             <KeyboardAvoidingView
                 style={{ flex: 1 }}
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -139,7 +144,7 @@ export function TrocarEquipamentoModal({ visible, serviceId, lines, onClose }: T
                         mbScreenBase="b0"
                         scrollable
                         buttonLeft={
-                            <TouchableOpacityBox onPress={onClose} padding="x8">
+                            <TouchableOpacityBox onPress={fechar} padding="x8">
                                 <Text preset="text20" color="gray400">✕</Text>
                             </TouchableOpacityBox>
                         }

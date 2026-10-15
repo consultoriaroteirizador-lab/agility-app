@@ -353,6 +353,43 @@ describe('TrocarEquipamentoModal (fase 3D)', () => {
         expect(mockSwap).not.toHaveBeenCalled();
     });
 
+    const botaoFechar = (t: Arvore) =>
+        t.root.findAll((n) => typeof n.props.onPress === 'function' && n.findAll((c) => c.props.children === '✕').length > 0)[0];
+
+    // "Cancelar" já respeitava a trava; o ✕ e o voltar do Android fechavam com o POST em voo.
+    it('com o POST em voo, ✕ e o voltar do Android não fecham; depois da falha, o ✕ fecha', async () => {
+        mockLookup.mockResolvedValue(ACHADO);
+        let rejeitar!: (e: unknown) => void;
+        mockSwap.mockReturnValueOnce(new Promise((_, r) => { rejeitar = r; }));
+        const t = render([A]);
+        digitar(t, 'Código *', 'MOD-NOVO');
+        digitar(t, 'Nº de série *', 'SN-B');
+        await sairDoCodigo(t);
+
+        let envio!: Promise<unknown>;
+        await act(async () => {
+            envio = botao(t, 'Registrar troca').props.onPress();
+        });
+        expect(mockSwap).toHaveBeenCalledTimes(1);
+
+        act(() => {
+            botaoFechar(t).props.onPress();
+        });
+        act(() => {
+            t.root.findByType(Modal).props.onRequestClose();
+        });
+        expect(onClose).not.toHaveBeenCalled();
+
+        await act(async () => {
+            rejeitar({ success: false, error: { message: 'Instável', code: 'BAD_REQUEST' } });
+            await envio;
+        });
+        act(() => {
+            botaoFechar(t).props.onPress();
+        });
+        expect(onClose).toHaveBeenCalledTimes(1);
+    });
+
     it('outra linha muda com o modal aberto: a escolhida segue no formulário e o modal não fecha', () => {
         const t = render([A, ROTEADOR]);
         escolher(t, 'ROTEADOR');
