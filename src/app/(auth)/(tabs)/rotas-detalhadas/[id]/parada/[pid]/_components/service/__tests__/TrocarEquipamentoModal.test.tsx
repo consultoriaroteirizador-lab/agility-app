@@ -198,10 +198,18 @@ describe('TrocarEquipamentoModal (fase 3D)', () => {
 
         // Dentro do Box que o KeyboardAvoidingView encolhe (e não filho direto dele): senão, no iOS,
         // o `bottom` absoluto ignora o padding do teclado e o toast fica atrás dele.
-        const kav = t.root.find((n) => (n.type as unknown) === KeyboardAvoidingView);
-        const filhos = kav.children.filter((c) => typeof c !== 'string');
-        expect(filhos).toHaveLength(1);
-        expect((filhos[0] as TestRenderer.ReactTestInstance).findAllByType(Toast)).toHaveLength(1);
+        // Sobe do Toast: tem de passar pelo Box interno (flex 1 + paddingTop do topo seguro) antes de
+        // chegar ao KeyboardAvoidingView. (`kav.children` não serve: é só a View host que o KAV renderiza.)
+        const toast = modalNativo(t).findByType(Toast);
+        let no: TestRenderer.ReactTestInstance | null = toast.parent;
+        let boxInterno: TestRenderer.ReactTestInstance | null = null;
+        while (no && (no.type as unknown) !== KeyboardAvoidingView) {
+            const estilo = no.props?.style as { paddingTop?: number } | undefined;
+            if (!boxInterno && estilo && !Array.isArray(estilo) && estilo.paddingTop === 20) boxInterno = no;
+            no = no.parent;
+        }
+        expect(no).not.toBeNull(); // chegou ao KeyboardAvoidingView
+        expect(boxInterno).not.toBeNull(); // e passou pelo Box interno no caminho
 
         atualizar(t, false, [A]);
         expect(t.root.findAllByType(Toast)).toHaveLength(0);
