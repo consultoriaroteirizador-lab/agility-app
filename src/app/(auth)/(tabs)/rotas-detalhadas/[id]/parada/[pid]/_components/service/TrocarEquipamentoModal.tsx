@@ -273,10 +273,12 @@ export function TrocarEquipamentoModal({ visible, serviceId, lines, onClose }: T
                             </Box>
                         )}
                     </ScreenBase>
+                    {/* O <Toast /> da raiz fica atrás do Modal nativo: sem este, a falha da troca era muda.
+                        Os dois leem o mesmo store; este só existe com o modal aberto. Fica dentro do Box
+                        que o KeyboardAvoidingView encolhe: no iOS o `padding` não conta para o `bottom`
+                        de um filho absoluto direto do KAV, e o toast ficaria atrás do teclado. */}
+                    <Toast />
                 </Box>
-                {/* O <Toast /> da raiz fica atrás do Modal nativo: sem este, a falha da troca era muda.
-                    Os dois leem o mesmo store; este só existe com o modal aberto. */}
-                <Toast />
             </KeyboardAvoidingView>
         </Modal>
     );

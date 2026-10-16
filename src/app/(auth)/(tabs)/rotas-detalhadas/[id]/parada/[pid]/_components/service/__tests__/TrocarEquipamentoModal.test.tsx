@@ -3,7 +3,7 @@
  * do campo, validação, envio, toast, e as duas armadilhas da rede lenta (consulta atrasada e toque duplo).
  */
 import React from 'react';
-import { Modal } from 'react-native';
+import { KeyboardAvoidingView, Modal } from 'react-native';
 
 import { ThemeProvider } from '@shopify/restyle';
 import TestRenderer, { act } from 'react-test-renderer';
@@ -195,6 +195,13 @@ describe('TrocarEquipamentoModal (fase 3D)', () => {
         const t = render([A]);
 
         expect(modalNativo(t).findAllByType(Toast)).toHaveLength(1);
+
+        // Dentro do Box que o KeyboardAvoidingView encolhe (e não filho direto dele): senão, no iOS,
+        // o `bottom` absoluto ignora o padding do teclado e o toast fica atrás dele.
+        const kav = t.root.find((n) => (n.type as unknown) === KeyboardAvoidingView);
+        const filhos = kav.children.filter((c) => typeof c !== 'string');
+        expect(filhos).toHaveLength(1);
+        expect((filhos[0] as TestRenderer.ReactTestInstance).findAllByType(Toast)).toHaveLength(1);
 
         atualizar(t, false, [A]);
         expect(t.root.findAllByType(Toast)).toHaveLength(0);
