@@ -4,11 +4,9 @@ import { ServiceType } from './dto/types'
 /**
  * As linhas de um serviço, num lugar só (épico itens do pedido, fase 3C).
  *
- * O backend pendura as linhas na resposta por `attachServiceLines`: o pedido recebe `items` e, até a
- * fase 4, `materials` com as mesmas linhas; o SERVICE recebe só `materials`. Nenhuma resposta traz
- * `pickupItems`/`pickupMaterials`: a coleta vem na mesma lista, com `direction: 'PICKUP'`.
- *
- * FASE 4: o pedido deixa de receber `materials`, e o `?? svc.materials` de `serviceLines` sai.
+ * O backend pendura as linhas na resposta por `attachServiceLines`: o pedido recebe só `items` e o
+ * SERVICE só `materials` (fase 4). Nenhuma resposta traz `pickupItems`/`pickupMaterials`: a coleta vem
+ * na mesma lista, com `direction: 'PICKUP'`.
  */
 
 type TipoDoServico = ServiceType | string | null | undefined
@@ -24,7 +22,7 @@ type RespostaComLinhas = {
 export function serviceLines(svc: RespostaComLinhas | null | undefined): ServiceLine[] | null {
     if (!svc) return null
     if (svc.serviceType === ServiceType.SERVICE) return svc.materials ?? null
-    return svc.items ?? svc.materials ?? null
+    return svc.items ?? null
 }
 
 /** A linha sem `direction` é entrega, como no backend. */
