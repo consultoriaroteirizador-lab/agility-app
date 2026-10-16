@@ -2,10 +2,6 @@ import { BaseResponse } from '@/api'
 import type { Id } from '@/types/base'
 
 import type {
-    CreateServiceRequest,
-    CreateServicesBatchRequest,
-    BatchCreationResult,
-    UpdateServiceRequest,
     ListServicesRequest,
     ServiceResponse,
     ServiceCompletionDetailsRequest,
@@ -28,22 +24,6 @@ import type {
 import type { ServiceType } from './dto/types'
 import { serviceAPI, type ServiceItem, type StartAttendanceOptions } from './serviceAPI'
 
-/**
- * Cria um service
- * TODO: Validação de coordenadas de endereço pode ser adicionada quando necessário
- */
-async function create(payload: CreateServiceRequest): Promise<BaseResponse<ServiceResponse>> {
-    return serviceAPI.create(payload)
-}
-
-/**
- * Cria múltiplos services em batch
- * TODO: Validação de coordenadas de endereço pode ser adicionada quando necessário
- */
-async function createBatch(payload: CreateServicesBatchRequest): Promise<BaseResponse<BatchCreationResult>> {
-    return serviceAPI.createBatch(payload)
-}
-
 async function findAll(params: ListServicesRequest = {}): Promise<BaseResponse<ServiceResponse[]>> {
     return serviceAPI.findAll(params)
 }
@@ -58,13 +38,6 @@ async function findPending(): Promise<BaseResponse<ServiceResponse[]>> {
 
 async function findOne(id: Id): Promise<BaseResponse<ServiceResponse>> {
     return serviceAPI.findOne(id)
-}
-
-async function update(
-    id: Id,
-    payload: UpdateServiceRequest,
-): Promise<BaseResponse<ServiceResponse>> {
-    return serviceAPI.update(id, payload)
 }
 
 async function assignDriver(id: Id, driverId: Id): Promise<BaseResponse<ServiceResponse>> {
@@ -165,13 +138,10 @@ async function clearDraft(id: Id): Promise<void> {
 
 export type { ServiceItem, BatchDeleteResult }
 export const serviceService = {
-    create,
-    createBatch,
     findAll,
     findByRoutingId,
     findPending,
     findOne,
-    update,
     assignDriver,
     unassignDriver,
     start,

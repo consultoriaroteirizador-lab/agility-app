@@ -6,6 +6,7 @@ jest.mock('@/api/apiConfig', () => ({
 
 import { ServiceType } from '../dto/types'
 import { serviceAPI } from '../serviceAPI'
+import { serviceService } from '../serviceService'
 
 beforeEach(() => {
     mockGet.mockReset()
@@ -32,4 +33,10 @@ it.each(FAMILIAS)('checkLine de %s confere em /services/:id/%s/:lineId/check com
     const corpo = { status: 'DAMAGED' as const, actualQuantity: 1, notes: 'amassado', photoProof: 'https://x/f.jpg' }
     await serviceAPI.checkLine('s1', serviceType, 'l9', corpo)
     expect(mockPatch).toHaveBeenCalledWith(`/services/s1/${rota}/l9/check`, corpo)
+})
+
+// Fase 4 (épico itens do pedido): o app não escreve linhas; o caminho de escrita morto saiu.
+it.each(['create', 'createBatch', 'update'])('serviceAPI e serviceService não expõem %s', (nome) => {
+    expect(serviceAPI).not.toHaveProperty(nome)
+    expect(serviceService).not.toHaveProperty(nome)
 })

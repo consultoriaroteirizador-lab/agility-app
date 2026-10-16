@@ -2,8 +2,8 @@
  * Fase 3C do épico itens do pedido (C6): fora de `serviceLines.ts`, nenhum código do app lê
  * `materials` de uma resposta. O tipo já impede a leitura direta (`ServiceResponse` não tem o
  * campo); esta varredura pega o que escaparia por `any` e impede a resposta de voltar a declarar
- * `materials` ou `items`. Os tipos de request (`dto/request/`) ficam de fora: são escrita, e o
- * caminho morto de escrita está no backlog de limpeza.
+ * `materials` ou `items`. Os tipos de request (`dto/request/`) ficam de fora: são escrita (o caminho de
+ * escrita morto saiu na fase 4, e o pedido de criação não declara mais `materials`).
  */
 import * as fs from 'fs';
 import * as path from 'path';
@@ -46,4 +46,9 @@ it('fora de serviceLines.ts e dos tipos de request, ninguém lê materials', () 
 it('a resposta do serviço não declara materials nem items (eles moram só em serviceLines.ts)', () => {
     const resposta = fs.readFileSync(path.join(SRC, 'domain/agility/service/dto/response/service.response.ts'), 'utf8');
     expect(resposta).not.toMatch(/^\s*(materials|items)\??\s*:/m);
+});
+
+it('o pedido de criação não declara materials (fase 4: o app não escreve linhas)', () => {
+    const pedido = fs.readFileSync(path.join(SRC, 'domain/agility/service/dto/request/create-service.request.ts'), 'utf8');
+    expect(pedido).not.toMatch(/^\s*materials\??\s*:/m);
 });

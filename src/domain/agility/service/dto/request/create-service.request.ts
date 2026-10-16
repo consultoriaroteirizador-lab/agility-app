@@ -3,7 +3,6 @@ import type { ServiceType, PriorityLevel, PersonType } from '../types'
 import type { ServiceAddressRequest } from './service-address.request'
 import type { ServiceClientInfoRequest } from './service-client-info.request'
 import type { ServiceDetailsRequest } from './service-details.request'
-import type { ServiceMaterialRequest } from './service-material.request'
 import type { ServiceScheduleRequest } from './service-schedule.request'
 
 /**
@@ -69,9 +68,6 @@ export interface CreateServiceRequest {
 
     /** Schedule - optional */
     schedule?: ServiceScheduleRequest
-
-    /** Materials - optional */
-    materials?: ServiceMaterialRequest[]
 
     /** Description (legacy) - optional */
     description?: string
