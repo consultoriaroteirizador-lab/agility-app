@@ -25,7 +25,6 @@ describe('serviceLines', () => {
         expect(serviceLines({ serviceType, items: [SEM_DIRECAO], materials: [RECOLHER] })).toEqual([SEM_DIRECAO])
     })
 
-    // Fase 4: reescrito. Antes o pedido só com materials caía em materials; o backend não manda mais.
     it.each(PEDIDOS)('pedido (%s) só com materials não mostra linha (fase 4): null', (serviceType) => {
         expect(serviceLines({ serviceType, materials: [RECOLHER] })).toBeNull()
     })

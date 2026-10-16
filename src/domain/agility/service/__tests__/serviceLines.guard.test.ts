@@ -48,7 +48,10 @@ it('a resposta do serviço não declara materials nem items (eles moram só em s
     expect(resposta).not.toMatch(/^\s*(materials|items)\??\s*:/m);
 });
 
-it('o pedido de criação não declara materials (fase 4: o app não escreve linhas)', () => {
-    const pedido = fs.readFileSync(path.join(SRC, 'domain/agility/service/dto/request/create-service.request.ts'), 'utf8');
-    expect(pedido).not.toMatch(/^\s*materials\??\s*:/m);
-});
+it.each(['create-service.request.ts', 'update-service.request.ts'])(
+    'o pedido %s não declara materials (fase 4: o app não escreve linhas)',
+    (arquivo) => {
+        const pedido = fs.readFileSync(path.join(SRC, 'domain/agility/service/dto/request', arquivo), 'utf8');
+        expect(pedido).not.toMatch(/^\s*materials\??\s*:/m);
+    },
+);
