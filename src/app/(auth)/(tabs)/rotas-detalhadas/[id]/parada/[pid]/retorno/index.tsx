@@ -26,6 +26,7 @@ import { useStopActions, useUserLocation } from '../_hooks';
 import { getCurrentCoords } from '../_hooks/getCurrentCoords';
 import { montarReturnChecklist } from '../_utils/returnChecklist';
 import { othersConcluidos } from '../_utils/returnGate';
+import { returnReasonLabel } from '../_utils/returnReason';
 
 /**
  * Tela da parada de RETORNO (CD/origem).
@@ -38,18 +39,6 @@ import { othersConcluidos } from '../_utils/returnGate';
  * O retorno costuma ter só lat/long (sem Address cadastrado), então o endereço e
  * o mapa vêm do ponto de retorno do map-data (mapData.return / origin).
  */
-/** Rótulo do motivo do retorno (separado da quantidade). Vazio quando não há. */
-function reasonLabel(reason?: string | null): string {
-  switch (String(reason ?? '').toUpperCase()) {
-    case 'FAILED': return ' · Falha na entrega';
-    case 'PARTIAL': return ' · Entrega parcial';
-    case 'MISSING': return ' · Item ausente';
-    case 'DAMAGED': return ' · Danificado';
-    case 'REFUSED': return ' · Recusado';
-    default: return '';
-  }
-}
-
 function RetornoContent() {
   const params = useLocalSearchParams<{ id: string; pid: string }>();
   const routeId = params.id as string;
@@ -481,7 +470,7 @@ function RetornoContent() {
                           {item.material}
                         </Text>
                         <Text preset="text12" color="gray600">
-                          {item.origin === 'PICKUP' ? 'Devolução/coleta' : `Não entregue${reasonLabel(item.reason)}`}
+                          {item.origin === 'PICKUP' ? 'Devolução/coleta' : `Não entregue${returnReasonLabel(item.reason)}`}
                           {item.serviceCode ? ` · #${item.serviceCode}` : ''}
                         </Text>
                       </Box>

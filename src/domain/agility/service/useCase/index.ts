@@ -17,6 +17,8 @@ export { useRemoveService } from './useRemoveService'
 // Linhas (fase 3C)
 export { useCheckLine } from './useCheckLine'
 export { useGetServiceLines } from './useGetServiceLines'
+// Troca de equipamento (fase 3D)
+export { useSwapLine } from './useSwapLine'
 // Draft
 export { useSaveServiceDraft } from './useSaveServiceDraft'
 export { useGetServiceDraft } from './useGetServiceDraft'

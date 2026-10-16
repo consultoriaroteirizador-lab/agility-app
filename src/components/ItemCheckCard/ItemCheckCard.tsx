@@ -9,6 +9,8 @@ const statusConfig: Record<MaterialStatus, { bg: string; text: string; label: st
     MISSING: { bg: 'redError', text: 'redError', label: 'Não encontrado' },
     DAMAGED: { bg: 'redError', text: 'redError', label: 'Danificado' },
     REFUSED: { bg: 'redError', text: 'redError', label: 'Recusado' },
+    // Fase 3D: trocado na parada; a linha B, que ficou no lugar, aparece como "Checado".
+    SWAPPED: { bg: 'gray100', text: 'gray500', label: 'Trocado' },
 };
 
 export interface ItemCheckCardProps {

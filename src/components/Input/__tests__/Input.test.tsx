@@ -42,3 +42,27 @@ it('editável: sem fundo e texto normal', () => {
     expect(campo(tree).props.backgroundColor).toBeUndefined();
     expect(corDoTexto(tree)).toBe(theme.colors.gray700);
 });
+
+// Fase 3D: o Código da troca consulta o cadastro ao sair do campo. Antes, o onBlur de quem chama
+// substituía o da borda (o spread vinha depois) e a borda ficava com a cor de foco.
+it.each([
+    ['sem máscara', {}],
+    ['com máscara', { typeMask: 'cpf' as const }],
+])('onFocus e onBlur de quem chama rodam junto com os da borda (%s)', (_nome, extra) => {
+    const onFocus = jest.fn();
+    const onBlur = jest.fn();
+    const tree = render({ onFocus, onBlur, ...extra });
+    const input = tree.root.findAll((n) => (n.type as unknown) === 'TextInput')[0];
+
+    act(() => {
+        input.props.onFocus({ nativeEvent: {} });
+    });
+    expect(onFocus).toHaveBeenCalledTimes(1);
+    expect(campo(tree).props.borderColor).toBe('primary100');
+
+    act(() => {
+        input.props.onBlur({ nativeEvent: {} });
+    });
+    expect(onBlur).toHaveBeenCalledTimes(1);
+    expect(campo(tree).props.borderColor).toBe('gray400');
+});

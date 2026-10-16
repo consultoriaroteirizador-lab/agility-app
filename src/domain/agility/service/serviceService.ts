@@ -21,6 +21,9 @@ import type {
     ServiceLine,
     MaterialCheckRequest,
     MaterialCheckResponse,
+    EquipmentLookupResponse,
+    SwapLineRequest,
+    SwapLineResponse,
 } from './dto/response/service-line.response'
 import type { ServiceType } from './dto/types'
 import { serviceAPI, type ServiceItem, type StartAttendanceOptions } from './serviceAPI'
@@ -136,6 +139,15 @@ async function checkLine(
     return serviceAPI.checkLine(serviceId, serviceType, lineId, payload)
 }
 
+// Troca de equipamento (fase 3D)
+async function lookupEquipment(serviceId: Id, code: string): Promise<BaseResponse<EquipmentLookupResponse>> {
+    return serviceAPI.lookupEquipment(serviceId, code)
+}
+
+async function swapLine(serviceId: Id, lineId: Id, payload: SwapLineRequest): Promise<BaseResponse<SwapLineResponse>> {
+    return serviceAPI.swapLine(serviceId, lineId, payload)
+}
+
 async function saveDraft(
     id: Id,
     draft: ServiceDraftData,
@@ -173,6 +185,9 @@ export const serviceService = {
     // Linhas (fase 3C)
     getLines,
     checkLine,
+    // Troca de equipamento (fase 3D)
+    lookupEquipment,
+    swapLine,
     // Draft
     saveDraft,
     getDraft,
