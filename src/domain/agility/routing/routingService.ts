@@ -7,8 +7,6 @@ import type {
     ListRoutingsRequest,
     RoutingResponse,
     RoutingCountResponse,
-    AddServicesToRoutingRequest,
-    AddServicesToRoutingResponse,
     RoutingSummaryResponse,
     RoutingMapDataResponse,
     BroadcastingQueryRequest,
@@ -90,13 +88,6 @@ async function remove(id: Id): Promise<BaseResponse<RoutingResponse>> {
     return routingAPI.remove(id)
 }
 
-async function addServices(
-    id: Id,
-    payload: AddServicesToRoutingRequest,
-): Promise<BaseResponse<AddServicesToRoutingResponse>> {
-    return routingAPI.addServices(id, payload)
-}
-
 async function getSummary(id: Id): Promise<BaseResponse<RoutingSummaryResponse>> {
     return routingAPI.getSummary(id)
 }
@@ -143,7 +134,6 @@ export const routingService = {
     complete,
     cancel,
     remove,
-    addServices,
     getSummary,
     getMapData,
     acceptRouting,

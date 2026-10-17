@@ -2,8 +2,8 @@
  * Fase 3C do épico itens do pedido (C6): fora de `serviceLines.ts`, nenhum código do app lê
  * `materials` de uma resposta. O tipo já impede a leitura direta (`ServiceResponse` não tem o
  * campo); esta varredura pega o que escaparia por `any` e impede a resposta de voltar a declarar
- * `materials` ou `items`. Os tipos de request (`dto/request/`) ficam de fora: são escrita (o caminho de
- * escrita morto saiu na fase 4, e o pedido de criação não declara mais `materials`).
+ * `materials` ou `items`. Os tipos de request (`dto/request/`) ficam de fora: são escrita (os requests de
+ * criação e edição do pedido saíram, e nenhum tipo de `dto/request` declara `materials`).
  */
 import * as fs from 'fs';
 import * as path from 'path';
@@ -48,10 +48,17 @@ it('a resposta do serviço não declara materials nem items (eles moram só em s
     expect(resposta).not.toMatch(/^\s*(materials|items)\??\s*:/m);
 });
 
-it.each(['create-service.request.ts', 'update-service.request.ts'])(
+const PASTA_REQUEST = path.join(SRC, 'domain/agility/service/dto/request');
+const ARQUIVOS_REQUEST = fs.readdirSync(PASTA_REQUEST).filter((nome) => nome.endsWith('.ts'));
+
+it('a pasta dto/request não está vazia (sem isso a negativa abaixo passaria calada)', () => {
+    expect(ARQUIVOS_REQUEST.length).toBeGreaterThan(1);
+});
+
+it.each(ARQUIVOS_REQUEST)(
     'o pedido %s não declara materials (fase 4: o app não escreve linhas)',
     (arquivo) => {
-        const pedido = fs.readFileSync(path.join(SRC, 'domain/agility/service/dto/request', arquivo), 'utf8');
+        const pedido = fs.readFileSync(path.join(PASTA_REQUEST, arquivo), 'utf8');
         expect(pedido).not.toMatch(/^\s*materials\??\s*:/m);
     },
 );

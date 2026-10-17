@@ -25,7 +25,7 @@ import {
   formatNotasLabel,
   formatResumoDaNota,
   mapGrupoToParada,
-  pathForServiceType,
+  rotaDaNotaDe,
   resolveNotaFiscalLabel,
   resolveParadaAtendida,
   resolvePedidosDaParada,
@@ -83,14 +83,6 @@ function StopDetailContent() {
     () => pedidosDaParada.map((p, i) => mapGrupoToParada([p], i, null)),
     [pedidosDaParada],
   );
-
-  // Rota do fluxo de entrega/coleta/serviço de cada nota — MESMO mapa
-  // (`pathForServiceType`) do useEffect de auto-redirect abaixo para
-  // DELIVERY/PICKUP/SERVICE. O grupo é sempre homogêneo em tipo (o tipo entra
-  // na chave de agrupamento), então basta olhar o tipo do serviço corrente uma
-  // vez. Calculado aqui (antes dos early returns) porque `handleOpenNota`
-  // também precisa dele; `pathForServiceType` aceita `undefined` (loading).
-  const rotaDaNota = pathForServiceType(service?.serviceType);
 
   // Embedded address from service (when backend sends it)
   const embeddedAddress = service?.address ?? addressFromList ?? null;
@@ -297,10 +289,12 @@ function StopDetailContent() {
     }
 
     router.push({
-      pathname: rotaDaNota,
+      // Cada nota abre o fluxo do PRÓPRIO tipo: o grupo pode misturar entrega e
+      // serviço (mesmo sentido). O tipo da navegação só vale se a nota não está na lista.
+      pathname: rotaDaNotaDe(pedidosDaParada, pid, service?.serviceType),
       params: { id: routeId, pid },
     });
-  }, [pedidosDaParada, temEtapaPropriaAntesDoAtendimento, rotaDaNota, routeId, router, startAttendanceDaNotaAsync, queryClient, showToast]);
+  }, [pedidosDaParada, temEtapaPropriaAntesDoAtendimento, service?.serviceType, routeId, router, startAttendanceDaNotaAsync, queryClient, showToast]);
 
   // Local state
   const [activeTab, setActiveTab] = useState<TabType>('local');

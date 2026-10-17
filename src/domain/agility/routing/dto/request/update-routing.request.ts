@@ -68,9 +68,6 @@ export interface UpdateRoutingRequest {
     /** Routing type (SERVICE or PRODUCT) - optional */
     routingType?: RoutingType
 
-    /** Service IDs - optional */
-    serviceIds?: string[]
-
     /** Routing status - optional */
     status?: RoutingStatus
 }

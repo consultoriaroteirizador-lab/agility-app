@@ -52,3 +52,28 @@ it('linha pendente: "Pendente" e o botão Check (controle)', () => {
     expect(temTexto(t, 'Pendente')).toBe(true);
     expect(temTexto(t, 'Check')).toBe(true);
 });
+
+it('mostra "S/N: X" quando a linha tem serialNumber (backlog: a série certa no check)', () => {
+    const t = render(linha({ status: 'PENDING', serialNumber: 'SN-A' }));
+    expect(temTexto(t, 'S/N: SN-A')).toBe(true);
+});
+
+it('sem série, não mostra "S/N"', () => {
+    const t = render(linha({ status: 'PENDING', serialNumber: null }));
+    expect(t.root.findAll((n) => typeof n.props.children === 'string' && n.props.children.startsWith('S/N')).length).toBe(0);
+});
+
+it('o S/N do cartão corta o começo e mantém o fim da série visível', () => {
+    const t = render(linha({ status: 'PENDING', serialNumber: 'ZTEGC8A1B2C3' }));
+    const no = t.root.findAll((n) => n.props.children === 'S/N: ZTEGC8A1B2C3' && n.props.numberOfLines === 1)[0];
+    expect(no.props.ellipsizeMode).toBe('head');
+});
+
+it('serial e SKU vazios não mostram S/N nem SKU (o `!!` é defensivo, sem mudança de comportamento)', () => {
+    let t!: TestRenderer.ReactTestRenderer;
+    expect(() => {
+        t = render(linha({ status: 'PENDING', serialNumber: '', sku: '' }));
+    }).not.toThrow();
+    expect(temTexto(t, 'Pendente')).toBe(true);
+    expect(t.root.findAll((n) => typeof n.props.children === 'string' && n.props.children.startsWith('S/N')).length).toBe(0);
+});

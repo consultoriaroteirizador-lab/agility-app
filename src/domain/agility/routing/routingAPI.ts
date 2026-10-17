@@ -8,8 +8,6 @@ import type {
     ListRoutingsRequest,
     RoutingResponse,
     RoutingCountResponse,
-    AddServicesToRoutingRequest,
-    AddServicesToRoutingResponse,
     RoutingSummaryResponse,
     RoutingMapDataResponse,
     BroadcastingQueryRequest,
@@ -140,17 +138,6 @@ async function remove(id: Id): Promise<BaseResponse<RoutingResponse>> {
     return data
 }
 
-async function addServices(
-    id: Id,
-    payload: AddServicesToRoutingRequest,
-): Promise<BaseResponse<AddServicesToRoutingResponse>> {
-    const { data } = await apiAgility.post<BaseResponse<AddServicesToRoutingResponse>>(
-        `/routings/${id}/services`,
-        payload,
-    )
-    return data
-}
-
 async function getSummary(id: Id): Promise<BaseResponse<RoutingSummaryResponse>> {
     const { data } = await apiAgility.get<BaseResponse<RoutingSummaryResponse>>(`/routings/${id}/summary`)
     return data
@@ -253,7 +240,6 @@ export const routingAPI = {
     complete,
     cancel,
     remove,
-    addServices,
     getSummary,
     getMapData,
     acceptRouting,

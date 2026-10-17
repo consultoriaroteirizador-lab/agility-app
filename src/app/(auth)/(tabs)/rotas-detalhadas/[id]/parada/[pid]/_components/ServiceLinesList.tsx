@@ -61,7 +61,7 @@ export const ServiceLinesList = ({ lines, serviceType }: ServiceLinesListProps) 
                                         <Text preset="text14" fontWeightPreset="semibold" color="colorTextPrimary">
                                             {line.material || linesTitle(serviceType, 1)}
                                         </Text>
-                                        {line.serialNumber && (
+                                        {!!line.serialNumber && (
                                             <Text preset="text12" color="gray500" mt="y2">
                                                 S/N: {line.serialNumber}
                                             </Text>

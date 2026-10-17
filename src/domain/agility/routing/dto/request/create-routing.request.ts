@@ -65,9 +65,6 @@ export interface CreateRoutingRequest {
     /** Routing type (SERVICE or PRODUCT) - optional */
     routingType?: RoutingType
 
-    /** Service IDs to add to routing - optional */
-    serviceIds?: string[]
-
     /** Services to create inline with the routing (new services) - optional */
     services?: any[] // BatchServiceItemDto[] - using any[] for now to avoid circular dependency
 }
