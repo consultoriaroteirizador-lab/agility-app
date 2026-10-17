@@ -5,7 +5,7 @@ import { ServiceType } from '@/domain/agility/service/dto/types'
 import type { Parada } from '../../_types/rota.types'
 import { collectLiveServiceIds, countParadasByStatus, findOutrasParadas, findParadasConcluidasInsucesso, getParadasOrdenadas, hasMultipleParadasEmAndamento, mapServicesToParadas, resolvePedidosDaParada, withLedgerNonDelivered } from '../routeCalculations'
 import { buildInsucessoList, countLedgerOnly } from '../routeNonDelivered'
-import { mapGrupoToParada, pathForServiceType } from '../statusMappers'
+import { mapGrupoToParada, pathForServiceType, rotaDaNotaDe } from '../statusMappers'
 import { findGrupoDoServico, groupContiguousStops } from '../stopGrouping'
 
 function parada(over: Partial<Parada> & { serviceId: string }): Parada {
@@ -234,6 +234,23 @@ describe('pathForServiceType', () => {
     it('tipo desconhecido/nulo → default de entrega (mesmo fallback do índice de notas)', () => {
         expect(pathForServiceType(null)).toBe('/rotas-detalhadas/[id]/parada/[pid]/entrega')
         expect(pathForServiceType('QUALQUER_OUTRO')).toBe('/rotas-detalhadas/[id]/parada/[pid]/entrega')
+    })
+})
+
+describe('rotaDaNotaDe (backlog: parada agrupada mista)', () => {
+    const entrega = { id: 'd1', serviceType: ServiceType.DELIVERY } as unknown as ServiceResponse
+    const servico = { id: 's1', serviceType: ServiceType.SERVICE } as unknown as ServiceResponse
+
+    it('rotaDaNotaDe: grupo [DELIVERY, SERVICE], a nota do SERVICE abre o fluxo de serviço', () => {
+        expect(rotaDaNotaDe([entrega, servico], 's1', ServiceType.DELIVERY)).toBe('/rotas-detalhadas/[id]/parada/[pid]/service')
+    })
+
+    it('rotaDaNotaDe: grupo [SERVICE, DELIVERY], a nota de entrega abre o fluxo de entrega', () => {
+        expect(rotaDaNotaDe([servico, entrega], 'd1', ServiceType.SERVICE)).toBe('/rotas-detalhadas/[id]/parada/[pid]/entrega')
+    })
+
+    it('rotaDaNotaDe: pid fora da lista (ainda carregando) cai no tipo do pedido da navegação', () => {
+        expect(rotaDaNotaDe([], 's1', ServiceType.SERVICE)).toBe('/rotas-detalhadas/[id]/parada/[pid]/service')
     })
 })
 

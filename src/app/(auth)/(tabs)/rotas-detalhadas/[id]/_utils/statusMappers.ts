@@ -147,6 +147,16 @@ export function pathForServiceType(serviceType: ServiceType | string | null | un
 }
 
 /**
+ * Rota do fluxo da NOTA `pid` dentro de uma parada agrupada. O agrupamento usa o
+ * sentido (`stopGrouping.ts`), e DELIVERY e SERVICE têm o mesmo (D): uma parada
+ * pode misturar entrega e serviço, e cada nota abre o fluxo do PRÓPRIO tipo. O
+ * tipo da navegação só vale quando a nota ainda não está na lista (loading).
+ */
+export function rotaDaNotaDe(pedidos: ServiceResponse[], pid: string, tipoDaNavegacao?: ServiceType | string | null): StopServiceRoutePath {
+    return pathForServiceType(pedidos.find((p) => p.id === pid)?.serviceType ?? tipoDaNavegacao)
+}
+
+/**
  * Determina o status da parada baseado nos campos booleanos do serviço
  * 
  * IMPORTANTE: Usa APENAS os campos booleanos do backend (isPending, isInProgress, 

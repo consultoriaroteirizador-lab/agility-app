@@ -27,6 +27,7 @@ export {
     mapGrupoToParada,
     mapServiceToParada,
     pathForServiceType,
+    rotaDaNotaDe,
     type StopServiceRoutePath,
 
     // Funções de verificação
