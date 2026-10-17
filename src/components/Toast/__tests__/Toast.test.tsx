@@ -36,6 +36,8 @@ function Disparador() {
     return null;
 }
 
+let arvores: TestRenderer.ReactTestRenderer[] = [];
+
 function montar() {
     let tree!: TestRenderer.ReactTestRenderer;
     act(() => {
@@ -46,6 +48,7 @@ function montar() {
             </ThemeProvider>,
         );
     });
+    arvores.push(tree);
     return tree;
 }
 
@@ -80,6 +83,8 @@ beforeEach(() => {
 
 afterEach(() => {
     act(() => esconder());
+    act(() => arvores.forEach((a) => a.unmount()));
+    arvores = [];
     jest.useRealTimers();
     jest.restoreAllMocks();
 });

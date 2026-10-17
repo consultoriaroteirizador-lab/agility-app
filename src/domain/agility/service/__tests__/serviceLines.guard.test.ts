@@ -3,7 +3,7 @@
  * `materials` de uma resposta. O tipo já impede a leitura direta (`ServiceResponse` não tem o
  * campo); esta varredura pega o que escaparia por `any` e impede a resposta de voltar a declarar
  * `materials` ou `items`. Os tipos de request (`dto/request/`) ficam de fora: são escrita (os requests de
- * escrita de serviço saíram, e nenhum tipo de `dto/request` declara `materials`).
+ * criação e edição do pedido saíram, e nenhum tipo de `dto/request` declara `materials`).
  */
 import * as fs from 'fs';
 import * as path from 'path';

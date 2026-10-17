@@ -69,7 +69,7 @@ it('o S/N do cartão corta o começo e mantém o fim da série visível', () => 
     expect(no.props.ellipsizeMode).toBe('head');
 });
 
-it('serial e SKU vazios não quebram a renderização', () => {
+it('serial e SKU vazios não mostram S/N nem SKU (o `!!` é defensivo, sem mudança de comportamento)', () => {
     let t!: TestRenderer.ReactTestRenderer;
     expect(() => {
         t = render(linha({ status: 'PENDING', serialNumber: '', sku: '' }));
