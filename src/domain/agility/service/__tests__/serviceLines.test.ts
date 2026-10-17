@@ -21,12 +21,12 @@ describe('serviceLines', () => {
         expect(serviceLines({ serviceType: ServiceType.SERVICE, items: [RECOLHER] })).toBeNull()
     })
 
-    it.each(PEDIDOS)('pedido (%s) lê items antes de materials', (serviceType) => {
+    it.each(PEDIDOS)('pedido (%s) lê items e ignora materials', (serviceType) => {
         expect(serviceLines({ serviceType, items: [SEM_DIRECAO], materials: [RECOLHER] })).toEqual([SEM_DIRECAO])
     })
 
-    it('pedido só com materials (antes da fase 4): lê materials', () => {
-        expect(serviceLines({ serviceType: ServiceType.DELIVERY, materials: [RECOLHER] })).toEqual([RECOLHER])
+    it.each(PEDIDOS)('pedido (%s) só com materials não mostra linha (fase 4): null', (serviceType) => {
+        expect(serviceLines({ serviceType, materials: [RECOLHER] })).toBeNull()
     })
 
     it('pedido só com items (formato da fase 4): lê items', () => {

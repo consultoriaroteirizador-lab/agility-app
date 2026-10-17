@@ -2,7 +2,6 @@ import { useState } from 'react';
 
 import { ActivityIndicator, Box, Text, TouchableOpacityBox } from '@/components';
 import { Icon } from '@/components/Icon/Icon';
-import { ServiceType } from '@/domain/agility/service/dto/types';
 import { useGetServiceLines } from '@/domain/agility/service/useCase/useGetServiceLines';
 import { measure } from '@/theme';
 
@@ -18,9 +17,12 @@ export type TransferOrderOutcome = {
 };
 
 /**
- * Card de um pedido do lote de transferência. Toca pra expandir e ver os itens
- * (materiais) daquele pedido — read-only, sem conferência (o check de item real
- * acontece no last-mile, não na transferência). A busca dos itens é LAZY: só
+ * Card de um pedido do lote de transferência e também de cada nota da parada
+ * agrupada (entrega, coleta e SERVICE). Toca pra expandir e ver as linhas daquele
+ * pedido — read-only, sem conferência (o check de item real acontece no
+ * last-mile, não na transferência). As linhas vêm pela família do tipo da própria
+ * nota (`parada.pedidos[0]`): pedido em `/items`, SERVICE em `/materials`; o
+ * backend recusa a família errada com 400. A busca das linhas é LAZY: só
  * dispara `useGetServiceLines` quando o card é expandido, evitando N requisições de
  * cara num lote grande.
  *
@@ -57,7 +59,7 @@ export function TransferOrderCard({
     openLabel?: string;
 }) {
     const [expanded, setExpanded] = useState(false);
-    const { lines, isLoading, isError } = useGetServiceLines(expanded ? parada.serviceId : undefined, ServiceType.TRANSFER);
+    const { lines, isLoading, isError } = useGetServiceLines(expanded ? parada.serviceId : undefined, parada.pedidos[0]?.serviceType);
     const isNotReceived = outcome?.outcome === 'NOT_RECEIVED';
 
     // Cabeçalho de NOTA: status à esquerda e nota fiscal à direita na MESMA linha,

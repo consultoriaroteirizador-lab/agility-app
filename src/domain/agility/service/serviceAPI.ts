@@ -3,10 +3,6 @@ import { apiAgility } from '@/api/apiConfig'
 import type { Id } from '@/types/base'
 
 import type {
-    CreateServiceRequest,
-    CreateServicesBatchRequest,
-    BatchCreationResult,
-    UpdateServiceRequest,
     ListServicesRequest,
     ServiceResponse,
     ServiceCompletionDetailsRequest,
@@ -34,16 +30,6 @@ import { lineRoute } from './serviceLines'
 // Export ServiceResponse as ServiceItem for backward compatibility
 export type ServiceItem = ServiceResponse
 
-async function create(payload: CreateServiceRequest): Promise<BaseResponse<ServiceResponse>> {
-    const { data } = await apiAgility.post<BaseResponse<ServiceResponse>>('/services', payload)
-    return data
-}
-
-async function createBatch(payload: CreateServicesBatchRequest): Promise<BaseResponse<BatchCreationResult>> {
-    const { data } = await apiAgility.post<BaseResponse<BatchCreationResult>>('/services/batch', payload)
-    return data
-}
-
 async function findAll(params: ListServicesRequest = {}): Promise<BaseResponse<ServiceResponse[]>> {
     const { data } = await apiAgility.get<BaseResponse<ServiceResponse[]>>('/services', {
         params: {
@@ -69,14 +55,6 @@ async function findPending(): Promise<BaseResponse<ServiceResponse[]>> {
 
 async function findOne(id: Id): Promise<BaseResponse<ServiceResponse>> {
     const { data } = await apiAgility.get<BaseResponse<ServiceResponse>>(`/services/${id}`)
-    return data
-}
-
-async function update(
-    id: Id,
-    payload: UpdateServiceRequest,
-): Promise<BaseResponse<ServiceResponse>> {
-    const { data } = await apiAgility.patch<BaseResponse<ServiceResponse>>(`/services/${id}`, payload)
     return data
 }
 
@@ -272,13 +250,10 @@ async function clearDraft(id: Id): Promise<void> {
 }
 
 export const serviceAPI = {
-    create,
-    createBatch,
     findAll,
     findByRoutingId,
     findPending,
     findOne,
-    update,
     assignDriver,
     unassignDriver,
     start,
