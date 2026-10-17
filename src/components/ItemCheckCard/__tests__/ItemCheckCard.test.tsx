@@ -62,3 +62,12 @@ it('sem série, não mostra "S/N"', () => {
     const t = render(linha({ status: 'PENDING', serialNumber: null }));
     expect(t.root.findAll((n) => typeof n.props.children === 'string' && n.props.children.startsWith('S/N')).length).toBe(0);
 });
+
+it('serial e SKU vazios não quebram a renderização', () => {
+    let t!: TestRenderer.ReactTestRenderer;
+    expect(() => {
+        t = render(linha({ status: 'PENDING', serialNumber: '', sku: '' }));
+    }).not.toThrow();
+    expect(temTexto(t, 'Pendente')).toBe(true);
+    expect(t.root.findAll((n) => typeof n.props.children === 'string' && n.props.children.startsWith('S/N')).length).toBe(0);
+});
