@@ -63,6 +63,12 @@ export function ItemCheckCard({ item, onCheck }: ItemCheckCardProps) {
                     </Text>
                 )}
 
+                {item.serialNumber && (
+                    <Text preset="text12" color="gray400" numberOfLines={1}>
+                        {`S/N: ${item.serialNumber}`}
+                    </Text>
+                )}
+
                 {item.checkNotes && (
                     <Text preset="text12" color="gray400" marginTop="y4" numberOfLines={2}>
                         {item.checkNotes}

@@ -142,6 +142,11 @@ export function ItemCheckModal({ visible, item, onClose, onConfirm, loading, sta
                                         • SKU: {item.sku}
                                     </Text>
                                 )}
+                                {item.serialNumber && (
+                                    <Text preset="text14" color="gray400">
+                                        {`• S/N: ${item.serialNumber}`}
+                                    </Text>
+                                )}
                             </Box>
                         </Box>
 
