@@ -64,7 +64,7 @@ export function ItemCheckCard({ item, onCheck }: ItemCheckCardProps) {
                 )}
 
                 {!!item.serialNumber && (
-                    <Text preset="text12" color="gray400" numberOfLines={1}>
+                    <Text preset="text12" color="gray400" numberOfLines={1} ellipsizeMode="head">
                         {`S/N: ${item.serialNumber}`}
                     </Text>
                 )}

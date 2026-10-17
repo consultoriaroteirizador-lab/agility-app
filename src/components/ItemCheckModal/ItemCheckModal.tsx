@@ -133,7 +133,7 @@ export function ItemCheckModal({ visible, item, onClose, onConfirm, loading, sta
                             <Text preset="text16" color="colorTextPrimary" fontWeightPreset="bold">
                                 {item.material}
                             </Text>
-                            <Box flexDirection="row" gap="x8" marginTop="y4">
+                            <Box flexDirection="row" flexWrap="wrap" gap="x8" marginTop="y4">
                                 <Text preset="text14" color="gray400">
                                     Quantidade: {item.quantity} {item.unit ?? 'un'}
                                 </Text>

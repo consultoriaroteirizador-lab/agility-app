@@ -47,6 +47,14 @@ it('o modal do check mostra o S/N ao lado do SKU', () => {
     expect(temTexto(t, '• S/N: SN-A')).toBe(true);
 });
 
+it('a linha Quantidade/SKU/S/N do modal quebra em vez de sair da tela (360 dp)', () => {
+    const t = render(linha({ sku: 'ONT-F670L', serialNumber: 'ZTEGC8A1B2C3' }));
+    let no: TestRenderer.ReactTestInstance | null = t.root.findAll((n) => n.props.children === '• S/N: ZTEGC8A1B2C3')[0];
+    while (no && no.props.flexDirection !== 'row') no = no.parent;
+    expect(no).not.toBeNull();
+    expect(no?.props.flexWrap).toBe('wrap');
+});
+
 it('o modal do check sem série não mostra "S/N"', () => {
     const t = render(linha({ sku: 'MOD-1', serialNumber: null }));
     const comSN = t.root.findAll(

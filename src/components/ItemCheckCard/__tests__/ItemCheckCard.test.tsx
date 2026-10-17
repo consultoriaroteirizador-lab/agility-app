@@ -63,6 +63,12 @@ it('sem série, não mostra "S/N"', () => {
     expect(t.root.findAll((n) => typeof n.props.children === 'string' && n.props.children.startsWith('S/N')).length).toBe(0);
 });
 
+it('o S/N do cartão corta o começo e mantém o fim da série visível', () => {
+    const t = render(linha({ status: 'PENDING', serialNumber: 'ZTEGC8A1B2C3' }));
+    const no = t.root.findAll((n) => n.props.children === 'S/N: ZTEGC8A1B2C3' && n.props.numberOfLines === 1)[0];
+    expect(no.props.ellipsizeMode).toBe('head');
+});
+
 it('serial e SKU vazios não quebram a renderização', () => {
     let t!: TestRenderer.ReactTestRenderer;
     expect(() => {
