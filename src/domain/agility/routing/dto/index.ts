@@ -8,10 +8,6 @@ export type { ListRoutingsRequest } from './request/list-routings.request'
 export type { RoutingsAggregatedSummaryResponse } from './response/routings-aggregated-summary.response'
 export type { RoutingPointRequest } from './request/routing-point.request'
 export type { RoutingOfferConfigRequest } from './request/routing-offer-config.request'
-export type { 
-    AddServicesToRoutingRequest, 
-    AddServicesToRoutingResponse 
-} from './request/add-services-to-routing.request'
 export type { BroadcastingQueryRequest } from './request/broadcasting-query.request'
 export type { AcceptRoutingRequest } from './request/accept-routing.request'
 export type {
