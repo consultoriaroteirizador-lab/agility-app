@@ -53,12 +53,16 @@ export function Toast() {
     );
 
     useEffect(() => {
-        if (toast) {
-            runEnteringAnimation();
-            setTimeout(() => {
-                runExitingAnimation(hideToast);
-            }, toast.duration || DEFAULT_DURATION);
-        }
+        if (!toast) return;
+        runEnteringAnimation();
+        // O toast seguinte (ou a desmontagem) cancela o timer deste, senão ele apagaria o seguinte antes da hora; e a
+        // saída interrompida por um toast novo (`finished: false`) não apaga o novo.
+        const timer = setTimeout(() => {
+            runExitingAnimation(({ finished }) => {
+                if (finished) hideToast();
+            });
+        }, toast.duration || DEFAULT_DURATION);
+        return () => clearTimeout(timer);
     }, [hideToast, runEnteringAnimation, runExitingAnimation, toast]);
 
     if (!toast) {
