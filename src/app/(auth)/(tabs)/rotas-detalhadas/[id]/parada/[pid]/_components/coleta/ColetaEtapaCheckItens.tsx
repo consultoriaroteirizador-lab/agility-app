@@ -5,6 +5,7 @@ import { ButtonBack } from '@/components/Button/ButtonBack';
 import { ItemCheckCard } from '@/components/ItemCheckCard';
 import { ItemCheckModal } from '@/components/ItemCheckModal';
 import type { ServiceLine, MaterialStatus } from '@/domain/agility/service/dto/response/service-line.response';
+import { pluralize } from '@/functions';
 import { measure } from '@/theme';
 
 import { useParada } from '../../_context/ParadaContext';
@@ -97,7 +98,7 @@ export function ColetaEtapaCheckItens() {
                                     Itens para coleta
                                 </Text>
                                 <Text preset="text20" color="colorTextPrimary" fontWeightPreset="bold">
-                                    {linesState.lines.length} itens
+                                    {pluralize(linesState.lines.length, 'item', 'itens')}
                                 </Text>
                             </Box>
                             <Box
@@ -189,6 +190,7 @@ export function ColetaEtapaCheckItens() {
                     onClose={handleCloseModal}
                     onConfirm={handleConfirmCheck}
                     loading={checking}
+                    context="pickup"
                 />
             </Box>
         </ScreenBase>

@@ -5,6 +5,7 @@ import { ButtonBack } from '@/components/Button/ButtonBack';
 import { ItemCheckCard } from '@/components/ItemCheckCard';
 import { ItemCheckModal } from '@/components/ItemCheckModal';
 import type { ServiceLine, MaterialStatus, MaterialDirection } from '@/domain/agility/service/dto/response/service-line.response';
+import { pluralize } from '@/functions';
 import { measure } from '@/theme';
 
 import { useParada } from '../../_context/ParadaContext';
@@ -144,7 +145,7 @@ export function EtapaCheckItens({
                                     fontWeightPreset="bold"
                                     numberOfLines={1}
                                 >
-                                    {items.length} itens
+                                    {pluralize(items.length, 'item', 'itens')}
                                 </Text>
                             </Box>
 
@@ -243,6 +244,7 @@ export function EtapaCheckItens({
                     onClose={handleCloseModal}
                     onConfirm={handleConfirmCheck}
                     loading={checking}
+                    context={direction === 'PICKUP' ? 'pickup' : 'delivery'}
                 />
             </Box>
         </ScreenBase>

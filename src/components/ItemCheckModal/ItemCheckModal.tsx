@@ -13,14 +13,8 @@ import { measure } from '@/theme';
 
 import { acceptUploadResult, buildCheckPayload, canConfirm, isQuantityValid as checkQuantity, photoRequirement } from './itemCheckPhoto';
 import type { CheckData, CheckStatus } from './itemCheckPhoto';
-
-interface StatusLabels {
-    CHECKED?: string;
-    PARTIAL?: string;
-    MISSING?: string;
-    DAMAGED?: string;
-    REFUSED?: string;
-}
+import { getCheckTexts, quantityTitle } from './itemCheckTexts';
+import type { CheckContext } from './itemCheckTexts';
 
 interface ItemCheckModalProps {
     visible: boolean;
@@ -28,24 +22,9 @@ interface ItemCheckModalProps {
     onClose: () => void;
     onConfirm: (data: CheckData) => void;
     loading?: boolean;
-    statusLabels?: StatusLabels;
+    /** Contexto do check (textos e opções); padrão: entrega. */
+    context?: CheckContext;
 }
-
-const DEFAULT_STATUS_LABELS: Record<CheckStatus, string> = {
-    CHECKED: 'Entregue',
-    PARTIAL: 'Parcial',
-    MISSING: 'Não encontrado',
-    DAMAGED: 'Danificado',
-    REFUSED: 'Recusado',
-};
-
-const DEFAULT_DESCRIPTIONS: Record<CheckStatus, string> = {
-    CHECKED: 'Item entregue com sucesso',
-    PARTIAL: 'Entrega parcial',
-    MISSING: 'Item não estava disponível',
-    DAMAGED: 'Item chegou danificado',
-    REFUSED: 'Cliente recusou o item',
-};
 
 const DEFAULT_STATE = {
     status: 'CHECKED' as CheckStatus,
@@ -53,7 +32,7 @@ const DEFAULT_STATE = {
     notes: '',
 };
 
-export function ItemCheckModal({ visible, item, onClose, onConfirm, loading, statusLabels }: ItemCheckModalProps) {
+export function ItemCheckModal({ visible, item, onClose, onConfirm, loading, context = 'delivery' }: ItemCheckModalProps) {
     const { top } = useAppSafeArea();
     const [status, setStatus] = useState<CheckStatus>(DEFAULT_STATE.status);
     const [actualQuantity, setActualQuantity] = useState(DEFAULT_STATE.actualQuantity);
@@ -81,14 +60,12 @@ export function ItemCheckModal({ visible, item, onClose, onConfirm, loading, sta
 
     if (!visible || !item) return null;
 
-    const labels = { ...DEFAULT_STATUS_LABELS, ...statusLabels };
-    const statusOptions: { value: CheckStatus; label: string; description: string }[] = [
-        { value: 'CHECKED', label: labels.CHECKED, description: DEFAULT_DESCRIPTIONS.CHECKED },
-        { value: 'PARTIAL', label: labels.PARTIAL, description: DEFAULT_DESCRIPTIONS.PARTIAL },
-        { value: 'MISSING', label: labels.MISSING, description: DEFAULT_DESCRIPTIONS.MISSING },
-        { value: 'DAMAGED', label: labels.DAMAGED, description: DEFAULT_DESCRIPTIONS.DAMAGED },
-        { value: 'REFUSED', label: labels.REFUSED, description: DEFAULT_DESCRIPTIONS.REFUSED },
-    ];
+    const texts = getCheckTexts(context);
+    const statusOptions = texts.statuses.map((value) => ({
+        value,
+        label: texts.labels[value],
+        description: texts.descriptions[value],
+    }));
 
     const handlePhotosChange = async (assets: ImagePickerAsset[]) => {
         uploadGeneration.current += 1;
@@ -230,16 +207,16 @@ export function ItemCheckModal({ visible, item, onClose, onConfirm, loading, sta
                         {needsQuantity && (
                             <Box>
                                 <Input
-                                    title={isPartial ? 'Quantidade entregue:' : 'Quantidade entregue (opcional):'}
+                                    title={quantityTitle(texts, isPartial)}
                                     borderType="all"
                                     value={actualQuantity}
                                     onChangeText={setActualQuantity}
                                     placeholder={`Máx: ${item.quantity}`}
                                     keyboardType="numeric"
                                 />
-                                {isDamaged && (
+                                {isDamaged && !!texts.damagedQuantityHint && (
                                     <Text preset="text12" color="gray400">
-                                        Informe quanto você entregou; o restante volta ao CD.
+                                        {texts.damagedQuantityHint}
                                     </Text>
                                 )}
                                 {!!actualQuantity && !isQuantityValid && (
