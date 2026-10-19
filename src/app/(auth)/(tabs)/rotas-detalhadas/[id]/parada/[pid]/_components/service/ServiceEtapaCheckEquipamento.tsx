@@ -19,6 +19,7 @@ export function ServiceEtapaCheckEquipamento() {
         linesState,
         checkLine,
         completeCheck,
+        serviceId,
     } = useParada();
 
     const [selectedItem, setSelectedItem] = useState<ServiceLine | null>(null);
@@ -204,6 +205,7 @@ export function ServiceEtapaCheckEquipamento() {
                     onClose={handleCloseModal}
                     onConfirm={handleConfirmCheck}
                     loading={checking}
+                    serviceId={serviceId}
                     context="equipment"
                 />
             </Box>

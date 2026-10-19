@@ -23,6 +23,7 @@ export function ColetaEtapaCheckItens() {
         completeCheck,
         goToNextStep,
         goToPreviousStep,
+        serviceId,
     } = useParada();
 
     const [selectedItem, setSelectedItem] = useState<ServiceLine | null>(null);
@@ -190,6 +191,7 @@ export function ColetaEtapaCheckItens() {
                     onClose={handleCloseModal}
                     onConfirm={handleConfirmCheck}
                     loading={checking}
+                    serviceId={serviceId}
                     context="pickup"
                 />
             </Box>

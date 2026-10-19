@@ -11,7 +11,7 @@ import { useAppSafeArea } from '@/hooks';
 import { useToastService } from '@/services/Toast/useToast';
 import { measure } from '@/theme';
 
-import { acceptUploadResult, buildCheckPayload, canConfirm, isQuantityValid as checkQuantity, photoRequirement } from './itemCheckPhoto';
+import { acceptUploadResult, buildCheckPayload, canConfirm, isQuantityValid as checkQuantity, photoRequirement, shouldDiscardPhotoOnStatusChange } from './itemCheckPhoto';
 import type { CheckData, CheckStatus } from './itemCheckPhoto';
 import { getCheckTexts, quantityTitle } from './itemCheckTexts';
 import type { CheckContext } from './itemCheckTexts';
@@ -24,6 +24,8 @@ interface ItemCheckModalProps {
     loading?: boolean;
     /** Contexto do check (textos e opções); padrão: entrega. */
     context?: CheckContext;
+    /** Serviço dono da linha (o upload da foto é gravado sob ele, como nos demais uploads da parada). */
+    serviceId?: string;
 }
 
 const DEFAULT_STATE = {
@@ -32,7 +34,7 @@ const DEFAULT_STATE = {
     notes: '',
 };
 
-export function ItemCheckModal({ visible, item, onClose, onConfirm, loading, context = 'delivery' }: ItemCheckModalProps) {
+export function ItemCheckModal({ visible, item, onClose, onConfirm, loading, context = 'delivery', serviceId }: ItemCheckModalProps) {
     const { top } = useAppSafeArea();
     const [status, setStatus] = useState<CheckStatus>(DEFAULT_STATE.status);
     const [actualQuantity, setActualQuantity] = useState(DEFAULT_STATE.actualQuantity);
@@ -67,6 +69,17 @@ export function ItemCheckModal({ visible, item, onClose, onConfirm, loading, con
         description: texts.descriptions[value],
     }));
 
+    const handleStatusChange = (next: CheckStatus) => {
+        setStatus(next);
+        if (shouldDiscardPhotoOnStatusChange(next)) {
+            // Invalida o upload em voo: o resultado velho é descartado e o Confirmar libera na hora.
+            uploadGeneration.current += 1;
+            setUploading(false);
+            setPhoto(null);
+            setPhotoUrl(undefined);
+        }
+    };
+
     const handlePhotosChange = async (assets: ImagePickerAsset[]) => {
         uploadGeneration.current += 1;
         const generation = uploadGeneration.current;
@@ -81,7 +94,7 @@ export function ItemCheckModal({ visible, item, onClose, onConfirm, loading, con
         setPhotoUrl(undefined);
         setUploading(true);
         try {
-            const [url] = await uploadMultipleServicePhotos([next]);
+            const [url] = await uploadMultipleServicePhotos([next], serviceId);
             if (!url) throw new Error('upload sem URL');
             if (acceptUploadResult(generation, uploadGeneration.current)) setPhotoUrl(url);
         } catch {
@@ -165,7 +178,7 @@ export function ItemCheckModal({ visible, item, onClose, onConfirm, loading, con
                                 return (
                                     <TouchableOpacityBox
                                         key={option.value}
-                                        onPress={() => setStatus(option.value)}
+                                        onPress={() => handleStatusChange(option.value)}
                                         flexDirection="row"
                                         alignItems="center"
                                         padding="y10"
@@ -231,7 +244,7 @@ export function ItemCheckModal({ visible, item, onClose, onConfirm, loading, con
                         {photoNeed !== 'none' && (
                             <Box>
                                 <MultiPhotoPicker
-                                    label={photoNeed === 'required' ? 'Foto da avaria (obrigatória)' : 'Foto (opcional)'}
+                                    label={photoNeed === 'required' ? 'Foto obrigatória da avaria' : 'Foto opcional'}
                                     photos={photo ? [photo] : []}
                                     onPhotosChange={handlePhotosChange}
                                     maxPhotos={1}

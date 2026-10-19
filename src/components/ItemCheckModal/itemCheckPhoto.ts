@@ -16,6 +16,11 @@ export function photoRequirement(status: CheckStatus): PhotoRequirement {
     return 'none';
 }
 
+/** Trocar para um status sem campo de foto descarta a foto e o upload em voo (libera o Confirmar). */
+export function shouldDiscardPhotoOnStatusChange(next: CheckStatus): boolean {
+    return photoRequirement(next) === 'none';
+}
+
 interface CanConfirmInput {
     status: CheckStatus;
     /** Quantidade da linha (limite superior da quantidade entregue). */

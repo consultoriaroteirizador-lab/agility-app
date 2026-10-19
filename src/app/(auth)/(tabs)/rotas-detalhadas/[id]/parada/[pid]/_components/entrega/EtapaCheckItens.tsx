@@ -50,6 +50,7 @@ export function EtapaCheckItens({
         completeCheck,
         goToNextStep,
         goToPreviousStep,
+        serviceId,
     } = useParada();
 
     const [selectedItem, setSelectedItem] = useState<ServiceLine | null>(null);
@@ -244,6 +245,7 @@ export function EtapaCheckItens({
                     onClose={handleCloseModal}
                     onConfirm={handleConfirmCheck}
                     loading={checking}
+                    serviceId={serviceId}
                     context={direction === 'PICKUP' ? 'pickup' : 'delivery'}
                 />
             </Box>

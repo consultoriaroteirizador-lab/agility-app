@@ -1,7 +1,7 @@
 /**
  * Foto do check do item (D-4): DAMAGED exige, REFUSED/PARTIAL aceitam, o resto não tem campo.
  */
-import { acceptUploadResult, buildCheckPayload, canConfirm, photoRequirement } from '../itemCheckPhoto';
+import { acceptUploadResult, buildCheckPayload, canConfirm, photoRequirement, shouldDiscardPhotoOnStatusChange } from '../itemCheckPhoto';
 
 describe('photoRequirement', () => {
     it.each([
@@ -99,5 +99,17 @@ describe('acceptUploadResult (corrida do upload)', () => {
     it('upload sem nada no meio vale', () => {
         const g = novo();
         expect(acceptUploadResult(g.bump(), g.atual())).toBe(true);
+    });
+});
+
+describe('shouldDiscardPhotoOnStatusChange', () => {
+    it.each([
+        ['CHECKED', true],
+        ['MISSING', true],
+        ['DAMAGED', false],
+        ['REFUSED', false],
+        ['PARTIAL', false],
+    ] as const)('trocar para %s descarta a foto/upload em voo: %s', (status, esperado) => {
+        expect(shouldDiscardPhotoOnStatusChange(status)).toBe(esperado);
     });
 });
