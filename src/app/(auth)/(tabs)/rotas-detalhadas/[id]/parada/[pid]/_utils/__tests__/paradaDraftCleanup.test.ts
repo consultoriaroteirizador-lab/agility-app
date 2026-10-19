@@ -42,3 +42,21 @@ describe('clearParadaDraftEverywhere', () => {
         expect(clearRemote).not.toHaveBeenCalled();
     });
 });
+
+describe('clearParadaDraftEverywhere: servidor sem bloquear', () => {
+    it('o servidor lento não segura a função (só o local é aguardado)', async () => {
+        const clearLocal = jest.fn().mockResolvedValue(undefined);
+        const clearRemote = jest.fn().mockReturnValue(new Promise(() => {}));
+
+        await expect(clearParadaDraftEverywhere('s1', { clearLocal, clearRemote })).resolves.toBeUndefined();
+        expect(clearRemote).toHaveBeenCalledWith('s1');
+    });
+
+    it('servidor que falha depois não gera rejeição não tratada', async () => {
+        const clearLocal = jest.fn().mockResolvedValue(undefined);
+        const clearRemote = jest.fn().mockRejectedValue(new Error('Network Error'));
+
+        await clearParadaDraftEverywhere('s1', { clearLocal, clearRemote });
+        await new Promise((r) => setImmediate(r));
+    });
+});
