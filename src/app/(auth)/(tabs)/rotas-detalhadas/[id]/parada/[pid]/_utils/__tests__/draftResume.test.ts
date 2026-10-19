@@ -6,7 +6,7 @@
  */
 import type { ServiceResponse } from '@/domain/agility/service/dto';
 
-import { deliveredFromDraftEtapa, etapaRestauradaDoRascunho, formAnsweredOnServer } from '../draftResume';
+import { deliveredFromDraftEtapa, etapaRestauradaDoRascunho, formAnsweredOnServer, serviceProntoParaHidratar } from '../draftResume';
 
 function servico(over: Partial<ServiceResponse>): ServiceResponse {
     return { id: 's1', formGroupIds: [], formGroupAnswers: null, ...over } as unknown as ServiceResponse;
@@ -84,5 +84,19 @@ describe('etapaRestauradaDoRascunho', () => {
 
     it.each([undefined, null, 0])('rascunho sem etapa (%s) resulta na etapa de chegada', (etapa) => {
         expect(etapaRestauradaDoRascunho({ etapa, emAtendimento: true, ...entrega })).toBe(1);
+    });
+});
+
+describe('serviceProntoParaHidratar', () => {
+    it('sem serviço ainda: não hidrata', () => {
+        expect(serviceProntoParaHidratar({ service: null, isRefetching: false })).toBe(false);
+    });
+
+    it('serviço em cache com refetch em voo: espera o status fresco', () => {
+        expect(serviceProntoParaHidratar({ service: servico({}), isRefetching: true })).toBe(false);
+    });
+
+    it('serviço carregado e sem refetch em voo: hidrata', () => {
+        expect(serviceProntoParaHidratar({ service: servico({}), isRefetching: false })).toBe(true);
     });
 });

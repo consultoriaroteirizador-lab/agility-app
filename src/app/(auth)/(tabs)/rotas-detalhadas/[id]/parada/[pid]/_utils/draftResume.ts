@@ -55,3 +55,15 @@ export function etapaRestauradaDoRascunho(params: {
     if (params.isTransfer || params.emAtendimento) return etapa;
     return 1;
 }
+
+/**
+ * A hidratação do rascunho decide a etapa pelo status do pedido, então só roda com o
+ * serviço carregado e sem refetch em voo: com cache velho (ASSIGNED em cache, servidor
+ * já IN_ATTENDANCE) a etapa seria limitada a 1 por um status defasado.
+ */
+export function serviceProntoParaHidratar(params: {
+    service: unknown | null | undefined;
+    isRefetching: boolean;
+}): boolean {
+    return !!params.service && !params.isRefetching;
+}

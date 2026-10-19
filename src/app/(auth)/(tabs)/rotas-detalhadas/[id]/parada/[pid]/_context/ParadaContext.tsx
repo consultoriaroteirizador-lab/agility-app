@@ -45,7 +45,7 @@ import { useToastService } from '@/services/Toast/useToast';
 import { resolveParadaAtendidaElegivel, resolvePedidosDaParada } from '../../../_utils';
 import { useStopStatus } from '../_hooks/useStopStatus';
 import { resolveCompanyRules } from '../_utils/companyRules';
-import { deliveredFromDraftEtapa, etapaRestauradaDoRascunho, formAnsweredOnServer } from '../_utils/draftResume';
+import { deliveredFromDraftEtapa, etapaRestauradaDoRascunho, formAnsweredOnServer, serviceProntoParaHidratar } from '../_utils/draftResume';
 import {
   draftHasAnyValue,
   draftToPickupEvidence,
@@ -281,7 +281,7 @@ interface ParadaProviderProps {
 
 export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderProps) {
   // Buscar dados do serviço
-  const { service, isLoading, isError } = useFindOneService(serviceId);
+  const { service, isLoading, isError, isRefetching: isServiceRefetching } = useFindOneService(serviceId);
 
   // TRANSFER: serviço ponto-a-ponto (origem A → destino B). O wizard tem 2 pernas.
   const isTransfer = service?.serviceType === ServiceType.TRANSFER;
@@ -825,8 +825,9 @@ export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderPr
   useEffect(() => {
     if (!serviceId || !backendDraftFetched) return;
     if (hydratedRef.current === serviceId) return;
-    // A etapa a restaurar depende do status do pedido: espera o serviço chegar.
-    if (!service) return;
+    // A etapa a restaurar depende do status do pedido: espera o serviço fresco
+    // (cache velho com refetch em voo limitaria a etapa por um status defasado).
+    if (!serviceProntoParaHidratar({ service, isRefetching: isServiceRefetching })) return;
 
     let cancelled = false;
     const run = async () => {
@@ -920,7 +921,7 @@ export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderPr
     return () => {
       cancelled = true;
     };
-  }, [serviceId, backendDraftFetched, backendDraft, backendDraftUpdatedAt, isTerminalStatus, service, isServiceStartedRaw, isTransfer]);
+  }, [serviceId, backendDraftFetched, backendDraft, backendDraftUpdatedAt, isTerminalStatus, service, isServiceRefetching, isServiceStartedRaw, isTransfer]);
 
   // Retomada depois da confirmação: o formulário já enviado não volta (o envio é POST
   // e duplicaria as respostas). Espera o serviço carregar com as respostas gravadas.

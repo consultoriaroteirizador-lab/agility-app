@@ -101,7 +101,11 @@ function FalhaScreenContent() {
       // `clearDraft` limpa só o rascunho do formulário de insucesso. O rascunho da PARADA
       // (etapa) também tem de sumir, no aparelho e no servidor: sem isso a próxima
       // tentativa do pedido reabria na etapa desta (best-effort, nunca trava o fluxo).
-      await clearDraft();
+      try {
+        await clearDraft();
+      } catch {
+        // best-effort: a limpeza da parada abaixo e a navegação seguem mesmo assim.
+      }
       await clearParadaDraftEverywhere(serviceId, {
         clearLocal: clearParadaDraft,
         clearRemote: (sid) => serviceService.clearDraft(sid),
