@@ -165,6 +165,8 @@ export interface ReturnManifestItem {
     delivered?: number | null
     serviceId: string
     serviceCode: string | null
+    /** Número de série do item, quando houver. */
+    serialNumber?: string | null
 }
 
 export interface ReturnManifestResponse {
