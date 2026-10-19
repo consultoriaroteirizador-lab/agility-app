@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { KeyboardAvoidingView, Modal, Platform } from 'react-native';
 
 import type { ImagePickerAsset } from 'expo-image-picker';
@@ -11,7 +11,7 @@ import { useAppSafeArea } from '@/hooks';
 import { useToastService } from '@/services/Toast/useToast';
 import { measure } from '@/theme';
 
-import { buildCheckPayload, canConfirm, photoRequirement } from './itemCheckPhoto';
+import { acceptUploadResult, buildCheckPayload, canConfirm, isQuantityValid as checkQuantity, photoRequirement } from './itemCheckPhoto';
 import type { CheckData, CheckStatus } from './itemCheckPhoto';
 
 interface StatusLabels {
@@ -63,10 +63,13 @@ export function ItemCheckModal({ visible, item, onClose, onConfirm, loading, sta
     const [photoUrl, setPhotoUrl] = useState<string | undefined>();
     const [uploading, setUploading] = useState(false);
     const { showToast } = useToastService();
+    // Geração do upload: reset e cada troca/remoção de foto a incrementam (ver acceptUploadResult).
+    const uploadGeneration = useRef(0);
 
     // Reseta o estado toda vez que o modal abre/fecha
     useEffect(() => {
         if (!visible) {
+            uploadGeneration.current += 1;
             setStatus(DEFAULT_STATE.status);
             setActualQuantity(DEFAULT_STATE.actualQuantity);
             setNotes(DEFAULT_STATE.notes);
@@ -88,8 +91,11 @@ export function ItemCheckModal({ visible, item, onClose, onConfirm, loading, sta
     ];
 
     const handlePhotosChange = async (assets: ImagePickerAsset[]) => {
+        uploadGeneration.current += 1;
+        const generation = uploadGeneration.current;
         const next = assets[assets.length - 1];
         if (!next) {
+            setUploading(false);
             setPhoto(null);
             setPhotoUrl(undefined);
             return;
@@ -100,27 +106,23 @@ export function ItemCheckModal({ visible, item, onClose, onConfirm, loading, sta
         try {
             const [url] = await uploadMultipleServicePhotos([next]);
             if (!url) throw new Error('upload sem URL');
-            setPhotoUrl(url);
+            if (acceptUploadResult(generation, uploadGeneration.current)) setPhotoUrl(url);
         } catch {
+            if (!acceptUploadResult(generation, uploadGeneration.current)) return;
             // Nada é confirmado: a foto sai da tela e o motorista tenta de novo.
             setPhoto(null);
             showToast({ message: 'Não foi possível enviar a foto. Tente novamente.', type: 'error' });
         } finally {
-            setUploading(false);
+            if (acceptUploadResult(generation, uploadGeneration.current)) setUploading(false);
         }
     };
 
-    const parsedQuantity = parseFloat(actualQuantity);
     const isPartial = status === 'PARTIAL';
     const isDamaged = status === 'DAMAGED';
     // "Quantidade entregue" aparece em PARTIAL (obrigatório) e DAMAGED (opcional —
     // ex.: entreguei 1, o outro veio danificado). O restante volta ao CD.
     const needsQuantity = isPartial || isDamaged;
-    const hasQty = !!actualQuantity;
-    const qtyInRange = parsedQuantity >= 0 && parsedQuantity <= item.quantity;
-    const isQuantityValid = isPartial
-        ? (hasQty && parsedQuantity > 0 && parsedQuantity <= item.quantity)
-        : (!hasQty || qtyInRange); // DAMAGED: opcional; se preenchido, 0..quantidade
+    const isQuantityValid = checkQuantity({ status, quantity: item.quantity, actualQuantity });
     const photoNeed = photoRequirement(status);
     const confirmInput = { status, quantity: item.quantity, actualQuantity, notes, photoUrl, uploading };
     const isConfirmDisabled = loading || !canConfirm(confirmInput);

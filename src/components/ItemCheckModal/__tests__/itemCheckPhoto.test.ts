@@ -1,7 +1,7 @@
 /**
  * Foto do check do item (D-4): DAMAGED exige, REFUSED/PARTIAL aceitam, o resto não tem campo.
  */
-import { buildCheckPayload, canConfirm, photoRequirement } from '../itemCheckPhoto';
+import { acceptUploadResult, buildCheckPayload, canConfirm, photoRequirement } from '../itemCheckPhoto';
 
 describe('photoRequirement', () => {
     it.each([
@@ -67,5 +67,37 @@ describe('buildCheckPayload', () => {
             actualQuantity: 1,
             photoProof: 'u',
         });
+    });
+});
+
+describe('acceptUploadResult (corrida do upload)', () => {
+    // Mesmo contador do modal: reset e cada troca/remoção de foto incrementam.
+    const novo = () => {
+        let gen = 0;
+        return { bump: () => ++gen, atual: () => gen };
+    };
+
+    it('upload velho depois do reset é descartado', () => {
+        const g = novo();
+        const iniciado = g.bump(); // anexou foto no item A
+        g.bump(); // fechou o modal (reset)
+        expect(acceptUploadResult(iniciado, g.atual())).toBe(false);
+    });
+    it('upload velho depois da remoção da foto é descartado', () => {
+        const g = novo();
+        const iniciado = g.bump();
+        g.bump(); // removeu a foto durante o envio
+        expect(acceptUploadResult(iniciado, g.atual())).toBe(false);
+    });
+    it('dois uploads em sequência: só o último vale', () => {
+        const g = novo();
+        const primeiro = g.bump();
+        const segundo = g.bump();
+        expect(acceptUploadResult(primeiro, g.atual())).toBe(false);
+        expect(acceptUploadResult(segundo, g.atual())).toBe(true);
+    });
+    it('upload sem nada no meio vale', () => {
+        const g = novo();
+        expect(acceptUploadResult(g.bump(), g.atual())).toBe(true);
     });
 });

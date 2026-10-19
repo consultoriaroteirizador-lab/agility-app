@@ -27,12 +27,21 @@ interface CanConfirmInput {
 }
 
 /** PARTIAL exige quantidade 1..max; DAMAGED aceita vazia, mas se preenchida fica em 0..max. */
-function isQuantityValid({ status, quantity, actualQuantity }: CanConfirmInput): boolean {
+export function isQuantityValid({ status, quantity, actualQuantity }: CanConfirmInput): boolean {
     const parsed = parseFloat(actualQuantity);
     const hasQty = !!actualQuantity;
     if (status === 'PARTIAL') return hasQty && parsed > 0 && parsed <= quantity;
     if (status === 'DAMAGED') return !hasQty || (parsed >= 0 && parsed <= quantity);
     return true;
+}
+
+/**
+ * Um upload só vale se nenhuma troca/remoção de foto nem reset do modal aconteceu
+ * desde que ele começou: cada um incrementa a geração. Resultado de geração antiga
+ * (sucesso, erro ou fim de envio) é descartado.
+ */
+export function acceptUploadResult(startedGeneration: number, currentGeneration: number): boolean {
+    return startedGeneration === currentGeneration;
 }
 
 export function canConfirm(input: CanConfirmInput): boolean {
