@@ -5,6 +5,7 @@ import { Icon } from '@/components/Icon/Icon';
 import type { IconNameMaterial } from '@/components/Icon/Icon';
 import type { RoutingResponse } from '@/domain/agility/routing/dto';
 import { RoutingStatus } from '@/domain/agility/routing/dto/types';
+import { pluralize } from '@/functions';
 import { measure } from '@/theme';
 import type { ThemeColors } from '@/theme/theme';
 
@@ -221,7 +222,7 @@ function RouteItemComponent({ route, onPress }: RouteItemProps) {
                             text={`${orderCount} ${orderCount === 1 ? 'pedido' : 'pedidos'}`}
                         />
                     ) : (
-                        <Metric icon="place" text={`${route.totalServices || 0} paradas`} />
+                        <Metric icon="place" text={pluralize(route.totalServices || 0, 'parada', 'paradas')} />
                     )}
                     <Metric icon="straighten" text={formatDistance(route.totalDistanceKm)} />
                     <Metric icon="schedule" text={formatDuration(route.totalDurationMinutes)} />
