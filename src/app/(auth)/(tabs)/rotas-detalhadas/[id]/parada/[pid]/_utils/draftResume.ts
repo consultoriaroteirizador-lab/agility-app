@@ -1,4 +1,7 @@
 import type { ServiceResponse } from '@/domain/agility/service/dto';
+import { ServiceStatus, ServiceType } from '@/domain/agility/service/dto/types';
+
+import { clearParadaDraftEverywhere } from './paradaDraftCleanup';
 
 /**
  * Retomar a parada depois de recarregar o app. O rascunho devolve a `etapa`, mas
@@ -66,4 +69,40 @@ export function serviceProntoParaHidratar(params: {
     isRefetching: boolean;
 }): boolean {
     return !!params.service && !params.isRefetching;
+}
+
+interface OutraTentativaInput {
+    serviceType: string | null | undefined;
+    status: string | null | undefined;
+    /** O pedido pode vir marcado como em atendimento mesmo com o `status` defasado. */
+    isInAttendance?: boolean | null;
+    etapa: number | null | undefined;
+}
+
+/**
+ * Rascunho de uma tentativa que já acabou: pedido que NÃO é TRANSFER, fora de
+ * atendimento, com etapa salva ≥ 2. A etapa 2 em diante só existe depois do
+ * `start-attendance`; com o pedido de volta à fila (insucesso por devolução à
+ * fila fecha a tentativa na hora) o que está salvo é resíduo — recebedor, fotos,
+ * assinatura e formulário incluídos. O check de saída do SERVICE (etapa 1, pedido
+ * ASSIGNED) não entra: etapa 1 nunca é resíduo.
+ */
+export function rascunhoDeOutraTentativa({ serviceType, status, isInAttendance, etapa }: OutraTentativaInput): boolean {
+    if (serviceType === ServiceType.TRANSFER) return false;
+    if (status === ServiceStatus.IN_ATTENDANCE || isInAttendance === true) return false;
+    return (etapa ?? 0) >= 2;
+}
+
+/**
+ * Se o rascunho é de outra tentativa, apaga-o (aparelho e servidor, best-effort) e
+ * devolve `true`: a hidratação não restaura campo nenhum.
+ */
+export async function descartarRascunhoDeOutraTentativa(
+    serviceId: string,
+    input: OutraTentativaInput,
+    cleaners: Parameters<typeof clearParadaDraftEverywhere>[1],
+): Promise<boolean> {
+    if (!rascunhoDeOutraTentativa(input)) return false;
+    await clearParadaDraftEverywhere(serviceId, cleaners);
+    return true;
 }

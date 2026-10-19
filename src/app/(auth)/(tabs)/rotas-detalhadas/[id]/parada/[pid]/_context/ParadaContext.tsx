@@ -45,7 +45,7 @@ import { useToastService } from '@/services/Toast/useToast';
 import { resolveParadaAtendidaElegivel, resolvePedidosDaParada } from '../../../_utils';
 import { useStopStatus } from '../_hooks/useStopStatus';
 import { resolveCompanyRules } from '../_utils/companyRules';
-import { deliveredFromDraftEtapa, etapaRestauradaDoRascunho, formAnsweredOnServer, serviceProntoParaHidratar } from '../_utils/draftResume';
+import { deliveredFromDraftEtapa, descartarRascunhoDeOutraTentativa, etapaRestauradaDoRascunho, formAnsweredOnServer, serviceProntoParaHidratar } from '../_utils/draftResume';
 import {
   draftHasAnyValue,
   draftToPickupEvidence,
@@ -853,6 +853,20 @@ export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderPr
       } else if (backendDraft) {
         chosen = backendDraft;
       }
+
+      // Rascunho de tentativa que já acabou (pedido de volta à fila): não restaura NADA e
+      // apaga do aparelho e do servidor, senão recebedor, fotos e assinatura voltam.
+      if (
+        chosen &&
+        (await descartarRascunhoDeOutraTentativa(
+          serviceId,
+          { serviceType: service?.serviceType, status: service?.status, isInAttendance: service?.isInAttendance, etapa: chosen.etapa },
+          { clearLocal: clearParadaDraft, clearRemote: (sid) => serviceService.clearDraft(sid) },
+        ))
+      ) {
+        chosen = null;
+      }
+      if (cancelled) return;
 
       if (chosen) {
         if (chosen.recipient) {

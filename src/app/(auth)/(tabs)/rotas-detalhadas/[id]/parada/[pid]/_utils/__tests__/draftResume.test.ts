@@ -6,7 +6,14 @@
  */
 import type { ServiceResponse } from '@/domain/agility/service/dto';
 
-import { deliveredFromDraftEtapa, etapaRestauradaDoRascunho, formAnsweredOnServer, serviceProntoParaHidratar } from '../draftResume';
+import {
+    deliveredFromDraftEtapa,
+    descartarRascunhoDeOutraTentativa,
+    etapaRestauradaDoRascunho,
+    formAnsweredOnServer,
+    rascunhoDeOutraTentativa,
+    serviceProntoParaHidratar,
+} from '../draftResume';
 
 function servico(over: Partial<ServiceResponse>): ServiceResponse {
     return { id: 's1', formGroupIds: [], formGroupAnswers: null, ...over } as unknown as ServiceResponse;
@@ -98,5 +105,46 @@ describe('serviceProntoParaHidratar', () => {
 
     it('serviço carregado e sem refetch em voo: hidrata', () => {
         expect(serviceProntoParaHidratar({ service: servico({}), isRefetching: false })).toBe(true);
+    });
+});
+
+describe('rascunhoDeOutraTentativa', () => {
+    it.each([
+        ['SERVICE', 'PENDING', 3, true],
+        ['COLETA', 'PENDING', 2, true],
+        ['SERVICE', 'ASSIGNED', 2, true],
+        ['SERVICE', 'IN_ATTENDANCE', 3, false],
+        ['SERVICE', 'ASSIGNED', 1, false],
+        ['SERVICE', 'PENDING', 1, false],
+        ['TRANSFER', 'PENDING', 3, false],
+        ['TRANSFER', 'ASSIGNED', 2, false],
+    ])('%s %s etapa %s -> %s', (serviceType, status, etapa, esperado) => {
+        expect(rascunhoDeOutraTentativa({ serviceType, status, etapa })).toBe(esperado);
+    });
+
+    it('isInAttendance=true conta como em atendimento mesmo com status defasado', () => {
+        expect(rascunhoDeOutraTentativa({ serviceType: 'SERVICE', status: 'ASSIGNED', isInAttendance: true, etapa: 3 })).toBe(false);
+    });
+
+    it('sem etapa salva não é resíduo', () => {
+        expect(rascunhoDeOutraTentativa({ serviceType: 'SERVICE', status: 'PENDING', etapa: undefined })).toBe(false);
+    });
+});
+
+describe('descartarRascunhoDeOutraTentativa', () => {
+    const cleaners = () => ({ clearLocal: jest.fn().mockResolvedValue(undefined), clearRemote: jest.fn().mockResolvedValue(undefined) });
+
+    it('resíduo: limpa local e servidor e devolve true (a hidratação não aplica nada)', async () => {
+        const c = cleaners();
+        await expect(descartarRascunhoDeOutraTentativa('s1', { serviceType: 'SERVICE', status: 'PENDING', etapa: 3 }, c)).resolves.toBe(true);
+        expect(c.clearLocal).toHaveBeenCalledWith('s1');
+        expect(c.clearRemote).toHaveBeenCalledWith('s1');
+    });
+
+    it('rascunho válido: não limpa nada e devolve false', async () => {
+        const c = cleaners();
+        await expect(descartarRascunhoDeOutraTentativa('s1', { serviceType: 'SERVICE', status: 'IN_ATTENDANCE', etapa: 3 }, c)).resolves.toBe(false);
+        expect(c.clearLocal).not.toHaveBeenCalled();
+        expect(c.clearRemote).not.toHaveBeenCalled();
     });
 });
