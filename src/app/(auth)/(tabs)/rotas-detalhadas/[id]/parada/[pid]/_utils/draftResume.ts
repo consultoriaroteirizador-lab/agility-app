@@ -33,3 +33,25 @@ export function formAnsweredOnServer(
     );
     return formGroupIds.every((id) => respondidos.has(id));
 }
+
+/**
+ * Qual etapa restaurar do rascunho. A etapa 2 em diante ("Entreguei / Não entreguei" e
+ * as seguintes) só existe com o pedido EM ATENDIMENTO, isto é, depois do
+ * `start-attendance`. Pedido fora de atendimento com rascunho adiantado é resíduo de
+ * uma tentativa anterior (o pedido voltou à fila): retomar a etapa dela pula "Indo pra
+ * lá / Estou aqui!", o `start-attendance` nunca roda e o "Finalizar" volta 400.
+ *
+ * Voltar à etapa 1 não atrapalha o check de saída do SERVICE: ele aparece antes da
+ * chegada pelo estado do pedido (`!isServiceStarted && needsMaterialCheck`), não pela
+ * etapa. TRANSFER conduz a navegação por perna manualmente e fica de fora.
+ */
+export function etapaRestauradaDoRascunho(params: {
+    etapa: number | null | undefined;
+    emAtendimento: boolean;
+    isTransfer: boolean;
+}): number {
+    const etapa = params.etapa ?? 0;
+    if (etapa < 1) return 1;
+    if (params.isTransfer || params.emAtendimento) return etapa;
+    return 1;
+}

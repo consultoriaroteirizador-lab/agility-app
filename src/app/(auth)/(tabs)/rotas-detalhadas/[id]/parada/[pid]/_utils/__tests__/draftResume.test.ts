@@ -6,7 +6,7 @@
  */
 import type { ServiceResponse } from '@/domain/agility/service/dto';
 
-import { deliveredFromDraftEtapa, formAnsweredOnServer } from '../draftResume';
+import { deliveredFromDraftEtapa, etapaRestauradaDoRascunho, formAnsweredOnServer } from '../draftResume';
 
 function servico(over: Partial<ServiceResponse>): ServiceResponse {
     return { id: 's1', formGroupIds: [], formGroupAnswers: null, ...over } as unknown as ServiceResponse;
@@ -45,5 +45,44 @@ describe('formAnsweredOnServer', () => {
         expect(formAnsweredOnServer(servico({ formGroupIds: null as never }))).toBe(false);
         expect(formAnsweredOnServer(null)).toBe(false);
         expect(formAnsweredOnServer(undefined)).toBe(false);
+    });
+});
+
+describe('etapaRestauradaDoRascunho', () => {
+    const entrega = { isTransfer: false };
+
+    it('pedido PENDING com rascunho na etapa 2 (tentativa anterior) volta à etapa de chegada', () => {
+        expect(etapaRestauradaDoRascunho({ etapa: 2, emAtendimento: false, ...entrega })).toBe(1);
+    });
+
+    it.each([3, 4, 5])('pedido fora de atendimento com rascunho na etapa %s também volta à chegada', (etapa) => {
+        expect(etapaRestauradaDoRascunho({ etapa, emAtendimento: false, ...entrega })).toBe(1);
+    });
+
+    it('pedido IN_ATTENDANCE na etapa 2 mantém a etapa', () => {
+        expect(etapaRestauradaDoRascunho({ etapa: 2, emAtendimento: true, ...entrega })).toBe(2);
+    });
+
+    it.each([3, 4, 5])('pedido IN_ATTENDANCE na etapa %s mantém a etapa (o check não é pulado)', (etapa) => {
+        const restaurada = etapaRestauradaDoRascunho({ etapa, emAtendimento: true, ...entrega });
+        expect(restaurada).toBe(etapa);
+        expect(deliveredFromDraftEtapa(restaurada)).toBe(true);
+    });
+
+    it('SERVICE ASSIGNED no check de saída (etapa 1) segue na etapa 1: o check não depende da etapa', () => {
+        expect(etapaRestauradaDoRascunho({ etapa: 1, emAtendimento: false, ...entrega })).toBe(1);
+    });
+
+    it('a etapa clampada não liga delivered', () => {
+        const restaurada = etapaRestauradaDoRascunho({ etapa: 3, emAtendimento: false, ...entrega });
+        expect(deliveredFromDraftEtapa(restaurada)).toBe(false);
+    });
+
+    it('TRANSFER controla a navegação por perna: mantém a etapa do rascunho', () => {
+        expect(etapaRestauradaDoRascunho({ etapa: 2, emAtendimento: false, isTransfer: true })).toBe(2);
+    });
+
+    it.each([undefined, null, 0])('rascunho sem etapa (%s) resulta na etapa de chegada', (etapa) => {
+        expect(etapaRestauradaDoRascunho({ etapa, emAtendimento: true, ...entrega })).toBe(1);
     });
 });

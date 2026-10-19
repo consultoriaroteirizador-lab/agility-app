@@ -45,7 +45,7 @@ import { useToastService } from '@/services/Toast/useToast';
 import { resolveParadaAtendidaElegivel, resolvePedidosDaParada } from '../../../_utils';
 import { useStopStatus } from '../_hooks/useStopStatus';
 import { resolveCompanyRules } from '../_utils/companyRules';
-import { deliveredFromDraftEtapa, formAnsweredOnServer } from '../_utils/draftResume';
+import { deliveredFromDraftEtapa, etapaRestauradaDoRascunho, formAnsweredOnServer } from '../_utils/draftResume';
 import {
   draftHasAnyValue,
   draftToPickupEvidence,
@@ -825,6 +825,8 @@ export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderPr
   useEffect(() => {
     if (!serviceId || !backendDraftFetched) return;
     if (hydratedRef.current === serviceId) return;
+    // A etapa a restaurar depende do status do pedido: espera o serviço chegar.
+    if (!service) return;
 
     let cancelled = false;
     const run = async () => {
@@ -882,10 +884,16 @@ export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderPr
         }
         if (chosen.paymentMethod) setPaymentMethod(chosen.paymentMethod as PaymentMethodType);
         if (chosen.etapa) {
-          setEtapa(chosen.etapa);
+          // Pedido fora de atendimento não retoma etapa adiantada (resíduo de tentativa anterior).
+          const etapaRestaurada = etapaRestauradaDoRascunho({
+            etapa: chosen.etapa,
+            emAtendimento: isServiceStartedRaw,
+            isTransfer,
+          });
+          setEtapa(etapaRestaurada);
           // Etapa ≥ 3 só existe depois da confirmação; sem isto as telas de check
           // (que exigem `delivered`) eram puladas ao recarregar o app.
-          if (deliveredFromDraftEtapa(chosen.etapa)) {
+          if (deliveredFromDraftEtapa(etapaRestaurada)) {
             setDelivered(true);
             setRetomadaPosConfirmacao(serviceId);
           }
@@ -912,7 +920,7 @@ export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderPr
     return () => {
       cancelled = true;
     };
-  }, [serviceId, backendDraftFetched, backendDraft, backendDraftUpdatedAt, isTerminalStatus]);
+  }, [serviceId, backendDraftFetched, backendDraft, backendDraftUpdatedAt, isTerminalStatus, service, isServiceStartedRaw, isTransfer]);
 
   // Retomada depois da confirmação: o formulário já enviado não volta (o envio é POST
   // e duplicaria as respostas). Espera o serviço carregar com as respostas gravadas.
