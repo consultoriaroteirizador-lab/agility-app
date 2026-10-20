@@ -79,7 +79,7 @@ export function validateFuelForm(s: FuelFormState): { payload: FuelEntryPayload 
  * Multipart do POST /fuel-entries/me. O back converte com Number(): número vai com PONTO ("45,5" vira NaN e
  * dá 400) e boolean vai como "true"/"false".
  */
-export function buildFuelEntryFormData(p: FuelEntryPayload, receipt: { uri: string; name: string; type: string }): FormData {
+export function buildFuelEntryFormData(p: FuelEntryPayload, receipt: { uri: string; name: string; type: string }, idempotencyKey: string): FormData {
     const fd = new FormData();
     fd.append('fuelType', p.fuelType);
     fd.append('liters', String(p.liters));
@@ -88,6 +88,7 @@ export function buildFuelEntryFormData(p: FuelEntryPayload, receipt: { uri: stri
     fd.append('fullTank', p.fullTank ? 'true' : 'false');
     fd.append('paidBy', p.paidBy);
     if (p.stationName) fd.append('stationName', p.stationName);
+    fd.append('idempotencyKey', idempotencyKey);
     // @ts-expect-error: o FormData do React Native aceita { uri, name, type } como arquivo
     fd.append('receipt', receipt);
     return fd;

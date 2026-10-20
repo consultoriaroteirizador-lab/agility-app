@@ -14,6 +14,7 @@ const { fuelEntryAPI } = require('../../fuelEntryAPI');
 const vars = {
     payload: { fuelType: 'DIESEL' as const, liters: 10, totalValue: 60, odometerKm: 1, fullTank: true, paidBy: 'COMPANY' as const },
     photo: { uri: 'u', width: 1, height: 1 },
+    idempotencyKey: 'key-1',
 };
 
 function setup() {
@@ -38,6 +39,6 @@ it('sucesso devolve o lançamento', async () => {
     fuelEntryAPI.create.mockResolvedValue({ id: 'e1' });
     const { hook, tree, queryClient } = setup();
     await act(async () => { await expect(hook().createFuelEntry(vars)).resolves.toEqual({ id: 'e1' }); });
-    expect(fuelEntryAPI.create).toHaveBeenCalledWith(vars.payload, vars.photo);
+    expect(fuelEntryAPI.create).toHaveBeenCalledWith(vars.payload, vars.photo, 'key-1');
     act(() => tree.unmount()); queryClient.clear();
 });

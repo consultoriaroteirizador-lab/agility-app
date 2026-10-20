@@ -1,7 +1,9 @@
 import { erroDeRede, erroDeTimeout, mensagemDaApi } from '@/api/apiErrorMessage';
 import { appDayKey, formatHHmm } from '@/functions/dateFunctions';
 
-import type { FuelEntry, FuelType } from './dto/types';
+import { formatCurrency } from '@/utils/formatCurrency';
+
+import type { FuelEntry, FuelEntryReimbursement, FuelType } from './dto/types';
 
 export const FUEL_LABEL: Record<FuelType, string> = { DIESEL: 'Diesel', GASOLINE: 'Gasolina', ETHANOL: 'Etanol' };
 
@@ -36,6 +38,24 @@ export function formatFilledAt(iso: string): string {
 export function inconsistencyText(e: Pick<FuelEntry, 'odometerInconsistent' | 'previousOdometerKm'>): string | null {
     if (!e.odometerInconsistent || e.previousOdometerKm === null) return null;
     return `Odômetro abaixo do anterior (${formatKm(e.previousOdometerKm)}): a central vai revisar.`;
+}
+
+/** A situação do reembolso do abastecimento, em centavos vindos do back. */
+export function reimbursementText(r: FuelEntryReimbursement): string {
+    const motivo = r.reason ? ` Motivo: ${r.reason}` : '';
+    switch (r.status) {
+        case 'A_APROVAR':
+            return 'Reembolso aguardando aprovação';
+        case 'APROVADO': {
+            const aprovado = r.approvedAmountCents ?? r.requestedAmountCents;
+            if (aprovado === r.requestedAmountCents) return `Reembolso aprovado: ${formatCurrency(aprovado)}`;
+            return `Reembolso aprovado: ${formatCurrency(aprovado)} de ${formatCurrency(r.requestedAmountCents)}.${motivo}`;
+        }
+        case 'RECUSADO':
+            return `Reembolso recusado.${motivo}`;
+        case 'CANCELADO':
+            return 'Reembolso cancelado';
+    }
 }
 
 type ErroComCampos = { error?: { validationErrors?: { message?: string }[] }; response?: { status?: number } };

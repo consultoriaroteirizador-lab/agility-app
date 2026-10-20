@@ -25,6 +25,7 @@ it('envio: um POST multipart com a foto comprimida em receipt', async () => {
     const r = await fuelEntryAPI.create(
         { fuelType: 'DIESEL', liters: 45.5, totalValue: 250, odometerKm: 48210, fullTank: true, paidBy: 'COMPANY' },
         { uri: 'file://o.jpg', width: 3000, height: 4000 },
+        'key-9',
     );
     expect(r).toEqual({ id: 'e1', odometerInconsistent: false });
     const [url, body, config] = mockPost.mock.calls[0];
@@ -33,6 +34,7 @@ it('envio: um POST multipart com a foto comprimida em receipt', async () => {
     const receipt = (body as FakeFormData).entries.find(([k]) => k === 'receipt')?.[1] as { uri: string; name: string; type: string };
     expect(receipt.uri).toBe('file://comprimida.jpg');
     expect(receipt.type).toBe('image/jpeg');
+    expect((body as FakeFormData).entries.find(([k]) => k === 'idempotencyKey')?.[1]).toBe('key-9');
     expect(receipt.name).toMatch(/^nota_\d+\.jpg$/);
 });
 

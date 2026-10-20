@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { ScrollView, Switch } from 'react-native';
 
 import { Ionicons } from '@expo/vector-icons';
+import * as Crypto from 'expo-crypto';
 import { useRouter } from 'expo-router';
 
 import { ActivityIndicator, Box, BRLInput, Button, Input, ScreenBase, Text, TouchableOpacityBox } from '@/components';
@@ -59,6 +60,9 @@ export default function AbastecerScreen() {
     const { createFuelEntry } = useCreateFuelEntry();
     const { run, isSubmitting } = useSubmitLock();
     const [campos, setCampos] = useState<Campos>(INICIAL);
+    // Uma chave por tentativa de lançar: o segundo toque depois de um erro de rede a reenvia igual (o back
+    // devolve o lançamento já gravado, não um segundo). Só o sucesso troca a chave.
+    const [idempotencyKey, setIdempotencyKey] = useState(() => Crypto.randomUUID());
     const [escolhido, setEscolhido] = useState<FuelType | null>(null);
     const update = (patch: Partial<Campos>) => setCampos((c) => ({ ...c, ...patch }));
 
@@ -103,7 +107,8 @@ export default function AbastecerScreen() {
         const photo = campos.photo;
         await run(async () => {
             try {
-                const entry = await createFuelEntry({ payload, photo });
+                const entry = await createFuelEntry({ payload, photo, idempotencyKey });
+                setIdempotencyKey(Crypto.randomUUID());
                 showToast(fuelEntrySuccessToast(entry));
                 // `replace`: voltar não reabre o formulário preenchido.
                 router.replace('/menu/abastecimento/historico');
@@ -184,6 +189,11 @@ export default function AbastecerScreen() {
                                 <Chip key={p.value} selected={campos.paidBy === p.value} label={p.label} onPress={() => update({ paidBy: p.value })} />
                             ))}
                         </Box>
+                        {campos.paidBy === 'DRIVER' && context.reimbursable && (
+                            <Text mt="t4" fontSize={measure.m12} color="colorTextSecondary">
+                                Vira um pedido de reembolso, aprovado pela central.
+                            </Text>
+                        )}
                     </Box>
 
                     <Input

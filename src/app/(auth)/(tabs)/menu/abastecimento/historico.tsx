@@ -5,7 +5,7 @@ import { FlatList, RefreshControl } from 'react-native';
 
 import { ActivityIndicator, Box, ScreenBase, Text, TouchableOpacityBox } from '@/components';
 import { ButtonBack } from '@/components/Button/ButtonBack';
-import { FUEL_LABEL, formatFilledAt, formatLiters, inconsistencyText, useInfiniteMyFuelEntries, type FuelEntry } from '@/domain/agility/fuelEntry';
+import { FUEL_LABEL, formatFilledAt, formatLiters, inconsistencyText, reimbursementText, useInfiniteMyFuelEntries, type FuelEntry } from '@/domain/agility/fuelEntry';
 import { measure } from '@/theme';
 import { formatCurrency } from '@/utils/formatCurrency';
 
@@ -22,6 +22,11 @@ function Linha({ item }: { item: FuelEntry }) {
             {anulado && (
                 <Text mt="t4" fontSize={measure.m12} color="colorTextSecondary">
                     {item.voidReason ? `Anulado pela central: ${item.voidReason}` : 'Anulado pela central'}
+                </Text>
+            )}
+            {item.reimbursement && (
+                <Text mt="t4" fontSize={measure.m12} color="colorTextSecondary">
+                    {reimbursementText(item.reimbursement)}
                 </Text>
             )}
             {!anulado && aviso && (

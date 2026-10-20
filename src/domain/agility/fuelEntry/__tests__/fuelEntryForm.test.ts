@@ -58,10 +58,11 @@ describe('buildFuelEntryFormData', () => {
         const fd = buildFuelEntryFormData(
             { fuelType: 'ETHANOL', liters: 45.5, totalValue: 250, odometerKm: 48210, fullTank: false, paidBy: 'DRIVER', stationName: 'Posto Sul' },
             { uri: 'file://c.jpg', name: 'nota.jpg', type: 'image/jpeg' },
+            'key-1',
         ) as unknown as FakeFormData;
         expect(fd.entries).toEqual([
             ['fuelType', 'ETHANOL'], ['liters', '45.5'], ['totalValue', '250.00'], ['odometerKm', '48210'],
-            ['fullTank', 'false'], ['paidBy', 'DRIVER'], ['stationName', 'Posto Sul'],
+            ['fullTank', 'false'], ['paidBy', 'DRIVER'], ['stationName', 'Posto Sul'], ['idempotencyKey', 'key-1'],
             ['receipt', { uri: 'file://c.jpg', name: 'nota.jpg', type: 'image/jpeg' }],
         ]);
     });
@@ -70,6 +71,7 @@ describe('buildFuelEntryFormData', () => {
         const fd = buildFuelEntryFormData(
             { fuelType: 'DIESEL', liters: 10, totalValue: 60, odometerKm: 1, fullTank: true, paidBy: 'COMPANY' },
             { uri: 'u', name: 'n.jpg', type: 'image/jpeg' },
+            'key-2',
         ) as unknown as FakeFormData;
         expect(fd.entries.map(([k]) => k)).not.toContain('stationName');
     });
