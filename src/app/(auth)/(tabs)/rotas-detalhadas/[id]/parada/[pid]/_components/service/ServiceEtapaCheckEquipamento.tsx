@@ -7,25 +7,19 @@ import { ButtonBack } from '@/components/Button/ButtonBack';
 import { ItemCheckCard } from '@/components/ItemCheckCard';
 import { ItemCheckModal } from '@/components/ItemCheckModal';
 import type { ServiceLine, MaterialStatus } from '@/domain/agility/service/dto/response/service-line.response';
+import { pluralize } from '@/functions';
 import { measure } from '@/theme';
 
 import { useParada } from '../../_context/ParadaContext';
 
 type CheckStatus = 'CHECKED' | 'PARTIAL' | 'MISSING' | 'DAMAGED' | 'REFUSED';
 
-const EQUIPMENT_STATUS_LABELS = {
-    CHECKED: 'Levei',
-    PARTIAL: 'Parcial',
-    MISSING: 'Não levei',
-    DAMAGED: 'Danificado',
-    REFUSED: 'Recusado',
-};
-
 export function ServiceEtapaCheckEquipamento() {
     const {
         linesState,
         checkLine,
         completeCheck,
+        serviceId,
     } = useParada();
 
     const [selectedItem, setSelectedItem] = useState<ServiceLine | null>(null);
@@ -108,7 +102,7 @@ export function ServiceEtapaCheckEquipamento() {
                                     fontWeightPreset="bold"
                                     numberOfLines={1}
                                 >
-                                    {linesState.lines.length} itens
+                                    {pluralize(linesState.lines.length, 'item', 'itens')}
                                 </Text>
                             </Box>
 
@@ -211,7 +205,8 @@ export function ServiceEtapaCheckEquipamento() {
                     onClose={handleCloseModal}
                     onConfirm={handleConfirmCheck}
                     loading={checking}
-                    statusLabels={EQUIPMENT_STATUS_LABELS}
+                    serviceId={serviceId}
+                    context="equipment"
                 />
             </Box>
         </ScreenBase>

@@ -45,7 +45,7 @@ import { useToastService } from '@/services/Toast/useToast';
 import { resolveParadaAtendidaElegivel, resolvePedidosDaParada } from '../../../_utils';
 import { useStopStatus } from '../_hooks/useStopStatus';
 import { resolveCompanyRules } from '../_utils/companyRules';
-import { deliveredFromDraftEtapa, formAnsweredOnServer } from '../_utils/draftResume';
+import { deliveredFromDraftEtapa, descartarRascunhoDeOutraTentativa, etapaRestauradaDoRascunho, formAnsweredOnServer, serviceProntoParaHidratar } from '../_utils/draftResume';
 import {
   draftHasAnyValue,
   draftToPickupEvidence,
@@ -281,7 +281,7 @@ interface ParadaProviderProps {
 
 export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderProps) {
   // Buscar dados do serviço
-  const { service, isLoading, isError } = useFindOneService(serviceId);
+  const { service, isLoading, isError, isRefetching: isServiceRefetching } = useFindOneService(serviceId);
 
   // TRANSFER: serviço ponto-a-ponto (origem A → destino B). O wizard tem 2 pernas.
   const isTransfer = service?.serviceType === ServiceType.TRANSFER;
@@ -825,6 +825,9 @@ export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderPr
   useEffect(() => {
     if (!serviceId || !backendDraftFetched) return;
     if (hydratedRef.current === serviceId) return;
+    // A etapa a restaurar depende do status do pedido: espera o serviço fresco
+    // (cache velho com refetch em voo limitaria a etapa por um status defasado).
+    if (!serviceProntoParaHidratar({ service, isRefetching: isServiceRefetching })) return;
 
     let cancelled = false;
     const run = async () => {
@@ -850,6 +853,20 @@ export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderPr
       } else if (backendDraft) {
         chosen = backendDraft;
       }
+
+      // Rascunho de tentativa que já acabou (pedido de volta à fila): não restaura NADA e
+      // apaga do aparelho e do servidor, senão recebedor, fotos e assinatura voltam.
+      if (
+        chosen &&
+        (await descartarRascunhoDeOutraTentativa(
+          serviceId,
+          { serviceType: service?.serviceType, status: service?.status, isInAttendance: service?.isInAttendance, etapa: chosen.etapa },
+          { clearLocal: clearParadaDraft, clearRemote: (sid) => serviceService.clearDraft(sid) },
+        ))
+      ) {
+        chosen = null;
+      }
+      if (cancelled) return;
 
       if (chosen) {
         if (chosen.recipient) {
@@ -882,10 +899,16 @@ export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderPr
         }
         if (chosen.paymentMethod) setPaymentMethod(chosen.paymentMethod as PaymentMethodType);
         if (chosen.etapa) {
-          setEtapa(chosen.etapa);
+          // Pedido fora de atendimento não retoma etapa adiantada (resíduo de tentativa anterior).
+          const etapaRestaurada = etapaRestauradaDoRascunho({
+            etapa: chosen.etapa,
+            emAtendimento: isServiceStartedRaw,
+            isTransfer,
+          });
+          setEtapa(etapaRestaurada);
           // Etapa ≥ 3 só existe depois da confirmação; sem isto as telas de check
           // (que exigem `delivered`) eram puladas ao recarregar o app.
-          if (deliveredFromDraftEtapa(chosen.etapa)) {
+          if (deliveredFromDraftEtapa(etapaRestaurada)) {
             setDelivered(true);
             setRetomadaPosConfirmacao(serviceId);
           }
@@ -912,7 +935,7 @@ export function ParadaProvider({ children, serviceId, rotaId }: ParadaProviderPr
     return () => {
       cancelled = true;
     };
-  }, [serviceId, backendDraftFetched, backendDraft, backendDraftUpdatedAt, isTerminalStatus]);
+  }, [serviceId, backendDraftFetched, backendDraft, backendDraftUpdatedAt, isTerminalStatus, service, isServiceRefetching, isServiceStartedRaw, isTransfer]);
 
   // Retomada depois da confirmação: o formulário já enviado não volta (o envio é POST
   // e duplicaria as respostas). Espera o serviço carregar com as respostas gravadas.

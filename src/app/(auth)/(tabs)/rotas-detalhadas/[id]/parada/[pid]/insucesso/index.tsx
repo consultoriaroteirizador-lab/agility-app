@@ -10,9 +10,11 @@ import { ButtonBack } from '@/components/Button/ButtonBack';
 import type { OrderOccurrenceReasonResponse } from '@/domain/agility/order-occurrence-reason/dto';
 import { useFindOccurrenceReasons } from '@/domain/agility/order-occurrence-reason/useCase';
 import type { ApplyOccurrenceRequest } from '@/domain/agility/service/dto';
+import { serviceService } from '@/domain/agility/service/serviceService';
 import { useFindOneService, useFindServicesByRoutingId, useRegisterOccurrence } from '@/domain/agility/service/useCase';
 import { KEY_SERVICES, moneyChangedKeys, routeStopChangedKeys } from '@/domain/queryKeys';
 import { loadOccurrenceReasonsMirror } from '@/services/storage/occurrenceReasonsStorage';
+import { clearParadaDraft } from '@/services/storage/paradaDraftStorage';
 import { useToastService } from '@/services/Toast/useToast';
 import { measure } from '@/theme';
 
@@ -20,6 +22,7 @@ import { resolvePedidosDaParada } from '../../../_utils';
 import { getCurrentCoords } from '../_hooks/getCurrentCoords';
 import { useDestinoAposNota } from '../_hooks/useDestinoAposNota';
 import { useInsucessoDraft } from '../_hooks/useInsucessoDraft';
+import { clearParadaDraftEverywhere } from '../_utils/paradaDraftCleanup';
 
 import { coordsParaOcorrencia } from './occurrenceLocation';
 import { occurrenceOutcomeMessage } from './occurrenceOutcome';
@@ -95,9 +98,18 @@ function FalhaScreenContent() {
         });
       }
 
-      // Backend já limpa o draft em reportFailure; aqui limpamos o cache local
-      // (best-effort; o cleanStaleParadaDrafts global também resolve no próximo open).
-      await clearDraft();
+      // `clearDraft` limpa só o rascunho do formulário de insucesso. O rascunho da PARADA
+      // (etapa) também tem de sumir, no aparelho e no servidor: sem isso a próxima
+      // tentativa do pedido reabria na etapa desta (best-effort, nunca trava o fluxo).
+      try {
+        await clearDraft();
+      } catch {
+        // best-effort: a limpeza da parada abaixo e a navegação seguem mesmo assim.
+      }
+      await clearParadaDraftEverywhere(serviceId, {
+        clearLocal: clearParadaDraft,
+        clearRemote: (sid) => serviceService.clearDraft(sid),
+      });
 
       // Invalidar queries relacionadas — inclui o /map-data, de onde sai a trava
       // do "Cheguei no retorno" (ver `routeStopChangedKeys`). Sem ele, o retorno

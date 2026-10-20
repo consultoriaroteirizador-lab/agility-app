@@ -1,4 +1,7 @@
 import type { ServiceResponse } from '@/domain/agility/service/dto';
+import { ServiceStatus, ServiceType } from '@/domain/agility/service/dto/types';
+
+import { clearParadaDraftEverywhere } from './paradaDraftCleanup';
 
 /**
  * Retomar a parada depois de recarregar o app. O rascunho devolve a `etapa`, mas
@@ -32,4 +35,74 @@ export function formAnsweredOnServer(
         (service.formGroupAnswers ?? []).filter((a) => a.entityId === service.id).map((a) => a.formGroupId),
     );
     return formGroupIds.every((id) => respondidos.has(id));
+}
+
+/**
+ * Qual etapa restaurar do rascunho. A etapa 2 em diante ("Entreguei / Não entreguei" e
+ * as seguintes) só existe com o pedido EM ATENDIMENTO, isto é, depois do
+ * `start-attendance`. Pedido fora de atendimento com rascunho adiantado é resíduo de
+ * uma tentativa anterior (o pedido voltou à fila): retomar a etapa dela pula "Indo pra
+ * lá / Estou aqui!", o `start-attendance` nunca roda e o "Finalizar" volta 400.
+ *
+ * Voltar à etapa 1 não atrapalha o check de saída do SERVICE: ele aparece antes da
+ * chegada pelo estado do pedido (`!isServiceStarted && needsMaterialCheck`), não pela
+ * etapa. TRANSFER conduz a navegação por perna manualmente e fica de fora.
+ */
+export function etapaRestauradaDoRascunho(params: {
+    etapa: number | null | undefined;
+    emAtendimento: boolean;
+    isTransfer: boolean;
+}): number {
+    const etapa = params.etapa ?? 0;
+    if (etapa < 1) return 1;
+    if (params.isTransfer || params.emAtendimento) return etapa;
+    return 1;
+}
+
+/**
+ * A hidratação do rascunho decide a etapa pelo status do pedido, então só roda com o
+ * serviço carregado e sem refetch em voo: com cache velho (ASSIGNED em cache, servidor
+ * já IN_ATTENDANCE) a etapa seria limitada a 1 por um status defasado.
+ */
+export function serviceProntoParaHidratar(params: {
+    service: unknown | null | undefined;
+    isRefetching: boolean;
+}): boolean {
+    return !!params.service && !params.isRefetching;
+}
+
+interface OutraTentativaInput {
+    serviceType: string | null | undefined;
+    status: string | null | undefined;
+    /** O pedido pode vir marcado como em atendimento mesmo com o `status` defasado. */
+    isInAttendance?: boolean | null;
+    etapa: number | null | undefined;
+}
+
+/**
+ * Rascunho de uma tentativa que já acabou: pedido que NÃO é TRANSFER, fora de
+ * atendimento, com etapa salva ≥ 2. A etapa 2 em diante só existe depois do
+ * `start-attendance`; com o pedido de volta à fila (insucesso por devolução à
+ * fila fecha a tentativa na hora) o que está salvo é resíduo — recebedor, fotos,
+ * assinatura e formulário incluídos. O check de saída do SERVICE (etapa 1, pedido
+ * ASSIGNED) não entra: etapa 1 nunca é resíduo.
+ */
+export function rascunhoDeOutraTentativa({ serviceType, status, isInAttendance, etapa }: OutraTentativaInput): boolean {
+    if (serviceType === ServiceType.TRANSFER) return false;
+    if (status === ServiceStatus.IN_ATTENDANCE || isInAttendance === true) return false;
+    return (etapa ?? 0) >= 2;
+}
+
+/**
+ * Se o rascunho é de outra tentativa, apaga-o (aparelho e servidor, best-effort) e
+ * devolve `true`: a hidratação não restaura campo nenhum.
+ */
+export async function descartarRascunhoDeOutraTentativa(
+    serviceId: string,
+    input: OutraTentativaInput,
+    cleaners: Parameters<typeof clearParadaDraftEverywhere>[1],
+): Promise<boolean> {
+    if (!rascunhoDeOutraTentativa(input)) return false;
+    await clearParadaDraftEverywhere(serviceId, cleaners);
+    return true;
 }

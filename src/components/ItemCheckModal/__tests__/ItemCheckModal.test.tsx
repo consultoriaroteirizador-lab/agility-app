@@ -19,7 +19,7 @@ jest.mock('react-native-background-geolocation', () => ({
     default: { ready: jest.fn(), onLocation: jest.fn(), removeListeners: jest.fn() },
 }));
 jest.mock('@/components/Icon/LocalIcon', () => ({ LocalIcon: () => null }));
-jest.mock('@expo/vector-icons', () => ({ Ionicons: () => null }));
+jest.mock('@expo/vector-icons', () => ({ Ionicons: () => null, MaterialIcons: () => null }));
 jest.mock('@/components/Input/Input', () => ({ Input: () => null }));
 jest.mock('@/hooks/useAppSafeArea', () => ({ useAppSafeArea: () => ({ top: 20, bottom: 20 }) }));
 
@@ -28,12 +28,12 @@ import { ItemCheckModal } from '../ItemCheckModal';
 const linha = (over: Partial<ServiceLine>): ServiceLine =>
     ({ id: 'l', material: 'MODEM A', quantity: 1, status: 'PENDING', createdAt: '', updatedAt: '', ...over }) as ServiceLine;
 
-function render(item: ServiceLine) {
+function render(item: ServiceLine, context?: 'delivery' | 'pickup' | 'equipment') {
     let tree!: TestRenderer.ReactTestRenderer;
     act(() => {
         tree = TestRenderer.create(
             <ThemeProvider theme={theme}>
-                <ItemCheckModal visible item={item} onClose={jest.fn()} onConfirm={jest.fn()} />
+                <ItemCheckModal visible item={item} onClose={jest.fn()} onConfirm={jest.fn()} context={context} />
             </ThemeProvider>,
         );
     });
@@ -62,4 +62,24 @@ it('o modal do check sem série não mostra "S/N"', () => {
             (Array.isArray(n.props.children) && n.props.children.some((c: unknown) => typeof c === 'string' && c.includes('S/N'))),
     );
     expect(comSN.length).toBe(0);
+});
+
+function escolher(t: TestRenderer.ReactTestRenderer, rotulo: string) {
+    let no: TestRenderer.ReactTestInstance | null = t.root.findAll((n) => n.props.children === rotulo)[0];
+    while (no && typeof no.props.onPress !== 'function') no = no.parent;
+    act(() => no?.props.onPress());
+}
+
+const botaoConfirmar = (t: TestRenderer.ReactTestRenderer) => t.root.findAll((n) => n.props.title === 'Confirmar' && 'disabled' in n.props)[0];
+
+it('em DAMAGED sem foto o Confirmar fica desabilitado', () => {
+    const t = render(linha({}));
+    expect(botaoConfirmar(t).props.disabled).toBeFalsy();
+    escolher(t, 'Danificado');
+    expect(botaoConfirmar(t).props.disabled).toBe(true);
+});
+
+it('no contexto de equipamento a opção Recusado não aparece', () => {
+    expect(temTexto(render(linha({}), 'equipment'), 'Recusado')).toBe(false);
+    expect(temTexto(render(linha({}), 'delivery'), 'Recusado')).toBe(true);
 });

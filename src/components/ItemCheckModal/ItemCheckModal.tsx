@@ -1,27 +1,20 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { KeyboardAvoidingView, Modal, Platform } from 'react-native';
 
+import type { ImagePickerAsset } from 'expo-image-picker';
+
 import { Box, Text, TouchableOpacityBox, Button, Input, ScreenBase } from '@/components';
+import MultiPhotoPicker from '@/components/MultiPhotoPicker/MultiPhotoPicker';
 import type { ServiceLine } from '@/domain/agility/service/dto/response/service-line.response';
+import { uploadMultipleServicePhotos } from '@/domain/agility/service/serviceUploadUtils';
 import { useAppSafeArea } from '@/hooks';
+import { useToastService } from '@/services/Toast/useToast';
 import { measure } from '@/theme';
 
-type CheckStatus = 'CHECKED' | 'PARTIAL' | 'MISSING' | 'DAMAGED' | 'REFUSED';
-
-interface CheckData {
-    status: CheckStatus;
-    actualQuantity?: number;
-    notes?: string;
-    photoProof?: string;
-}
-
-interface StatusLabels {
-    CHECKED?: string;
-    PARTIAL?: string;
-    MISSING?: string;
-    DAMAGED?: string;
-    REFUSED?: string;
-}
+import { acceptUploadResult, buildCheckPayload, canConfirm, isQuantityValid as checkQuantity, photoRequirement, shouldDiscardPhotoOnStatusChange } from './itemCheckPhoto';
+import type { CheckData, CheckStatus } from './itemCheckPhoto';
+import { getCheckTexts, quantityTitle } from './itemCheckTexts';
+import type { CheckContext } from './itemCheckTexts';
 
 interface ItemCheckModalProps {
     visible: boolean;
@@ -29,24 +22,11 @@ interface ItemCheckModalProps {
     onClose: () => void;
     onConfirm: (data: CheckData) => void;
     loading?: boolean;
-    statusLabels?: StatusLabels;
+    /** Contexto do check (textos e opções); padrão: entrega. */
+    context?: CheckContext;
+    /** Serviço dono da linha (o upload da foto é gravado sob ele, como nos demais uploads da parada). */
+    serviceId?: string;
 }
-
-const DEFAULT_STATUS_LABELS: Record<CheckStatus, string> = {
-    CHECKED: 'Entregue',
-    PARTIAL: 'Parcial',
-    MISSING: 'Não encontrado',
-    DAMAGED: 'Danificado',
-    REFUSED: 'Recusado',
-};
-
-const DEFAULT_DESCRIPTIONS: Record<CheckStatus, string> = {
-    CHECKED: 'Item entregue com sucesso',
-    PARTIAL: 'Entrega parcial',
-    MISSING: 'Item não estava disponível',
-    DAMAGED: 'Item chegou danificado',
-    REFUSED: 'Cliente recusou o item',
-};
 
 const DEFAULT_STATE = {
     status: 'CHECKED' as CheckStatus,
@@ -54,53 +34,91 @@ const DEFAULT_STATE = {
     notes: '',
 };
 
-export function ItemCheckModal({ visible, item, onClose, onConfirm, loading, statusLabels }: ItemCheckModalProps) {
+export function ItemCheckModal({ visible, item, onClose, onConfirm, loading, context = 'delivery', serviceId }: ItemCheckModalProps) {
     const { top } = useAppSafeArea();
     const [status, setStatus] = useState<CheckStatus>(DEFAULT_STATE.status);
     const [actualQuantity, setActualQuantity] = useState(DEFAULT_STATE.actualQuantity);
     const [notes, setNotes] = useState(DEFAULT_STATE.notes);
+    // Uma foto por linha: o asset local (miniatura) e a URL devolvida pelo upload.
+    const [photo, setPhoto] = useState<ImagePickerAsset | null>(null);
+    const [photoUrl, setPhotoUrl] = useState<string | undefined>();
+    const [uploading, setUploading] = useState(false);
+    const { showToast } = useToastService();
+    // Geração do upload: reset e cada troca/remoção de foto a incrementam (ver acceptUploadResult).
+    const uploadGeneration = useRef(0);
 
     // Reseta o estado toda vez que o modal abre/fecha
     useEffect(() => {
         if (!visible) {
+            uploadGeneration.current += 1;
             setStatus(DEFAULT_STATE.status);
             setActualQuantity(DEFAULT_STATE.actualQuantity);
             setNotes(DEFAULT_STATE.notes);
+            setPhoto(null);
+            setPhotoUrl(undefined);
+            setUploading(false);
         }
     }, [visible]);
 
     if (!visible || !item) return null;
 
-    const labels = { ...DEFAULT_STATUS_LABELS, ...statusLabels };
-    const statusOptions: { value: CheckStatus; label: string; description: string }[] = [
-        { value: 'CHECKED', label: labels.CHECKED, description: DEFAULT_DESCRIPTIONS.CHECKED },
-        { value: 'PARTIAL', label: labels.PARTIAL, description: DEFAULT_DESCRIPTIONS.PARTIAL },
-        { value: 'MISSING', label: labels.MISSING, description: DEFAULT_DESCRIPTIONS.MISSING },
-        { value: 'DAMAGED', label: labels.DAMAGED, description: DEFAULT_DESCRIPTIONS.DAMAGED },
-        { value: 'REFUSED', label: labels.REFUSED, description: DEFAULT_DESCRIPTIONS.REFUSED },
-    ];
+    const texts = getCheckTexts(context);
+    const statusOptions = texts.statuses.map((value) => ({
+        value,
+        label: texts.labels[value],
+        description: texts.descriptions[value],
+    }));
 
-    const parsedQuantity = parseFloat(actualQuantity);
+    const handleStatusChange = (next: CheckStatus) => {
+        setStatus(next);
+        if (shouldDiscardPhotoOnStatusChange(next)) {
+            // Invalida o upload em voo: o resultado velho é descartado e o Confirmar libera na hora.
+            uploadGeneration.current += 1;
+            setUploading(false);
+            setPhoto(null);
+            setPhotoUrl(undefined);
+        }
+    };
+
+    const handlePhotosChange = async (assets: ImagePickerAsset[]) => {
+        uploadGeneration.current += 1;
+        const generation = uploadGeneration.current;
+        const next = assets[assets.length - 1];
+        if (!next) {
+            setUploading(false);
+            setPhoto(null);
+            setPhotoUrl(undefined);
+            return;
+        }
+        setPhoto(next);
+        setPhotoUrl(undefined);
+        setUploading(true);
+        try {
+            const [url] = await uploadMultipleServicePhotos([next], serviceId);
+            if (!url) throw new Error('upload sem URL');
+            if (acceptUploadResult(generation, uploadGeneration.current)) setPhotoUrl(url);
+        } catch {
+            if (!acceptUploadResult(generation, uploadGeneration.current)) return;
+            // Nada é confirmado: a foto sai da tela e o motorista tenta de novo.
+            setPhoto(null);
+            showToast({ message: 'Não foi possível enviar a foto. Tente novamente.', type: 'error' });
+        } finally {
+            if (acceptUploadResult(generation, uploadGeneration.current)) setUploading(false);
+        }
+    };
+
     const isPartial = status === 'PARTIAL';
     const isDamaged = status === 'DAMAGED';
     // "Quantidade entregue" aparece em PARTIAL (obrigatório) e DAMAGED (opcional —
     // ex.: entreguei 1, o outro veio danificado). O restante volta ao CD.
     const needsQuantity = isPartial || isDamaged;
-    const hasQty = !!actualQuantity;
-    const qtyInRange = parsedQuantity >= 0 && parsedQuantity <= item.quantity;
-    const isQuantityValid = isPartial
-        ? (hasQty && parsedQuantity > 0 && parsedQuantity <= item.quantity)
-        : (!hasQty || qtyInRange); // DAMAGED: opcional; se preenchido, 0..quantidade
-    const isConfirmDisabled = loading || !isQuantityValid;
+    const isQuantityValid = checkQuantity({ status, quantity: item.quantity, actualQuantity });
+    const photoNeed = photoRequirement(status);
+    const confirmInput = { status, quantity: item.quantity, actualQuantity, notes, photoUrl, uploading };
+    const isConfirmDisabled = loading || !canConfirm(confirmInput);
 
     const handleConfirm = () => {
-        // Envia actualQuantity quando é PARTIAL, ou DAMAGED com quantidade informada.
-        const sendQuantity = isPartial || (isDamaged && hasQty);
-        onConfirm({
-            status,
-            ...(sendQuantity && { actualQuantity: parsedQuantity }),
-            ...(notes.trim() && { notes: notes.trim() }),
-        });
+        onConfirm(buildCheckPayload(confirmInput));
     };
 
     return (
@@ -160,7 +178,7 @@ export function ItemCheckModal({ visible, item, onClose, onConfirm, loading, sta
                                 return (
                                     <TouchableOpacityBox
                                         key={option.value}
-                                        onPress={() => setStatus(option.value)}
+                                        onPress={() => handleStatusChange(option.value)}
                                         flexDirection="row"
                                         alignItems="center"
                                         padding="y10"
@@ -202,22 +220,38 @@ export function ItemCheckModal({ visible, item, onClose, onConfirm, loading, sta
                         {needsQuantity && (
                             <Box>
                                 <Input
-                                    title={isPartial ? 'Quantidade entregue:' : 'Quantidade entregue (opcional):'}
+                                    title={quantityTitle(texts, isPartial)}
                                     borderType="all"
                                     value={actualQuantity}
                                     onChangeText={setActualQuantity}
                                     placeholder={`Máx: ${item.quantity}`}
                                     keyboardType="numeric"
                                 />
-                                {isDamaged && (
+                                {isDamaged && !!texts.damagedQuantityHint && (
                                     <Text preset="text12" color="gray400">
-                                        Informe quanto você entregou; o restante volta ao CD.
+                                        {texts.damagedQuantityHint}
                                     </Text>
                                 )}
                                 {!!actualQuantity && !isQuantityValid && (
                                     <Text preset="text12" color="redError">
                                         Quantidade não pode exceder {item.quantity} {item.unit ?? 'un'}
                                     </Text>
+                                )}
+                            </Box>
+                        )}
+
+                        {/* Foto — obrigatória em DAMAGED, opcional em PARTIAL/REFUSED */}
+                        {photoNeed !== 'none' && (
+                            <Box>
+                                <MultiPhotoPicker
+                                    label={photoNeed === 'required' ? 'Foto obrigatória da avaria' : 'Foto opcional'}
+                                    photos={photo ? [photo] : []}
+                                    onPhotosChange={handlePhotosChange}
+                                    maxPhotos={1}
+                                    padding="m0"
+                                />
+                                {uploading && (
+                                    <Text preset="text12" color="gray400">Enviando foto...</Text>
                                 )}
                             </Box>
                         )}

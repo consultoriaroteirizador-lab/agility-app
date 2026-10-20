@@ -473,6 +473,11 @@ function RetornoContent() {
                           {item.origin === 'PICKUP' ? 'Devolução/coleta' : `Não entregue${returnReasonLabel(item.reason)}`}
                           {item.serviceCode ? ` · #${item.serviceCode}` : ''}
                         </Text>
+                        {!!item.serialNumber && (
+                          <Text preset="text12" color="gray600">
+                            S/N: {item.serialNumber}
+                          </Text>
+                        )}
                       </Box>
                     </TouchableOpacityBox>
 
