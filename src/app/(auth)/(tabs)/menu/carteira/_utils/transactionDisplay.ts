@@ -40,6 +40,7 @@ const TYPE_CONFIG: Record<TransactionType, TypeConfig> = {
     },
     [TransactionType.WITHDRAWAL]: { label: 'Saque pago', icon: 'cash-outline', iconColor: '#F44336', bgColor: '#FFEBEE', category: 'withdrawals' },
     [TransactionType.MANUAL_CREDIT]: { label: 'Crédito da empresa', icon: 'add-circle', iconColor: '#4CAF50', bgColor: '#E8F5E9', category: 'adjustments' },
+    [TransactionType.FUEL_REIMBURSEMENT]: { label: 'Reembolso de abastecimento', icon: 'water', iconColor: '#4CAF50', bgColor: '#E8F5E9', category: 'adjustments' },
     [TransactionType.MANUAL_DEBIT]: { label: 'Débito da empresa', icon: 'remove-circle', iconColor: '#F44336', bgColor: '#FFEBEE', category: 'adjustments' },
     // Legados (antes da F2).
     [TransactionType.CREDIT]: { label: 'Crédito', icon: 'add-circle', iconColor: '#4CAF50', bgColor: '#E8F5E9', category: 'freight' },

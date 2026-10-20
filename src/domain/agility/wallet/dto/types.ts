@@ -13,6 +13,7 @@ export enum TransactionType {
     WITHDRAWAL = 'WITHDRAWAL',
     MANUAL_CREDIT = 'MANUAL_CREDIT',
     MANUAL_DEBIT = 'MANUAL_DEBIT',
+    FUEL_REIMBURSEMENT = 'FUEL_REIMBURSEMENT',
 
     // Legados: continuam legíveis no extrato, nenhum caminho novo grava.
     CREDIT = 'CREDIT',
