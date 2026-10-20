@@ -48,6 +48,8 @@ jest.mock('@/domain/agility/fuelEntry', () => ({
 const AbastecerScreen = require('../index').default;
 
 const CONTEXTO = { vehicleId: 'v1', plate: 'ABC1D23', defaultFuelType: 'DIESEL', lastOdometerKm: 48000, rechargeOnly: false, reimbursable: true };
+// O que preencher() envia; o lançamento devolvido igual a isso é o caminho normal.
+const IGUAL = { totalValue: 250, liters: 45.5, paidBy: 'COMPANY', odometerKm: 48210 };
 const FOTO = { uri: 'file://nota.jpg', width: 3000, height: 4000 };
 
 beforeEach(() => {
@@ -104,7 +106,7 @@ it('sem foto, Enviar fica desligado e diz por quê', () => {
 });
 
 it('envia litros e odômetro convertidos, e vai para Meus abastecimentos', async () => {
-    mockCreate.mockResolvedValue({ odometerInconsistent: false, previousOdometerKm: 48000 });
+    mockCreate.mockResolvedValue({ ...IGUAL, odometerInconsistent: false, previousOdometerKm: 48000 });
     const t = render();
     preencher(t);
     await act(async () => {
@@ -132,7 +134,7 @@ it('duplo toque em Enviar: um POST só', async () => {
     await act(async () => {
         void botao(t).props.onPress();
         void botao(t).props.onPress();
-        resolver({ odometerInconsistent: false, previousOdometerKm: null });
+        resolver({ ...IGUAL, odometerInconsistent: false, previousOdometerKm: null });
     });
     expect(mockCreate).toHaveBeenCalledTimes(1);
 });
@@ -170,7 +172,7 @@ it('recusa do back: a frase de cada campo no toast', async () => {
 });
 
 it('odômetro abaixo do anterior: o toast avisa a revisão', async () => {
-    mockCreate.mockResolvedValue({ odometerInconsistent: true, previousOdometerKm: 50000 });
+    mockCreate.mockResolvedValue({ ...IGUAL, odometerInconsistent: true, previousOdometerKm: 50000 });
     const t = render();
     preencher(t);
     await act(async () => {
@@ -219,7 +221,7 @@ const AVISO_REEMBOLSO = 'Vira um pedido de reembolso, aprovado pela central.';
 
 it('a chave nasce ao montar, repete no segundo toque depois de erro de rede e troca depois do sucesso', async () => {
     mockCreate.mockRejectedValueOnce({ success: false, error: { message: 'Sem conexão com o servidor.', code: 'AU-000' } });
-    mockCreate.mockResolvedValue({ odometerInconsistent: false, previousOdometerKm: null });
+    mockCreate.mockResolvedValue({ ...IGUAL, odometerInconsistent: false, previousOdometerKm: null });
     const t = render();
     preencher(t);
     await act(async () => {
@@ -251,4 +253,19 @@ it('reimbursable false: nem com "Eu" o aviso aparece', () => {
     const t = render();
     act(() => pagador(t, 'Eu').props.onPress());
     expect(temTexto(t, AVISO_REEMBOLSO)).toBe(false);
+});
+
+it('lancamento devolvido com dados diferentes do envio (replay da chave): avisa e segue o fluxo', async () => {
+    mockCreate.mockResolvedValue({ ...IGUAL, liters: 30, odometerInconsistent: false, previousOdometerKm: 48000 });
+    const t = render();
+    preencher(t);
+    await act(async () => {
+        await botao(t).props.onPress();
+    });
+    expect(mockShowToast).toHaveBeenCalledWith({
+        message: 'Este abastecimento já tinha sido registrado com os dados do primeiro envio. Confira em Meus abastecimentos.',
+        type: 'success',
+    });
+    expect(mockShowToast).not.toHaveBeenCalledWith({ message: 'Abastecimento registrado.', type: 'success' });
+    expect(mockRouter.replace).toHaveBeenCalledWith('/menu/abastecimento/historico');
 });

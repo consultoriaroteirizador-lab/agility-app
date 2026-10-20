@@ -16,7 +16,9 @@ import {
     formatKm,
     fuelContextErrorMessage,
     fuelEntryErrorMessage,
+    entryDiffersFromPayload,
     fuelEntrySuccessToast,
+    REPLAYED_ENTRY_MESSAGE,
     useCreateFuelEntry,
     useFuelEntryContext,
     validateFuelForm,
@@ -109,7 +111,10 @@ export default function AbastecerScreen() {
             try {
                 const entry = await createFuelEntry({ payload, photo, idempotencyKey });
                 setIdempotencyKey(Crypto.randomUUID());
-                showToast(fuelEntrySuccessToast(entry));
+                // A mesma chave devolve o lançamento da tentativa anterior: se o motorista editou depois, avisa.
+                showToast(
+                    entryDiffersFromPayload(entry, payload) ? { message: REPLAYED_ENTRY_MESSAGE, type: 'success' } : fuelEntrySuccessToast(entry),
+                );
                 // `replace`: voltar não reabre o formulário preenchido.
                 router.replace('/menu/abastecimento/historico');
             } catch (e) {

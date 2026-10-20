@@ -36,7 +36,7 @@ describe('describeTransaction — sinal pela direção', () => {
     });
 
     it('reembolso de abastecimento entra com "+" e rótulo próprio', () => {
-        const d = describeTransaction(tx({ type: 'FUEL_REIMBURSEMENT' as Tx['type'], direction: 'IN', sourceType: 'FUEL_REIMBURSEMENT' as Tx['sourceType'] }));
+        const d = describeTransaction(tx({ type: 'FUEL_REIMBURSEMENT' as Tx['type'], direction: 'IN', sourceType: 'FUEL_REIMBURSEMENT' }));
         expect(d.amountText).toBe(`+${formatCurrency(5000)}`);
         expect(d.label).toBe('Reembolso de abastecimento');
         expect(d.category).toBe('adjustments');

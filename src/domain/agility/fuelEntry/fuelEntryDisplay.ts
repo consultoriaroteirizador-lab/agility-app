@@ -8,9 +8,9 @@ import type { FuelEntry, FuelEntryReimbursement, FuelType } from './dto/types';
 export const FUEL_LABEL: Record<FuelType, string> = { DIESEL: 'Diesel', GASOLINE: 'Gasolina', ETHANOL: 'Etanol' };
 
 export const OFFLINE_MESSAGE = 'Sem internet. O que você digitou continua aqui: conecte-se e toque em Enviar de novo.';
-// Timeout: a request saiu e pode ter sido gravada. "Toque em Enviar de novo" criaria um segundo lançamento.
-export const TIMEOUT_MESSAGE =
-    'O envio demorou demais e não deu para confirmar se o abastecimento foi registrado. Confira em Meus abastecimentos antes de enviar de novo.';
+// Timeout: a request saiu e pode ter sido gravada, mas o formulário reenvia com a mesma chave de idempotência.
+export const TIMEOUT_MESSAGE = 'O envio demorou demais. O que você digitou continua aqui: toque em Enviar de novo. Se ele já tiver chegado, não duplica.';
+export const REPLAYED_ENTRY_MESSAGE = 'Este abastecimento já tinha sido registrado com os dados do primeiro envio. Confira em Meus abastecimentos.';
 // 413: a compressão falhou e a original passou dos 5 MB; o multer do back recusa em inglês ("File too large").
 export const PHOTO_TOO_LARGE_MESSAGE = 'A foto da nota ficou grande demais para enviar. Tire outra foto e toque em Enviar de novo.';
 const FALLBACK = 'Não foi possível registrar o abastecimento. Tente novamente.';

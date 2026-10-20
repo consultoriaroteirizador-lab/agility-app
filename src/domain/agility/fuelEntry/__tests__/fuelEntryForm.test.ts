@@ -1,4 +1,4 @@
-import { buildFuelEntryFormData, parseDecimalBR, parseOdometer, validateFuelForm, type FuelFormState } from '../fuelEntryForm';
+import { buildFuelEntryFormData, entryDiffersFromPayload, parseDecimalBR, parseOdometer, validateFuelForm, type FuelFormState } from '../fuelEntryForm';
 
 class FakeFormData {
     entries: [string, unknown][] = [];
@@ -74,5 +74,23 @@ describe('buildFuelEntryFormData', () => {
             'key-2',
         ) as unknown as FakeFormData;
         expect(fd.entries.map(([k]) => k)).not.toContain('stationName');
+    });
+});
+
+describe('entryDiffersFromPayload', () => {
+    const payload = { totalValue: 250, liters: 45.5, paidBy: 'COMPANY' as const, odometerKm: 48210 };
+    const entry = { ...payload };
+    it('igual: false (inclusive numero vindo como texto)', () => {
+        expect(entryDiffersFromPayload(entry, payload)).toBe(false);
+        expect(entryDiffersFromPayload({ ...entry, liters: '45.500' as unknown as number, totalValue: '250.00' as unknown as number }, payload)).toBe(false);
+    });
+    it.each([
+        ['totalValue', { totalValue: 250.01 }],
+        ['liters', { liters: 45.501 }],
+        ['paidBy', { paidBy: 'DRIVER' as const }],
+        ['odometerKm', { odometerKm: 48211 }],
+        ['odometerKm nulo', { odometerKm: null as unknown as number }],
+    ])('%s diferente: true', (_n, patch) => {
+        expect(entryDiffersFromPayload({ ...entry, ...patch }, payload)).toBe(true);
     });
 });

@@ -1,4 +1,4 @@
-import type { FuelPayer, FuelType, ReceiptPhoto } from './dto/types';
+import type { FuelEntry, FuelPayer, FuelType, ReceiptPhoto } from './dto/types';
 
 export const FUEL_TYPES: FuelType[] = ['DIESEL', 'GASOLINE', 'ETHANOL'];
 const STATION_MAX = 120; // o @MaxLength do DTO; acima disso o back responde em inglês
@@ -92,4 +92,22 @@ export function buildFuelEntryFormData(p: FuelEntryPayload, receipt: { uri: stri
     // @ts-expect-error: o FormData do React Native aceita { uri, name, type } como arquivo
     fd.append('receipt', receipt);
     return fd;
+}
+
+/**
+ * O lançamento devolvido difere do que acabou de ser enviado? Com a mesma chave de idempotência o back devolve o
+ * lançamento da tentativa anterior, mesmo que o motorista tenha editado o formulário depois. Compara os campos
+ * numéricos por igualdade exata, depois de Number(), porque o back pode serializar decimal como texto.
+ */
+export function entryDiffersFromPayload(
+    entry: Pick<FuelEntry, 'totalValue' | 'liters' | 'paidBy' | 'odometerKm'>,
+    payload: Pick<FuelEntryPayload, 'totalValue' | 'liters' | 'paidBy' | 'odometerKm'>,
+): boolean {
+    return (
+        Number(entry.totalValue) !== payload.totalValue ||
+        Number(entry.liters) !== payload.liters ||
+        entry.paidBy !== payload.paidBy ||
+        entry.odometerKm === null ||
+        Number(entry.odometerKm) !== payload.odometerKm
+    );
 }

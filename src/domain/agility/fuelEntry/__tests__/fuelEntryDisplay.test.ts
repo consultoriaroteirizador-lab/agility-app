@@ -31,7 +31,7 @@ describe('fuelEntryErrorMessage', () => {
     });
     it('timeout: o envio pode ter sido gravado, então manda conferir antes de enviar de novo', () => {
         expect(fuelEntryErrorMessage({ success: false, error: { message: 'A requisição demorou demais.', code: 'AU-000', timeout: true } })).toBe(TIMEOUT_MESSAGE);
-        expect(TIMEOUT_MESSAGE).toContain('Meus abastecimentos');
+        expect(TIMEOUT_MESSAGE).toBe('O envio demorou demais. O que você digitou continua aqui: toque em Enviar de novo. Se ele já tiver chegado, não duplica.');
         expect(TIMEOUT_MESSAGE).not.toBe(OFFLINE_MESSAGE);
     });
     it('foto grande demais (413): a frase em português, nunca o "File too large" do back', () => {
