@@ -57,6 +57,7 @@ const linha = {
     paidBy: 'COMPANY',
     status: 'ACTIVE',
     voidReason: null,
+    reimbursement: null,
 };
 
 function textos() {
@@ -96,4 +97,14 @@ it('erro na primeira página: pede para tentar de novo, nunca mostra a lista vaz
     const t = textos();
     expect(t).toContain('Não foi possível carregar seus abastecimentos.');
     expect(t).not.toContain('Nenhum abastecimento registrado ainda.');
+});
+
+it('mostra a situação do reembolso quando existe, e nada quando é nulo', () => {
+    mockList.mockReturnValue({
+        ...base,
+        items: [{ ...linha, odometerInconsistent: false, reimbursement: { status: 'A_APROVAR', requestedAmountCents: 25000, approvedAmountCents: null, reason: null, decidedAt: null } }],
+    });
+    expect(textos()).toContain('Reembolso aguardando aprovação');
+    mockList.mockReturnValue({ ...base, items: [{ ...linha, odometerInconsistent: false }] });
+    expect(textos().filter((x) => x.startsWith('Reembolso'))).toEqual([]);
 });

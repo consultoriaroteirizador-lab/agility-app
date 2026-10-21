@@ -35,6 +35,13 @@ describe('describeTransaction — sinal pela direção', () => {
         expect(d.label).toBe('Crédito da empresa');
     });
 
+    it('reembolso de abastecimento entra com "+" e rótulo próprio', () => {
+        const d = describeTransaction(tx({ type: 'FUEL_REIMBURSEMENT' as Tx['type'], direction: 'IN', sourceType: 'FUEL_REIMBURSEMENT' }));
+        expect(d.amountText).toBe(`+${formatCurrency(5000)}`);
+        expect(d.label).toBe('Reembolso de abastecimento');
+        expect(d.category).toBe('adjustments');
+    });
+
     it('ADJUSTMENT legado segue a direção gravada pela migration', () => {
         expect(describeTransaction(tx({ type: 'ADJUSTMENT' as Tx['type'], direction: 'IN', sourceType: 'LEGACY' })).amountText).toBe(
             `+${formatCurrency(5000)}`,

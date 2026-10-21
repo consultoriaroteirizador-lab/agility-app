@@ -13,7 +13,8 @@ import type { FuelEntryPayload } from '../fuelEntryForm';
 export function useCreateFuelEntry() {
     const queryClient = useQueryClient();
     const { mutateAsync, isPending } = useMutation({
-        mutationFn: (v: { payload: FuelEntryPayload; photo: ReceiptPhoto }) => fuelEntryAPI.create(v.payload, v.photo),
+        mutationFn: (v: { payload: FuelEntryPayload; photo: ReceiptPhoto; idempotencyKey: string }) =>
+            fuelEntryAPI.create(v.payload, v.photo, v.idempotencyKey),
         onSettled: () => {
             void queryClient.invalidateQueries({ queryKey: [KEY_FUEL_ENTRIES] });
         },

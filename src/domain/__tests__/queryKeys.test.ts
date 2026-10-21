@@ -1,6 +1,6 @@
 import { QueryClient } from '@tanstack/react-query';
 
-import { KEY_CHATS, KEY_FINANCE, KEY_NOTIFICATIONS, KEY_ROUTINGS, KEY_SERVICES, KEY_TICKETS, KEY_WALLET, PUSH_INVALIDATED_KEYS } from '../queryKeys';
+import { KEY_CHATS, KEY_FINANCE, KEY_FUEL_ENTRIES, KEY_NOTIFICATIONS, KEY_ROUTINGS, KEY_SERVICES, KEY_TICKETS, KEY_WALLET, PUSH_INVALIDATED_KEYS } from '../queryKeys';
 
 describe('PUSH_INVALIDATED_KEYS', () => {
     it('push invalida rotas, notificacoes, chats e protocolos', () => {
@@ -16,6 +16,10 @@ describe('PUSH_INVALIDATED_KEYS', () => {
     // com a tela de carteira/ganhos/cobrancas montada nao atualizava o saldo.
     it('push invalida carteira e financeiro (ROUTE_COMPLETED/PAYMENT_RECEIVED nascem dos mesmos eventos)', () => {
         expect(PUSH_INVALIDATED_KEYS).toEqual(expect.arrayContaining([KEY_WALLET, KEY_FINANCE]));
+    });
+
+    it('push invalida o historico de abastecimentos (push de reembolso abre essa tela)', () => {
+        expect(PUSH_INVALIDATED_KEYS).toContain(KEY_FUEL_ENTRIES);
     });
 
     // ROUTE_STOP_RELOCATED: a central corrigiu o local da parada. A tela da parada

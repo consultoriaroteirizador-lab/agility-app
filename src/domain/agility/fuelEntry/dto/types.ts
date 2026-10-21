@@ -11,6 +11,19 @@ export interface FuelEntryContext {
     defaultFuelType: FuelType | null;
     lastOdometerKm: number | null;
     rechargeOnly: boolean;
+    /** O veículo é da empresa: abastecimento pago pelo motorista vira pedido de reembolso. */
+    reimbursable: boolean;
+}
+
+export type FuelReimbursementStatus = 'A_APROVAR' | 'APROVADO' | 'RECUSADO' | 'CANCELADO';
+
+/** FuelEntryReimbursementView do back; valores em CENTAVOS. */
+export interface FuelEntryReimbursement {
+    status: FuelReimbursementStatus;
+    requestedAmountCents: number;
+    approvedAmountCents: number | null;
+    reason: string | null;
+    decidedAt: string | null;
 }
 
 /** Subconjunto do FuelEntryView que o app lê. */
@@ -27,6 +40,7 @@ export interface FuelEntry {
     paidBy: FuelPayer;
     status: 'ACTIVE' | 'VOIDED';
     voidReason: string | null;
+    reimbursement: FuelEntryReimbursement | null;
 }
 
 /** A foto como o ImagePicker devolve (só o que o app usa). */

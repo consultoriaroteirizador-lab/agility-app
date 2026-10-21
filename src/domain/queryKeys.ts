@@ -29,6 +29,9 @@ export const KEY_FUEL_ENTRIES = 'fuel-entries'
  * tela de carteira/ganhos/cobranças montada em background não refazia o
  * saldo — só a rota/notificação.
  *
+ * `KEY_FUEL_ENTRIES`: o push de reembolso aprovado/recusado abre o historico de abastecimentos, que guardava
+ * o lancamento sem o reembolso por ate 60 s (staleTime) e sem refetch-on-focus.
+ *
  * `KEY_SERVICES` entrou com ROUTE_STOP_RELOCATED (01/10/2026): a central corrige o
  * local de uma parada da rota do motorista, e a tela da parada — de onde sai o link
  * do Waze/Maps — guardava a coordenada antiga por até 5 min. Invalidar só refaz o que
@@ -42,6 +45,7 @@ export const PUSH_INVALIDATED_KEYS: readonly string[] = [
     KEY_WALLET,
     KEY_FINANCE,
     KEY_SERVICES,
+    KEY_FUEL_ENTRIES,
 ]
 
 /**

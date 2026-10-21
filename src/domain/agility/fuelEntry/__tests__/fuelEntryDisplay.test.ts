@@ -1,5 +1,7 @@
+import { formatCurrency } from '@/utils/formatCurrency';
+
 import {
-    formatDecimalBR, formatFilledAt, formatKm, formatLiters, fuelEntryErrorMessage, fuelEntrySuccessToast, inconsistencyText, OFFLINE_MESSAGE, PHOTO_TOO_LARGE_MESSAGE, TIMEOUT_MESSAGE,
+    formatDecimalBR, formatFilledAt, formatKm, formatLiters, fuelEntryErrorMessage, fuelEntrySuccessToast, inconsistencyText, OFFLINE_MESSAGE, reimbursementText, PHOTO_TOO_LARGE_MESSAGE, TIMEOUT_MESSAGE,
 } from '../fuelEntryDisplay';
 
 describe('formatDecimalBR', () => {
@@ -29,7 +31,7 @@ describe('fuelEntryErrorMessage', () => {
     });
     it('timeout: o envio pode ter sido gravado, então manda conferir antes de enviar de novo', () => {
         expect(fuelEntryErrorMessage({ success: false, error: { message: 'A requisição demorou demais.', code: 'AU-000', timeout: true } })).toBe(TIMEOUT_MESSAGE);
-        expect(TIMEOUT_MESSAGE).toContain('Meus abastecimentos');
+        expect(TIMEOUT_MESSAGE).toBe('O envio demorou demais. O que você digitou continua aqui: toque em Enviar de novo. Se ele já tiver chegado, não duplica.');
         expect(TIMEOUT_MESSAGE).not.toBe(OFFLINE_MESSAGE);
     });
     it('foto grande demais (413): a frase em português, nunca o "File too large" do back', () => {
@@ -59,4 +61,19 @@ it('toast de sucesso avisa a revisão quando o odômetro ficou abaixo', () => {
         message: 'Abastecimento registrado, mas o odômetro está abaixo do último (50.000 km). A central vai revisar.',
         type: 'success',
     });
+});
+
+describe('reimbursementText', () => {
+    const base = { requestedAmountCents: 30000, approvedAmountCents: null, reason: null, decidedAt: null };
+    const brl = (c: number) => formatCurrency(c);
+    it('A_APROVAR', () => expect(reimbursementText({ ...base, status: 'A_APROVAR' })).toBe('Reembolso aguardando aprovação'));
+    it('APROVADO cheio', () =>
+        expect(reimbursementText({ ...base, status: 'APROVADO', approvedAmountCents: 30000 })).toBe(`Reembolso aprovado: ${brl(30000)}`));
+    it('APROVADO parcial com motivo', () =>
+        expect(reimbursementText({ ...base, status: 'APROVADO', approvedAmountCents: 28000, reason: 'Nota rasurada' })).toBe(
+            `Reembolso aprovado: ${brl(28000)} de ${brl(30000)}. Motivo: Nota rasurada`,
+        ));
+    it('RECUSADO', () =>
+        expect(reimbursementText({ ...base, status: 'RECUSADO', reason: 'Nota ilegível' })).toBe('Reembolso recusado. Motivo: Nota ilegível'));
+    it('CANCELADO', () => expect(reimbursementText({ ...base, status: 'CANCELADO' })).toBe('Reembolso cancelado'));
 });

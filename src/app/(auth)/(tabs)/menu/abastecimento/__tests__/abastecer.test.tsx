@@ -24,6 +24,9 @@ jest.mock('@expo/vector-icons', () => ({ Ionicons: () => null }));
 jest.mock('@/components/Input/Input', () => ({ Input: () => null }));
 jest.mock('@/components/MultiPhotoPicker', () => ({ MultiPhotoPicker: () => null }));
 
+let mockUuidSeq = 0;
+jest.mock('expo-crypto', () => ({ randomUUID: () => `uuid-${++mockUuidSeq}` }));
+
 const mockRouter = { push: jest.fn(), back: jest.fn(), replace: jest.fn() };
 jest.mock('expo-router', () => ({ useRouter: () => mockRouter, router: mockRouter }));
 
@@ -44,11 +47,14 @@ jest.mock('@/domain/agility/fuelEntry', () => ({
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const AbastecerScreen = require('../index').default;
 
-const CONTEXTO = { vehicleId: 'v1', plate: 'ABC1D23', defaultFuelType: 'DIESEL', lastOdometerKm: 48000, rechargeOnly: false };
+const CONTEXTO = { vehicleId: 'v1', plate: 'ABC1D23', defaultFuelType: 'DIESEL', lastOdometerKm: 48000, rechargeOnly: false, reimbursable: true };
+// O que preencher() envia; o lançamento devolvido igual a isso é o caminho normal.
+const IGUAL = { totalValue: 250, liters: 45.5, paidBy: 'COMPANY', odometerKm: 48210 };
 const FOTO = { uri: 'file://nota.jpg', width: 3000, height: 4000 };
 
 beforeEach(() => {
     jest.clearAllMocks();
+    mockUuidSeq = 0;
     mockUseContext.mockReturnValue({ context: CONTEXTO, isLoading: false, isError: false, error: null, refetch: mockRefetch });
 });
 
@@ -67,6 +73,8 @@ function render() {
 const campo = (t: TestRenderer.ReactTestRenderer, title: string) =>
     t.root.findAll((n) => n.props.title === title && typeof n.props.onChangeText === 'function')[0];
 const botao = (t: TestRenderer.ReactTestRenderer) => t.root.findAllByProps({ title: 'Enviar' })[0];
+const pagador = (t: TestRenderer.ReactTestRenderer, label: string) =>
+    t.root.findAll((n) => n.props.accessibilityRole === 'button' && typeof n.props.onPress === 'function' && n.findAll((c) => c.props.children === label).length > 0)[0];
 const temTexto = (t: TestRenderer.ReactTestRenderer, s: string) => t.root.findAll((n) => n.props.children === s).length > 0;
 
 function preencher(t: TestRenderer.ReactTestRenderer, { foto = true } = {}) {
@@ -98,7 +106,7 @@ it('sem foto, Enviar fica desligado e diz por quê', () => {
 });
 
 it('envia litros e odômetro convertidos, e vai para Meus abastecimentos', async () => {
-    mockCreate.mockResolvedValue({ odometerInconsistent: false, previousOdometerKm: 48000 });
+    mockCreate.mockResolvedValue({ ...IGUAL, odometerInconsistent: false, previousOdometerKm: 48000 });
     const t = render();
     preencher(t);
     await act(async () => {
@@ -108,6 +116,7 @@ it('envia litros e odômetro convertidos, e vai para Meus abastecimentos', async
     expect(mockCreate).toHaveBeenCalledWith({
         payload: { fuelType: 'DIESEL', liters: 45.5, totalValue: 250, odometerKm: 48210, fullTank: true, paidBy: 'COMPANY' },
         photo: FOTO,
+        idempotencyKey: expect.any(String),
     });
     expect(mockShowToast).toHaveBeenCalledWith({ message: 'Abastecimento registrado.', type: 'success' });
     expect(mockRouter.replace).toHaveBeenCalledWith('/menu/abastecimento/historico');
@@ -125,7 +134,7 @@ it('duplo toque em Enviar: um POST só', async () => {
     await act(async () => {
         void botao(t).props.onPress();
         void botao(t).props.onPress();
-        resolver({ odometerInconsistent: false, previousOdometerKm: null });
+        resolver({ ...IGUAL, odometerInconsistent: false, previousOdometerKm: null });
     });
     expect(mockCreate).toHaveBeenCalledTimes(1);
 });
@@ -163,7 +172,7 @@ it('recusa do back: a frase de cada campo no toast', async () => {
 });
 
 it('odômetro abaixo do anterior: o toast avisa a revisão', async () => {
-    mockCreate.mockResolvedValue({ odometerInconsistent: true, previousOdometerKm: 50000 });
+    mockCreate.mockResolvedValue({ ...IGUAL, odometerInconsistent: true, previousOdometerKm: 50000 });
     const t = render();
     preencher(t);
     await act(async () => {
@@ -206,4 +215,57 @@ it('sem veículo (422): a frase do back e Tentar novamente', () => {
         t.root.findAllByProps({ testID: 'abastecer-contexto-erro' })[0].props.onPress();
     });
     expect(mockRefetch).toHaveBeenCalled();
+});
+
+const AVISO_REEMBOLSO = 'Vira um pedido de reembolso, aprovado pela central.';
+
+it('a chave nasce ao montar, repete no segundo toque depois de erro de rede e troca depois do sucesso', async () => {
+    mockCreate.mockRejectedValueOnce({ success: false, error: { message: 'Sem conexão com o servidor.', code: 'AU-000' } });
+    mockCreate.mockResolvedValue({ ...IGUAL, odometerInconsistent: false, previousOdometerKm: null });
+    const t = render();
+    preencher(t);
+    await act(async () => {
+        await botao(t).props.onPress();
+    });
+    await act(async () => {
+        await botao(t).props.onPress();
+    });
+    await act(async () => {
+        await botao(t).props.onPress();
+    });
+    const chaves = mockCreate.mock.calls.map((c) => c[0].idempotencyKey);
+    expect(chaves[0]).toBe('uuid-1');
+    expect(chaves[1]).toBe('uuid-1');
+    expect(chaves[2]).not.toBe('uuid-1');
+});
+
+it('com "Eu" e reimbursable, avisa que vira pedido de reembolso', () => {
+    const t = render();
+    expect(temTexto(t, AVISO_REEMBOLSO)).toBe(false);
+    act(() => pagador(t, 'Eu').props.onPress());
+    expect(temTexto(t, AVISO_REEMBOLSO)).toBe(true);
+    act(() => pagador(t, 'Empresa').props.onPress());
+    expect(temTexto(t, AVISO_REEMBOLSO)).toBe(false);
+});
+
+it('reimbursable false: nem com "Eu" o aviso aparece', () => {
+    mockUseContext.mockReturnValue({ context: { ...CONTEXTO, reimbursable: false }, isLoading: false, isError: false, error: null, refetch: mockRefetch });
+    const t = render();
+    act(() => pagador(t, 'Eu').props.onPress());
+    expect(temTexto(t, AVISO_REEMBOLSO)).toBe(false);
+});
+
+it('lancamento devolvido com dados diferentes do envio (replay da chave): avisa e segue o fluxo', async () => {
+    mockCreate.mockResolvedValue({ ...IGUAL, liters: 30, odometerInconsistent: false, previousOdometerKm: 48000 });
+    const t = render();
+    preencher(t);
+    await act(async () => {
+        await botao(t).props.onPress();
+    });
+    expect(mockShowToast).toHaveBeenCalledWith({
+        message: 'Este abastecimento já tinha sido registrado com os dados do primeiro envio. Confira em Meus abastecimentos.',
+        type: 'success',
+    });
+    expect(mockShowToast).not.toHaveBeenCalledWith({ message: 'Abastecimento registrado.', type: 'success' });
+    expect(mockRouter.replace).toHaveBeenCalledWith('/menu/abastecimento/historico');
 });

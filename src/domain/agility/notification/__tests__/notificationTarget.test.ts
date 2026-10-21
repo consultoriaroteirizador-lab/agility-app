@@ -132,6 +132,12 @@ describe('aviso de troca da chave PIX (F3)', () => {
         ).toEqual({ tipo: 'nomeada', rota: 'carteira', params: metadata });
     });
 
+    it('linkUrl "abastecimentos" (reembolso) vira a rota nomeada do historico', () => {
+        expect(
+            resolverDestinoDaNotificacao(notificacao({ type: NotificationType.SYSTEM_ALERT, linkUrl: 'abastecimentos', metadata: {} })),
+        ).toEqual({ tipo: 'nomeada', rota: 'abastecimentos', params: {} });
+    });
+
     it('SYSTEM_ALERT sem os campos da carteira segue sem destino', () => {
         expect(resolverDestinoDaNotificacao(notificacao({ metadata: { foo: 1 } }))).toBeNull();
     });

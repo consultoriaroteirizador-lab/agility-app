@@ -1,4 +1,4 @@
-import type { FuelPayer, FuelType, ReceiptPhoto } from './dto/types';
+import type { FuelEntry, FuelPayer, FuelType, ReceiptPhoto } from './dto/types';
 
 export const FUEL_TYPES: FuelType[] = ['DIESEL', 'GASOLINE', 'ETHANOL'];
 const STATION_MAX = 120; // o @MaxLength do DTO; acima disso o back responde em inglês
@@ -79,7 +79,7 @@ export function validateFuelForm(s: FuelFormState): { payload: FuelEntryPayload 
  * Multipart do POST /fuel-entries/me. O back converte com Number(): número vai com PONTO ("45,5" vira NaN e
  * dá 400) e boolean vai como "true"/"false".
  */
-export function buildFuelEntryFormData(p: FuelEntryPayload, receipt: { uri: string; name: string; type: string }): FormData {
+export function buildFuelEntryFormData(p: FuelEntryPayload, receipt: { uri: string; name: string; type: string }, idempotencyKey: string): FormData {
     const fd = new FormData();
     fd.append('fuelType', p.fuelType);
     fd.append('liters', String(p.liters));
@@ -88,7 +88,26 @@ export function buildFuelEntryFormData(p: FuelEntryPayload, receipt: { uri: stri
     fd.append('fullTank', p.fullTank ? 'true' : 'false');
     fd.append('paidBy', p.paidBy);
     if (p.stationName) fd.append('stationName', p.stationName);
+    fd.append('idempotencyKey', idempotencyKey);
     // @ts-expect-error: o FormData do React Native aceita { uri, name, type } como arquivo
     fd.append('receipt', receipt);
     return fd;
+}
+
+/**
+ * O lançamento devolvido difere do que acabou de ser enviado? Com a mesma chave de idempotência o back devolve o
+ * lançamento da tentativa anterior, mesmo que o motorista tenha editado o formulário depois. Compara os campos
+ * numéricos por igualdade exata, depois de Number(), porque o back pode serializar decimal como texto.
+ */
+export function entryDiffersFromPayload(
+    entry: Pick<FuelEntry, 'totalValue' | 'liters' | 'paidBy' | 'odometerKm'>,
+    payload: Pick<FuelEntryPayload, 'totalValue' | 'liters' | 'paidBy' | 'odometerKm'>,
+): boolean {
+    return (
+        Number(entry.totalValue) !== payload.totalValue ||
+        Number(entry.liters) !== payload.liters ||
+        entry.paidBy !== payload.paidBy ||
+        entry.odometerKm === null ||
+        Number(entry.odometerKm) !== payload.odometerKm
+    );
 }

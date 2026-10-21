@@ -18,6 +18,11 @@ beforeEach(() => {
 
 // Sem `withAnchor`, a pilha da aba nasce só com a tela do link: o voltar sai da aba e a aba
 // fica presa nela até recarregar o app (Menu preso na Carteira, rodada de 09/10/2026).
+it('"abastecimentos" abre o historico de abastecimentos (push do reembolso)', () => {
+    notificationRoutes.abastecimentos();
+    expect(mockNavigate).toHaveBeenCalledWith('/(auth)/(tabs)/menu/abastecimento/historico', { withAnchor: true });
+});
+
 it('"carteira" abre a carteira com a home do Menu por baixo (push da troca da chave PIX, F3)', () => {
     notificationRoutes.carteira();
     expect(mockNavigate).toHaveBeenCalledWith('/(auth)/(tabs)/menu/carteira', { withAnchor: true });

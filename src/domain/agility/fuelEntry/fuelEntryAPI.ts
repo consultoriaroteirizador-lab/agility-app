@@ -20,9 +20,9 @@ export const fuelEntryAPI = {
     },
 
     /** Um request só: o back grava a foto apenas se o lançamento passar na validação. */
-    async create(payload: FuelEntryPayload, photo: ReceiptPhoto): Promise<FuelEntry> {
+    async create(payload: FuelEntryPayload, photo: ReceiptPhoto, idempotencyKey: string): Promise<FuelEntry> {
         const uri = await compressReceipt(photo);
-        const formData = buildFuelEntryFormData(payload, { uri, name: `nota_${Date.now()}.jpg`, type: 'image/jpeg' });
+        const formData = buildFuelEntryFormData(payload, { uri, name: `nota_${Date.now()}.jpg`, type: 'image/jpeg' }, idempotencyKey);
         const response = await apiAgility.post(BASE_URL, formData, { headers: { 'Content-Type': 'multipart/form-data' } });
         return unwrap<FuelEntry>(response.data);
     },
