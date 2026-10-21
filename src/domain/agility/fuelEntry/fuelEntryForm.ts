@@ -104,9 +104,11 @@ export function entryDiffersFromPayload(
     payload: Pick<FuelEntryPayload, 'totalValue' | 'liters' | 'paidBy' | 'odometerKm'>,
 ): boolean {
     return (
-        // O back arredonda para a precisao do banco (litros Decimal(10,3), valor Decimal(12,2)); comparar nela.
+        // O back arredonda para a precisao do banco: valor Decimal(12,2) (o payload sai de centavos inteiros, entao centavos sao exatos);
+        // litros Decimal(3) por tolerancia de meio milesimo, porque Math.round(x * 1000) erra quando o float cai abaixo de .5 (0.5005 * 1000 = 500.4999...).
         Math.round(Number(entry.totalValue) * 100) !== Math.round(payload.totalValue * 100) ||
-        Math.round(Number(entry.liters) * 1000) !== Math.round(payload.liters * 1000) ||
+        Math.abs(Number(entry.liters) - payload.liters) > 0.0005 + 1e-9 ||
+
         entry.paidBy !== payload.paidBy ||
         entry.odometerKm === null ||
         Number(entry.odometerKm) !== payload.odometerKm
