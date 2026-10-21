@@ -90,6 +90,8 @@ describe('entryDiffersFromPayload', () => {
         expect(entryDiffersFromPayload({ ...entry, liters: '45.556' as unknown as number }, p(45.5555, 250))).toBe(false);
         expect(entryDiffersFromPayload({ ...entry, liters: 45.556 }, p(45.555, 250))).toBe(true);
         expect(entryDiffersFromPayload({ ...entry, liters: 0.501 }, p(0.5005, 250))).toBe(false);
+        expect(entryDiffersFromPayload({ ...entry, liters: undefined as unknown as number }, p(45.5, 250))).toBe(true);
+        expect(entryDiffersFromPayload({ ...entry, liters: "abc" as unknown as number }, p(45.5, 250))).toBe(true);
         expect(entryDiffersFromPayload({ ...entry, totalValue: 250.02 }, p(45.5, 250.01))).toBe(true);
     });
     it.each([
