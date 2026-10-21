@@ -97,15 +97,16 @@ export function buildFuelEntryFormData(p: FuelEntryPayload, receipt: { uri: stri
 /**
  * O lançamento devolvido difere do que acabou de ser enviado? Com a mesma chave de idempotência o back devolve o
  * lançamento da tentativa anterior, mesmo que o motorista tenha editado o formulário depois. Compara os campos
- * numéricos por igualdade exata, depois de Number(), porque o back pode serializar decimal como texto.
+ * numéricos na precisão do banco, depois de Number(), porque o back pode serializar decimal como texto.
  */
 export function entryDiffersFromPayload(
     entry: Pick<FuelEntry, 'totalValue' | 'liters' | 'paidBy' | 'odometerKm'>,
     payload: Pick<FuelEntryPayload, 'totalValue' | 'liters' | 'paidBy' | 'odometerKm'>,
 ): boolean {
     return (
-        Number(entry.totalValue) !== payload.totalValue ||
-        Number(entry.liters) !== payload.liters ||
+        // O back arredonda para a precisao do banco (litros Decimal(10,3), valor Decimal(12,2)); comparar nela.
+        Math.round(Number(entry.totalValue) * 100) !== Math.round(payload.totalValue * 100) ||
+        Math.round(Number(entry.liters) * 1000) !== Math.round(payload.liters * 1000) ||
         entry.paidBy !== payload.paidBy ||
         entry.odometerKm === null ||
         Number(entry.odometerKm) !== payload.odometerKm
