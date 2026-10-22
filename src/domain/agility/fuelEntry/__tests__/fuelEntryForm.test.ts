@@ -84,6 +84,16 @@ describe('entryDiffersFromPayload', () => {
         expect(entryDiffersFromPayload(entry, payload)).toBe(false);
         expect(entryDiffersFromPayload({ ...entry, liters: '45.500' as unknown as number, totalValue: '250.00' as unknown as number }, payload)).toBe(false);
     });
+    it('precisao do banco: litros em 3 casas e valor em 2 (o back arredonda)', () => {
+        const p = (liters: number, totalValue: number) => ({ ...payload, liters, totalValue });
+        expect(entryDiffersFromPayload({ ...entry, liters: 45.556 }, p(45.5555, 250))).toBe(false);
+        expect(entryDiffersFromPayload({ ...entry, liters: '45.556' as unknown as number }, p(45.5555, 250))).toBe(false);
+        expect(entryDiffersFromPayload({ ...entry, liters: 45.556 }, p(45.555, 250))).toBe(true);
+        expect(entryDiffersFromPayload({ ...entry, liters: 0.501 }, p(0.5005, 250))).toBe(false);
+        expect(entryDiffersFromPayload({ ...entry, liters: undefined as unknown as number }, p(45.5, 250))).toBe(true);
+        expect(entryDiffersFromPayload({ ...entry, liters: "abc" as unknown as number }, p(45.5, 250))).toBe(true);
+        expect(entryDiffersFromPayload({ ...entry, totalValue: 250.02 }, p(45.5, 250.01))).toBe(true);
+    });
     it.each([
         ['totalValue', { totalValue: 250.01 }],
         ['liters', { liters: 45.501 }],
