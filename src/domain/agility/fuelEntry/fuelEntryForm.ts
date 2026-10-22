@@ -46,6 +46,21 @@ export function parseOdometer(text: string): number | null {
     return Number(t.replace(/\./g, ''));
 }
 
+/** Faixa de preço por litro (centavos) que um abastecimento plausível cobre; fora dela o app pede confirmação. */
+export const PRICE_PER_LITER_MIN_CENTS = 300;
+export const PRICE_PER_LITER_MAX_CENTS = 1200;
+
+/** Preço por litro em centavos (arredondado), ou null sem litros válidos (>0) ou sem valor (>0). */
+export function pricePerLiterCents(litersText: string, totalValueCents: number | null): number | null {
+    const liters = parseDecimalBR(litersText);
+    if (liters === null || liters <= 0 || totalValueCents === null || totalValueCents <= 0) return null;
+    return Math.round(totalValueCents / liters);
+}
+
+export function isPricePerLiterPlausible(cents: number): boolean {
+    return cents >= PRICE_PER_LITER_MIN_CENTS && cents <= PRICE_PER_LITER_MAX_CENTS;
+}
+
 /**
  * O que falta para enviar, um motivo por vez, na ordem da tela. As regras de valor (2× o tanque, tetos)
  * ficam no back, que responde em português; aqui só o que o formulário consegue saber sozinho.

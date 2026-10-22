@@ -33,6 +33,17 @@ jest.mock('expo-router', () => ({ useRouter: () => mockRouter, router: mockRoute
 const mockShowToast = jest.fn();
 jest.mock('@/services/Toast/useToast', () => ({ useToastService: () => ({ showToast: mockShowToast }) }));
 
+// O modal real depende de ModalComponent; aqui ele só guarda as props para o teste tocar.
+type ModalProps = { isVisible: boolean; title: string; text?: string; buttonActionTitle?: string; buttonCloseTitle?: string; onPress?: () => Promise<void> | void; onClose: () => void };
+let mockModalProps: ModalProps | null = null;
+jest.mock('@/components/Modal/Modal', () => ({
+    __esModule: true,
+    default: (props: ModalProps) => {
+        mockModalProps = props;
+        return null;
+    },
+}));
+
 const mockCreate = jest.fn();
 const mockRefetch = jest.fn();
 type Ctx = { context: unknown; isLoading: boolean; isError: boolean; error: unknown; refetch: jest.Mock };
@@ -55,6 +66,7 @@ const FOTO = { uri: 'file://nota.jpg', width: 3000, height: 4000 };
 beforeEach(() => {
     jest.clearAllMocks();
     mockUuidSeq = 0;
+    mockModalProps = null;
     mockUseContext.mockReturnValue({ context: CONTEXTO, isLoading: false, isError: false, error: null, refetch: mockRefetch });
 });
 
@@ -268,4 +280,95 @@ it('lancamento devolvido com dados diferentes do envio (replay da chave): avisa 
     });
     expect(mockShowToast).not.toHaveBeenCalledWith({ message: 'Abastecimento registrado.', type: 'success' });
     expect(mockRouter.replace).toHaveBeenCalledWith('/menu/abastecimento/historico');
+});
+
+describe('valor total e preco por litro', () => {
+    const textos = (t: TestRenderer.ReactTestRenderer) => t.root.findAll((n) => typeof n.props.children === 'string').map((n) => n.props.children as string);
+    const nbsp = (s: string) => s.replace(/ /g, ' ');
+    const temFrase = (t: TestRenderer.ReactTestRenderer, s: string) => textos(t).some((x) => nbsp(x) === s);
+    const preencherValor = (t: TestRenderer.ReactTestRenderer, litros: string, cents: number) =>
+        act(() => {
+            campo(t, 'Litros').props.onChangeText(litros);
+            t.root.findAll((n) => typeof n.props.onChangeCents === 'function')[0].props.onChangeCents(cents);
+        });
+    const AVISO = 'parece fora do normal. Confira se digitou o valor total pago.';
+
+    it('o rotulo e "Valor total pago"', () => {
+        const t = render();
+        expect(temTexto(t, 'Valor total pago')).toBe(true);
+        expect(temTexto(t, 'Valor total')).toBe(false);
+    });
+
+    it('em faixa: mostra o preco por litro, sem aviso', () => {
+        const t = render();
+        preencherValor(t, '50', 31250);
+        expect(temFrase(t, 'R$ 6,25 por litro')).toBe(true);
+        expect(textos(t).some((x) => x.includes(AVISO))).toBe(false);
+    });
+
+    it('sem litros: nenhuma linha de preco por litro', () => {
+        const t = render();
+        preencherValor(t, '', 31250);
+        expect(textos(t).some((x) => x.includes('por litro'))).toBe(false);
+    });
+
+    it('fora da faixa: a linha vira o aviso', () => {
+        const t = render();
+        preencherValor(t, '50', 625);
+        expect(temFrase(t, `R$ 0,13 por litro ${AVISO}`)).toBe(true);
+    });
+
+    it('fora da faixa: Enviar pede confirmacao e nao envia; Corrigir cancela', async () => {
+        const t = render();
+        preencher(t);
+        preencherValor(t, '50', 625);
+        await act(async () => {
+            await botao(t).props.onPress();
+        });
+        expect(mockCreate).not.toHaveBeenCalled();
+        const m = mockModalProps!;
+        expect(m.isVisible).toBe(true);
+        expect(m.title).toBe('Confira o valor');
+        expect(nbsp(m.text!)).toBe('O preço por litro ficou em R$ 0,13. O campo é o valor total pago, não o preço do litro.');
+        expect(m.buttonActionTitle).toBe('Enviar assim mesmo');
+        expect(m.buttonCloseTitle).toBe('Corrigir');
+        act(() => m.onClose());
+        expect(mockModalProps!.isVisible).toBe(false);
+        expect(mockCreate).not.toHaveBeenCalled();
+    });
+
+    it('"Enviar assim mesmo" envia uma vez, com a mesma chave do reenvio', async () => {
+        mockCreate.mockRejectedValueOnce({ success: false, error: { message: 'Sem conexão com o servidor.', code: 'AU-000' } });
+        mockCreate.mockResolvedValue({ totalValue: 6.25, liters: 50, paidBy: 'COMPANY', odometerKm: 48210, odometerInconsistent: false, previousOdometerKm: null });
+        const t = render();
+        preencher(t);
+        preencherValor(t, '50', 625);
+        await act(async () => {
+            await botao(t).props.onPress();
+        });
+        await act(async () => {
+            await mockModalProps!.onPress!();
+        });
+        expect(mockCreate).toHaveBeenCalledTimes(1);
+        expect(mockModalProps!.isVisible).toBe(false);
+        await act(async () => {
+            await botao(t).props.onPress();
+        });
+        await act(async () => {
+            await mockModalProps!.onPress!();
+        });
+        expect(mockCreate).toHaveBeenCalledTimes(2);
+        expect(mockCreate.mock.calls[1][0].idempotencyKey).toBe(mockCreate.mock.calls[0][0].idempotencyKey);
+    });
+
+    it('em faixa: sem confirmacao, envia direto', async () => {
+        mockCreate.mockResolvedValue({ ...IGUAL, odometerInconsistent: false, previousOdometerKm: null });
+        const t = render();
+        preencher(t);
+        await act(async () => {
+            await botao(t).props.onPress();
+        });
+        expect(mockModalProps?.isVisible ?? false).toBe(false);
+        expect(mockCreate).toHaveBeenCalledTimes(1);
+    });
 });

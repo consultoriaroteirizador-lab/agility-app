@@ -1,4 +1,4 @@
-import { buildFuelEntryFormData, entryDiffersFromPayload, parseDecimalBR, parseOdometer, validateFuelForm, type FuelFormState } from '../fuelEntryForm';
+import { buildFuelEntryFormData, entryDiffersFromPayload, isPricePerLiterPlausible, parseDecimalBR, parseOdometer, pricePerLiterCents, validateFuelForm, type FuelFormState } from '../fuelEntryForm';
 
 class FakeFormData {
     entries: [string, unknown][] = [];
@@ -103,4 +103,17 @@ describe('entryDiffersFromPayload', () => {
     ])('%s diferente: true', (_n, patch) => {
         expect(entryDiffersFromPayload({ ...entry, ...patch }, payload)).toBe(true);
     });
+});
+
+describe('pricePerLiterCents', () => {
+    it('312,50 para 50 L: 625 centavos', () => expect(pricePerLiterCents('50', 31250)).toBe(625));
+    it('6,25 para 50 L: 13 centavos (arredonda meio para cima)', () => expect(pricePerLiterCents('50', 625)).toBe(13));
+    it('aceita litros com virgula', () => expect(pricePerLiterCents('45,5', 25000)).toBe(549));
+    it.each(['', '0', '0,0', 'abc'])('litros %p: null', (l) => expect(pricePerLiterCents(l, 25000)).toBeNull());
+    it.each([null, 0])('valor %p: null', (v) => expect(pricePerLiterCents('50', v)).toBeNull());
+});
+
+describe('isPricePerLiterPlausible', () => {
+    it.each([[300, true], [1200, true], [625, true], [299, false], [1201, false]])('%p centavos: %p', (c, e) =>
+        expect(isPricePerLiterPlausible(c)).toBe(e));
 });
