@@ -9,8 +9,13 @@ import { useRouter } from 'expo-router';
 
 import { ActivityIndicator, Box, BRLInput, Button, Input, ScreenBase, Text, TouchableOpacityBox } from '@/components';
 import { ButtonBack } from '@/components/Button/ButtonBack';
+import Modal from '@/components/Modal/Modal';
 import { MultiPhotoPicker } from '@/components/MultiPhotoPicker';
 import {
+    CONFIRM_PRICE_FIX,
+    CONFIRM_PRICE_SEND,
+    CONFIRM_PRICE_TITLE,
+    confirmPriceMessage,
     FUEL_LABEL,
     FUEL_TYPES,
     formatKm,
@@ -18,7 +23,12 @@ import {
     fuelEntryErrorMessage,
     entryDiffersFromPayload,
     fuelEntrySuccessToast,
+    isPricePerLiterPlausible,
+    pricePerLiterCents,
+    pricePerLiterText,
+    pricePerLiterWarningText,
     REPLAYED_ENTRY_MESSAGE,
+    TOTAL_VALUE_LABEL,
     useCreateFuelEntry,
     useFuelEntryContext,
     validateFuelForm,
@@ -65,6 +75,7 @@ export default function AbastecerScreen() {
     // Uma chave por tentativa de lançar: o segundo toque depois de um erro de rede a reenvia igual (o back
     // devolve o lançamento já gravado, não um segundo). Só o sucesso troca a chave.
     const [idempotencyKey, setIdempotencyKey] = useState(() => Crypto.randomUUID());
+    const [confirmandoPreco, setConfirmandoPreco] = useState(false);
     const [escolhido, setEscolhido] = useState<FuelType | null>(null);
     const update = (patch: Partial<Campos>) => setCampos((c) => ({ ...c, ...patch }));
 
@@ -104,7 +115,21 @@ export default function AbastecerScreen() {
     const fuelType = escolhido ?? context.defaultFuelType;
     const { payload, problem } = validateFuelForm({ ...campos, fuelType });
 
-    async function handleEnviar() {
+    const precoLitro = pricePerLiterCents(campos.litersText, campos.totalValueCents);
+    const precoSuspeito = precoLitro !== null && !isPricePerLiterPlausible(precoLitro);
+
+    // Preço por litro fora da faixa: confirma antes de enviar. A chave de idempotência e o lock ficam em enviar().
+    function handleEnviar() {
+        if (!payload || !campos.photo) return Promise.resolve();
+        if (precoSuspeito) {
+            setConfirmandoPreco(true);
+            return Promise.resolve();
+        }
+        return enviar();
+    }
+
+    async function enviar() {
+        setConfirmandoPreco(false);
         if (!payload || !campos.photo) return;
         const photo = campos.photo;
         await run(async () => {
@@ -158,9 +183,14 @@ export default function AbastecerScreen() {
 
                     <Box>
                         <Text fontSize={measure.m14} fontWeightPreset="semibold" mb="b8">
-                            Valor total
+                            {TOTAL_VALUE_LABEL}
                         </Text>
                         <BRLInput valueCents={campos.totalValueCents} onChangeCents={(totalValueCents: number | null) => update({ totalValueCents })} placeholder="R$ 0,00" />
+                        {precoLitro !== null && (
+                            <Text mt="t4" fontSize={measure.m12} color={precoSuspeito ? 'colorTextWarning' : 'colorTextSecondary'}>
+                                {precoSuspeito ? pricePerLiterWarningText(precoLitro) : pricePerLiterText(precoLitro)}
+                            </Text>
+                        )}
                     </Box>
 
                     <Box>
@@ -232,6 +262,17 @@ export default function AbastecerScreen() {
                     </TouchableOpacityBox>
                 </Box>
             </ScrollView>
+
+            <Modal
+                preset="action"
+                isVisible={confirmandoPreco && !isSubmitting}
+                title={CONFIRM_PRICE_TITLE}
+                text={precoLitro !== null ? confirmPriceMessage(precoLitro) : ''}
+                buttonActionTitle={CONFIRM_PRICE_SEND}
+                buttonCloseTitle={CONFIRM_PRICE_FIX}
+                onPress={enviar}
+                onClose={() => setConfirmandoPreco(false)}
+            />
         </ScreenBase>
     );
 }

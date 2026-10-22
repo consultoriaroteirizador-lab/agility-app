@@ -13,6 +13,15 @@ export const TIMEOUT_MESSAGE = 'O envio demorou demais. O que você digitou cont
 export const REPLAYED_ENTRY_MESSAGE = 'Este abastecimento já tinha sido registrado com os dados do primeiro envio. Confira em Meus abastecimentos.';
 // 413: a compressão falhou e a original passou dos 5 MB; o multer do back recusa em inglês ("File too large").
 export const PHOTO_TOO_LARGE_MESSAGE = 'A foto da nota ficou grande demais para enviar. Tire outra foto e toque em Enviar de novo.';
+export const TOTAL_VALUE_LABEL = 'Valor total pago';
+export const pricePerLiterText = (cents: number) => `${formatCurrency(cents)} por litro`;
+export const pricePerLiterWarningText = (cents: number) =>
+    `${formatCurrency(cents)} por litro parece fora do normal. Confira se digitou o valor total pago.`;
+export const CONFIRM_PRICE_TITLE = 'Confira o valor';
+export const CONFIRM_PRICE_FIX = 'Corrigir';
+export const CONFIRM_PRICE_SEND = 'Enviar assim mesmo';
+export const confirmPriceMessage = (cents: number) =>
+    `O preço por litro ficou em ${formatCurrency(cents)}. O campo é o valor total pago, não o preço do litro.`;
 const FALLBACK = 'Não foi possível registrar o abastecimento. Tente novamente.';
 
 /** Sem Intl.NumberFormat: o Hermes de aparelho antigo não garante o locale pt-BR. */
