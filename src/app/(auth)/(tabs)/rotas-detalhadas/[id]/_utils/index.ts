@@ -152,3 +152,9 @@ export {
     INTERVALO_RESERVA_MS,
     intervaloDeReserva,
 } from './pollingReserva'
+
+// ============================================
+// COMPOSIÇÃO DA ROTA (cavalo + carretas)
+// ============================================
+
+export { formatComposicao } from './composicao'

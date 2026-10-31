@@ -27,6 +27,18 @@ export interface RoutingHelperResponse {
     helperPhone?: string | null
 }
 
+/** Veículo da rota, no mínimo que o app usa. */
+export interface RoutingVehicleResponse {
+    plate?: string
+    kind?: 'RIGID' | 'TRACTOR' | 'TRAILER'
+}
+
+/** Carreta da composição (resumo). */
+export interface RoutingTrailerResponse {
+    position: number
+    plate: string
+}
+
 /**
  * Routing response DTO
  * Maps to RoutingEntity.toJson() from backend
@@ -213,6 +225,12 @@ export interface RoutingResponse {
     /** Ajudantes da viagem. Só o `GET /routings/:id` embute; o payload leve das
      *  listagens não traz. Ausente também enquanto o backend não subir. */
     helpers?: RoutingHelperResponse[]
+
+    /** Veículo da rota (cavalo, rígido ou null). Só o `GET /routings/:id` traz; ausente em backend antigo. */
+    vehicle?: RoutingVehicleResponse | null
+
+    /** Carretas na ordem da composição (`[]` em rota rígida). Ausente em backend antigo. */
+    trailers?: RoutingTrailerResponse[]
 
     /** Creation timestamp */
     createdAt: Date | string

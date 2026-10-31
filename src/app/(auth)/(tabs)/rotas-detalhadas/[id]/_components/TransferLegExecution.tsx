@@ -8,6 +8,7 @@ import { measure } from '@/theme';
 
 import { useRota } from '../_context/RotaContext';
 
+import { ComposicaoDaRota } from './ComposicaoDaRota';
 import { TransferComprovanteStep } from './TransferComprovanteStep';
 import { TransferOverviewStep } from './TransferOverviewStep';
 
@@ -75,6 +76,7 @@ export function TransferLegExecution() {
       }
     >
       <Box flex={1} pt="y8" gap="y16">
+        <ComposicaoDaRota />
         {step === 'overview' ? (
           <>
             <TransferOverviewStep />
