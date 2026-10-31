@@ -18,7 +18,7 @@ jest.mock('@/components/Icon/LocalIcon', () => ({ LocalIcon: () => null }));
 jest.mock('@expo/vector-icons', () => ({ Ionicons: () => null, MaterialIcons: () => null }));
 
 const mockUseRota = jest.fn();
-jest.mock('@/app/(auth)/(tabs)/rotas-detalhadas/[id]/_context/RotaContext', () => ({
+jest.mock('../../_context/RotaContext', () => ({
     useRota: () => mockUseRota(),
 }));
 

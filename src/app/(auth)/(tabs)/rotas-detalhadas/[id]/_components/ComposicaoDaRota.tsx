@@ -1,8 +1,9 @@
-import { useRota } from '@/app/(auth)/(tabs)/rotas-detalhadas/[id]/_context/RotaContext'
-import { formatComposicao } from '@/app/(auth)/(tabs)/rotas-detalhadas/[id]/_utils/composicao'
 import { Box, Text } from '@/components'
 import { Icon } from '@/components/Icon/Icon'
 import { measure } from '@/theme'
+
+import { useRota } from '../_context/RotaContext'
+import { formatComposicao } from '../_utils/composicao'
 
 /**
  * Veículo (ou cavalo + carretas) da rota, lido do contexto da rota aberta.

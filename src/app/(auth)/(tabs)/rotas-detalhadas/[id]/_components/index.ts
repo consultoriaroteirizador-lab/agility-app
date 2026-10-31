@@ -19,6 +19,8 @@ export { RouteHeader } from './RouteHeader'
 
 export { RouteProgress } from './RouteProgress'
 
+export { ComposicaoDaRota } from './ComposicaoDaRota'
+
 // ============================================
 // COMPONENTES DE AJUDANTES
 // ============================================

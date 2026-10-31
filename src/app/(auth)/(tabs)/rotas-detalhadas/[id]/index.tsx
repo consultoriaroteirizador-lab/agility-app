@@ -12,7 +12,6 @@ import { Redirect, useLocalSearchParams } from 'expo-router'
 import {
   ActivityIndicator,
   AjudantesDaRota,
-  ComposicaoDaRota,
   Box,
   Button,
   ScreenBase,
@@ -30,6 +29,7 @@ import {
   RouteActions,
   InsucessoRowItem,
   DevolucaoAoCdCard,
+  ComposicaoDaRota,
 } from './_components'
 import { MapaParadasModal } from './_components/MapaParadasModal'
 import { TransferLegExecution } from './_components/TransferLegExecution'
