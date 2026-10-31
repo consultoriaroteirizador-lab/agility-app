@@ -1,0 +1,1 @@
+export { ComposicaoDaRota } from './ComposicaoDaRota'

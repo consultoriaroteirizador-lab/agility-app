@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 
 import { router } from 'expo-router';
 
-import { ActivityIndicator, Box, Button, LocalIcon, ScreenBase, Text } from '@/components';
+import { ActivityIndicator, Box, Button, ComposicaoDaRota, LocalIcon, ScreenBase, Text } from '@/components';
 import { ButtonBack } from '@/components/Button/ButtonBack';
 import { measure } from '@/theme';
 
@@ -75,6 +75,7 @@ export function TransferLegExecution() {
       }
     >
       <Box flex={1} pt="y8" gap="y16">
+        <ComposicaoDaRota />
         {step === 'overview' ? (
           <>
             <TransferOverviewStep />

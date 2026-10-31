@@ -12,6 +12,7 @@ import { Redirect, useLocalSearchParams } from 'expo-router'
 import {
   ActivityIndicator,
   AjudantesDaRota,
+  ComposicaoDaRota,
   Box,
   Button,
   ScreenBase,
@@ -117,6 +118,7 @@ function ListHeader({ aba, setAba, proximaParada }: ListHeaderProps) {
     <>
       <RouteProgress />
       <AjudantesDaRota ajudantes={routing?.helpers} />
+      <ComposicaoDaRota />
       <RotaTabs aba={aba} setAba={setAba} />
       {/* Abaixo das abas, nas DUAS: o que volta no caminhão não pertence a uma
           aba — é obrigação da rota, e o pedido cancelado nem parada tem mais. */}
