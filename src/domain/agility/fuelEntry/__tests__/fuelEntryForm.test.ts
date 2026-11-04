@@ -21,6 +21,7 @@ describe('parseOdometer', () => {
 const valido: FuelFormState = {
     fuelType: 'DIESEL', litersText: '45,5', totalValueCents: 25000, odometerText: '48.210',
     fullTank: true, paidBy: 'COMPANY', stationName: '', photo: { uri: 'file://nota.jpg', width: 3000, height: 4000 },
+    odometerPhoto: { uri: 'file://odometro.jpg', width: 3000, height: 4000 },
 };
 
 describe('validateFuelForm', () => {
@@ -44,6 +45,7 @@ describe('validateFuelForm', () => {
         [{ odometerText: '48,2' }, 'Informe o odômetro do painel, em km'],
         [{ stationName: 'x'.repeat(121) }, 'O nome do posto tem no máximo 120 caracteres'],
         [{ photo: null }, 'Tire a foto da nota para enviar'],
+        [{ odometerPhoto: null }, 'Tire a foto do odômetro para enviar'],
     ])('%p: sem payload e com o motivo', (patch, motivo) => {
         expect(validateFuelForm({ ...valido, ...patch })).toEqual({ payload: null, problem: motivo });
     });
@@ -58,12 +60,14 @@ describe('buildFuelEntryFormData', () => {
         const fd = buildFuelEntryFormData(
             { fuelType: 'ETHANOL', liters: 45.5, totalValue: 250, odometerKm: 48210, fullTank: false, paidBy: 'DRIVER', stationName: 'Posto Sul' },
             { uri: 'file://c.jpg', name: 'nota.jpg', type: 'image/jpeg' },
+            { uri: 'file://d.jpg', name: 'odometro.jpg', type: 'image/jpeg' },
             'key-1',
         ) as unknown as FakeFormData;
         expect(fd.entries).toEqual([
             ['fuelType', 'ETHANOL'], ['liters', '45.5'], ['totalValue', '250.00'], ['odometerKm', '48210'],
             ['fullTank', 'false'], ['paidBy', 'DRIVER'], ['stationName', 'Posto Sul'], ['idempotencyKey', 'key-1'],
             ['receipt', { uri: 'file://c.jpg', name: 'nota.jpg', type: 'image/jpeg' }],
+            ['odometerPhoto', { uri: 'file://d.jpg', name: 'odometro.jpg', type: 'image/jpeg' }],
         ]);
     });
 
@@ -71,6 +75,7 @@ describe('buildFuelEntryFormData', () => {
         const fd = buildFuelEntryFormData(
             { fuelType: 'DIESEL', liters: 10, totalValue: 60, odometerKm: 1, fullTank: true, paidBy: 'COMPANY' },
             { uri: 'u', name: 'n.jpg', type: 'image/jpeg' },
+            { uri: 'u2', name: 'o.jpg', type: 'image/jpeg' },
             'key-2',
         ) as unknown as FakeFormData;
         expect(fd.entries.map(([k]) => k)).not.toContain('stationName');

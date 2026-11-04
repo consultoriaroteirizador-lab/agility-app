@@ -40,6 +40,7 @@ export interface FuelEntry {
     paidBy: FuelPayer;
     status: 'ACTIVE' | 'VOIDED';
     voidReason: string | null;
+    hasOdometerPhoto: boolean;
     reimbursement: FuelEntryReimbursement | null;
 }
 

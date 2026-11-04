@@ -12,6 +12,7 @@ export interface FuelFormState {
     paidBy: FuelPayer;
     stationName: string;
     photo: ReceiptPhoto | null;
+    odometerPhoto: ReceiptPhoto | null;
 }
 
 export interface FuelEntryPayload {
@@ -76,6 +77,7 @@ export function validateFuelForm(s: FuelFormState): { payload: FuelEntryPayload 
     const station = s.stationName.trim();
     if (station.length > STATION_MAX) return fail(`O nome do posto tem no máximo ${STATION_MAX} caracteres`);
     if (!s.photo) return fail('Tire a foto da nota para enviar');
+    if (!s.odometerPhoto) return fail('Tire a foto do odômetro para enviar');
     return {
         payload: {
             fuelType: s.fuelType,
@@ -94,7 +96,12 @@ export function validateFuelForm(s: FuelFormState): { payload: FuelEntryPayload 
  * Multipart do POST /fuel-entries/me. O back converte com Number(): número vai com PONTO ("45,5" vira NaN e
  * dá 400) e boolean vai como "true"/"false".
  */
-export function buildFuelEntryFormData(p: FuelEntryPayload, receipt: { uri: string; name: string; type: string }, idempotencyKey: string): FormData {
+export function buildFuelEntryFormData(
+    p: FuelEntryPayload,
+    receipt: { uri: string; name: string; type: string },
+    odometerPhoto: { uri: string; name: string; type: string },
+    idempotencyKey: string,
+): FormData {
     const fd = new FormData();
     fd.append('fuelType', p.fuelType);
     fd.append('liters', String(p.liters));
@@ -106,6 +113,8 @@ export function buildFuelEntryFormData(p: FuelEntryPayload, receipt: { uri: stri
     fd.append('idempotencyKey', idempotencyKey);
     // @ts-expect-error: o FormData do React Native aceita { uri, name, type } como arquivo
     fd.append('receipt', receipt);
+    // @ts-expect-error: idem
+    fd.append('odometerPhoto', odometerPhoto);
     return fd;
 }
 

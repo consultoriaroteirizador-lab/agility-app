@@ -4,6 +4,7 @@ jest.mock('@/api/apiConfig', () => ({ apiAgility: { get: (...a: unknown[]) => mo
 jest.mock('../receiptPhoto', () => ({ compressReceipt: jest.fn(async () => 'file://comprimida.jpg') }));
 
 import { fuelEntryAPI } from '../fuelEntryAPI';
+import { compressReceipt } from '../receiptPhoto';
 
 class FakeFormData {
     entries: [string, unknown][] = [];
@@ -12,7 +13,7 @@ class FakeFormData {
 const original = globalThis.FormData;
 beforeAll(() => { (globalThis as any).FormData = FakeFormData; });
 afterAll(() => { globalThis.FormData = original; });
-beforeEach(() => { mockGet.mockReset(); mockPost.mockReset(); });
+beforeEach(() => { mockGet.mockReset(); mockPost.mockReset(); (compressReceipt as jest.Mock).mockClear(); });
 
 it('contexto: tira o envelope', async () => {
     mockGet.mockResolvedValue({ data: { success: true, result: { vehicleId: 'v1', plate: 'ABC1D23', defaultFuelType: 'DIESEL', lastOdometerKm: 48210, rechargeOnly: false } } });
@@ -25,6 +26,7 @@ it('envio: um POST multipart com a foto comprimida em receipt', async () => {
     const r = await fuelEntryAPI.create(
         { fuelType: 'DIESEL', liters: 45.5, totalValue: 250, odometerKm: 48210, fullTank: true, paidBy: 'COMPANY' },
         { uri: 'file://o.jpg', width: 3000, height: 4000 },
+        { uri: 'file://odo.jpg', width: 3000, height: 4000 },
         'key-9',
     );
     expect(r).toEqual({ id: 'e1', odometerInconsistent: false });
@@ -36,6 +38,12 @@ it('envio: um POST multipart com a foto comprimida em receipt', async () => {
     expect(receipt.type).toBe('image/jpeg');
     expect((body as FakeFormData).entries.find(([k]) => k === 'idempotencyKey')?.[1]).toBe('key-9');
     expect(receipt.name).toMatch(/^nota_\d+\.jpg$/);
+    // as duas fotos passam pela mesma compressão e vão no mesmo multipart
+    expect(compressReceipt).toHaveBeenCalledTimes(2);
+    const odometro = (body as FakeFormData).entries.find(([k]) => k === 'odometerPhoto')?.[1] as { uri: string; name: string; type: string };
+    expect(odometro.uri).toBe('file://comprimida.jpg');
+    expect(odometro.type).toBe('image/jpeg');
+    expect(odometro.name).toMatch(/^odometro_\d+\.jpg$/);
 });
 
 it('lista: converte { data, total } na paginação do app', async () => {

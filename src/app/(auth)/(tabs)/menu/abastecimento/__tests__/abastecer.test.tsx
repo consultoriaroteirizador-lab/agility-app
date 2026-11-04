@@ -62,6 +62,7 @@ const CONTEXTO = { vehicleId: 'v1', plate: 'ABC1D23', defaultFuelType: 'DIESEL',
 // O que preencher() envia; o lançamento devolvido igual a isso é o caminho normal.
 const IGUAL = { totalValue: 250, liters: 45.5, paidBy: 'COMPANY', odometerKm: 48210 };
 const FOTO = { uri: 'file://nota.jpg', width: 3000, height: 4000 };
+const FOTO_ODOMETRO = { uri: 'file://odometro.jpg', width: 3000, height: 4000 };
 
 beforeEach(() => {
     jest.clearAllMocks();
@@ -89,12 +90,16 @@ const pagador = (t: TestRenderer.ReactTestRenderer, label: string) =>
     t.root.findAll((n) => n.props.accessibilityRole === 'button' && typeof n.props.onPress === 'function' && n.findAll((c) => c.props.children === label).length > 0)[0];
 const temTexto = (t: TestRenderer.ReactTestRenderer, s: string) => t.root.findAll((n) => n.props.children === s).length > 0;
 
-function preencher(t: TestRenderer.ReactTestRenderer, { foto = true } = {}) {
+const picker = (t: TestRenderer.ReactTestRenderer, label: string) =>
+    t.root.findAll((n) => n.props.label === label && typeof n.props.onPhotosChange === 'function')[0];
+
+function preencher(t: TestRenderer.ReactTestRenderer, { foto = true, fotoOdometro = true } = {}) {
     act(() => {
         campo(t, 'Litros').props.onChangeText('45,5');
         t.root.findAll((n) => typeof n.props.onChangeCents === 'function')[0].props.onChangeCents(25000);
         campo(t, 'Odômetro do painel (km)').props.onChangeText('48.210');
-        if (foto) t.root.findAll((n) => typeof n.props.onPhotosChange === 'function')[0].props.onPhotosChange([FOTO]);
+        if (foto) picker(t, 'Foto da nota').props.onPhotosChange([FOTO]);
+        if (fotoOdometro) picker(t, 'Foto do odômetro').props.onPhotosChange([FOTO_ODOMETRO]);
     });
 }
 
@@ -105,9 +110,18 @@ it('mostra a placa fixa e o último odômetro como referência', () => {
 });
 
 it('a foto só sai da câmera, uma só', () => {
-    const picker = render().root.findAll((n) => typeof n.props.onPhotosChange === 'function')[0];
-    expect(picker.props.allowGallery).toBe(false);
-    expect(picker.props.maxPhotos).toBe(1);
+    const t = render();
+    for (const label of ['Foto da nota', 'Foto do odômetro']) {
+        expect(picker(t, label).props.allowGallery).toBe(false);
+        expect(picker(t, label).props.maxPhotos).toBe(1);
+    }
+});
+
+it('sem foto do odômetro, Enviar fica desligado e diz por quê', () => {
+    const t = render();
+    preencher(t, { fotoOdometro: false });
+    expect(botao(t).props.disabled).toBe(true);
+    expect(temTexto(t, 'Tire a foto do odômetro para enviar')).toBe(true);
 });
 
 it('sem foto, Enviar fica desligado e diz por quê', () => {
@@ -128,6 +142,7 @@ it('envia litros e odômetro convertidos, e vai para Meus abastecimentos', async
     expect(mockCreate).toHaveBeenCalledWith({
         payload: { fuelType: 'DIESEL', liters: 45.5, totalValue: 250, odometerKm: 48210, fullTank: true, paidBy: 'COMPANY' },
         photo: FOTO,
+        odometerPhoto: FOTO_ODOMETRO,
         idempotencyKey: expect.any(String),
     });
     expect(mockShowToast).toHaveBeenCalledWith({ message: 'Abastecimento registrado.', type: 'success' });
