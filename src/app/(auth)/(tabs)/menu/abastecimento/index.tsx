@@ -41,7 +41,7 @@ import { useToastService } from '@/services/Toast/useToast';
 import { measure } from '@/theme';
 
 type Campos = Omit<FuelFormState, 'fuelType'>;
-const INICIAL: Campos = { litersText: '', totalValueCents: null, odometerText: '', fullTank: true, paidBy: 'COMPANY', stationName: '', photo: null };
+const INICIAL: Campos = { litersText: '', totalValueCents: null, odometerText: '', fullTank: true, paidBy: 'COMPANY', stationName: '', photo: null, odometerPhoto: null };
 const PAGADORES: { value: FuelPayer; label: string }[] = [
     { value: 'COMPANY', label: 'Empresa' },
     { value: 'DRIVER', label: 'Eu' },
@@ -120,7 +120,7 @@ export default function AbastecerScreen() {
 
     // Preço por litro fora da faixa: confirma antes de enviar. A chave de idempotência e o lock ficam em enviar().
     function handleEnviar() {
-        if (!payload || !campos.photo) return Promise.resolve();
+        if (!payload || !campos.photo || !campos.odometerPhoto) return Promise.resolve();
         if (precoSuspeito) {
             setConfirmandoPreco(true);
             return Promise.resolve();
@@ -130,11 +130,12 @@ export default function AbastecerScreen() {
 
     async function enviar() {
         setConfirmandoPreco(false);
-        if (!payload || !campos.photo) return;
+        if (!payload || !campos.photo || !campos.odometerPhoto) return;
         const photo = campos.photo;
+        const odometerPhoto = campos.odometerPhoto;
         await run(async () => {
             try {
-                const entry = await createFuelEntry({ payload, photo, idempotencyKey });
+                const entry = await createFuelEntry({ payload, photo, odometerPhoto, idempotencyKey });
                 setIdempotencyKey(Crypto.randomUUID());
                 // A mesma chave devolve o lançamento da tentativa anterior: se o motorista editou depois, avisa.
                 showToast(
@@ -207,6 +208,16 @@ export default function AbastecerScreen() {
                             </Text>
                         )}
                     </Box>
+
+                    <MultiPhotoPicker
+                        label="Foto do odômetro"
+                        maxPhotos={1}
+                        allowGallery={false}
+                        photos={campos.odometerPhoto ? [campos.odometerPhoto as never] : []}
+                        onPhotosChange={(fotos) =>
+                            update({ odometerPhoto: fotos[0] ? { uri: fotos[0].uri, width: fotos[0].width, height: fotos[0].height } : null })
+                        }
+                    />
 
                     <Box flexDirection="row" alignItems="center" justifyContent="space-between">
                         <Text fontSize={measure.m14} fontWeightPreset="semibold">

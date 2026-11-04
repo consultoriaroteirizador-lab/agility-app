@@ -100,7 +100,8 @@ it('sem internet no envio: a nova busca do contexto falha e o formulário preenc
         campo('Litros').props.onChangeText('45,5');
         tree.root.findAll((n) => typeof n.props.onChangeCents === 'function')[0].props.onChangeCents(25000);
         campo('Odômetro do painel (km)').props.onChangeText('48210');
-        tree.root.findAll((n) => typeof n.props.onPhotosChange === 'function')[0].props.onPhotosChange([{ uri: 'file://n.jpg', width: 10, height: 10 }]);
+        // a nota e a foto do odômetro: os dois pickers
+        tree.root.findAll((n) => typeof n.props.onPhotosChange === 'function').forEach((p) => p.props.onPhotosChange([{ uri: 'file://n.jpg', width: 10, height: 10 }]));
     });
     await act(async () => {
         await tree.root.findAllByProps({ title: 'Enviar' })[0].props.onPress();
