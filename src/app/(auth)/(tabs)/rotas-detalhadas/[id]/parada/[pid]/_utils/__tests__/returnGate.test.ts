@@ -18,9 +18,15 @@ describe('isHandedOff', () => {
         expect(isHandedOff('AT_HUB', null)).toBe(false)
     })
 
-    it('OUT_FOR_DELIVERY e DELIVERED contam em qualquer perna', () => {
-        expect(isHandedOff('OUT_FOR_DELIVERY', null)).toBe(true)
+    it('OUT_FOR_DELIVERY so conta como entregue em perna de malha', () => {
+        expect(isHandedOff('OUT_FOR_DELIVERY', 'TRANSFER')).toBe(true)
+        expect(isHandedOff('OUT_FOR_DELIVERY', 'LAST_MILE')).toBe(false)
+        expect(isHandedOff('OUT_FOR_DELIVERY', null)).toBe(false)
+    })
+
+    it('DELIVERED conta em qualquer perna', () => {
         expect(isHandedOff('DELIVERED', 'LAST_MILE')).toBe(true)
+        expect(isHandedOff('DELIVERED', null)).toBe(true)
     })
 
     it('fases pre-handoff nunca contam', () => {
@@ -46,6 +52,11 @@ describe('othersConcluidos', () => {
 
     it('pedido PENDING marcado AT_HUB em rota comum NAO libera o retorno', () => {
         const services = [{ serviceType: 'DELIVERY', status: 'PENDING', custodyPhase: 'AT_HUB' }]
+        expect(othersConcluidos(services, rotaComum)).toBe(false)
+    })
+
+    it('entrega a bordo (PENDING + OUT_FOR_DELIVERY) em rota comum NAO libera o retorno', () => {
+        const services = [{ serviceType: 'DELIVERY', status: 'PENDING', custodyPhase: 'OUT_FOR_DELIVERY' }]
         expect(othersConcluidos(services, rotaComum)).toBe(false)
     })
 

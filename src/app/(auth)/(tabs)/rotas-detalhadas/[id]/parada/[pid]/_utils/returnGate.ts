@@ -7,6 +7,12 @@
  * numa rota comum também fica `AT_HUB`, e contá-lo como entregue liberaria o
  * retorno com pedido ainda por fazer.
  *
+ * `OUT_FOR_DELIVERY` segue a mesma regra. No trecho de malha ele quer dizer que o
+ * last-mile já levou o pedido do CD. Numa rota comum ou de last-mile, quer dizer
+ * "carregado e a bordo" (o replan do Coleta + Entrega grava assim quem o
+ * motorista já carregou no ponto de carga), e contá-lo liberaria o retorno com
+ * entrega ainda no caminhão.
+ *
  * @module rotas-detalhadas/parada/utils/returnGate
  */
 
@@ -27,8 +33,9 @@ export function isTerminalStatus(status?: string | null): boolean {
  */
 export function isHandedOff(phase?: string | null, legType?: LegType): boolean {
     const fase = String(phase ?? '').toUpperCase()
-    if (fase === 'OUT_FOR_DELIVERY' || fase === 'DELIVERED') return true
-    return fase === 'AT_HUB' && String(legType ?? '').toUpperCase() === 'TRANSFER'
+    if (fase === 'DELIVERED') return true
+    const pernaDeMalha = String(legType ?? '').toUpperCase() === 'TRANSFER'
+    return pernaDeMalha && (fase === 'AT_HUB' || fase === 'OUT_FOR_DELIVERY')
 }
 
 /** Campos que a trava usa de cada parada da rota. */
