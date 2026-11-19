@@ -691,6 +691,7 @@ function StopDetailContent() {
                   return formatResumoDaNota(i + 1, notas.length, janela);
                 }}
                 onOpen={handleOpenNota}
+                compartimentoDe={compartimentoDe}
               />
             </>
           )}
