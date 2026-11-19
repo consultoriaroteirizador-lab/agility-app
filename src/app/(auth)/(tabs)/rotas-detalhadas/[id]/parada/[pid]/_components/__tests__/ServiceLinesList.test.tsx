@@ -57,3 +57,31 @@ describe('ServiceLinesList — troca de equipamento (fase 3D)', () => {
         expect(textos(t).some((s) => s.startsWith('No lugar de'))).toBe(false);
     });
 });
+
+describe('ServiceLinesList — compartimento por linha (fase 5C)', () => {
+    const renderCom = (lines: ServiceLine[], compartimentoDe?: (id: string) => string | null) => {
+        let tree!: TestRenderer.ReactTestRenderer;
+        act(() => {
+            tree = TestRenderer.create(
+                <ThemeProvider theme={theme}>
+                    <ServiceLinesList lines={lines} serviceType={ServiceType.DELIVERY} compartimentoDe={compartimentoDe} />
+                </ThemeProvider>,
+            );
+        });
+        return tree;
+    };
+    const linhas = [linha({ id: 'a', material: 'Gas A' }), linha({ id: 'b', material: 'Gas B' })];
+
+    it('mostra o texto embaixo da linha que tem plano e nada nas outras', () => {
+        const t = renderCom(linhas, (id) => (id === 'a' ? 'Carreta CRT5E01 · compartimento 2' : null));
+
+        // `textos` repete o texto por nível da árvore do Text; o conjunto tem só o da linha 'a'.
+        expect([...new Set(textos(t).filter((s) => s.includes('ompartimento')))]).toEqual(['Carreta CRT5E01 · compartimento 2']);
+    });
+
+    it('sem a prop a tela fica como antes', () => {
+        const t = renderCom(linhas);
+
+        expect(textos(t).some((s) => /ompartimento/.test(s))).toBe(false);
+    });
+});

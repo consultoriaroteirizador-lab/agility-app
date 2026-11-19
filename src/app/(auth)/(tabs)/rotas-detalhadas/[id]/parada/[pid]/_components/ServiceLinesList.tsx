@@ -7,6 +7,8 @@ import { measure } from '@/theme';
 type ServiceLinesListProps = {
     lines: readonly ServiceLine[] | null | undefined;
     serviceType: ServiceType | null | undefined;
+    /** Onde a linha vai no veículo (fase 5C); `null` ou ausente: nada aparece. */
+    compartimentoDe?: (lineId: string) => string | null;
 };
 
 /**
@@ -14,7 +16,7 @@ type ServiceLinesListProps = {
  * ("Entregar", "Coletar", "Transportar", "Devolver") e "Recolher"; no SERVICE, "Equipamentos".
  * Fase 3D: a linha trocada leva o selo "Trocado", e a que ficou no lugar dela, "No lugar de: …".
  */
-export const ServiceLinesList = ({ lines, serviceType }: ServiceLinesListProps) => {
+export const ServiceLinesList = ({ lines, serviceType, compartimentoDe }: ServiceLinesListProps) => {
     const groups = lineGroups(lines, serviceType);
 
     if (groups.length === 0) {
@@ -47,6 +49,7 @@ export const ServiceLinesList = ({ lines, serviceType }: ServiceLinesListProps) 
                     </Text>
                     {group.lines.map((line, index) => {
                         const noLugarDe = replacedLineLabel(lines, line);
+                        const compartimento = compartimentoDe?.(line.id) ?? null;
                         return (
                             <Box
                                 key={line.id || index}
@@ -69,6 +72,11 @@ export const ServiceLinesList = ({ lines, serviceType }: ServiceLinesListProps) 
                                         {line.sku && (
                                             <Text preset="text12" color="gray400" mt="y2">
                                                 SKU: {line.sku}
+                                            </Text>
+                                        )}
+                                        {!!compartimento && (
+                                            <Text preset="text12" color="gray500" mt="y2">
+                                                {compartimento}
                                             </Text>
                                         )}
                                         {noLugarDe && (
