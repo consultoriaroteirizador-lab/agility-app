@@ -5,6 +5,7 @@
 import React from 'react';
 
 import { ThemeProvider } from '@shopify/restyle';
+import { Text as RNText } from 'react-native';
 import TestRenderer, { act } from 'react-test-renderer';
 
 import type { ServiceLine } from '@/domain/agility/service/dto/response/service-line.response';
@@ -27,12 +28,12 @@ import { ItemCheckCard } from '../ItemCheckCard';
 const linha = (over: Partial<ServiceLine>): ServiceLine =>
     ({ id: 'l', material: 'MODEM A', quantity: 1, status: 'CHECKED', createdAt: '', updatedAt: '', ...over }) as ServiceLine;
 
-function render(item: ServiceLine) {
+function render(item: ServiceLine, compartimento?: string | null) {
     let tree!: TestRenderer.ReactTestRenderer;
     act(() => {
         tree = TestRenderer.create(
             <ThemeProvider theme={theme}>
-                <ItemCheckCard item={item} onCheck={jest.fn()} />
+                <ItemCheckCard item={item} onCheck={jest.fn()} compartimento={compartimento} />
             </ThemeProvider>,
         );
     });
@@ -76,4 +77,20 @@ it('serial e SKU vazios não mostram S/N nem SKU (o `!!` é defensivo, sem mudan
     }).not.toThrow();
     expect(temTexto(t, 'Pendente')).toBe(true);
     expect(t.root.findAll((n) => typeof n.props.children === 'string' && n.props.children.startsWith('S/N')).length).toBe(0);
+});
+
+const COMP = 'Carreta CRT5E01 · compartimento 1';
+const contaTextos = (t: TestRenderer.ReactTestRenderer) => t.root.findAll((n) => (n.type as unknown) === RNText).length;
+
+it('mostra o compartimento quando recebe', () => {
+    const t = render(linha({ status: 'PENDING', sku: 'SKU1' }), COMP);
+    expect(temTexto(t, COMP)).toBe(true);
+});
+
+it('não renderiza linha extra com null ou ausente', () => {
+    const base = render(linha({ status: 'PENDING' }));
+    const nulo = render(linha({ status: 'PENDING' }), null);
+    expect(contaTextos(nulo)).toBe(contaTextos(base));
+    expect(temTexto(nulo, COMP)).toBe(false);
+    expect(contaTextos(render(linha({ status: 'PENDING' }), COMP))).toBe(contaTextos(base) + 1);
 });
