@@ -22,6 +22,7 @@ import { formatDateOnly } from '@/utils/formatDate';
 
 import { MapaParadasModal } from '../../rotas-detalhadas/[id]/_components/MapaParadasModal';
 import { ServiceLinesModal } from '../../rotas-detalhadas/[id]/parada/[pid]/_components/shared/ServiceLinesModal';
+import { useCompartimentoDe } from '../../rotas-detalhadas/[id]/_hooks/useCompartimentoDe';
 import { useUserLocation } from '../../rotas-detalhadas/[id]/parada/[pid]/_hooks/useUserLocation';
 import { distanciaLinhaReta, itensDaParada, resumirCarga, type ItemOferta } from '../_utils/cargaOferta';
 import { motivoDeOfertaEncerrada, ofertaAceitavel } from '../_utils/estadoOferta';
@@ -95,6 +96,8 @@ export default function OfertaDetalhadaScreen() {
   } = useFindServicesByRoutingId(routingId);
   const { showToast } = useToastService();
   const safeArea = useAppSafeArea();
+  // Oferta sem veículo não tem plano: o callback devolve null e nada aparece.
+  const compartimentoDe = useCompartimentoDe(routingId);
   const [mostrarPopup, setMostrarPopup] = useState(false);
   const [mostrarMapa, setMostrarMapa] = useState(false);
   const [materiaisAbertos, setMateriaisAbertos] = useState<{ lines: ServiceLine[]; serviceType: ServiceType | null } | null>(null);
@@ -461,6 +464,7 @@ export default function OfertaDetalhadaScreen() {
           onClose={() => setMateriaisAbertos(null)}
           lines={materiaisAbertos?.lines ?? []}
           serviceType={materiaisAbertos?.serviceType}
+          compartimentoDe={compartimentoDe}
           title={`${linesTitle(materiaisAbertos?.serviceType)} da parada`}
         />
       </Box>

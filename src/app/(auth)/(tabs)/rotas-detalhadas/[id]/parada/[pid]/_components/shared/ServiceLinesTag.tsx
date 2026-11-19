@@ -6,6 +6,7 @@ import type { ServiceResponse } from '@/domain/agility/service/dto';
 import { ServiceType } from '@/domain/agility/service/dto/types';
 import { linesTitle, serviceLines } from '@/domain/agility/service/serviceLines';
 
+import { useCompartimentoDe } from '../../../../_hooks/useCompartimentoDe';
 import { ServiceLinesModal } from './ServiceLinesModal';
 
 /**
@@ -14,6 +15,8 @@ import { ServiceLinesModal } from './ServiceLinesModal';
  */
 export function ServiceLinesTag({ service }: { service: ServiceResponse | null | undefined }) {
     const [aberto, setAberto] = useState(false);
+    // Antes do `return null`: hook não pode ficar atrás de retorno condicional.
+    const compartimentoDe = useCompartimentoDe(service?.routingId);
     const lines = serviceLines(service) ?? [];
     if (lines.length === 0) return null;
     const serviceType = service?.serviceType;
@@ -41,6 +44,7 @@ export function ServiceLinesTag({ service }: { service: ServiceResponse | null |
                 onClose={() => setAberto(false)}
                 lines={lines}
                 serviceType={serviceType}
+                compartimentoDe={compartimentoDe}
             />
         </>
     );
