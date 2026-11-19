@@ -31,12 +31,29 @@ export interface RoutingHelperResponse {
 export interface RoutingVehicleResponse {
     plate?: string
     kind?: 'RIGID' | 'TRACTOR' | 'TRAILER'
+    /** Compartimentos do veículo; `null` no cavalo. Ausente em backend antigo. */
+    compartments?: number | null
 }
 
 /** Carreta da composição (resumo). */
 export interface RoutingTrailerResponse {
     position: number
     plate: string
+    /** Compartimentos da carreta. Ausente em backend antigo. */
+    compartments?: number
+}
+
+/** Linha do pedido alocada num compartimento (fase 5C). */
+export interface RoutingLoadPlanEntry {
+    orderItemId: string
+    serviceId: string
+    trailerVehicleId: string | null
+    /** `null`: a linha pode ir em qualquer compartimento. */
+    compartment: number | null
+    violationKinds: string[]
+    trailerPlate: string | null
+    productName: string
+    authorized: boolean
 }
 
 /**
@@ -231,6 +248,9 @@ export interface RoutingResponse {
 
     /** Carretas na ordem da composição (`[]` em rota rígida). Ausente em backend antigo. */
     trailers?: RoutingTrailerResponse[]
+
+    /** Onde cada linha do pedido vai no veículo. Só o `GET /routings/:id` traz; ausente em backend antigo. */
+    loadPlan?: RoutingLoadPlanEntry[]
 
     /** Creation timestamp */
     createdAt: Date | string
