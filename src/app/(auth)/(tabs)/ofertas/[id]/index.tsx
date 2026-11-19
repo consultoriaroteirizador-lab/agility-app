@@ -24,11 +24,9 @@ import { MapaParadasModal } from '../../rotas-detalhadas/[id]/_components/MapaPa
 import { ServiceLinesModal } from '../../rotas-detalhadas/[id]/parada/[pid]/_components/shared/ServiceLinesModal';
 import { useCompartimentoDe } from '../../rotas-detalhadas/[id]/_hooks/useCompartimentoDe';
 import { useUserLocation } from '../../rotas-detalhadas/[id]/parada/[pid]/_hooks/useUserLocation';
-import { distanciaLinhaReta, itensDaParada, resumirCarga, type ItemOferta } from '../_utils/cargaOferta';
+import { ItensDaParada } from '../_components/ItensDaParada';
+import { distanciaLinhaReta, itensDaParada, resumirCarga } from '../_utils/cargaOferta';
 import { motivoDeOfertaEncerrada, ofertaAceitavel } from '../_utils/estadoOferta';
-
-/** Quantos itens a parada mostra direto no card; o resto abre a lista completa. */
-const ITENS_VISIVEIS = 3;
 
 const SERVICE_TYPE_LABEL: Record<ServiceType, string> = {
   [ServiceType.DELIVERY]: 'Entrega',
@@ -390,11 +388,13 @@ export default function OfertaDetalhadaScreen() {
                   titulo="Itens"
                   itens={parada.itens.entrega}
                   onVerTodos={() => setMateriaisAbertos({ lines: parada.materiaisEntrega, serviceType: parada.serviceType })}
+                  compartimentoDe={compartimentoDe}
                 />
                 <ItensDaParada
                   titulo="Recolher no local"
                   itens={parada.itens.retorno}
                   onVerTodos={() => setMateriaisAbertos({ lines: parada.materiaisRetorno, serviceType: parada.serviceType })}
+                  compartimentoDe={compartimentoDe}
                 />
               </Box>
             </Box>
@@ -469,46 +469,6 @@ export default function OfertaDetalhadaScreen() {
         />
       </Box>
     </ScreenBase>
-  );
-}
-
-// Itens de uma parada, dentro do card da timeline. Some quando a lista está vazia:
-// rota de serviço em campo costuma não ter material, e um "Itens" vazio só ocupa espaço.
-type ItensDaParadaProps = {
-  titulo: string;
-  itens: ItemOferta[];
-  onVerTodos: () => void;
-};
-
-function ItensDaParada({ titulo, itens, onVerTodos }: ItensDaParadaProps) {
-  if (itens.length === 0) return null;
-
-  const visiveis = itens.slice(0, ITENS_VISIVEIS);
-  const restantes = itens.length - visiveis.length;
-
-  return (
-    <Box mt="y12" pt="y12" borderTopWidth={measure.m1} borderColor="gray200" gap="y6">
-      <Text preset="text12" color="gray600">{titulo}</Text>
-      {visiveis.map((item) => (
-        <Box key={item.id} flexDirection="row" alignItems="flex-start" gap="x8">
-          {item.quantidade !== null && (
-            <Text preset="text13" fontWeightPreset="semibold" color="primary100">
-              {item.quantidade}{item.unidade ? ` ${item.unidade}` : 'x'}
-            </Text>
-          )}
-          <Text preset="text13" color="colorTextPrimary" flexShrink={1}>
-            {item.nome}
-          </Text>
-        </Box>
-      ))}
-      {restantes > 0 && (
-        <TouchableOpacityBox onPress={onVerTodos} alignSelf="flex-start" py="y4">
-          <Text preset="text13" fontWeightPreset="semibold" color="primary100">
-            + {restantes} {restantes > 1 ? 'itens' : 'item'} · ver todos
-          </Text>
-        </TouchableOpacityBox>
-      )}
-    </Box>
   );
 }
 
