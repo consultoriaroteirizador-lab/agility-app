@@ -10,7 +10,7 @@ import Modal from '@/components/Modal/Modal';
 import { formatAddress } from '@/domain/agility/address/dto/response/address.response';
 import { useFindOneAddress } from '@/domain/agility/address/useCase';
 import { useGetMe } from '@/domain/agility/driver/useCase';
-import { useCompleteRouting, useFindOneRouting, usePendingReturns } from '@/domain/agility/routing/useCase';
+import { useCompleteRouting, usePendingReturns } from '@/domain/agility/routing/useCase';
 import { ServiceType } from '@/domain/agility/service/dto/types';
 import { linesTitle, serviceLines } from '@/domain/agility/service/serviceLines';
 import { useFindOneService, useFindServicesByRoutingId, useStartAttendance } from '@/domain/agility/service/useCase';
@@ -32,7 +32,7 @@ import {
   resolveTemEtapaPropriaAntesDoAtendimento,
   textoConcluirRota,
 } from '../../_utils';
-import { formatCompartimento, totalCompartimentos } from '../../_utils/compartimento';
+import { useCompartimentoDe } from '../../_hooks';
 
 import { ServiceLinesList, StopActions, StopTabs } from './_components';
 import { Map } from './_components/shared/Map';
@@ -54,15 +54,8 @@ function StopDetailContent() {
   const routeId = params.id as string;
   const serviceId = params.pid as string;
 
-  // Plano de carga da rota (fase 5C): onde cada linha do pedido vai no veículo. Esta tela não está
-  // sob o `RotaProvider` (é outra tela da pilha), então lê a MESMA query dele (`useFindOneRouting`, cache).
-  const { routing } = useFindOneRouting(routeId || '');
-  const loadPlan = routing?.loadPlan;
-  const totalComp = totalCompartimentos(routing);
-  const compartimentoDe = useCallback(
-    (lineId: string) => formatCompartimento(loadPlan?.find((e) => e.orderItemId === lineId), totalComp),
-    [loadPlan, totalComp],
-  );
+  // Plano de carga da rota (fase 5C): onde cada linha do pedido vai no veículo (mesma query do `RotaProvider`, cache).
+  const compartimentoDe = useCompartimentoDe(routeId);
 
   // Fetch service data
   const { service, isLoading, isError, refetch } = useFindOneService(serviceId || '');
