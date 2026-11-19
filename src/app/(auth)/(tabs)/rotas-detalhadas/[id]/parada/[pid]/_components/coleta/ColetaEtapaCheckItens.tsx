@@ -197,6 +197,7 @@ export function ColetaEtapaCheckItens() {
                     loading={checking}
                     serviceId={serviceId}
                     context="pickup"
+                    compartimento={selectedItem ? compartimentoDe(selectedItem.id) : null}
                 />
             </Box>
         </ScreenBase>

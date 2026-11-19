@@ -251,6 +251,7 @@ export function EtapaCheckItens({
                     loading={checking}
                     serviceId={serviceId}
                     context={direction === 'PICKUP' ? 'pickup' : 'delivery'}
+                    compartimento={selectedItem ? compartimentoDe(selectedItem.id) : null}
                 />
             </Box>
         </ScreenBase>

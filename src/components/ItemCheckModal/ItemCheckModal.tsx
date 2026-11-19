@@ -26,6 +26,8 @@ interface ItemCheckModalProps {
     context?: CheckContext;
     /** Serviço dono da linha (o upload da foto é gravado sob ele, como nos demais uploads da parada). */
     serviceId?: string;
+    /** Onde a linha vai no veículo (fase 5C), já formatado como no card; `null` ou ausente: nada aparece. */
+    compartimento?: string | null;
 }
 
 const DEFAULT_STATE = {
@@ -34,7 +36,7 @@ const DEFAULT_STATE = {
     notes: '',
 };
 
-export function ItemCheckModal({ visible, item, onClose, onConfirm, loading, context = 'delivery', serviceId }: ItemCheckModalProps) {
+export function ItemCheckModal({ visible, item, onClose, onConfirm, loading, context = 'delivery', serviceId, compartimento }: ItemCheckModalProps) {
     const { top } = useAppSafeArea();
     const [status, setStatus] = useState<CheckStatus>(DEFAULT_STATE.status);
     const [actualQuantity, setActualQuantity] = useState(DEFAULT_STATE.actualQuantity);
@@ -166,6 +168,11 @@ export function ItemCheckModal({ visible, item, onClose, onConfirm, loading, con
                                     </Text>
                                 )}
                             </Box>
+                            {!!compartimento && (
+                                <Text preset="text12" color="gray500" marginTop="y2">
+                                    {compartimento}
+                                </Text>
+                            )}
                         </Box>
 
                         {/* Opções de status */}
