@@ -83,3 +83,16 @@ it('no contexto de equipamento a opção Recusado não aparece', () => {
     expect(temTexto(render(linha({}), 'equipment'), 'Recusado')).toBe(false);
     expect(temTexto(render(linha({}), 'delivery'), 'Recusado')).toBe(true);
 });
+
+it('o modal do check mostra o compartimento do item quando ele vem', () => {
+    let tree!: TestRenderer.ReactTestRenderer;
+    act(() => {
+        tree = TestRenderer.create(
+            <ThemeProvider theme={theme}>
+                <ItemCheckModal visible item={linha({})} onClose={jest.fn()} onConfirm={jest.fn()} compartimento="Compartimento 2" />
+            </ThemeProvider>,
+        );
+    });
+    expect(temTexto(tree, 'Compartimento 2')).toBe(true);
+    expect(temTexto(render(linha({})), 'Compartimento 2')).toBe(false);
+});

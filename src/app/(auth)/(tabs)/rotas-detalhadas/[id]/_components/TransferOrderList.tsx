@@ -24,6 +24,7 @@ export function TransferOrderList({
     subtituloDeCard,
     notaFiscalDeCard,
     statusDeCard,
+    compartimentoDe,
 }: {
     paradas: Parada[];
     outcomes?: Record<string, TransferOrderOutcome>;
@@ -39,6 +40,8 @@ export function TransferOrderList({
     notaFiscalDeCard?: (parada: Parada, index: number) => string | null;
     /** Status de cada card, para o selo colorido. */
     statusDeCard?: (parada: Parada, index: number) => ParadaStatus;
+    /** Compartimento de cada linha (fase 5C); só a parada agrupada passa. */
+    compartimentoDe?: (lineId: string) => string | null;
 }) {
     return (
         <Box gap="y8">
@@ -59,6 +62,7 @@ export function TransferOrderList({
                     status={statusDeCard?.(parada, index)}
                     onOpen={onOpen ? () => onOpen(parada.serviceId) : undefined}
                     openLabel={openLabel}
+                    compartimentoDe={compartimentoDe}
                     onMarkNotReceived={onMarkNotReceived ? () => onMarkNotReceived(parada.serviceId) : undefined}
                     onMarkReceived={onMarkReceived ? () => onMarkReceived(parada.serviceId) : undefined}
                 />

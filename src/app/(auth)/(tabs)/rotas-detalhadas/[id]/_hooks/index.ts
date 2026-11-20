@@ -51,3 +51,9 @@ export {
 // ============================================
 
 export { useRouteLiveSync } from './useRouteLiveSync'
+
+// ============================================
+// USE COMPARTIMENTO DE
+// ============================================
+
+export { useCompartimentoDe } from './useCompartimentoDe'

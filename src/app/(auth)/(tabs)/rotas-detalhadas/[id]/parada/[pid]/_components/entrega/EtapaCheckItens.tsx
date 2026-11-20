@@ -8,6 +8,7 @@ import type { ServiceLine, MaterialStatus, MaterialDirection } from '@/domain/ag
 import { pluralize } from '@/functions';
 import { measure } from '@/theme';
 
+import { useCompartimentoDe } from '../../../../_hooks/useCompartimentoDe';
 import { useParada } from '../../_context/ParadaContext';
 
 type CheckStatus = 'CHECKED' | 'PARTIAL' | 'MISSING' | 'DAMAGED' | 'REFUSED';
@@ -51,7 +52,9 @@ export function EtapaCheckItens({
         goToNextStep,
         goToPreviousStep,
         serviceId,
+        rotaId,
     } = useParada();
+    const compartimentoDe = useCompartimentoDe(rotaId);
 
     const [selectedItem, setSelectedItem] = useState<ServiceLine | null>(null);
     const [modalVisible, setModalVisible] = useState(false);
@@ -194,6 +197,7 @@ export function EtapaCheckItens({
                                     <ItemCheckCard
                                         key={item.id}
                                         item={item}
+                                        compartimento={compartimentoDe(item.id)}
                                         onCheck={() => handleOpenCheck(item)}
                                     />
                                 ))}
@@ -247,6 +251,7 @@ export function EtapaCheckItens({
                     loading={checking}
                     serviceId={serviceId}
                     context={direction === 'PICKUP' ? 'pickup' : 'delivery'}
+                    compartimento={selectedItem ? compartimentoDe(selectedItem.id) : null}
                 />
             </Box>
         </ScreenBase>

@@ -16,9 +16,11 @@ const statusConfig: Record<MaterialStatus, { bg: string; text: string; label: st
 export interface ItemCheckCardProps {
     item: ServiceLine;
     onCheck: () => void;
+    /** Texto pronto de onde a linha vai no veículo; o componente é global e não conhece a rota. */
+    compartimento?: string | null;
 }
 
-export function ItemCheckCard({ item, onCheck }: ItemCheckCardProps) {
+export function ItemCheckCard({ item, onCheck, compartimento }: ItemCheckCardProps) {
     const config = statusConfig[item.status];
     const isChecked = item.status !== 'PENDING';
 
@@ -66,6 +68,12 @@ export function ItemCheckCard({ item, onCheck }: ItemCheckCardProps) {
                 {!!item.serialNumber && (
                     <Text preset="text12" color="gray400" numberOfLines={1} ellipsizeMode="head">
                         {`S/N: ${item.serialNumber}`}
+                    </Text>
+                )}
+
+                {!!compartimento && (
+                    <Text preset="text12" color="gray500" numberOfLines={2}>
+                        {compartimento}
                     </Text>
                 )}
 

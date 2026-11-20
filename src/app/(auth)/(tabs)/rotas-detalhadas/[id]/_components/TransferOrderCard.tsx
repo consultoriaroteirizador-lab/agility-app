@@ -41,6 +41,7 @@ export function TransferOrderCard({
     status,
     onOpen,
     openLabel = 'Abrir',
+    compartimentoDe,
 }: {
     parada: Parada;
     outcome?: TransferOrderOutcome;
@@ -57,6 +58,8 @@ export function TransferOrderCard({
     /** CTA que abre o fluxo daquele pedido. Sem ela o card permanece como era. */
     onOpen?: () => void;
     openLabel?: string;
+    /** Onde a linha vai no veículo (fase 5C); sem a prop (lote CD→CD) nada aparece. */
+    compartimentoDe?: (lineId: string) => string | null;
 }) {
     const [expanded, setExpanded] = useState(false);
     const { lines, isLoading, isError } = useGetServiceLines(expanded ? parada.serviceId : undefined, parada.pedidos[0]?.serviceType);
@@ -145,12 +148,18 @@ export function TransferOrderCard({
                     ) : lines.length === 0 ? (
                         <Text preset="text12" color="gray500">Nenhum item cadastrado neste pedido.</Text>
                     ) : (
-                        lines.map((m) => (
-                            <Box key={m.id} flexDirection="row" alignItems="center" gap="x8">
-                                <Text preset="text13" color="colorTextPrimary" numberOfLines={2} style={{ flex: 1 }}>{m.material}</Text>
-                                <Text preset="text12" color="gray600">x{m.quantity} {m.unit || 'un'}</Text>
-                            </Box>
-                        ))
+                        lines.map((m) => {
+                            const compartimento = compartimentoDe?.(m.id) ?? null;
+                            return (
+                                <Box key={m.id}>
+                                    <Box flexDirection="row" alignItems="center" gap="x8">
+                                        <Text preset="text13" color="colorTextPrimary" numberOfLines={2} style={{ flex: 1 }}>{m.material}</Text>
+                                        <Text preset="text12" color="gray600">x{m.quantity} {m.unit || 'un'}</Text>
+                                    </Box>
+                                    {compartimento ? <Text preset="text12" color="gray500">{compartimento}</Text> : null}
+                                </Box>
+                            );
+                        })
                     )}
                 </Box>
             ) : null}

@@ -14,9 +14,11 @@ interface ServiceLinesModalProps {
     serviceType: ServiceType | null | undefined;
     /** Título do modal (default: "Itens" no pedido, "Equipamentos" no SERVICE). */
     title?: string;
+    /** Onde a linha vai no veículo (plano de carga); sem a prop a lista fica como antes. */
+    compartimentoDe?: (lineId: string) => string | null;
 }
 
-export function ServiceLinesModal({ isVisible, onClose, lines, serviceType, title }: ServiceLinesModalProps) {
+export function ServiceLinesModal({ isVisible, onClose, lines, serviceType, title, compartimentoDe }: ServiceLinesModalProps) {
     return (
         <Modal
             title={title ?? linesTitle(serviceType)}
@@ -24,7 +26,7 @@ export function ServiceLinesModal({ isVisible, onClose, lines, serviceType, titl
             onClose={onClose}
         >
             <Box maxHeight={measure.y400} scrollable p="y20" px="x16" gap="y16" >
-                <ServiceLinesList lines={lines} serviceType={serviceType} />
+                <ServiceLinesList lines={lines} serviceType={serviceType} compartimentoDe={compartimentoDe} />
                 <Button
                     mt='t10'
                     alignSelf='center'
